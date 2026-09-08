@@ -24,6 +24,7 @@ export default function TabLayout() {
       <Tabs.Screen name="departments" options={{ title: "Phòng ban", href: null }} />
       <Tabs.Screen name="employees" options={{ title: "Nhân sự", href: null }} />
       <Tabs.Screen name="contracts" options={{ title: "Hợp đồng nhân sự", href: null }} />
+      <Tabs.Screen name="credentials" options={{ title: "Văn bằng & chứng chỉ", href: null }} />
       <Tabs.Screen name="projects" options={{ title: "Dự án", href: null }} />
       <Tabs.Screen name="work-calendar" options={{ title: "Lịch doanh nghiệp", href: null }} />
       <Tabs.Screen name="shifts" options={{ title: "Quản lý ca", href: null }} />

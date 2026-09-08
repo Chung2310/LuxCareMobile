@@ -3,9 +3,16 @@ import { canUseModule, hasPermission } from "../../auth/access";
 import { calendarAccess } from "../calendar/model";
 import { recruitmentAccess } from "../recruitment/access";
 import { canReadContracts } from "../contracts/model";
+import { canReadCredentials } from "../credentials/model";
 export function availableModules(user: UserProfile | null) {
   const hr = canUseModule(user, "hr");
   return [
+    {
+      title: "Văn bằng & chứng chỉ",
+      description: "Hồ sơ chuyên môn, thời hạn và tài liệu",
+      href: "/(tabs)/credentials" as const,
+      visible: canReadCredentials(user),
+    },
     {
       title: "Hợp đồng nhân sự",
       description: "Hợp đồng, thời hạn và lịch sử gia hạn",

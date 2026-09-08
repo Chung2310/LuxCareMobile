@@ -1,0 +1,21 @@
+import type { HRCredentialStatus, HRCredentialType } from "../../shared/hr-credential";
+export type Credential = {
+  _id: string;
+  employeeId: string;
+  employeeName: string;
+  name: string;
+  type: HRCredentialType;
+  credentialNumber?: string;
+  issuingOrganization: string;
+  issueDate: string;
+  expiryDate?: string | null;
+  professionalScope?: string;
+  fileUrl?: string;
+  fileName?: string;
+  fileMimeType?: string;
+  fileSize?: number;
+  resourceId?: string;
+  note?: string;
+  reminderDays: number;
+  status: HRCredentialStatus;
+};

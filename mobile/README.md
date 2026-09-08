@@ -308,6 +308,14 @@ Kiểm tra: 13/13 test trong 5 file qua; TypeScript web/mobile và bundle Hermes
 - Chưa thay/gỡ tệp đã lưu khi sửa hợp đồng: backend có dữ liệu mảng nhiều tệp nên cần hoàn thiện contract API trước để tránh ghi đè mất tệp. Chưa upload thêm vào bản gia hạn đã tồn tại.
 - 129 test/30 file, TypeScript và export Hermes Android/iOS qua (không phải APK/IPA); chưa UAT thiết bị/staging.
 
+## Đợt 34: tra cứu văn bằng và chứng chỉ
+
+- Thêm màn hình văn bằng/chứng chỉ cho quyền `credentials:read` hoặc `hr:read` trong phân hệ HR của doanh nghiệp. Backend quyết định phạm vi nhân viên và công ty/chi nhánh.
+- Tìm nhân viên/tên chứng chỉ/số hiệu/nơi cấp, lọc bốn loại văn bằng và ba trạng thái; phân trang server 20 bản ghi. Thống kê tổng/còn hạn/sắp hết hạn/hết hạn lấy riêng từ API, không theo bộ lọc danh sách.
+- Chi tiết có nơi/ngày cấp, thời hạn hoặc không thời hạn, số hiệu, phạm vi chuyên môn, số ngày nhắc và ghi chú. Tài liệu dùng luồng tải/chia sẻ sẵn có, tối đa 20 MB, phụ thuộc domain được media proxy cho phép.
+- Dùng lại kiểu Credential từ FE và `shared/hr-credential.ts`; trạng thái hiển thị theo API. Chưa tạo/sửa/xóa/upload chứng chỉ, chưa push nhắc hạn hoặc UAT thiết bị/staging.
+- Kiểm tra: 132/132 test trong 31 file, TypeScript và export Hermes Android/iOS qua (không phải APK/IPA).
+
 ## Quy tắc dùng lại FE (áp dụng cho các đợt tiếp)
 
 Service được xuất dưới dạng `createXService(transport)` cùng singleton mặc định cho web. Transport chỉ cung cấp `fetch` và `getAccessToken`; mobile inject API client, web giữ global fetch được interceptor hiện có bọc. Không polyfill localStorage/window, không sao chép service để tạo hai phiên bản endpoint. UI DOM/Tailwind phải chuyển thành component native. Trước khi chuyển service tiếp theo, rà soát các import gián tiếp tới Toast, auth, browser storage, window/document và file APIs.
@@ -330,7 +338,7 @@ Kết quả đợt ba ngày 2026-09-08: 90/90 kiểm thử trong 19 file qua, Ty
 
 ## Giới hạn hiện tại
 
-Đây là ba mươi ba đợt triển khai trong phạm vi ứng dụng đầy đủ, chưa phải bản đầy đủ chức năng. Xem `IMPLEMENTATION.md`.
+Đây là ba mươi bốn đợt triển khai trong phạm vi ứng dụng đầy đủ, chưa phải bản đầy đủ chức năng. Xem `IMPLEMENTATION.md`.
 
 - Giữ chính sách một phiên của backend; đăng nhập mobile có thể thay thế phiên web. Chưa thay đổi mô hình phiên theo thiết bị.
 - Super Admin nhận challenge 202 được chặn an toàn, chưa có UI hoàn tất MFA. Không hạ yêu cầu xác thực.
