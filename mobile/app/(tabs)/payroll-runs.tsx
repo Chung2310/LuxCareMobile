@@ -15,6 +15,7 @@ import {
 import { payslipMoney } from "../../src/features/payroll/model";
 import { PayslipDetails } from "../../src/features/payroll/PayslipDetails";
 import { PaymentHistory } from "../../src/features/payroll/PaymentHistory";
+import { PayrollExport } from "../../src/features/payroll/PayrollExport";
 import { AdjustmentHistory } from "../../src/features/payroll/AdjustmentHistory";
 import { PayrollAuditHistory } from "../../src/features/payroll/PayrollAuditHistory";
 import { canReadRunPayments } from "../../src/features/payroll/paymentModel";
@@ -131,6 +132,7 @@ export default function PayrollRuns() {
               setExpanded(null);
             }}
           />
+          <PayrollExport key={`export:${run._id}:${revision}`} run={run} />
           {canReadRunPayments(user) && <PaymentHistory key={run._id} runId={run._id} employees={lines} />}
           {!rows.length && <Text style={styles.text}>Không có dòng lương phù hợp.</Text>}
           {rows.map((line) => (

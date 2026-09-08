@@ -2,6 +2,8 @@
 
 Backend được triển khai từ repository LuxCare riêng. Đặt origin của backend trong `mobile/.env`; không có tài khoản hoặc secrets mẫu trong repository mobile.
 
+Xuất Excel gọi POST `/api/v1/payroll/runs/:id/exports`, body `{type}` với detailed/insurance/pit/bank_transfer. Route yêu cầu `payroll-payment:read`; bank_transfer cần thêm `payroll-payment:manage`. Backend kiểm tra scope công ty/chi nhánh và kỳ closed/paid (409 PAYROLL_RUN_NOT_CLOSED), dựng workbook từ effective lines/checksum và tạo PayrollExportJob completed trước khi trả byte XLSX. Mobile không tự retry; tải lại có thể tạo thêm export job, không tạo giao dịch chuyển tiền. Service chung giữ exportWorkbook trả Blob cho web, bổ sung downloadWorkbook trả Uint8Array cho native qua transport Bearer/x-branch-id. Native giới hạn 20 MB, timeout 120 giây và giữ tệp đã chia sẻ trong cache.
+
 Nhật ký kỳ gọi GET `/api/v1/payroll/periods/:periodKey/audit` với `payroll-period:read`, phạm vi công ty/chi nhánh xác thực. API trả mảng mới nhất trước, không phân trang hoặc bổ sung tên actor. Mobile hiển thị actorId, chỉ đọc reason/adjustmentId từ metadata; không coi nhật ký là cam kết mọi thao tác đều đã được backend ghi nhận.
 
 Tạo điều chỉnh POST `/api/v1/payroll/periods/:periodKey/adjustments` với quyền quản lý kỳ, body employeeId/kind/amount/reason, trả bản ghi pending. Mobile dùng roster `/api/v1/auth/users` theo công ty/chi nhánh để chọn nhân viên, cần quyền đọc endpoint đó; không tự mở quyền khi tải lỗi. API tạo chưa có idempotency, mobile chặn gửi lại sau lỗi cho đến khi đóng/tải lại. Form mobile giới hạn tiền nguyên VND không âm và lý do tối đa 2000 ký tự.

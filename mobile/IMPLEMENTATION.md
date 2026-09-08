@@ -15,7 +15,7 @@ Mục tiêu cuối: đối chiếu mọi màn hình/thao tác/quyền/API của 
 | Nghỉ phép / đơn từ | leaveService, types/leave, LeaveRequestsTab | Đã có 4 loại yêu cầu, nộp/duyệt/từ chối/xóa, số dư phép, biểu mẫu và tệp đính kèm; chờ UAT thiết bị/staging |
 | Hợp đồng / chứng chỉ | components/hr, shared/hr-credential, hrContractService, hrContractFiles, hrCredentialService | Hợp đồng có tạo/sửa/gia hạn, upload khi tạo, tra cứu và tải/chia sẻ; chưa thay/gỡ tệp đã lưu hoặc nhiều tệp mỗi nhóm. Chứng chỉ có tạo/sửa/xóa, danh sách/tìm/lọc/phân trang, thống kê, chi tiết, upload/thay tài liệu và tải/chia sẻ; chưa gỡ tài liệu đã lưu hoặc push nhắc hạn |
 | Tuyển dụng | recruitmentService, rosterService, types/recruitment | Có tin tuyển dụng theo chi nhánh: tạo/sửa nội dung, tìm/lọc/phân trang, chi tiết, chuyển trạng thái, xóa mềm/khôi phục; ứng viên có tạo/sửa/cảnh báo trùng/tìm/lọc/phân trang/hồ sơ/lịch sử/chuyển bước/gán người phụ trách/xóa mềm/khôi phục; phỏng vấn có danh sách/lọc/phân trang/tạo/sửa/trạng thái/kết quả/gán người/xóa mềm/khôi phục; quản trị pipeline; upload/thay/tải/chia sẻ/gỡ attachment JD/CV riêng theo quyền; có xem/sửa/gỡ liên kết và upload JD/CV công khai; chờ UAT thiết bị/staging |
-| Tiền lương | payrollService, types/payslip, types/payrollRun, types/payrollPayment, types/payrollAdjustment, types/payrollAudit, components/hr/payrollDetails | Có phiếu lương và chia sẻ HTML; tra cứu kỳ, tổng tiền, nhân viên; lịch sử thanh toán; tạo/tra cứu/duyệt/từ chối điều chỉnh; nhật ký kỳ. Chưa tạo/tính kỳ/công thức/duyệt kỳ/chốt/ghi thanh toán/sửa hoặc xóa điều chỉnh, PDF hoặc in native |
+| Tiền lương | payrollService, types/payslip, types/payrollRun, types/payrollPayment, types/payrollAdjustment, types/payrollAudit, components/hr/payrollDetails | Có phiếu lương và chia sẻ HTML; tra cứu kỳ, tổng tiền, nhân viên; lịch sử thanh toán; tạo/tra cứu/duyệt/từ chối điều chỉnh; nhật ký kỳ; xuất 4 mẫu Excel. Chưa tạo/tính kỳ/công thức/duyệt kỳ/chốt/ghi thanh toán/sửa hoặc xóa điều chỉnh, PDF hoặc in native |
 | Công việc / Kanban / KPI | kanbanService, kanbanMediaService, monthlyKpiService, types/hr, kanbanTaskTime | Có CRUD công việc/dự án, lịch sử, tiến độ; CRUD/hoàn thành/gán người cho việc nhỏ; upload/link/gỡ/tải tệp; KPI tháng theo quyền; chưa bảng kéo thả, ghi âm/quay trực tiếp, socket |
 | Chat | internalChatService, socketService | Chưa chuyển; cần lifecycle/reconnect native |
 | AI / kho kiến thức | assistantService, assistantKnowledgeService, chatbotRequest | Chưa chuyển; cần streaming/upload native |
@@ -100,6 +100,10 @@ Tạo điều chỉnh pending theo kỳ, chọn nhân viên từ roster chi nhá
 
 Nhật ký kỳ lương theo API: loại thao tác, thời gian Việt Nam, actorId và metadata lý do/mã điều chỉnh nếu có. Lọc thao tác, tìm mã người/thao tác, đặt lại, tải lại và xem thêm từng 20 bản ghi tại máy. Quyền đọc kỳ và phạm vi phiên; không cần bảng lương tồn tại. Chưa xuất nhật ký hoặc UAT thiết bị/staging.
 
+## Đợt bốn mươi bảy
+
+Xuất Excel chi tiết lương, bảo hiểm, thuế TNCN và chuyển khoản từ kỳ closed/paid theo quyền đọc thanh toán, thêm manage cho mẫu chuyển khoản. Dùng workbook có hiệu lực từ backend; không tự dựng bảng hoặc ghi thanh toán. Chia sẻ native với kiểm tra MIME/20 MB, timeout và hủy tải theo vòng đời màn hình. Giữ exportWorkbook Blob của FE. Chưa UAT thiết bị/staging.
+
 ## Đợt tiếp theo
 
 1. Kiểm chứng đăng nhập/thông báo/phòng ban với staging và thiết bị thật; chốt hành vi phiên web/mobile.
@@ -108,6 +112,8 @@ Nhật ký kỳ lương theo API: loại thao tác, thời gian Việt Nam, acto
 4. Tiếp tục các module còn lại trong bảng, ghi rõ màn hình và thao tác đã nghiệm thu.
 
 ## Tiêu chí nghiệm thu từng module
+
+Đợt bốn mươi bảy: 212/212 test trong 45 file qua; TypeScript và export Hermes Android/iOS qua. Kiểm thử quyền xuất, API có xác thực, dữ liệu byte, lỗi API/MIME/dung lượng và hủy/timeout tải tệp. Chưa UAT thiết bị/staging.
 
 Đợt hai mươi bảy: 18/18 test trong 5 file qua; TypeScript mobile và export Hermes Android/iOS qua. Có xem/mở/sửa/gỡ liên kết JD/CV công khai, bảo toàn publicId khi URL không đổi. Chưa upload kho công khai hoặc UAT thiết bị/staging.
 

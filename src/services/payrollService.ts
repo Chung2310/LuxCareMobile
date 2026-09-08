@@ -5,7 +5,25 @@ import type { PayrollAudit } from "../types/payrollAudit";
 import type { PayrollPayment } from "../types/payrollPayment";
 import type { PayrollAdjustment, PayrollAdjustmentInput } from "../types/payrollAdjustment";
 
+export type PayrollExportType = "detailed" | "insurance" | "pit" | "bank_transfer";
+export const payrollWorkbookMime = "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet";
 export function createPayrollService({ fetch, getAccessToken }: ServiceTransport) {
+  async function workbookResponse(runId: string, type: PayrollExportType, signal?: AbortSignal) {
+    const response = await fetch(`/api/v1/payroll/runs/${encodeURIComponent(runId)}/exports`, {
+      method: "POST",
+      headers: { "Content-Type": "application/json", Authorization: `Bearer ${getAccessToken()}` },
+      body: JSON.stringify({ type }),
+      signal,
+    });
+    if (!response.ok) {
+      const body = await response.json().catch(() => ({}));
+      throw Object.assign(new Error(body.message || "Không xuất được báo cáo lương."), {
+        status: response.status,
+        code: body.code,
+      });
+    }
+    return response;
+  }
   async function payslipResponse(runId: string, employeeId: string, signal?: AbortSignal) {
     const response = await fetch(
       `/api/v1/payroll/runs/${encodeURIComponent(runId)}/payslips/${encodeURIComponent(employeeId)}/print`,
@@ -149,17 +167,15 @@ export function createPayrollService({ fetch, getAccessToken }: ServiceTransport
       if (!bytes.length || bytes.length > 2 * 1024 * 1024) throw new Error("Phiếu lương trống hoặc vượt quá 2 MB.");
       return bytes;
     },
-    exportWorkbook: async (runId: string, type: "detailed" | "insurance" | "pit" | "bank_transfer") => {
-      const response = await fetch(`/api/v1/payroll/runs/${runId}/exports`, {
-        method: "POST",
-        headers: { "Content-Type": "application/json", Authorization: `Bearer ${getAccessToken()}` },
-        body: JSON.stringify({ type }),
-      });
-      if (!response.ok) {
-        const body = await response.json().catch(() => ({}));
-        throw new Error(body.message || "Payroll export failed");
-      }
-      return response.blob();
+    exportWorkbook: async (runId: string, type: PayrollExportType) => (await workbookResponse(runId, type)).blob(),
+    downloadWorkbook: async (runId: string, type: PayrollExportType, signal?: AbortSignal) => {
+      const response = await workbookResponse(runId, type, signal);
+      if (response.headers.get("content-type")?.split(";")[0].trim().toLowerCase() !== payrollWorkbookMime)
+        throw new Error("Định dạng báo cáo Excel không hợp lệ.");
+      if (Number(response.headers.get("content-length")) > 20 * 1024 * 1024) throw new Error("Báo cáo vượt quá 20 MB.");
+      const bytes = new Uint8Array(await response.arrayBuffer());
+      if (!bytes.length || bytes.length > 20 * 1024 * 1024) throw new Error("Báo cáo trống hoặc vượt quá 20 MB.");
+      return bytes;
     },
   };
 }
