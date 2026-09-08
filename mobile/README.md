@@ -365,6 +365,14 @@ Kiểm tra: 13/13 test trong 5 file qua; TypeScript web/mobile và bundle Hermes
 - Dọn cache khi hủy trước chia sẻ; giữ tệp đã chuyển cho bảng chia sẻ để ứng dụng nhận đọc được. Chưa có chính sách dọn cache riêng, chưa UAT thiết bị/staging.
 - Kiểm tra: 175/175 test trong 37 file, TypeScript và export Hermes Android/iOS qua (không phải APK/IPA).
 
+## Đợt bốn mươi mốt: tra cứu bảng lương theo kỳ
+
+- Màn hình Tra cứu bảng lương: nhập kỳ YYYY-MM, trạng thái, tìm tên/mã nhân viên và tổng thực nhận của các dòng có hiệu lực.
+- Dùng `payrollService.getRun` từ FE; chỉ hiển thị `effectiveLines`, không lấy `lines` cũ khi có `effectiveError` hoặc thiếu dữ liệu có hiệu lực. Phân biệt kỳ chưa tồn tại với lỗi API.
+- Cần HR, công ty/chi nhánh và quyền `payroll-period:read`; chi tiết dòng cần `payroll-payment:read/manage`. Bộ tìm nhân viên áp dụng trên kỳ API đã trả, chưa phân trang server.
+- Chưa tạo/tính/duyệt/chốt kỳ hoặc thanh toán; chưa UAT thiết bị/staging.
+- Kiểm tra: 179/179 test trong 38 file, TypeScript và export Hermes Android/iOS qua (không phải APK/IPA).
+
 ## Quy tắc dùng lại FE (áp dụng cho các đợt tiếp)
 
 Service được xuất dưới dạng `createXService(transport)` cùng singleton mặc định cho web. Transport chỉ cung cấp `fetch` và `getAccessToken`; mobile inject API client, web giữ global fetch được interceptor hiện có bọc. Không polyfill localStorage/window, không sao chép service để tạo hai phiên bản endpoint. UI DOM/Tailwind phải chuyển thành component native. Trước khi chuyển service tiếp theo, rà soát các import gián tiếp tới Toast, auth, browser storage, window/document và file APIs.
@@ -387,7 +395,7 @@ Kết quả đợt ba ngày 2026-09-08: 90/90 kiểm thử trong 19 file qua, Ty
 
 ## Giới hạn hiện tại
 
-Đây là bốn mươi đợt triển khai trong phạm vi ứng dụng đầy đủ, chưa phải bản đầy đủ chức năng. Xem `IMPLEMENTATION.md`.
+Đây là bốn mươi mốt đợt triển khai trong phạm vi ứng dụng đầy đủ, chưa phải bản đầy đủ chức năng. Xem `IMPLEMENTATION.md`.
 
 - Giữ chính sách một phiên của backend; đăng nhập mobile có thể thay thế phiên web. Chưa thay đổi mô hình phiên theo thiết bị.
 - Super Admin nhận challenge 202 được chặn an toàn, chưa có UI hoàn tất MFA. Không hạ yêu cầu xác thực.

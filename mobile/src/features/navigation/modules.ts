@@ -5,9 +5,16 @@ import { recruitmentAccess } from "../recruitment/access";
 import { canReadContracts } from "../contracts/model";
 import { canReadCredentials } from "../credentials/model";
 import { canReadPayslips } from "../payroll/model";
+import { canReadPayrollRuns } from "../payroll/runModel";
 export function availableModules(user: UserProfile | null) {
   const hr = canUseModule(user, "hr");
   return [
+    {
+      title: "Tra cứu bảng lương",
+      description: "Trạng thái kỳ và lương theo nhân viên",
+      href: "/(tabs)/payroll-runs" as const,
+      visible: canReadPayrollRuns(user),
+    },
     {
       title: "Phiếu lương của tôi",
       description: "Kỳ lương đã phát hành, thu nhập và khấu trừ",

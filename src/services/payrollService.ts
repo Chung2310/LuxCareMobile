@@ -1,5 +1,6 @@
 import { browserTransport, type ServiceTransport } from "./serviceTransport";
 import type { Payslip, PayslipDetail } from "../types/payslip";
+import type { PayrollRun } from "../types/payrollRun";
 
 export function createPayrollService({ fetch, getAccessToken }: ServiceTransport) {
   async function payslipResponse(runId: string, employeeId: string, signal?: AbortSignal) {
@@ -71,7 +72,7 @@ export function createPayrollService({ fetch, getAccessToken }: ServiceTransport
       request(`/policies/${id}/activate`, { method: "POST", body: JSON.stringify(payload) }),
     retirePolicy: (id: string) => request(`/policies/${id}/retire`, { method: "POST" }),
     deletePolicy: (id: string) => request(`/policies/${id}`, { method: "DELETE" }),
-    getRun: (periodKey: string) => request(`/periods/${periodKey}/run`),
+    getRun: (periodKey: string): Promise<PayrollRun> => request(`/periods/${encodeURIComponent(periodKey)}/run`),
     getLineDetail: (runId: string, employeeId: string): Promise<PayslipDetail> =>
       request(`/runs/${encodeURIComponent(runId)}/lines/${encodeURIComponent(employeeId)}`),
     getResults: (periodKey: string) => request(`/periods/${periodKey}/results`),

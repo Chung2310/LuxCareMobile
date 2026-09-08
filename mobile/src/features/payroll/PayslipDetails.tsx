@@ -7,7 +7,7 @@ import { payroll } from "../../api/services";
 import { messageOf } from "../../auth/SessionProvider";
 import { Button, Card, ErrorText, Loading, styles } from "../../ui";
 import { payslipMoney } from "./model";
-export function PayslipDetails({ item }: { item: Payslip }) {
+export function PayslipDetails({ item }: { item: Pick<Payslip, "runId" | "employeeId"> }) {
   const [data, setData] = useState<PayslipDetail | null>(null);
   const [error, setError] = useState<string | null>(null);
   const [loading, setLoading] = useState(true);
