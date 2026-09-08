@@ -2,6 +2,8 @@
 
 Backend được triển khai từ repository LuxCare riêng. Đặt origin của backend trong `mobile/.env`; không có tài khoản hoặc secrets mẫu trong repository mobile.
 
+Mở lại dùng POST `/api/v1/payroll/runs/:id/reopen`, quyền `payroll-period:manage`, body expectedVersion/reason (trim, 1–1000 ký tự). Mobile yêu cầu thêm quyền đọc/phạm vi chi nhánh, chỉ review/closed; backend chặn paid và confirmed payments, chuyển draft/version +1, xóa closedBy/closedAt/effectiveSnapshot và audit lý do. App kiểm tra run trực tiếp, không tự retry hoặc đảo thanh toán để vượt điều kiện. Phiếu cá nhân được lọc khỏi danh sách trong kỳ draft; không xóa các tệp đã chia sẻ hoặc tự phát hành lại.
+
 Chốt kỳ gọi POST `/api/v1/payroll/runs/:id/close`, quyền `payroll-period:manage`, body expectedVersion; mobile yêu cầu đọc kỳ/phạm vi chi nhánh và review/version hợp lệ. Backend xác minh active revision completed, checksum và effective snapshot đã pin (có đường tương thích cho kỳ review cũ), chuyển closed/version +1, ghi closedBy/closedAt và audit. Mobile tận dụng closeRun/ReviewPayrollRun, kiểm tra phản hồi run trực tiếp, không gửi lại sau lỗi hoặc thay số liệu để bỏ qua kiểm tra. Xuất báo cáo/phát hành phiếu là thao tác riêng sau tải lại, không tự thanh toán.
 
 Duyệt kỳ dùng POST `/api/v1/payroll/runs/:id/review`, quyền `payroll-period:manage`, body expectedVersion. Mobile tận dụng reviewRun của FE, yêu cầu thêm quyền đọc/phạm vi chi nhánh và draft/version hợp lệ. Workflow backend kiểm tra version, trạng thái, issues blocking và pin effective snapshot khi review; tăng version, lưu reviewedBy và audit. Response data là run trực tiếp; mobile đối chiếu _id/periodKey/status review/version +1, không tự retry hoặc chốt kỳ. Nhãn review hiện hiển thị “Đang kiểm tra”.

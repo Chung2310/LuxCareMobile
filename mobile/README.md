@@ -491,6 +491,13 @@ Kiểm tra: 13/13 test trong 5 file qua; TypeScript web/mobile và bundle Hermes
 - Chưa mở lại kỳ/ghi thanh toán hoặc UAT thiết bị/staging.
 - Kiểm tra: 277/277 test trong 53 file, TypeScript và export Hermes Android/iOS qua (không phải APK/IPA).
 
+## Đợt năm mươi bảy: mở lại kỳ lương
+
+- Mở review/closed về draft theo quyền đọc/quản lý, chi nhánh và version hợp lệ; không mở paid. Lý do bắt buộc 1–1000 ký tự sau trim, xem lại rồi xác nhận.
+- Tận dụng reopen của FE, kiểm tra phản hồi đúng kỳ/draft/version +1, khóa gửi trùng và tải lại sau thành công hoặc lỗi. Backend từ chối nếu còn thanh toán confirmed.
+- Mở lại bỏ effective snapshot đã lưu khi duyệt; phiếu không còn trong danh sách phát hành khi kỳ nháp. Các bản tải/chia sẻ trước đó vẫn tồn tại. Chưa ghi/đảo thanh toán hoặc UAT thiết bị/staging.
+- Kiểm tra: 284/284 test trong 54 file, TypeScript và export Hermes Android/iOS qua (không phải APK/IPA).
+
 ## Quy tắc dùng lại FE (áp dụng cho các đợt tiếp)
 
 Service được xuất dưới dạng `createXService(transport)` cùng singleton mặc định cho web. Transport chỉ cung cấp `fetch` và `getAccessToken`; mobile inject API client, web giữ global fetch được interceptor hiện có bọc. Không polyfill localStorage/window, không sao chép service để tạo hai phiên bản endpoint. UI DOM/Tailwind phải chuyển thành component native. Trước khi chuyển service tiếp theo, rà soát các import gián tiếp tới Toast, auth, browser storage, window/document và file APIs.
@@ -513,7 +520,7 @@ Kết quả đợt ba ngày 2026-09-08: 90/90 kiểm thử trong 19 file qua, Ty
 
 ## Giới hạn hiện tại
 
-Đây là năm mươi sáu đợt triển khai trong phạm vi ứng dụng đầy đủ, chưa phải bản đầy đủ chức năng. Xem `IMPLEMENTATION.md`.
+Đây là năm mươi bảy đợt triển khai trong phạm vi ứng dụng đầy đủ, chưa phải bản đầy đủ chức năng. Xem `IMPLEMENTATION.md`.
 
 - Giữ chính sách một phiên của backend; đăng nhập mobile có thể thay thế phiên web. Chưa thay đổi mô hình phiên theo thiết bị.
 - Super Admin nhận challenge 202 được chặn an toàn, chưa có UI hoàn tất MFA. Không hạ yêu cầu xác thực.
