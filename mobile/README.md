@@ -476,6 +476,13 @@ Kiểm tra: 13/13 test trong 5 file qua; TypeScript web/mobile và bundle Hermes
 - Chưa duyệt/chốt kỳ hoặc UAT tính lương trên thiết bị/staging thật.
 - Kiểm tra: 266/266 test trong 51 file, TypeScript và export Hermes Android/iOS qua (không phải APK/IPA).
 
+## Đợt năm mươi lăm: duyệt kỳ lương
+
+- Chuyển kỳ draft sang review với quyền đọc/quản lý kỳ, chi nhánh và version hợp lệ. Xem tổng thực nhận/số dòng hiện hành rồi xác nhận duyệt.
+- Tận dụng reviewRun của FE, gửi expectedVersion và mã hóa runId. Khóa gửi trùng, kiểm tra đúng kỳ/trạng thái review/version +1; thành công hoặc lỗi đều có tải lại.
+- Backend kiểm tra lỗi blocking và lưu effective snapshot. Kỳ review không cho tính lại trực tiếp; chưa chốt/thanh toán hoặc UAT thiết bị/staging.
+- Kiểm tra: 271/271 test trong 52 file, TypeScript và export Hermes Android/iOS qua (không phải APK/IPA).
+
 ## Quy tắc dùng lại FE (áp dụng cho các đợt tiếp)
 
 Service được xuất dưới dạng `createXService(transport)` cùng singleton mặc định cho web. Transport chỉ cung cấp `fetch` và `getAccessToken`; mobile inject API client, web giữ global fetch được interceptor hiện có bọc. Không polyfill localStorage/window, không sao chép service để tạo hai phiên bản endpoint. UI DOM/Tailwind phải chuyển thành component native. Trước khi chuyển service tiếp theo, rà soát các import gián tiếp tới Toast, auth, browser storage, window/document và file APIs.
@@ -498,7 +505,7 @@ Kết quả đợt ba ngày 2026-09-08: 90/90 kiểm thử trong 19 file qua, Ty
 
 ## Giới hạn hiện tại
 
-Đây là năm mươi tư đợt triển khai trong phạm vi ứng dụng đầy đủ, chưa phải bản đầy đủ chức năng. Xem `IMPLEMENTATION.md`.
+Đây là năm mươi lăm đợt triển khai trong phạm vi ứng dụng đầy đủ, chưa phải bản đầy đủ chức năng. Xem `IMPLEMENTATION.md`.
 
 - Giữ chính sách một phiên của backend; đăng nhập mobile có thể thay thế phiên web. Chưa thay đổi mô hình phiên theo thiết bị.
 - Super Admin nhận challenge 202 được chặn an toàn, chưa có UI hoàn tất MFA. Không hạ yêu cầu xác thực.

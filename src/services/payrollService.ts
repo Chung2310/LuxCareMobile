@@ -150,7 +150,10 @@ export function createPayrollService({ fetch, getAccessToken }: ServiceTransport
       request(`/runs/${runId}/calculate`, { method: "POST", body: JSON.stringify({ expectedVersion }) }),
     review: (periodKey: string) => request(`/periods/${periodKey}/approve`, { method: "POST" }),
     reviewRun: (runId: string, expectedVersion: number) =>
-      request(`/runs/${runId}/review`, { method: "POST", body: JSON.stringify({ expectedVersion }) }),
+      request(`/runs/${encodeURIComponent(runId)}/review`, {
+        method: "POST",
+        body: JSON.stringify({ expectedVersion }),
+      }),
     close: (periodKey: string) => request(`/periods/${periodKey}/close`, { method: "POST" }),
     closeRun: (runId: string, expectedVersion: number) =>
       request(`/runs/${runId}/close`, { method: "POST", body: JSON.stringify({ expectedVersion }) }),
