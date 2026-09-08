@@ -150,7 +150,10 @@ export function createPayrollService({ fetch, getAccessToken }: ServiceTransport
     cancelPayment: (paymentId: string) => request(`/payments/${paymentId}/cancel`, { method: "POST" }),
     reversePayment: (paymentId: string) => request(`/payments/${paymentId}/reverse`, { method: "POST" }),
     publishPayslips: (runId: string, employeeIds?: string[]) =>
-      request(`/runs/${runId}/payslips/publish`, { method: "POST", body: JSON.stringify({ employeeIds }) }),
+      request(`/runs/${encodeURIComponent(runId)}/payslips/publish`, {
+        method: "POST",
+        body: JSON.stringify({ employeeIds }),
+      }),
     getEmployeePayslips: async (): Promise<Payslip[]> => {
       const result = await request("/employee/me/payslips");
       if (!Array.isArray(result)) throw new Error("Dữ liệu phiếu lương không hợp lệ.");

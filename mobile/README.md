@@ -421,6 +421,14 @@ Kiểm tra: 13/13 test trong 5 file qua; TypeScript web/mobile và bundle Hermes
 - Tệp đã bàn giao được giữ trong cache cho ứng dụng nhận đọc. Chưa UAT tải/mở Excel trên thiết bị hoặc staging thật.
 - Kiểm tra: 212/212 test trong 45 file, TypeScript và export Hermes Android/iOS qua (không phải APK/IPA).
 
+## Đợt bốn mươi tám: phát hành phiếu lương
+
+- Từ tra cứu kỳ closed/paid, chọn từng nhân viên hoặc toàn bộ kỳ, tìm tên/mã, bỏ chọn và xem lại danh sách trước khi xác nhận phát hành.
+- Cần phân hệ HR, quyền đọc kỳ và quản lý thanh toán. Chỉ gửi mã thuộc các dòng lương có hiệu lực; danh sách rỗng không mặc định phát hành cho tất cả.
+- Hiển thị trạng thái đã phát hành từ kỳ lương, hỗ trợ phát hành lại. Khóa gửi trùng; kiểm tra phản hồi đủ người/đúng kỳ/trạng thái published. Thành công hoặc lỗi đều có nút tải lại trạng thái.
+- Tái sử dụng publishPayslips của FE. Chưa thu hồi phiếu hoặc kiểm thử phát hành trên thiết bị/staging thật.
+- Kiểm tra: 219/219 test trong 46 file, TypeScript và export Hermes Android/iOS qua (không phải APK/IPA).
+
 ## Quy tắc dùng lại FE (áp dụng cho các đợt tiếp)
 
 Service được xuất dưới dạng `createXService(transport)` cùng singleton mặc định cho web. Transport chỉ cung cấp `fetch` và `getAccessToken`; mobile inject API client, web giữ global fetch được interceptor hiện có bọc. Không polyfill localStorage/window, không sao chép service để tạo hai phiên bản endpoint. UI DOM/Tailwind phải chuyển thành component native. Trước khi chuyển service tiếp theo, rà soát các import gián tiếp tới Toast, auth, browser storage, window/document và file APIs.
@@ -443,7 +451,7 @@ Kết quả đợt ba ngày 2026-09-08: 90/90 kiểm thử trong 19 file qua, Ty
 
 ## Giới hạn hiện tại
 
-Đây là bốn mươi bảy đợt triển khai trong phạm vi ứng dụng đầy đủ, chưa phải bản đầy đủ chức năng. Xem `IMPLEMENTATION.md`.
+Đây là bốn mươi tám đợt triển khai trong phạm vi ứng dụng đầy đủ, chưa phải bản đầy đủ chức năng. Xem `IMPLEMENTATION.md`.
 
 - Giữ chính sách một phiên của backend; đăng nhập mobile có thể thay thế phiên web. Chưa thay đổi mô hình phiên theo thiết bị.
 - Super Admin nhận challenge 202 được chặn an toàn, chưa có UI hoàn tất MFA. Không hạ yêu cầu xác thực.
