@@ -405,6 +405,14 @@ Kiểm tra: 13/13 test trong 5 file qua; TypeScript web/mobile và bundle Hermes
 - Chưa sửa/xóa điều chỉnh hoặc UAT thiết bị/staging. Backend chưa có idempotency cho thao tác tạo.
 - Kiểm tra: 194/194 test trong 42 file, TypeScript và export Hermes Android/iOS qua (không phải APK/IPA).
 
+## Đợt bốn mươi sáu: nhật ký kỳ lương
+
+- Xem thao tác và ngày giờ Việt Nam, mã người thực hiện, lý do hoặc mã điều chỉnh nếu API có cung cấp; có lọc thao tác, tìm kiếm, đặt lại và tải lại.
+- Dùng endpoint audit theo kỳ qua payrollService, quyền đọc kỳ; vẫn xem khi chưa có bảng lương. Không suy diễn sự kiện ngoài dữ liệu backend.
+- Hiển thị từng nhóm 20 bản ghi tại máy; endpoint chưa phân trang. Giữ mã thao tác chưa có nhãn. Đổi kỳ/phiên hoặc rời màn hình bỏ kết quả tải cũ.
+- Chưa xuất nhật ký hoặc UAT thiết bị/staging.
+- Kiểm tra: 197/197 test trong 43 file, TypeScript và export Hermes Android/iOS qua (không phải APK/IPA).
+
 ## Quy tắc dùng lại FE (áp dụng cho các đợt tiếp)
 
 Service được xuất dưới dạng `createXService(transport)` cùng singleton mặc định cho web. Transport chỉ cung cấp `fetch` và `getAccessToken`; mobile inject API client, web giữ global fetch được interceptor hiện có bọc. Không polyfill localStorage/window, không sao chép service để tạo hai phiên bản endpoint. UI DOM/Tailwind phải chuyển thành component native. Trước khi chuyển service tiếp theo, rà soát các import gián tiếp tới Toast, auth, browser storage, window/document và file APIs.
@@ -427,7 +435,7 @@ Kết quả đợt ba ngày 2026-09-08: 90/90 kiểm thử trong 19 file qua, Ty
 
 ## Giới hạn hiện tại
 
-Đây là bốn mươi lăm đợt triển khai trong phạm vi ứng dụng đầy đủ, chưa phải bản đầy đủ chức năng. Xem `IMPLEMENTATION.md`.
+Đây là bốn mươi sáu đợt triển khai trong phạm vi ứng dụng đầy đủ, chưa phải bản đầy đủ chức năng. Xem `IMPLEMENTATION.md`.
 
 - Giữ chính sách một phiên của backend; đăng nhập mobile có thể thay thế phiên web. Chưa thay đổi mô hình phiên theo thiết bị.
 - Super Admin nhận challenge 202 được chặn an toàn, chưa có UI hoàn tất MFA. Không hạ yêu cầu xác thực.

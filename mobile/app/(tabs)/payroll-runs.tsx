@@ -16,6 +16,7 @@ import { payslipMoney } from "../../src/features/payroll/model";
 import { PayslipDetails } from "../../src/features/payroll/PayslipDetails";
 import { PaymentHistory } from "../../src/features/payroll/PaymentHistory";
 import { AdjustmentHistory } from "../../src/features/payroll/AdjustmentHistory";
+import { PayrollAuditHistory } from "../../src/features/payroll/PayrollAuditHistory";
 import { canReadRunPayments } from "../../src/features/payroll/paymentModel";
 export default function PayrollRuns() {
   const { user, selectedBranch } = useSession();
@@ -157,6 +158,7 @@ export default function PayrollRuns() {
           ))}
         </>
       )}
+      <PayrollAuditHistory key={`audit:${period}:${revision}`} period={period} />
     </Page>
   );
 }

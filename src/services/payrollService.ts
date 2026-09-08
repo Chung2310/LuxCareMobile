@@ -1,6 +1,7 @@
 import { browserTransport, type ServiceTransport } from "./serviceTransport";
 import type { Payslip, PayslipDetail } from "../types/payslip";
 import type { PayrollRun } from "../types/payrollRun";
+import type { PayrollAudit } from "../types/payrollAudit";
 import type { PayrollPayment } from "../types/payrollPayment";
 import type { PayrollAdjustment, PayrollAdjustmentInput } from "../types/payrollAdjustment";
 
@@ -43,6 +44,12 @@ export function createPayrollService({ fetch, getAccessToken }: ServiceTransport
   }
 
   return {
+    getAudit: async (periodKey: string): Promise<PayrollAudit[]> => {
+      const result = await request(`/periods/${encodeURIComponent(periodKey)}/audit`);
+      if (!Array.isArray(result) || result.some((item) => item.periodKey !== periodKey))
+        throw new Error("Nhật ký không khớp kỳ lương.");
+      return result;
+    },
     getFormulas: () => request("/formulas"),
     createFormula: (payload: unknown) => request("/formulas", { method: "POST", body: JSON.stringify(payload) }),
     updateFormula: (id: string, payload: unknown) =>
