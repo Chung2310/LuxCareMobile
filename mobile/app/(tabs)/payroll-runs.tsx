@@ -141,7 +141,7 @@ export default function PayrollRuns() {
         employees={lines}
         onChanged={() => setRevision((value) => value + 1)}
       />
-      <PayrollVariables />
+      <PayrollVariables key={`variables:${revision}`} onChanged={() => setRevision((value) => value + 1)} />
       <AdjustmentHistory
         key={`${period}:${revision}`}
         period={period}

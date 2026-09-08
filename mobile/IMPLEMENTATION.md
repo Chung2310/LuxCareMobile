@@ -184,6 +184,10 @@ Thêm bản ghi đối soát từ roster chi nhánh, loại người đã có d�
 
 Danh mục biến lương toàn công ty: tìm/lọc/xem thêm và tạo nháp theo quyền quản lý kỳ. Tái sử dụng service FE, kiểm tra mã/đơn vị/mặc định/nội dung phản hồi, xem lại phạm vi công ty và khóa gửi trùng. Chưa sửa/áp dụng/ngưng biến hoặc UAT thiết bị/staging.
 
+## Đợt sáu mươi tám
+
+Áp dụng/áp dụng lại và ngưng biến theo trạng thái, quyền và phạm vi công ty. Xem lại trước gửi, kiểm tra phản hồi giữ nội dung/version hiện có, khóa gửi trùng và tải lại danh mục/đầu vào. Chưa sửa nội dung hoặc UAT thiết bị/staging; API chuyển trạng thái chưa hỗ trợ expectedVersion.
+
 ## Đợt tiếp theo
 
 1. Kiểm chứng đăng nhập/thông báo/phòng ban với staging và thiết bị thật; chốt hành vi phiên web/mobile.
@@ -192,6 +196,8 @@ Danh mục biến lương toàn công ty: tìm/lọc/xem thêm và tạo nháp t
 4. Tiếp tục các module còn lại trong bảng, ghi rõ màn hình và thao tác đã nghiệm thu.
 
 ## Tiêu chí nghiệm thu từng module
+
+Đợt sáu mươi tám: 371/371 test trong 65 file qua; TypeScript và export Hermes Android/iOS qua. Kiểm tra chuyển trạng thái/quyền/company, phản hồi giữ nội dung/version và endpoint/lỗi không retry. Chưa UAT thiết bị/staging.
 
 Đợt sáu mươi bảy: 363/363 test trong 64 file qua; TypeScript và export Hermes Android/iOS qua. Kiểm tra quyền/phạm vi/mã trùng/mặc định, phản hồi draft và service/lỗi không retry. Chưa UAT thiết bị/staging.
 

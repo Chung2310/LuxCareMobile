@@ -91,8 +91,10 @@ export function createPayrollService({ fetch, getAccessToken }: ServiceTransport
     getPeriodInputVariables: () => request("/period-input-variables"),
     createPeriodInputVariable: (payload: unknown) =>
       request("/period-input-variables", { method: "POST", body: JSON.stringify(payload) }),
-    activatePeriodInputVariable: (id: string) => request(`/period-input-variables/${id}/activate`, { method: "POST" }),
-    retirePeriodInputVariable: (id: string) => request(`/period-input-variables/${id}/retire`, { method: "POST" }),
+    activatePeriodInputVariable: (id: string) =>
+      request(`/period-input-variables/${encodeURIComponent(id)}/activate`, { method: "POST" }),
+    retirePeriodInputVariable: (id: string) =>
+      request(`/period-input-variables/${encodeURIComponent(id)}/retire`, { method: "POST" }),
     getPolicies: () => request("/policies"),
     createPolicy: (payload: unknown) => request("/policies", { method: "POST", body: JSON.stringify(payload) }),
     updatePolicy: (id: string, payload: unknown) =>

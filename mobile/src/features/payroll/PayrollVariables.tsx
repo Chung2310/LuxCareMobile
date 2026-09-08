@@ -15,7 +15,9 @@ import {
   type PayrollVariable,
 } from "./variableModel";
 import { CreatePayrollVariable } from "./CreatePayrollVariable";
-export function PayrollVariables() {
+import { canTransitionVariable, type VariableAction } from "./variableTransitionModel";
+import { TransitionPayrollVariable } from "./TransitionPayrollVariable";
+export function PayrollVariables({ onChanged }: { onChanged: () => void }) {
   const { user, selectedBranch } = useSession();
   const allowed = canReadPayrollRuns(user);
   const [items, setItems] = useState<PayrollVariable[]>([]),
@@ -26,12 +28,14 @@ export function PayrollVariables() {
     [limit, setLimit] = useState(20);
   const [search, setSearch] = useState(""),
     [status, setStatus] = useState("");
+  const [selected, setSelected] = useState<{ item: PayrollVariable; action: VariableAction } | null>(null);
   useFocusEffect(
     useCallback(() => {
       let active = true;
       setItems([]);
       setError(null);
       setCreating(false);
+      setSelected(null);
       setLoading(false);
       setLimit(20);
       if (!allowed || !user?.companyCode) return;
@@ -67,7 +71,7 @@ export function PayrollVariables() {
       <Text style={styles.muted}>Dùng chung công ty {user?.companyCode}, gồm cả nháp và biến đã ngưng áp dụng.</Text>
       <Button
         title="Tải lại danh mục biến"
-        disabled={loading || creating}
+        disabled={loading || creating || !!selected}
         onPress={() => setRevision((value) => value + 1)}
       />
       {loading && <Loading />}
@@ -75,7 +79,7 @@ export function PayrollVariables() {
       {!loading && !error && (
         <>
           {canManageVariables(user) && (
-            <Button title="Thêm biến nháp" disabled={creating} onPress={() => setCreating(true)} />
+            <Button title="Thêm biến nháp" disabled={creating || !!selected} onPress={() => setCreating(true)} />
           )}
           {creating && (
             <CreatePayrollVariable
@@ -87,7 +91,7 @@ export function PayrollVariables() {
           <Field
             label="Tìm mã, tên hoặc mô tả biến"
             value={search}
-            editable={!creating}
+            editable={!creating && !selected}
             onChangeText={(value) => {
               setSearch(value);
               setLimit(20);
@@ -96,7 +100,7 @@ export function PayrollVariables() {
           <ChoiceField
             label="Trạng thái biến"
             value={status}
-            disabled={creating}
+            disabled={creating || !!selected}
             choices={[
               { value: "", label: "Tất cả" },
               ...Object.entries(variableStatuses).map(([value, label]) => ({ value, label })),
@@ -120,6 +124,31 @@ export function PayrollVariables() {
                 Mặc định: {item.defaultValue === undefined ? "Chưa cấu hình" : inputValue(item.defaultValue)}
               </Text>
               <Text style={styles.text}>{item.description || "Chưa có mô tả"}</Text>
+              {(["activate", "retire"] as const).map(
+                (action) =>
+                  canTransitionVariable(user, item, action) && (
+                    <Button
+                      key={action}
+                      title={
+                        action === "retire"
+                          ? "Ngưng áp dụng"
+                          : item.status === "retired"
+                            ? "Áp dụng lại"
+                            : "Áp dụng biến"
+                      }
+                      disabled={creating || !!selected}
+                      onPress={() => setSelected({ item, action })}
+                    />
+                  ),
+              )}
+              {selected?.item._id === item._id && (
+                <TransitionPayrollVariable
+                  item={selected.item}
+                  action={selected.action}
+                  onClose={() => setSelected(null)}
+                  onChanged={onChanged}
+                />
+              )}
             </Card>
           ))}
           {rows.length > limit && <Button title="Xem thêm 20 biến" onPress={() => setLimit((value) => value + 20)} />}
