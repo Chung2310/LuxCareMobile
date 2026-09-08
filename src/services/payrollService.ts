@@ -1,6 +1,7 @@
 import { browserTransport, type ServiceTransport } from "./serviceTransport";
 import type { Payslip, PayslipDetail } from "../types/payslip";
 import type { PayrollRun } from "../types/payrollRun";
+import type { PayrollPayment } from "../types/payrollPayment";
 
 export function createPayrollService({ fetch, getAccessToken }: ServiceTransport) {
   async function payslipResponse(runId: string, employeeId: string, signal?: AbortSignal) {
@@ -100,7 +101,11 @@ export function createPayrollService({ fetch, getAccessToken }: ServiceTransport
       request(`/periods/${periodKey}/adjustments/${adjustmentId}/approve`, { method: "POST" }),
     rejectAdjustment: (periodKey: string, adjustmentId: string) =>
       request(`/periods/${periodKey}/adjustments/${adjustmentId}/reject`, { method: "POST" }),
-    getPayments: (runId: string) => request(`/runs/${runId}/payments`),
+    getPayments: async (runId: string): Promise<PayrollPayment[]> => {
+      const result = await request(`/runs/${encodeURIComponent(runId)}/payments`);
+      if (!Array.isArray(result)) throw new Error("Dữ liệu thanh toán không hợp lệ.");
+      return result;
+    },
     createPayment: (runId: string, payload: unknown) =>
       request(`/runs/${runId}/payments`, { method: "POST", body: JSON.stringify(payload) }),
     confirmPayment: (paymentId: string) => request(`/payments/${paymentId}/confirm`, { method: "POST" }),

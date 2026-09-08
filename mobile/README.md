@@ -373,6 +373,14 @@ Kiểm tra: 13/13 test trong 5 file qua; TypeScript web/mobile và bundle Hermes
 - Chưa tạo/tính/duyệt/chốt kỳ hoặc thanh toán; chưa UAT thiết bị/staging.
 - Kiểm tra: 179/179 test trong 38 file, TypeScript và export Hermes Android/iOS qua (không phải APK/IPA).
 
+## Đợt bốn mươi hai: lịch sử thanh toán lương
+
+- Trong Tra cứu bảng lương có lịch sử thanh toán, lọc nháp/xác nhận/hủy/đảo, số tiền, ngày, ghi chú, mốc trạng thái và phân bổ nhân viên.
+- Tổng đã xác nhận chỉ cộng `amount` của khoản confirmed, không cộng lại các dòng phân bổ; tổng không phụ thuộc bộ lọc trạng thái.
+- Tận dụng `payrollService.getPayments`; cần quyền đọc kỳ và `payroll-payment:read`. Lỗi hoặc dữ liệu sai không hiển thị tổng bằng 0. Bỏ kết quả tải khi rời màn hình/đổi phạm vi.
+- Liên kết chứng từ chỉ hiển thị để sao chép; chưa tải chứng từ, tạo/xác nhận/hủy/đảo thanh toán hoặc UAT thiết bị/staging.
+- Kiểm tra: 183/183 test trong 39 file, TypeScript và export Hermes Android/iOS qua (không phải APK/IPA).
+
 ## Quy tắc dùng lại FE (áp dụng cho các đợt tiếp)
 
 Service được xuất dưới dạng `createXService(transport)` cùng singleton mặc định cho web. Transport chỉ cung cấp `fetch` và `getAccessToken`; mobile inject API client, web giữ global fetch được interceptor hiện có bọc. Không polyfill localStorage/window, không sao chép service để tạo hai phiên bản endpoint. UI DOM/Tailwind phải chuyển thành component native. Trước khi chuyển service tiếp theo, rà soát các import gián tiếp tới Toast, auth, browser storage, window/document và file APIs.
@@ -395,7 +403,7 @@ Kết quả đợt ba ngày 2026-09-08: 90/90 kiểm thử trong 19 file qua, Ty
 
 ## Giới hạn hiện tại
 
-Đây là bốn mươi mốt đợt triển khai trong phạm vi ứng dụng đầy đủ, chưa phải bản đầy đủ chức năng. Xem `IMPLEMENTATION.md`.
+Đây là bốn mươi hai đợt triển khai trong phạm vi ứng dụng đầy đủ, chưa phải bản đầy đủ chức năng. Xem `IMPLEMENTATION.md`.
 
 - Giữ chính sách một phiên của backend; đăng nhập mobile có thể thay thế phiên web. Chưa thay đổi mô hình phiên theo thiết bị.
 - Super Admin nhận challenge 202 được chặn an toàn, chưa có UI hoàn tất MFA. Không hạ yêu cầu xác thực.

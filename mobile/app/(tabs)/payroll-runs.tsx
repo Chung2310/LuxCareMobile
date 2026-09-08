@@ -14,6 +14,8 @@ import {
 } from "../../src/features/payroll/runModel";
 import { payslipMoney } from "../../src/features/payroll/model";
 import { PayslipDetails } from "../../src/features/payroll/PayslipDetails";
+import { PaymentHistory } from "../../src/features/payroll/PaymentHistory";
+import { canReadRunPayments } from "../../src/features/payroll/paymentModel";
 export default function PayrollRuns() {
   const { user, selectedBranch } = useSession();
   const allowed = canReadPayrollRuns(user);
@@ -122,6 +124,7 @@ export default function PayrollRuns() {
               setExpanded(null);
             }}
           />
+          {canReadRunPayments(user) && <PaymentHistory key={run._id} runId={run._id} employees={lines} />}
           {!rows.length && <Text style={styles.text}>Không có dòng lương phù hợp.</Text>}
           {rows.map((line) => (
             <Card key={line.employeeId}>

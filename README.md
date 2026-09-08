@@ -38,4 +38,4 @@ Các nguồn dùng chung là bản sao tại thời điểm tách repository, kh
 
 ## Kiểm tra repository
 
-Ngày 2026-09-08: 179/179 kiểm thử trong 38 file qua; TypeScript và export Hermes Android/iOS qua trong repository độc lập. Chưa kiểm thử thiết bị/staging thật.
+Ngày 2026-09-08: 183/183 kiểm thử trong 39 file qua; TypeScript và export Hermes Android/iOS qua trong repository độc lập. Chưa kiểm thử thiết bị/staging thật.
