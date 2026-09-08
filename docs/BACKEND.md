@@ -9,6 +9,7 @@ Backend được triển khai từ repository LuxCare riêng. Đặt origin củ
 - Phòng ban cần xử lý tên cũ bằng mẫu literal đã escape trong `server/service/department.service.ts` và `department-legacy-pattern.ts` của LuxCare.
 - Tải tài liệu dùng media proxy có xác thực và danh sách domain cho phép. Upload tài liệu/đơn từ cần các route managed upload tương ứng; tệp công khai tuyển dụng dùng `/api/v1/recruitment/files/public`.
 - Hợp đồng chưa có version token chống cập nhật đồng thời. Mobile chỉ PATCH trường thay đổi; cần đối soát nếu nhiều người cùng sửa.
+- Gia hạn trả `{ contract, extension }`, cập nhật hạn và chuyển expired về active. Backend hiện tạo lịch sử trước rồi lưu hợp đồng, chưa có transaction/idempotency chung; sau lỗi không rõ kết quả cần kiểm tra cả hai bản ghi trước khi gửi lại.
 - Khung giờ check-in/out của ca hiện được lưu cấu hình nhưng backend chưa thực thi đầy đủ. Cờ xác nhận khuôn mặt lấy từ nguồn cấu hình chung, không tự bật ở mobile.
 
 Các sửa đổi backend không được tự triển khai khi push repository mobile. Đối chiếu [ma trận triển khai](../mobile/IMPLEMENTATION.md) và kiểm thử trên staging trước nghiệm thu.

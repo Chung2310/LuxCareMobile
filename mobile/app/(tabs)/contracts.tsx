@@ -4,6 +4,7 @@ import { Modal, Text } from "react-native";
 import { SafeAreaView } from "react-native-safe-area-context";
 import type { Contract, Employee } from "../../../src/types/hrContract";
 import { ContractForm } from "../../src/features/contracts/ContractForm";
+import { ExtensionForm } from "../../src/features/contracts/ExtensionForm";
 import type { ContractList } from "../../../src/services/hrContractService";
 import { getContractFiles, getSignedImages } from "../../../src/services/hrContractFiles";
 import { contracts } from "../../src/api/services";
@@ -22,7 +23,9 @@ export default function Contracts() {
   const { user, selectedBranch } = useSession();
   const allowed = canReadContracts(user);
   const manage = canManageContracts(user);
-  const [editing, setEditing] = useState<{ contract?: Contract; employees: Employee[] } | null>(null);
+  const [editing, setEditing] = useState<{ contract?: Contract; employees: Employee[]; extension?: boolean } | null>(
+    null,
+  );
   const formLock = useRef(false);
   const closeForm = () => {
     if (formLock.current) return;
@@ -136,6 +139,12 @@ export default function Contracts() {
                 <Text style={styles.text}>{item.note || "Không có ghi chú"}</Text>
                 {manage && (
                   <Button
+                    title="Tạo gia hạn"
+                    onPress={() => setEditing({ contract: item, employees: [], extension: true })}
+                  />
+                )}
+                {manage && (
+                  <Button
                     title="Sửa hợp đồng"
                     onPress={() => setEditing({ contract: item, employees: data!.employees })}
                   />
@@ -167,20 +176,34 @@ export default function Contracts() {
       </Page>
       <Modal visible={!!editing && manage} animationType="slide" onRequestClose={closeForm}>
         <SafeAreaView style={styles.page}>
-          {editing && manage && (
-            <ContractForm
-              contract={editing.contract}
-              employees={editing.employees}
-              scope={{ companyCode: user!.companyCode!, branchId }}
-              setLocked={(value) => {
-                formLock.current = value;
-              }}
-              onClose={() => {
-                setEditing(null);
-                setRevision((value) => value + 1);
-              }}
-            />
-          )}
+          {editing &&
+            manage &&
+            (editing.extension && editing.contract ? (
+              <ExtensionForm
+                contract={editing.contract}
+                scope={{ companyCode: user!.companyCode!, branchId }}
+                setLocked={(value) => {
+                  formLock.current = value;
+                }}
+                onClose={() => {
+                  setEditing(null);
+                  setRevision((value) => value + 1);
+                }}
+              />
+            ) : (
+              <ContractForm
+                contract={editing.contract}
+                employees={editing.employees}
+                scope={{ companyCode: user!.companyCode!, branchId }}
+                setLocked={(value) => {
+                  formLock.current = value;
+                }}
+                onClose={() => {
+                  setEditing(null);
+                  setRevision((value) => value + 1);
+                }}
+              />
+            ))}
         </SafeAreaView>
       </Modal>
     </>

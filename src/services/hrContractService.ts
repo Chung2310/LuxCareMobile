@@ -20,6 +20,7 @@ export interface ContractList {
 }
 export type ContractInput = Pick<Contract, "contractType" | "employeeId" | "startDate" | "endDate" | "status" | "note">;
 export type ContractScope = Pick<ContractFilters, "companyCode" | "branchId">;
+export type ExtensionInput = Pick<Extension, "newEndDate" | "extensionDate" | "reason">;
 export function createHrContractService({ fetch, getAccessToken }: ServiceTransport) {
   async function request(path: string, filters: object, init: RequestInit = {}) {
     const query = new URLSearchParams();
@@ -39,6 +40,15 @@ export function createHrContractService({ fetch, getAccessToken }: ServiceTransp
     return body;
   }
   return {
+    async extend(
+      scope: ContractScope,
+      id: string,
+      value: ExtensionInput,
+    ): Promise<{ contract: Contract; extension: Extension }> {
+      return (
+        await request(`/${encodeURIComponent(id)}/extensions`, scope, { method: "POST", body: JSON.stringify(value) })
+      ).data;
+    },
     async create(scope: ContractScope, value: ContractInput): Promise<Contract> {
       return (await request("", scope, { method: "POST", body: JSON.stringify(value) })).data;
     },

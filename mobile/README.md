@@ -292,6 +292,14 @@ Kiểm tra: 13/13 test trong 5 file qua; TypeScript web/mobile và bundle Hermes
 - API hợp đồng chưa có version/concurrency token; PATCH tối thiểu giảm ghi đè trường không sửa, chưa ngăn được hai người cùng sửa một trường. Tạo hợp đồng mới mặc định bản nháp. Chưa tạo gia hạn hoặc upload/gỡ tệp hợp đồng trên mobile.
 - Kiểm tra: 17 test/5 file, TypeScript gốc/mobile và export Hermes Android/iOS qua (không phải APK/IPA); chưa UAT dữ liệu thật/thiết bị.
 
+## Đợt 32: tạo gia hạn hợp đồng
+
+- Thêm nút Tạo gia hạn trong chi tiết hợp đồng cho quyền đọc/quản lý HR. Nhập ngày hết hạn mới, ngày gia hạn và lý do tối đa 1000 ký tự.
+- Kiểm tra ngày hợp lệ và hạn mới phải sau hạn hiện tại. Gửi đúng API `POST /hr-contracts/:id/extensions`, không gửi kèm thay đổi nhân viên, trạng thái hoặc tệp.
+- API tạo lịch sử, cập nhật hạn hợp đồng và chuyển hợp đồng expired thành active; các trạng thái khác được giữ theo backend. Đóng form sau thành công sẽ tải lại danh sách và lịch sử khi mở chi tiết.
+- Khóa thao tác lưu/đóng trong lúc gửi. Với lỗi mạng/5xx hoặc phản hồi thiếu bản ghi, chặn gửi lại cho đến khi đóng và kiểm tra kết quả. Backend chưa có transaction/version/idempotency cho toàn bộ luồng, vì vậy lỗi có thể để lại lịch sử trước khi hạn hợp đồng được cập nhật; cần đối soát trên staging.
+- Kiểm tra độc lập: 123/123 test trong 29 file và TypeScript qua. Chưa UAT thiết bị/staging. Upload/gỡ tệp hợp đồng và gia hạn vẫn chưa chuyển.
+
 ## Quy tắc dùng lại FE (áp dụng cho các đợt tiếp)
 
 Service được xuất dưới dạng `createXService(transport)` cùng singleton mặc định cho web. Transport chỉ cung cấp `fetch` và `getAccessToken`; mobile inject API client, web giữ global fetch được interceptor hiện có bọc. Không polyfill localStorage/window, không sao chép service để tạo hai phiên bản endpoint. UI DOM/Tailwind phải chuyển thành component native. Trước khi chuyển service tiếp theo, rà soát các import gián tiếp tới Toast, auth, browser storage, window/document và file APIs.
@@ -314,7 +322,7 @@ Kết quả đợt ba ngày 2026-09-08: 90/90 kiểm thử trong 19 file qua, Ty
 
 ## Giới hạn hiện tại
 
-Đây là ba mươi mốt đợt triển khai trong phạm vi ứng dụng đầy đủ, chưa phải bản đầy đủ chức năng. Xem `IMPLEMENTATION.md`.
+Đây là ba mươi hai đợt triển khai trong phạm vi ứng dụng đầy đủ, chưa phải bản đầy đủ chức năng. Xem `IMPLEMENTATION.md`.
 
 - Giữ chính sách một phiên của backend; đăng nhập mobile có thể thay thế phiên web. Chưa thay đổi mô hình phiên theo thiết bị.
 - Super Admin nhận challenge 202 được chặn an toàn, chưa có UI hoàn tất MFA. Không hạ yêu cầu xác thực.
