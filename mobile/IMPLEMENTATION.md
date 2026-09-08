@@ -176,6 +176,10 @@ Hoàn tác sáu trường đối soát cơ bản đã lưu về dữ liệu ngu�
 
 Sửa/hoàn tác biến đang áp dụng trong form đối soát. Khi sửa gửi đầy đủ map để giữ biến cũ, hoàn tác dùng custom.CODE; chặn kết hợp sửa map và gỡ nhánh custom cùng request. Xem trước, lý do/version, kiểm tra phản hồi cả biến đã giữ. Chưa quản trị biến/ngưng áp dụng/thêm bản ghi/bulk hoặc UAT thiết bị/staging.
 
+## Đợt sáu mươi sáu
+
+Thêm bản ghi đối soát từ roster chi nhánh, loại người đã có dữ liệu, tìm tên/mã và chọn nhân viên trước dùng form hiện có. Bản ghi khởi tạo version 0, yêu cầu giá trị/lý do, kiểm tra response version 1 và dữ liệu; tải lại cả kỳ sau kết quả/lỗi, không retry. Chưa bulk/quản trị biến hoặc UAT thiết bị/staging.
+
 ## Đợt tiếp theo
 
 1. Kiểm chứng đăng nhập/thông báo/phòng ban với staging và thiết bị thật; chốt hành vi phiên web/mobile.
@@ -184,6 +188,8 @@ Sửa/hoàn tác biến đang áp dụng trong form đối soát. Khi sửa gử
 4. Tiếp tục các module còn lại trong bảng, ghi rõ màn hình và thao tác đã nghiệm thu.
 
 ## Tiêu chí nghiệm thu từng module
+
+Đợt sáu mươi sáu: 354/354 test trong 63 file qua; TypeScript và export Hermes Android/iOS qua. Kiểm tra roster/phạm vi/trùng, khởi tạo version 0, giá trị bắt buộc/0/custom và phản hồi version 1. Chưa UAT thiết bị/staging.
 
 Đợt sáu mươi lăm: 349/349 test trong 62 file qua; TypeScript và export Hermes Android/iOS qua. Kiểm tra giữ map/biến cũ, active/giá trị/phần trăm, clear custom, chặn path conflict và đối chiếu phản hồi. Chưa UAT thiết bị/staging.
 

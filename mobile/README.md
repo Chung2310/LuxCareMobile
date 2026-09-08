@@ -561,6 +561,14 @@ Kiểm tra: 13/13 test trong 5 file qua; TypeScript web/mobile và bundle Hermes
 - Chưa sửa/hoàn tác biến đã ngưng áp dụng, quản trị danh mục biến, thêm bản ghi hoặc bulk; chưa UAT thiết bị/staging.
 - Kiểm tra: 349/349 test trong 62 file, TypeScript và export Hermes Android/iOS qua (không phải APK/IPA).
 
+## Đợt sáu mươi sáu: thêm bản ghi đối soát
+
+- Thêm đối soát cho nhân viên chưa có bản ghi trong kỳ; lấy roster chi nhánh qua service FE, lọc phạm vi và loại bản ghi đã có/ID trùng. Tìm tên/mã, xem thêm 20 người mỗi lượt.
+- Dùng lại form chỉnh đối soát cho bản ghi mới version 0; nhập ít nhất một giá trị cơ bản hoặc biến đang áp dụng và lý do. Không tự điền 0 hay mặc định vào payload.
+- Xem lại, khóa gửi trùng, gửi PUT với expectedVersion 0, kiểm tra phản hồi version 1 đúng nhân viên/kỳ/giá trị. Sau kết quả/lỗi tải lại cả kỳ và đối soát; không tự retry hoặc tính lại lương.
+- Chưa lưu hàng loạt/quản trị danh mục biến hoặc UAT thiết bị/staging. Cần tài khoản được API roster cho phép đọc danh sách nhân viên.
+- Kiểm tra: 354/354 test trong 63 file, TypeScript và export Hermes Android/iOS qua (không phải APK/IPA).
+
 ## Quy tắc dùng lại FE (áp dụng cho các đợt tiếp)
 
 Service được xuất dưới dạng `createXService(transport)` cùng singleton mặc định cho web. Transport chỉ cung cấp `fetch` và `getAccessToken`; mobile inject API client, web giữ global fetch được interceptor hiện có bọc. Không polyfill localStorage/window, không sao chép service để tạo hai phiên bản endpoint. UI DOM/Tailwind phải chuyển thành component native. Trước khi chuyển service tiếp theo, rà soát các import gián tiếp tới Toast, auth, browser storage, window/document và file APIs.
@@ -583,7 +591,7 @@ Kết quả đợt ba ngày 2026-09-08: 90/90 kiểm thử trong 19 file qua, Ty
 
 ## Giới hạn hiện tại
 
-Đây là sáu mươi lăm đợt triển khai trong phạm vi ứng dụng đầy đủ, chưa phải bản đầy đủ chức năng. Xem `IMPLEMENTATION.md`.
+Đây là sáu mươi sáu đợt triển khai trong phạm vi ứng dụng đầy đủ, chưa phải bản đầy đủ chức năng. Xem `IMPLEMENTATION.md`.
 
 - Giữ chính sách một phiên của backend; đăng nhập mobile có thể thay thế phiên web. Chưa thay đổi mô hình phiên theo thiết bị.
 - Super Admin nhận challenge 202 được chặn an toàn, chưa có UI hoàn tất MFA. Không hạ yêu cầu xác thực.

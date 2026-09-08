@@ -9,6 +9,8 @@ import { canReadPayrollRuns, validPayrollPeriod } from "./runModel";
 import { parsePeriodInputs, periodInputFields, inputValue, type PeriodInputs } from "./periodInputModel";
 import { canEditPeriodInput } from "./periodInputEditModel";
 import { EditPeriodInput } from "./EditPeriodInput";
+import { CreatePeriodInput } from "./CreatePeriodInput";
+import { canCreatePayrollRun } from "./createRunModel";
 export function PayrollPeriodInputs({
   period,
   employees,
@@ -29,6 +31,7 @@ export function PayrollPeriodInputs({
   const [limit, setLimit] = useState(20);
   const [revision, setRevision] = useState(0);
   const [editing, setEditing] = useState<string | null>(null);
+  const [creating, setCreating] = useState(false);
   useFocusEffect(
     useCallback(() => {
       let active = true;
@@ -36,6 +39,7 @@ export function PayrollPeriodInputs({
       setError(null);
       setExpanded(null);
       setEditing(null);
+      setCreating(false);
       setLimit(20);
       setSearch("");
       setLoading(false);
@@ -75,7 +79,7 @@ export function PayrollPeriodInputs({
       </Text>
       <Button
         title="Tải lại dữ liệu đối soát"
-        disabled={loading || !!editing}
+        disabled={loading || !!editing || creating}
         onPress={() => setRevision((value) => value + 1)}
       />
       {loading && <Loading />}
@@ -88,9 +92,19 @@ export function PayrollPeriodInputs({
               : "Dữ liệu đầu vào đã khóa theo trạng thái kỳ."}
           </Text>
           {data.needsRefresh && <Text style={styles.text}>Bảng lương cần cập nhật sau thay đổi dữ liệu đầu vào.</Text>}
+          {data.editable && canCreatePayrollRun(user, branchId) && (
+            <Button
+              title="Thêm đối soát cho nhân viên"
+              disabled={!!editing || creating}
+              onPress={() => setCreating(true)}
+            />
+          )}
+          {creating && (
+            <CreatePeriodInput period={period} data={data} onClose={() => setCreating(false)} onChanged={onChanged} />
+          )}
           <Field
             label="Tìm nhân viên, mã hoặc lý do"
-            editable={!editing}
+            editable={!editing && !creating}
             value={search}
             onChangeText={(value) => {
               setSearch(value);
@@ -105,7 +119,7 @@ export function PayrollPeriodInputs({
               <Text style={styles.heading}>{nameOf(item.employeeId)}</Text>
               <Button
                 title={expanded === item.employeeId ? "Thu gọn" : "Xem giá trị đối soát"}
-                disabled={!!editing}
+                disabled={!!editing || creating}
                 onPress={() => setExpanded(expanded === item.employeeId ? null : item.employeeId)}
               />
               {expanded === item.employeeId && (
@@ -127,7 +141,7 @@ export function PayrollPeriodInputs({
                   {canEditPeriodInput(user, branchId, data.editable, item) && (
                     <Button
                       title="Chỉnh dữ liệu đối soát"
-                      disabled={!!editing}
+                      disabled={!!editing || creating}
                       onPress={() => setEditing(item.employeeId)}
                     />
                   )}

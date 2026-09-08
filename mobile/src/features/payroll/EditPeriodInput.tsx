@@ -13,6 +13,7 @@ export function EditPeriodInput({
   onClose,
   onChanged,
   variables,
+  creating = false,
 }: {
   item: PeriodInput;
   editable: boolean;
@@ -20,6 +21,7 @@ export function EditPeriodInput({
   onClose: () => void;
   onChanged: () => void;
   variables: PeriodInputs["variables"];
+  creating?: boolean;
 }) {
   const { user, selectedBranch } = useSession();
   const allowed = canEditPeriodInput(user, selectedBranch?._id || user?.branchId, editable, item);
@@ -58,7 +60,7 @@ export function EditPeriodInput({
   return (
     <Card>
       <Text style={styles.heading}>
-        Chỉnh đối soát · {name} · {item.periodKey}
+        {creating ? "Tạo đối soát" : "Chỉnh đối soát"} · {name} · {item.periodKey}
       </Text>
       <Text style={styles.muted}>
         Chi nhánh: {selectedBranch?.name || "Chi nhánh của phiên đăng nhập"}. Ô trống giữ dữ liệu cũ; nhập 0 để ghi đè
