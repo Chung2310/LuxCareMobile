@@ -1,5 +1,6 @@
 import * as SecureStore from "expo-secure-store";
 import { MobileApi } from "./client";
+import { createPayrollService } from "../../../src/services/payrollService";
 import { createHrCredentialService } from "../../../src/services/hrCredentialService";
 import { createHrContractService } from "../../../src/services/hrContractService";
 import { createRecruitmentService } from "../../../src/services/recruitmentService";
@@ -38,6 +39,7 @@ function createApi() {
   }
 }
 export const api = createApi();
+export const payroll = createPayrollService(api.transport);
 export const credentials = createHrCredentialService(api.transport);
 export const contracts = createHrContractService(api.transport);
 export const dashboard = createDashboardService(api.transport);

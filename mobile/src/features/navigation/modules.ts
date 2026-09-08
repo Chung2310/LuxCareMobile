@@ -4,9 +4,16 @@ import { calendarAccess } from "../calendar/model";
 import { recruitmentAccess } from "../recruitment/access";
 import { canReadContracts } from "../contracts/model";
 import { canReadCredentials } from "../credentials/model";
+import { canReadPayslips } from "../payroll/model";
 export function availableModules(user: UserProfile | null) {
   const hr = canUseModule(user, "hr");
   return [
+    {
+      title: "Phiếu lương của tôi",
+      description: "Kỳ lương đã phát hành, thu nhập và khấu trừ",
+      href: "/(tabs)/payslips" as const,
+      visible: canReadPayslips(user),
+    },
     {
       title: "Văn bằng & chứng chỉ",
       description: "Hồ sơ chuyên môn, thời hạn và tài liệu",
