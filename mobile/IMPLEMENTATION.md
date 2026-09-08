@@ -180,6 +180,10 @@ Sửa/hoàn tác biến đang áp dụng trong form đối soát. Khi sửa gử
 
 Thêm bản ghi đối soát từ roster chi nhánh, loại người đã có dữ liệu, tìm tên/mã và chọn nhân viên trước dùng form hiện có. Bản ghi khởi tạo version 0, yêu cầu giá trị/lý do, kiểm tra response version 1 và dữ liệu; tải lại cả kỳ sau kết quả/lỗi, không retry. Chưa bulk/quản trị biến hoặc UAT thiết bị/staging.
 
+## Đợt sáu mươi bảy
+
+Danh mục biến lương toàn công ty: tìm/lọc/xem thêm và tạo nháp theo quyền quản lý kỳ. Tái sử dụng service FE, kiểm tra mã/đơn vị/mặc định/nội dung phản hồi, xem lại phạm vi công ty và khóa gửi trùng. Chưa sửa/áp dụng/ngưng biến hoặc UAT thiết bị/staging.
+
 ## Đợt tiếp theo
 
 1. Kiểm chứng đăng nhập/thông báo/phòng ban với staging và thiết bị thật; chốt hành vi phiên web/mobile.
@@ -188,6 +192,8 @@ Thêm bản ghi đối soát từ roster chi nhánh, loại người đã có d�
 4. Tiếp tục các module còn lại trong bảng, ghi rõ màn hình và thao tác đã nghiệm thu.
 
 ## Tiêu chí nghiệm thu từng module
+
+Đợt sáu mươi bảy: 363/363 test trong 64 file qua; TypeScript và export Hermes Android/iOS qua. Kiểm tra quyền/phạm vi/mã trùng/mặc định, phản hồi draft và service/lỗi không retry. Chưa UAT thiết bị/staging.
 
 Đợt sáu mươi sáu: 354/354 test trong 63 file qua; TypeScript và export Hermes Android/iOS qua. Kiểm tra roster/phạm vi/trùng, khởi tạo version 0, giá trị bắt buộc/0/custom và phản hồi version 1. Chưa UAT thiết bị/staging.
 
