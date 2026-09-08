@@ -2,6 +2,7 @@ import { browserTransport, type ServiceTransport } from "./serviceTransport";
 import type { Payslip, PayslipDetail } from "../types/payslip";
 import type { PayrollRun } from "../types/payrollRun";
 import type { PayrollPayment } from "../types/payrollPayment";
+import type { PayrollAdjustment } from "../types/payrollAdjustment";
 
 export function createPayrollService({ fetch, getAccessToken }: ServiceTransport) {
   async function payslipResponse(runId: string, employeeId: string, signal?: AbortSignal) {
@@ -94,7 +95,12 @@ export function createPayrollService({ fetch, getAccessToken }: ServiceTransport
     markPaid: (runId: string, payload: { expectedVersion: number }) =>
       request(`/runs/${runId}/mark-paid`, { method: "POST", body: JSON.stringify(payload) }),
     reset: (periodKey: string) => request(`/periods/${periodKey}`, { method: "DELETE" }),
-    getAdjustments: (periodKey: string) => request(`/periods/${periodKey}/adjustments`),
+    getAdjustments: async (periodKey: string): Promise<PayrollAdjustment[]> => {
+      const result = await request(`/periods/${encodeURIComponent(periodKey)}/adjustments`);
+      if (!Array.isArray(result) || result.some((item) => item.periodKey !== periodKey))
+        throw new Error("Dữ liệu điều chỉnh không khớp kỳ lương.");
+      return result;
+    },
     createAdjustment: (periodKey: string, payload: any) =>
       request(`/periods/${periodKey}/adjustments`, { method: "POST", body: JSON.stringify(payload) }),
     approveAdjustment: (periodKey: string, adjustmentId: string) =>

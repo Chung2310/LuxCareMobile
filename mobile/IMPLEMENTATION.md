@@ -15,7 +15,7 @@ Mục tiêu cuối: đối chiếu mọi màn hình/thao tác/quyền/API của 
 | Nghỉ phép / đơn từ | leaveService, types/leave, LeaveRequestsTab | Đã có 4 loại yêu cầu, nộp/duyệt/từ chối/xóa, số dư phép, biểu mẫu và tệp đính kèm; chờ UAT thiết bị/staging |
 | Hợp đồng / chứng chỉ | components/hr, shared/hr-credential, hrContractService, hrContractFiles, hrCredentialService | Hợp đồng có tạo/sửa/gia hạn, upload khi tạo, tra cứu và tải/chia sẻ; chưa thay/gỡ tệp đã lưu hoặc nhiều tệp mỗi nhóm. Chứng chỉ có tạo/sửa/xóa, danh sách/tìm/lọc/phân trang, thống kê, chi tiết, upload/thay tài liệu và tải/chia sẻ; chưa gỡ tài liệu đã lưu hoặc push nhắc hạn |
 | Tuyển dụng | recruitmentService, rosterService, types/recruitment | Có tin tuyển dụng theo chi nhánh: tạo/sửa nội dung, tìm/lọc/phân trang, chi tiết, chuyển trạng thái, xóa mềm/khôi phục; ứng viên có tạo/sửa/cảnh báo trùng/tìm/lọc/phân trang/hồ sơ/lịch sử/chuyển bước/gán người phụ trách/xóa mềm/khôi phục; phỏng vấn có danh sách/lọc/phân trang/tạo/sửa/trạng thái/kết quả/gán người/xóa mềm/khôi phục; quản trị pipeline; upload/thay/tải/chia sẻ/gỡ attachment JD/CV riêng theo quyền; có xem/sửa/gỡ liên kết và upload JD/CV công khai; chờ UAT thiết bị/staging |
-| Tiền lương | payrollService, types/payslip, types/payrollRun, types/payrollPayment, components/hr/payrollDetails | Có phiếu lương cá nhân, chi tiết và chia sẻ HTML; tra cứu bảng lương theo kỳ, trạng thái, nhân viên và tổng thực nhận; lịch sử thanh toán, lọc trạng thái và phân bổ nhân viên. Chưa tạo/tính kỳ/công thức/duyệt/chốt/ghi thanh toán, PDF hoặc in native |
+| Tiền lương | payrollService, types/payslip, types/payrollRun, types/payrollPayment, types/payrollAdjustment, components/hr/payrollDetails | Có phiếu lương cá nhân và chia sẻ HTML; tra cứu kỳ, nhân viên, tổng thực nhận; lịch sử thanh toán và phân bổ; tra cứu điều chỉnh theo loại/trạng thái/nhân viên/lý do. Chưa tạo/tính kỳ/công thức/duyệt/chốt/ghi thanh toán/ghi điều chỉnh, PDF hoặc in native |
 | Công việc / Kanban / KPI | kanbanService, kanbanMediaService, monthlyKpiService, types/hr, kanbanTaskTime | Có CRUD công việc/dự án, lịch sử, tiến độ; CRUD/hoàn thành/gán người cho việc nhỏ; upload/link/gỡ/tải tệp; KPI tháng theo quyền; chưa bảng kéo thả, ghi âm/quay trực tiếp, socket |
 | Chat | internalChatService, socketService | Chưa chuyển; cần lifecycle/reconnect native |
 | AI / kho kiến thức | assistantService, assistantKnowledgeService, chatbotRequest | Chưa chuyển; cần streaming/upload native |
@@ -83,6 +83,10 @@ Tra cứu bảng lương theo YYYY-MM, trạng thái, tìm nhân viên, tổng t
 ## Đợt bốn mươi hai
 
 Lịch sử thanh toán của kỳ qua API có xác thực: trạng thái, phân bổ nhân viên, ghi chú, mốc ngày và liên kết chứng từ dạng văn bản. Tổng chỉ tính khoản confirmed, không cộng lại allocations. Cần quyền đọc kỳ và đọc thanh toán; không mở bằng quyền manage đơn lẻ. Lọc trạng thái trên danh sách API trả về, chưa phân trang server. Chưa thao tác ghi thanh toán hoặc UAT thiết bị/staging.
+
+## Đợt bốn mươi ba
+
+Tra cứu điều chỉnh phụ cấp/thưởng/khấu trừ/điều chỉnh khác theo kỳ, lọc loại/trạng thái/tìm nhân viên hoặc lý do, đặt lại và tải lại. Không phụ thuộc kỳ đã có run. Kiểm tra quyền đọc kỳ và dữ liệu trả đúng kỳ; không suy diễn khoản đã duyệt đã ảnh hưởng thực nhận. Chưa tạo/duyệt/từ chối điều chỉnh hoặc UAT thiết bị/staging.
 
 ## Đợt tiếp theo
 
