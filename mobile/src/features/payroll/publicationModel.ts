@@ -14,6 +14,19 @@ export function publicationEmployees(run: PayrollRun, selected: string[]) {
     throw new Error("Chọn ít nhất một nhân viên thuộc bảng lương hiện tại.");
   return ids;
 }
+export function canWithdrawPayslip(user: UserProfile | null, run: PayrollRun, employeeId: string) {
+  return (
+    canPublishPayslips(user, run) &&
+    !run.effectiveError &&
+    !!run.effectiveLines?.some((line) => line.employeeId === employeeId) &&
+    !!run.publishedEmployeeIds?.includes(employeeId)
+  );
+}
+export function validateWithdrawalResponse(value: unknown, runId: string, employeeId: string) {
+  const doc = value as { runId?: string; employeeId?: string; status?: string } | null;
+  if (!doc || doc.runId !== runId || doc.employeeId !== employeeId || doc.status !== "withdrawn")
+    throw new Error("Kết quả thu hồi không khớp phiếu lương đã chọn.");
+}
 export function validatePublicationResponse(value: unknown, runId: string, ids: string[]) {
   if (!Array.isArray(value) || value.length !== ids.length) throw new Error("Kết quả phát hành chưa đầy đủ.");
   const received = new Set<string>();

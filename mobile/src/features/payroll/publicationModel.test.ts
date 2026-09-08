@@ -2,7 +2,13 @@ import { expect, it, vi } from "vitest";
 import type { UserProfile } from "../../../../src/types/common";
 import type { PayrollRun } from "../../../../src/types/payrollRun";
 import { createPayrollService } from "../../../../src/services/payrollService";
-import { canPublishPayslips, publicationEmployees, validatePublicationResponse } from "./publicationModel";
+import {
+  canPublishPayslips,
+  canWithdrawPayslip,
+  publicationEmployees,
+  validatePublicationResponse,
+  validateWithdrawalResponse,
+} from "./publicationModel";
 const user = {
   uid: "u",
   companyCode: "A",
@@ -18,6 +24,57 @@ const run: PayrollRun = {
     { employeeId: "b", calculation: {} },
   ],
 };
+it("withdraws only an effective published employee with management permission", () => {
+  const published = { ...run, publishedEmployeeIds: ["a", "outside"] };
+  expect(canWithdrawPayslip(user, published, "a")).toBe(true);
+  expect(canWithdrawPayslip(user, { ...published, status: "paid" }, "a")).toBe(true);
+  for (const id of ["b", "outside", ""]) expect(canWithdrawPayslip(user, published, id)).toBe(false);
+  for (const value of [
+    run,
+    { ...published, status: "draft" },
+    { ...published, effectiveLines: undefined },
+    { ...published, effectiveError: { message: "stale" } },
+  ])
+    expect(canWithdrawPayslip(user, value, "a")).toBe(false);
+  expect(canWithdrawPayslip(null, published, "a")).toBe(false);
+  expect(
+    canWithdrawPayslip({ ...user, permissions: ["payroll-period:read", "payroll-payment:read"] }, published, "a"),
+  ).toBe(false);
+});
+it("validates the withdrawn employee and run rather than accepting any successful response", () => {
+  const doc = { runId: "r", employeeId: "a", status: "withdrawn" };
+  expect(() => validateWithdrawalResponse(doc, "r", "a")).not.toThrow();
+  for (const value of [
+    null,
+    [],
+    {},
+    { ...doc, status: "published" },
+    { ...doc, employeeId: "b" },
+    { ...doc, runId: "other" },
+  ])
+    expect(() => validateWithdrawalResponse(value, "r", "a")).toThrow();
+});
+it("withdraws through the encoded authenticated endpoint without a publication payload", async () => {
+  const doc = { runId: "r/1", employeeId: "a?2", status: "withdrawn" };
+  const fetch = vi.fn().mockResolvedValue(new Response(JSON.stringify({ data: doc })));
+  const value = await createPayrollService({ fetch, getAccessToken: () => "token" }).withdrawPayslip("r/1", "a?2");
+  expect(value).toEqual(doc);
+  expect(fetch).toHaveBeenCalledWith(
+    "/api/v1/payroll/runs/r%2F1/payslips/a%3F2/withdraw",
+    expect.objectContaining({
+      method: "POST",
+      headers: { "Content-Type": "application/json", Authorization: "Bearer token" },
+    }),
+  );
+  expect(fetch.mock.calls[0][1].body).toBeUndefined();
+});
+it.each([403, 404, 500])("does not retry a withdrawal refusal %s", async (status) => {
+  const fetch = vi.fn().mockResolvedValue(new Response(JSON.stringify({ code: "PAYSLIP_NOT_FOUND" }), { status }));
+  await expect(
+    createPayrollService({ fetch, getAccessToken: () => "t" }).withdrawPayslip("r", "a"),
+  ).rejects.toMatchObject({ status, code: "PAYSLIP_NOT_FOUND" });
+  expect(fetch).toHaveBeenCalledOnce();
+});
 it("requires period read, payment manage, HR company scope and a closed or paid run", () => {
   expect(canPublishPayslips(user, run)).toBe(true);
   expect(canPublishPayslips({ ...user, permissions: ["*"] }, { ...run, status: "paid" })).toBe(true);

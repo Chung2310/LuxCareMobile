@@ -5,7 +5,13 @@ import type { PayrollRun } from "../../../../src/types/payrollRun";
 import { payroll } from "../../api/services";
 import { messageOf, useSession } from "../../auth/SessionProvider";
 import { Button, Card, ErrorText, Field, styles } from "../../ui";
-import { canPublishPayslips, publicationEmployees, validatePublicationResponse } from "./publicationModel";
+import {
+  canPublishPayslips,
+  canWithdrawPayslip,
+  publicationEmployees,
+  validatePublicationResponse,
+  validateWithdrawalResponse,
+} from "./publicationModel";
 export function PayslipPublication({ run, onChanged }: { run: PayrollRun; onChanged: () => void }) {
   const { user, selectedBranch } = useSession();
   const allowed = canPublishPayslips(user, run);
@@ -17,6 +23,7 @@ export function PayslipPublication({ run, onChanged }: { run: PayrollRun; onChan
   const [busy, setBusy] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [done, setDone] = useState(false);
+  const [withdrawing, setWithdrawing] = useState<string | null>(null);
   useFocusEffect(
     useCallback(() => {
       active.current = true;
@@ -50,6 +57,51 @@ export function PayslipPublication({ run, onChanged }: { run: PayrollRun; onChan
     }
   };
   if (!allowed) return null;
+  if (withdrawing) {
+    const employee = lines.find((line) => line.employeeId === withdrawing);
+    const withdraw = async () => {
+      if (attempted.current || !canWithdrawPayslip(user, run, withdrawing)) return;
+      attempted.current = true;
+      setBusy(true);
+      try {
+        const saved = await payroll.withdrawPayslip(run._id, withdrawing);
+        validateWithdrawalResponse(saved, run._id, withdrawing);
+        if (active.current) setDone(true);
+      } catch (error) {
+        if (active.current) setError(`${messageOf(error)} Tải lại để kiểm tra trạng thái trước khi thao tác tiếp.`);
+      } finally {
+        if (active.current) setBusy(false);
+      }
+    };
+    return (
+      <Card>
+        <Text style={styles.heading}>Thu hồi phiếu lương · {run.periodKey}</Text>
+        <Text style={styles.text}>{employee?.employeeName || withdrawing}</Text>
+        <Text style={styles.muted}>Chi nhánh: {selectedBranch?.name || "Chi nhánh của phiên đăng nhập"}</Text>
+        {done ? (
+          <Text style={styles.text}>Đã thu hồi phiếu lương. Tải lại để cập nhật trạng thái.</Text>
+        ) : (
+          <>
+            <Text style={styles.text}>
+              Sau khi thu hồi, phiếu này sẽ không còn trong danh sách phiếu được phát hành cho nhân viên. Có thể phát
+              hành lại khi cần.
+            </Text>
+            <Text style={styles.muted}>
+              Bản đã tải hoặc chia sẻ trước đó vẫn có thể tồn tại trên thiết bị hay ứng dụng nhận.
+            </Text>
+            <Button
+              title={busy ? "Đang thu hồi…" : "Xác nhận thu hồi phiếu lương"}
+              disabled={busy || !!error || !canWithdrawPayslip(user, run, withdrawing)}
+              onPress={() => void withdraw()}
+            />
+            {!attempted.current && <Button title="Quay lại" onPress={() => setWithdrawing(null)} />}
+          </>
+        )}
+        <ErrorText message={error} />
+        {(done || error) && <Button title="Tải lại trạng thái kỳ lương" disabled={busy} onPress={onChanged} />}
+      </Card>
+    );
+  }
   return (
     <Card>
       <Text style={styles.heading}>Phát hành phiếu lương · {run.periodKey}</Text>
@@ -98,6 +150,9 @@ export function PayslipPublication({ run, onChanged }: { run: PayrollRun; onChan
                     )
                   }
                 />
+              )}
+              {!confirming && canWithdrawPayslip(user, run, line.employeeId) && (
+                <Button title="Thu hồi phiếu đã phát hành" onPress={() => setWithdrawing(line.employeeId)} />
               )}
             </Card>
           ))}

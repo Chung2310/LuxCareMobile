@@ -429,6 +429,14 @@ Kiểm tra: 13/13 test trong 5 file qua; TypeScript web/mobile và bundle Hermes
 - Tái sử dụng publishPayslips của FE. Chưa thu hồi phiếu hoặc kiểm thử phát hành trên thiết bị/staging thật.
 - Kiểm tra: 219/219 test trong 46 file, TypeScript và export Hermes Android/iOS qua (không phải APK/IPA).
 
+## Đợt bốn mươi chín: thu hồi phiếu lương
+
+- Thu hồi từng phiếu đang được phát hành từ danh sách nhân viên trong kỳ closed/paid, dùng cùng quyền đọc kỳ/quản lý thanh toán và phạm vi phiên hiện tại.
+- Xác nhận tên nhân viên, kỳ và chi nhánh trước khi gửi; có quay lại trước thao tác. Khóa phát hành/thu hồi đồng thời trong panel và khóa gửi lại sau lỗi.
+- Kiểm tra phản hồi đúng kỳ/nhân viên/trạng thái withdrawn; thành công hoặc lỗi đều cho tải lại kỳ. Phiếu không còn trong danh sách phát hành của nhân viên sau thu hồi; bản đã tải/chia sẻ trước đó không bị xóa.
+- Tận dụng payrollService và panel phát hành hiện có. Chưa thu hồi hàng loạt, lý do thu hồi riêng hoặc UAT thiết bị/staging.
+- Kiểm tra: 225/225 test trong 46 file, TypeScript và export Hermes Android/iOS qua (không phải APK/IPA).
+
 ## Quy tắc dùng lại FE (áp dụng cho các đợt tiếp)
 
 Service được xuất dưới dạng `createXService(transport)` cùng singleton mặc định cho web. Transport chỉ cung cấp `fetch` và `getAccessToken`; mobile inject API client, web giữ global fetch được interceptor hiện có bọc. Không polyfill localStorage/window, không sao chép service để tạo hai phiên bản endpoint. UI DOM/Tailwind phải chuyển thành component native. Trước khi chuyển service tiếp theo, rà soát các import gián tiếp tới Toast, auth, browser storage, window/document và file APIs.
@@ -451,7 +459,7 @@ Kết quả đợt ba ngày 2026-09-08: 90/90 kiểm thử trong 19 file qua, Ty
 
 ## Giới hạn hiện tại
 
-Đây là bốn mươi tám đợt triển khai trong phạm vi ứng dụng đầy đủ, chưa phải bản đầy đủ chức năng. Xem `IMPLEMENTATION.md`.
+Đây là bốn mươi chín đợt triển khai trong phạm vi ứng dụng đầy đủ, chưa phải bản đầy đủ chức năng. Xem `IMPLEMENTATION.md`.
 
 - Giữ chính sách một phiên của backend; đăng nhập mobile có thể thay thế phiên web. Chưa thay đổi mô hình phiên theo thiết bị.
 - Super Admin nhận challenge 202 được chặn an toàn, chưa có UI hoàn tất MFA. Không hạ yêu cầu xác thực.

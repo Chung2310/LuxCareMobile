@@ -149,6 +149,10 @@ export function createPayrollService({ fetch, getAccessToken }: ServiceTransport
     confirmPayment: (paymentId: string) => request(`/payments/${paymentId}/confirm`, { method: "POST" }),
     cancelPayment: (paymentId: string) => request(`/payments/${paymentId}/cancel`, { method: "POST" }),
     reversePayment: (paymentId: string) => request(`/payments/${paymentId}/reverse`, { method: "POST" }),
+    withdrawPayslip: (runId: string, employeeId: string) =>
+      request(`/runs/${encodeURIComponent(runId)}/payslips/${encodeURIComponent(employeeId)}/withdraw`, {
+        method: "POST",
+      }),
     publishPayslips: (runId: string, employeeIds?: string[]) =>
       request(`/runs/${encodeURIComponent(runId)}/payslips/publish`, {
         method: "POST",
