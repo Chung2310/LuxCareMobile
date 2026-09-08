@@ -2,6 +2,23 @@ import { browserTransport, type ServiceTransport } from "./serviceTransport";
 import type { Payslip, PayslipDetail } from "../types/payslip";
 
 export function createPayrollService({ fetch, getAccessToken }: ServiceTransport) {
+  async function payslipResponse(runId: string, employeeId: string, signal?: AbortSignal) {
+    const response = await fetch(
+      `/api/v1/payroll/runs/${encodeURIComponent(runId)}/payslips/${encodeURIComponent(employeeId)}/print`,
+      {
+        headers: { Authorization: `Bearer ${getAccessToken()}` },
+        signal,
+      },
+    );
+    if (!response.ok) {
+      const body = await response.json().catch(() => ({}));
+      throw Object.assign(
+        new Error(body.message || "Không tải được phiếu lương. Phiếu có thể đã bị thu hồi; hãy tải lại danh sách."),
+        { status: response.status, code: body.code },
+      );
+    }
+    return response;
+  }
   async function request(path: string, init?: RequestInit) {
     const response = await fetch(`/api/v1/payroll${path}`, {
       cache: "no-store",
@@ -95,15 +112,16 @@ export function createPayrollService({ fetch, getAccessToken }: ServiceTransport
       if (!Array.isArray(result)) throw new Error("Dữ liệu phiếu lương không hợp lệ.");
       return result;
     },
-    printPayslip: async (runId: string, employeeId: string) => {
-      const response = await fetch(`/api/v1/payroll/runs/${runId}/payslips/${employeeId}/print`, {
-        headers: { Authorization: `Bearer ${getAccessToken()}` },
-      });
-      if (!response.ok) {
-        const body = await response.json().catch(() => ({}));
-        throw new Error(body.message || "Unable to print payslip");
-      }
-      return response.blob();
+    printPayslip: async (runId: string, employeeId: string) => (await payslipResponse(runId, employeeId)).blob(),
+    downloadPayslip: async (runId: string, employeeId: string, signal?: AbortSignal) => {
+      const response = await payslipResponse(runId, employeeId, signal);
+      if (response.headers.get("content-type")?.split(";")[0].trim().toLowerCase() !== "text/html")
+        throw new Error("Định dạng phiếu lương không hợp lệ.");
+      if (Number(response.headers.get("content-length")) > 2 * 1024 * 1024)
+        throw new Error("Phiếu lương vượt quá 2 MB.");
+      const bytes = new Uint8Array(await response.arrayBuffer());
+      if (!bytes.length || bytes.length > 2 * 1024 * 1024) throw new Error("Phiếu lương trống hoặc vượt quá 2 MB.");
+      return bytes;
     },
     exportWorkbook: async (runId: string, type: "detailed" | "insurance" | "pit" | "bank_transfer") => {
       const response = await fetch(`/api/v1/payroll/runs/${runId}/exports`, {

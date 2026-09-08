@@ -357,6 +357,14 @@ Kiểm tra: 13/13 test trong 5 file qua; TypeScript web/mobile và bundle Hermes
 - Lọc kỳ trong danh sách API đã trả, endpoint cá nhân chưa phân trang. Chưa tạo/duyệt/chốt kỳ, thanh toán, in/chia sẻ phiếu hoặc UAT thiết bị/staging.
 - Kiểm tra: 163/163 test trong 36 file, TypeScript và export Hermes Android/iOS qua (không phải APK/IPA).
 
+## Đợt bốn mươi: lưu/chia sẻ phiếu lương
+
+- Tải bản HTML do API LuxCare phát hành và mở bảng chia sẻ Android/iOS để chọn ứng dụng nhận hoặc nơi lưu. Không phải PDF, chưa có in native.
+- Dùng chung endpoint/service in của FE với Bearer token, kiểm tra quyền và trạng thái phát hành mỗi lần tải. Không gửi access token trong tệp hoặc URL mở ngoài.
+- Kiểm tra MIME HTML, nội dung không rỗng, tối đa 2 MB; timeout 120 giây gồm đọc body, hủy khi rời màn hình và chặn bấm trùng trên cùng phiếu.
+- Dọn cache khi hủy trước chia sẻ; giữ tệp đã chuyển cho bảng chia sẻ để ứng dụng nhận đọc được. Chưa có chính sách dọn cache riêng, chưa UAT thiết bị/staging.
+- Kiểm tra: 175/175 test trong 37 file, TypeScript và export Hermes Android/iOS qua (không phải APK/IPA).
+
 ## Quy tắc dùng lại FE (áp dụng cho các đợt tiếp)
 
 Service được xuất dưới dạng `createXService(transport)` cùng singleton mặc định cho web. Transport chỉ cung cấp `fetch` và `getAccessToken`; mobile inject API client, web giữ global fetch được interceptor hiện có bọc. Không polyfill localStorage/window, không sao chép service để tạo hai phiên bản endpoint. UI DOM/Tailwind phải chuyển thành component native. Trước khi chuyển service tiếp theo, rà soát các import gián tiếp tới Toast, auth, browser storage, window/document và file APIs.
@@ -379,7 +387,7 @@ Kết quả đợt ba ngày 2026-09-08: 90/90 kiểm thử trong 19 file qua, Ty
 
 ## Giới hạn hiện tại
 
-Đây là ba mươi chín đợt triển khai trong phạm vi ứng dụng đầy đủ, chưa phải bản đầy đủ chức năng. Xem `IMPLEMENTATION.md`.
+Đây là bốn mươi đợt triển khai trong phạm vi ứng dụng đầy đủ, chưa phải bản đầy đủ chức năng. Xem `IMPLEMENTATION.md`.
 
 - Giữ chính sách một phiên của backend; đăng nhập mobile có thể thay thế phiên web. Chưa thay đổi mô hình phiên theo thiết bị.
 - Super Admin nhận challenge 202 được chặn an toàn, chưa có UI hoàn tất MFA. Không hạ yêu cầu xác thực.

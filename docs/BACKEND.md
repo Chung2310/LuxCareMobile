@@ -2,6 +2,8 @@
 
 Backend được triển khai từ repository LuxCare riêng. Đặt origin của backend trong `mobile/.env`; không có tài khoản hoặc secrets mẫu trong repository mobile.
 
+Tải phiếu lương dùng GET `/api/v1/payroll/runs/:id/payslips/:employeeId/print` với Bearer token. Response hiện là `text/html`, có mẫu in và `window.print()` của backend; mobile lưu nguyên byte vào `.html` và mở bảng chia sẻ, không thực thi HTML trong app. API kiểm tra quyền, trạng thái phát hành và checksum; lỗi 403/404/409 được hiển thị, không dùng bản cũ để thay thế. Bản đã chia sẻ nằm trong cache thiết bị cho ứng dụng nhận đọc; chưa có xuất PDF/in native.
+
 - Login native gửi header `x-luxcare-client: native`. Backend phải trả refresh token cho native; refresh nhận token trong body, web tiếp tục dùng cookie HttpOnly.
 - Mobile dùng Bearer access token trong bộ nhớ và refresh token trong SecureStore. Giữ chính sách phiên của backend; đăng nhập có thể thay thế phiên web.
 - Các route phải giữ module/permission guard và phạm vi công ty/chi nhánh. Mobile gửi `x-branch-id` khi chọn chi nhánh; một số API còn nhận branchId trong query.

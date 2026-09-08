@@ -8,6 +8,7 @@ import { Button, Card, ErrorText, Loading, Page, styles } from "../../src/ui";
 import { ChoiceField } from "../../src/features/leave/ChoiceField";
 import { canReadPayslips, payslipMoney, payslipsForPeriod } from "../../src/features/payroll/model";
 import { PayslipDetails } from "../../src/features/payroll/PayslipDetails";
+import { SharePayslipButton } from "../../src/features/payroll/SharePayslipButton";
 export default function Payslips() {
   const { user, selectedBranch } = useSession();
   const allowed = canReadPayslips(user);
@@ -92,6 +93,7 @@ export default function Payslips() {
               onPress={() => setExpanded(expanded === key ? null : key)}
             />
             {expanded === key && <PayslipDetails item={item} />}
+            <SharePayslipButton item={item} />
           </Card>
         );
       })}

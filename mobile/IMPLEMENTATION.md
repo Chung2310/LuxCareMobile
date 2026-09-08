@@ -15,7 +15,7 @@ Mục tiêu cuối: đối chiếu mọi màn hình/thao tác/quyền/API của 
 | Nghỉ phép / đơn từ | leaveService, types/leave, LeaveRequestsTab | Đã có 4 loại yêu cầu, nộp/duyệt/từ chối/xóa, số dư phép, biểu mẫu và tệp đính kèm; chờ UAT thiết bị/staging |
 | Hợp đồng / chứng chỉ | components/hr, shared/hr-credential, hrContractService, hrContractFiles, hrCredentialService | Hợp đồng có tạo/sửa/gia hạn, upload khi tạo, tra cứu và tải/chia sẻ; chưa thay/gỡ tệp đã lưu hoặc nhiều tệp mỗi nhóm. Chứng chỉ có tạo/sửa/xóa, danh sách/tìm/lọc/phân trang, thống kê, chi tiết, upload/thay tài liệu và tải/chia sẻ; chưa gỡ tài liệu đã lưu hoặc push nhắc hạn |
 | Tuyển dụng | recruitmentService, rosterService, types/recruitment | Có tin tuyển dụng theo chi nhánh: tạo/sửa nội dung, tìm/lọc/phân trang, chi tiết, chuyển trạng thái, xóa mềm/khôi phục; ứng viên có tạo/sửa/cảnh báo trùng/tìm/lọc/phân trang/hồ sơ/lịch sử/chuyển bước/gán người phụ trách/xóa mềm/khôi phục; phỏng vấn có danh sách/lọc/phân trang/tạo/sửa/trạng thái/kết quả/gán người/xóa mềm/khôi phục; quản trị pipeline; upload/thay/tải/chia sẻ/gỡ attachment JD/CV riêng theo quyền; có xem/sửa/gỡ liên kết và upload JD/CV công khai; chờ UAT thiết bị/staging |
-| Tiền lương | payrollService, types/payslip, components/hr/payrollDetails | Có danh sách phiếu lương cá nhân đã phát hành, lọc kỳ và chi tiết công/thu nhập/khấu trừ/KPI, thực nhận/đã trả/còn lại. Chưa quản lý kỳ/công thức/duyệt/chốt/thanh toán hoặc in/chia sẻ |
+| Tiền lương | payrollService, types/payslip, components/hr/payrollDetails | Có danh sách phiếu lương cá nhân đã phát hành, lọc kỳ và chi tiết công/thu nhập/khấu trừ/KPI, thực nhận/đã trả/còn lại; tải/chia sẻ HTML từ API. Chưa quản lý kỳ/công thức/duyệt/chốt/thanh toán, PDF hoặc in native |
 | Công việc / Kanban / KPI | kanbanService, kanbanMediaService, monthlyKpiService, types/hr, kanbanTaskTime | Có CRUD công việc/dự án, lịch sử, tiến độ; CRUD/hoàn thành/gán người cho việc nhỏ; upload/link/gỡ/tải tệp; KPI tháng theo quyền; chưa bảng kéo thả, ghi âm/quay trực tiếp, socket |
 | Chat | internalChatService, socketService | Chưa chuyển; cần lifecycle/reconnect native |
 | AI / kho kiến thức | assistantService, assistantKnowledgeService, chatbotRequest | Chưa chuyển; cần streaming/upload native |
@@ -71,6 +71,10 @@ Tra cứu hợp đồng/chứng chỉ theo nhân viên bằng bộ chọn dùng 
 ## Đợt ba mươi chín
 
 Phiếu lương cá nhân dùng service payroll tách transport từ FE và helper chi tiết FE. Danh sách GET `/employee/me/payslips`, chi tiết GET `/runs/:id/lines/:employeeId`; quyền và bản phát hành kiểm tra ở backend. Có lọc kỳ trên dữ liệu đã tải, trạng thái rỗng/lỗi/tải lại, bỏ kết quả request khi rời màn hình. Không tự tính lại thực nhận hay lưu phiếu vào storage. Chưa quản lý kỳ lương, in/chia sẻ hoặc UAT thiết bị/staging.
+
+## Đợt bốn mươi
+
+Lưu/chia sẻ phiếu lương HTML từ endpoint in có xác thực. Giữ nội dung server, kiểm tra MIME/dung lượng khai báo và thực tế tối đa 2 MB; hủy theo lifecycle, timeout 120 giây, giữ cache sau chuyển cho bảng chia sẻ. API kiểm tra lại quyền/bản phát hành/checksum mỗi lần tải. Không tạo PDF hoặc gọi máy in native. Chưa UAT thiết bị/staging.
 
 ## Đợt tiếp theo
 
