@@ -15,7 +15,7 @@ Mục tiêu cuối: đối chiếu mọi màn hình/thao tác/quyền/API của 
 | Nghỉ phép / đơn từ | leaveService, types/leave, LeaveRequestsTab | Đã có 4 loại yêu cầu, nộp/duyệt/từ chối/xóa, số dư phép, biểu mẫu và tệp đính kèm; chờ UAT thiết bị/staging |
 | Hợp đồng / chứng chỉ | components/hr, shared/hr-credential, hrContractService, hrContractFiles, hrCredentialService | Hợp đồng có tạo/sửa/gia hạn, upload khi tạo, tra cứu và tải/chia sẻ; chưa thay/gỡ tệp đã lưu hoặc nhiều tệp mỗi nhóm. Chứng chỉ có tạo/sửa/xóa, danh sách/tìm/lọc/phân trang, thống kê, chi tiết, upload/thay tài liệu và tải/chia sẻ; chưa gỡ tài liệu đã lưu hoặc push nhắc hạn |
 | Tuyển dụng | recruitmentService, rosterService, types/recruitment | Có tin tuyển dụng theo chi nhánh: tạo/sửa nội dung, tìm/lọc/phân trang, chi tiết, chuyển trạng thái, xóa mềm/khôi phục; ứng viên có tạo/sửa/cảnh báo trùng/tìm/lọc/phân trang/hồ sơ/lịch sử/chuyển bước/gán người phụ trách/xóa mềm/khôi phục; phỏng vấn có danh sách/lọc/phân trang/tạo/sửa/trạng thái/kết quả/gán người/xóa mềm/khôi phục; quản trị pipeline; upload/thay/tải/chia sẻ/gỡ attachment JD/CV riêng theo quyền; có xem/sửa/gỡ liên kết và upload JD/CV công khai; chờ UAT thiết bị/staging |
-| Tiền lương | payrollService, types/payslip, types/payrollRun, types/payrollPayment, types/payrollAdjustment, types/payrollAudit, types/payrollIssue, components/hr/payrollDetails | Có phiếu lương và chia sẻ HTML; tạo kỳ nháp thường theo tháng và đồng bộ công đã tổng hợp; tra cứu kỳ, tổng tiền, nhân viên; lỗi/cảnh báo kỳ; lịch sử thanh toán; tạo/tra cứu/duyệt/từ chối điều chỉnh; nhật ký kỳ; xuất 4 mẫu Excel; phát hành và thu hồi phiếu theo nhân viên. Chưa tạo kỳ bổ sung/tổng hợp và khóa công kỳ/tính kỳ/công thức/duyệt kỳ/chốt/ghi thanh toán/sửa hoặc xóa điều chỉnh, PDF hoặc in native |
+| Tiền lương | payrollService, types/payslip, types/payrollRun, types/payrollPayment, types/payrollAdjustment, types/payrollAudit, types/payrollIssue, components/hr/payrollDetails | Có phiếu lương và chia sẻ HTML; tạo kỳ nháp thường theo tháng, đồng bộ công đã tổng hợp và khóa bản công; tra cứu kỳ, tổng tiền, nhân viên; lỗi/cảnh báo kỳ; lịch sử thanh toán; tạo/tra cứu/duyệt/từ chối điều chỉnh; nhật ký kỳ; xuất 4 mẫu Excel; phát hành và thu hồi phiếu theo nhân viên. Chưa tạo kỳ bổ sung/tổng hợp công kỳ/tính kỳ/công thức/duyệt kỳ/chốt/ghi thanh toán/sửa hoặc xóa điều chỉnh, PDF hoặc in native |
 | Công việc / Kanban / KPI | kanbanService, kanbanMediaService, monthlyKpiService, types/hr, kanbanTaskTime | Có CRUD công việc/dự án, lịch sử, tiến độ; CRUD/hoàn thành/gán người cho việc nhỏ; upload/link/gỡ/tải tệp; KPI tháng theo quyền; chưa bảng kéo thả, ghi âm/quay trực tiếp, socket |
 | Chat | internalChatService, socketService | Chưa chuyển; cần lifecycle/reconnect native |
 | AI / kho kiến thức | assistantService, assistantKnowledgeService, chatbotRequest | Chưa chuyển; cần streaming/upload native |
@@ -124,6 +124,10 @@ Tạo kỳ regular draft theo tháng sau khi GET xác nhận không có kỳ, v�
 
 Đồng bộ công kỳ draft theo expectedVersion và Idempotency-Key, dùng kết quả công đã tổng hợp ở backend. Xác nhận phạm vi, chặn gửi trùng, đối chiếu job và hiển thị số nhân viên/lỗi chặn. Tải lại kỳ và issues sau kết quả hoặc lỗi; không tự retry. Chưa tổng hợp công từ chấm công thô/khóa công/tính lương native hoặc UAT thiết bị/staging.
 
+## Đợt năm mươi ba
+
+Khóa công ngay sau lần đồng bộ không có lỗi blocking; xác nhận số người, gửi version mới, khóa thao tác đồng thời trong panel và kiểm tra snapshot/run trả về. Hiển thị mã bản công/số nhân viên, giữ trạng thái draft và cho tải lại. Chưa tính lương/mở khóa snapshot hoặc UAT thiết bị/staging.
+
 ## Đợt tiếp theo
 
 1. Kiểm chứng đăng nhập/thông báo/phòng ban với staging và thiết bị thật; chốt hành vi phiên web/mobile.
@@ -132,6 +136,8 @@ Tạo kỳ regular draft theo tháng sau khi GET xác nhận không có kỳ, v�
 4. Tiếp tục các module còn lại trong bảng, ghi rõ màn hình và thao tác đã nghiệm thu.
 
 ## Tiêu chí nghiệm thu từng module
+
+Đợt năm mươi ba: 260/260 test trong 50 file qua; TypeScript và export Hermes Android/iOS qua. Kiểm tra snapshot/kỳ/phiên bản, endpoint xác thực và lỗi blocking/chưa sync/xung đột không retry. Chưa UAT thiết bị/staging.
 
 Đợt năm mươi hai: 253/253 test trong 49 file qua; TypeScript và export Hermes Android/iOS qua. Kiểm tra quyền/version draft, key/header/payload, phản hồi job sai phạm vi hoặc chưa xong, số lượng và lỗi không retry. Chưa UAT thiết bị/staging.
 

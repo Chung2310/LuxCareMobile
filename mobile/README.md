@@ -461,6 +461,13 @@ Kiểm tra: 13/13 test trong 5 file qua; TypeScript web/mobile và bundle Hermes
 - Chưa tổng hợp công kỳ trên mobile, khóa công hoặc UAT thiết bị/staging.
 - Kiểm tra: 253/253 test trong 49 file, TypeScript và export Hermes Android/iOS qua (không phải APK/IPA).
 
+## Đợt năm mươi ba: khóa bản công kỳ lương
+
+- Sau đồng bộ thành công không có lỗi blocking, xác nhận số nhân viên và khóa bản công ngay trong panel đồng bộ. Dùng quyền/phạm vi kỳ nháp hiện có và expectedVersion mới sau đồng bộ.
+- Khóa gửi trùng và tải lại khi lỗi; đối chiếu runId/kỳ/trạng thái/version cùng snapshot có mã, thời gian khóa và danh sách nhân viên trước khi báo thành công.
+- Hiển thị số nhân viên và mã bản công; kỳ vẫn draft. Chưa tính lương, mở khóa/thay thế snapshot hoặc UAT thiết bị/staging. Sau khi rời panel cần đồng bộ lại trước khi khóa; API vẫn quyết định điều kiện thực tế.
+- Kiểm tra: 260/260 test trong 50 file, TypeScript và export Hermes Android/iOS qua (không phải APK/IPA).
+
 ## Quy tắc dùng lại FE (áp dụng cho các đợt tiếp)
 
 Service được xuất dưới dạng `createXService(transport)` cùng singleton mặc định cho web. Transport chỉ cung cấp `fetch` và `getAccessToken`; mobile inject API client, web giữ global fetch được interceptor hiện có bọc. Không polyfill localStorage/window, không sao chép service để tạo hai phiên bản endpoint. UI DOM/Tailwind phải chuyển thành component native. Trước khi chuyển service tiếp theo, rà soát các import gián tiếp tới Toast, auth, browser storage, window/document và file APIs.
@@ -483,7 +490,7 @@ Kết quả đợt ba ngày 2026-09-08: 90/90 kiểm thử trong 19 file qua, Ty
 
 ## Giới hạn hiện tại
 
-Đây là năm mươi hai đợt triển khai trong phạm vi ứng dụng đầy đủ, chưa phải bản đầy đủ chức năng. Xem `IMPLEMENTATION.md`.
+Đây là năm mươi ba đợt triển khai trong phạm vi ứng dụng đầy đủ, chưa phải bản đầy đủ chức năng. Xem `IMPLEMENTATION.md`.
 
 - Giữ chính sách một phiên của backend; đăng nhập mobile có thể thay thế phiên web. Chưa thay đổi mô hình phiên theo thiết bị.
 - Super Admin nhận challenge 202 được chặn an toàn, chưa có UI hoàn tất MFA. Không hạ yêu cầu xác thực.

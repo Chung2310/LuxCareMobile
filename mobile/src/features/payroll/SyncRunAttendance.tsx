@@ -7,6 +7,7 @@ import { payroll } from "../../api/services";
 import { useSession, messageOf } from "../../auth/SessionProvider";
 import { Button, Card, ErrorText, styles } from "../../ui";
 import { canSyncRunAttendance, syncAttendanceSummary } from "./syncAttendanceModel";
+import { lockedAttendanceSummary } from "./lockAttendanceModel";
 export function SyncRunAttendance({ run, onChanged }: { run: PayrollRun; onChanged: () => void }) {
   const { user, selectedBranch } = useSession();
   const allowed = canSyncRunAttendance(user, selectedBranch?._id || user?.branchId, run);
@@ -16,6 +17,9 @@ export function SyncRunAttendance({ run, onChanged }: { run: PayrollRun; onChang
   const [busy, setBusy] = useState(false);
   const [result, setResult] = useState<ReturnType<typeof syncAttendanceSummary> | null>(null);
   const [error, setError] = useState<string | null>(null);
+  const lockAttempted = useRef(false);
+  const [confirmLock, setConfirmLock] = useState(false);
+  const [locked, setLocked] = useState<ReturnType<typeof lockedAttendanceSummary> | null>(null);
   useFocusEffect(
     useCallback(() => {
       active.current = true;
@@ -40,6 +44,21 @@ export function SyncRunAttendance({ run, onChanged }: { run: PayrollRun; onChang
     }
   };
   if (!allowed) return null;
+  const lockAttendance = async () => {
+    if (!allowed || !result || result.blockingIssueCount !== 0 || !confirmLock || lockAttempted.current) return;
+    lockAttempted.current = true;
+    setBusy(true);
+    try {
+      const expectedVersion = run.version! + 1;
+      const saved = await payroll.lockRunAttendance(run._id, expectedVersion);
+      const summary = lockedAttendanceSummary(saved, run, expectedVersion);
+      if (active.current) setLocked(summary);
+    } catch (error) {
+      if (active.current) setError(`${messageOf(error)} Tải lại kỳ để kiểm tra trạng thái trước khi thao tác tiếp.`);
+    } finally {
+      if (active.current) setBusy(false);
+    }
+  };
   return (
     <Card>
       <Text style={styles.heading}>Đồng bộ công kỳ {run.periodKey}</Text>
@@ -71,6 +90,38 @@ export function SyncRunAttendance({ run, onChanged }: { run: PayrollRun; onChang
               {!attempted.current && <Button title="Quay lại" onPress={() => setConfirming(false)} />}
             </>
           )}
+        </>
+      )}
+      {result && !locked && result.blockingIssueCount === 0 && !error && (
+        <>
+          <Text style={styles.muted}>
+            Khóa công sẽ lưu bản công vừa đồng bộ để dùng tính lương. Kỳ lương vẫn là nháp.
+          </Text>
+          {!confirmLock ? (
+            <Button title="Khóa bản công vừa đồng bộ" onPress={() => setConfirmLock(true)} />
+          ) : (
+            <>
+              <Text style={styles.text}>
+                Xác nhận khóa công của {result.employeeCount} nhân viên cho kỳ {run.periodKey}.
+              </Text>
+              <Button
+                title={busy ? "Đang khóa công…" : "Xác nhận khóa công"}
+                disabled={busy}
+                onPress={() => void lockAttendance()}
+              />
+              {!lockAttempted.current && <Button title="Quay lại" onPress={() => setConfirmLock(false)} />}
+            </>
+          )}
+        </>
+      )}
+      {locked && (
+        <>
+          <Text style={styles.text}>
+            Đã khóa bản công của {locked.employeeCount} nhân viên. Tiếp tục tính lương trên LuxCare web.
+          </Text>
+          <Text selectable style={styles.muted}>
+            Mã bản công: {locked.snapshotId}
+          </Text>
         </>
       )}
       <ErrorText message={error} />
