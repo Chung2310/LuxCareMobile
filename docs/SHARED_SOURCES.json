@@ -1,0 +1,156 @@
+{
+  "sourceRepository": "https://github.com/Chung2310/LuxCare",
+  "snapshotDate": "2026-09-08",
+  "note": "Snapshot includes local frontend changes used by mobile; not an automatic upstream sync.",
+  "files": [
+    {
+      "path": "shared/permissions.ts",
+      "sha256": "b6382ab5db389efded6a814f220285d49a8e57ab0c2dc6084f4e5eb34d2b39b3"
+    },
+    {
+      "path": "shared/supply-inventory.ts",
+      "sha256": "b55d2be2af883beb72b83be1a292ac786b56894ebd3acfc755ed29a1421468b6"
+    },
+    {
+      "path": "src/components/hr/kanbanTaskTime.ts",
+      "sha256": "22c257942a8eb92f37a63336d935c128b62192a4d958ec488873ea481d473e6b"
+    },
+    {
+      "path": "src/config/attendanceFaceCheck.ts",
+      "sha256": "ab27f33dd78d9875175f70475359e3c2748087703163c74caf99bbbb0ce06813"
+    },
+    {
+      "path": "src/config/businessTypes.ts",
+      "sha256": "06d4d6397ebfe14e33ea3e2b20abe71edf28b1513b76af6d5ff7227a86aa627f"
+    },
+    {
+      "path": "src/config/modules.ts",
+      "sha256": "0432076c5bc3afe033694c7f2bfa55b1466719c3cf1befc00e6ea328d3bf2feb"
+    },
+    {
+      "path": "src/services/accountService.ts",
+      "sha256": "a5ae710150d5d79f44e494f0adaede753e0169a0bdddc386855330521e3c342d"
+    },
+    {
+      "path": "src/services/apiClientError.ts",
+      "sha256": "428df291d8399cb4efb8242a56eb85105c1fe647875e4722d0901e87fb6e0e9a"
+    },
+    {
+      "path": "src/services/attendanceErrors.ts",
+      "sha256": "bd8cd5fa1359b6655cbb1a52e0b545f222f12a6af3036a004a31f7fbc6c636ff"
+    },
+    {
+      "path": "src/services/attendanceService.ts",
+      "sha256": "ed018654906070b3d5b85a962b2df15658d770595cf3654593e20d1a1b79cc13"
+    },
+    {
+      "path": "src/services/branchService.ts",
+      "sha256": "a1b61a3abd3a2db807e04d875efa6b66bc6ce043938f6489fafced265f021652"
+    },
+    {
+      "path": "src/services/companyWorkCalendarService.ts",
+      "sha256": "d6b770fc47ed3b2ba3c3d3cc743db10cbcd4e7982739151133f745e541ee28e4"
+    },
+    {
+      "path": "src/services/dashboardService.ts",
+      "sha256": "cfd2876cab5bba791feae845e2969b38798ff087d58c612a9644d3ec17818419"
+    },
+    {
+      "path": "src/services/departmentService.ts",
+      "sha256": "33ae9de5e454176bd1d74ec525650f31d860d09288a629fc1c9fae9b85b26739"
+    },
+    {
+      "path": "src/services/hrCalendarService.ts",
+      "sha256": "b3292af181413df0ed97e28a0dac1f5e74d1a1a6098f21cdf5b7646eeabb3f38"
+    },
+    {
+      "path": "src/services/hrContractFiles.ts",
+      "sha256": "3b605629fd1ae40a7c616789dd5a50a88d651616dade22f840b2b3756cbdaeb8"
+    },
+    {
+      "path": "src/services/hrContractService.ts",
+      "sha256": "b08d4b54fc7cb09dca22c239063cf3890a4812a49809e2b4ed06aa55b1646c5f"
+    },
+    {
+      "path": "src/services/kanbanMediaService.ts",
+      "sha256": "da01b557ef6acbeef3606bd37d30b75e0b878db6f58a8686d2968c447ecafe9c"
+    },
+    {
+      "path": "src/services/kanbanService.ts",
+      "sha256": "919cb2ce5f2452b9553be4c61d3a06fb47ac720a7424c95f797c851df6a435e4"
+    },
+    {
+      "path": "src/services/leaveService.ts",
+      "sha256": "fe0e20d18aff1292e57f530213a9dafedc61e277a944d09e46d18c8bbaa210bb"
+    },
+    {
+      "path": "src/services/monthlyKpiService.ts",
+      "sha256": "b45635ef08754e0abdd38bbb0c74ef0306207f0357945351b2bb6090bcd04661"
+    },
+    {
+      "path": "src/services/notificationService.ts",
+      "sha256": "72250f9b72265d920923c585a4cb4a11b2098015f1cc259964e99c746533f1cb"
+    },
+    {
+      "path": "src/services/recruitmentService.ts",
+      "sha256": "b779f08cd2f5eb4b902dbe4dea178570cba2cbc13b7dc96d988d0691952212e2"
+    },
+    {
+      "path": "src/services/rosterService.ts",
+      "sha256": "a7718ead59e874f21cdd2b666a7403cc3c1ecbe70f57592b6cec2b4b5b4e3bdf"
+    },
+    {
+      "path": "src/services/serviceTransport.ts",
+      "sha256": "7d7fbf84b17d05416ba247773039461ca15e53d37189350358134c77d6e09bcd"
+    },
+    {
+      "path": "src/types/attendance.ts",
+      "sha256": "89eef0ebc9d900972c0801bf97a6e74a6b8291e52b7e8c62f920ecb36d574d0c"
+    },
+    {
+      "path": "src/types/common.ts",
+      "sha256": "afbf6146558c18724162b12a4cd46998f091416ff777366bba401a8a88e5b0ea"
+    },
+    {
+      "path": "src/types/dashboard.ts",
+      "sha256": "bb356b1496286624d6736c466189378d810056d11afef0d31375e8f1099392e2"
+    },
+    {
+      "path": "src/types/hr.ts",
+      "sha256": "12219606c2855d1e9ee34815e20f7fab3a443d29f64dfaed0c59abe115e22ce9"
+    },
+    {
+      "path": "src/types/hrContract.ts",
+      "sha256": "ecce0c2915a33123306424034aa849fd49a14e5814298a22285db42ff8bb17a5"
+    },
+    {
+      "path": "src/types/index.ts",
+      "sha256": "89be5f68126299a6604f3c1337a17eee63f65932c6ab0272f4dbb4ad1589caa6"
+    },
+    {
+      "path": "src/types/integrations.ts",
+      "sha256": "ea26199cc23d328256e027c7fb1713f0b569b4377ef75b38561188063bc902e7"
+    },
+    {
+      "path": "src/types/leave.ts",
+      "sha256": "88151356cfdf5c8852cbef595aa153ff755ecec2b4b2c95812465fa0f72c8f62"
+    },
+    {
+      "path": "src/types/pagination.ts",
+      "sha256": "86e8ebb0c54a5a6537e77addb8eb5642a1f0b22a07001e9dd561f5ef0de48e8d"
+    },
+    {
+      "path": "src/types/recruitment.ts",
+      "sha256": "2834def30a5d8a040f9968b4e80e7f2b86c07424d371b709e87e1171ef104b3b"
+    },
+    {
+      "path": "src/types/resource.ts",
+      "sha256": "d2b457527f0e4c33a7ec84e5b32b5c834490c9e6281e8266605fd0d4f6c7236b"
+    },
+    {
+      "path": "src/utils/permissionUtils.ts",
+      "sha256": "ca21f0996bdc306124888f2a496112afe1eb2363309836e675ee8219742010d9"
+    }
+  ],
+  "hashNormalization": "UTF-8 source with LF line endings"
+}

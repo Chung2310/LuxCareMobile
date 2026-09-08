@@ -1,0 +1,43 @@
+{
+  "expo": {
+    "name": "LuxCare",
+    "slug": "luxcare-mobile",
+    "scheme": "luxcare",
+    "version": "1.0.0",
+    "orientation": "portrait",
+    "icon": "./assets/icon.png",
+    "userInterfaceStyle": "light",
+    "ios": {
+      "supportsTablet": true
+    },
+    "android": {
+      "adaptiveIcon": {
+        "backgroundColor": "#E6F4FE",
+        "foregroundImage": "./assets/android-icon-foreground.png",
+        "backgroundImage": "./assets/android-icon-background.png",
+        "monochromeImage": "./assets/android-icon-monochrome.png"
+      },
+      "predictiveBackGestureEnabled": false
+    },
+    "web": {
+      "favicon": "./assets/favicon.png"
+    },
+    "plugins": [
+      "expo-secure-store",
+      "expo-router",
+      "expo-sharing",
+      [
+        "expo-camera",
+        {
+          "cameraPermission": "LuxCare cần camera để chụp ảnh xác nhận chấm công.",
+          "recordAudioAndroid": false,
+          "barcodeScannerEnabled": false
+        }
+      ],
+      [
+        "expo-location",
+        { "locationWhenInUsePermission": "LuxCare cần vị trí hiện tại để xác nhận địa điểm chấm công." }
+      ]
+    ]
+  }
+}

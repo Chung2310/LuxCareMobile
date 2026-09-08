@@ -1,0 +1,17 @@
+{
+  "name": "luxcare-mobile-repository",
+  "version": "1.0.0",
+  "private": true,
+  "scripts": {
+    "test": "vitest run --maxWorkers 1",
+    "typecheck": "npm --prefix mobile run typecheck",
+    "export:native": "npm --prefix mobile run export:native",
+    "start": "npm --prefix mobile start"
+  },
+  "devDependencies": {
+    "vitest": "4.1.10"
+  },
+  "engines": {
+    "node": ">=22.13.0"
+  }
+}
