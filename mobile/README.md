@@ -333,6 +333,14 @@ Kiểm tra: 13/13 test trong 5 file qua; TypeScript web/mobile và bundle Hermes
 - Kiểm tra: 142/142 test trong 33 file, TypeScript và export Hermes Android/iOS qua (không phải APK/IPA).
 - Chưa UAT trên thiết bị/staging thật.
 
+## Đợt ba mươi bảy: tài liệu chứng chỉ
+
+- Chọn và tải một tệp PDF/JPG/PNG/WebP tối đa 10 MB khi tạo hoặc sửa chứng chỉ; kiểm tra dung lượng thực trước khi đọc base64.
+- Gửi metadata và token upload cùng hồ sơ khi lưu. Bỏ tệp vừa chọn giữ tài liệu đã lưu; thay tệp có thông báo tệp cũ có thể vẫn còn trong kho.
+- Khóa lưu/đóng trong khi chọn và tải, hủy upload khi unmount, dọn bản sao cache; timeout upload 120 giây. Không tự xóa tệp pending trên server khi bỏ chọn.
+- Chưa có gỡ tài liệu đã lưu hoặc push nhắc hạn; chưa UAT thiết bị/staging.
+- Kiểm tra: 152/152 test trong 34 file, TypeScript và export Hermes Android/iOS qua (không phải APK/IPA).
+
 ## Quy tắc dùng lại FE (áp dụng cho các đợt tiếp)
 
 Service được xuất dưới dạng `createXService(transport)` cùng singleton mặc định cho web. Transport chỉ cung cấp `fetch` và `getAccessToken`; mobile inject API client, web giữ global fetch được interceptor hiện có bọc. Không polyfill localStorage/window, không sao chép service để tạo hai phiên bản endpoint. UI DOM/Tailwind phải chuyển thành component native. Trước khi chuyển service tiếp theo, rà soát các import gián tiếp tới Toast, auth, browser storage, window/document và file APIs.
@@ -355,7 +363,7 @@ Kết quả đợt ba ngày 2026-09-08: 90/90 kiểm thử trong 19 file qua, Ty
 
 ## Giới hạn hiện tại
 
-Đây là ba mươi sáu đợt triển khai trong phạm vi ứng dụng đầy đủ, chưa phải bản đầy đủ chức năng. Xem `IMPLEMENTATION.md`.
+Đây là ba mươi bảy đợt triển khai trong phạm vi ứng dụng đầy đủ, chưa phải bản đầy đủ chức năng. Xem `IMPLEMENTATION.md`.
 
 - Giữ chính sách một phiên của backend; đăng nhập mobile có thể thay thế phiên web. Chưa thay đổi mô hình phiên theo thiết bị.
 - Super Admin nhận challenge 202 được chặn an toàn, chưa có UI hoàn tất MFA. Không hạ yêu cầu xác thực.

@@ -32,7 +32,15 @@ export type CredentialInput = Pick<
   | "professionalScope"
   | "note"
   | "reminderDays"
->;
+> &
+  Partial<CredentialFileFields>;
+export interface CredentialFileFields {
+  fileUrl: string;
+  fileName: string;
+  fileMimeType: string;
+  fileSize: number;
+  uploadToken: string;
+}
 export function createHrCredentialService({ fetch, getAccessToken }: ServiceTransport) {
   async function save(companyCode: string, value: Partial<CredentialInput>, id?: string): Promise<Credential> {
     const response = await fetch(
@@ -49,6 +57,26 @@ export function createHrCredentialService({ fetch, getAccessToken }: ServiceTran
     return body.data;
   }
   return {
+    async upload(
+      companyCode: string,
+      value: { file: string; name: string; mimeType: string; size: number },
+      signal?: AbortSignal,
+    ): Promise<{ url: string; uploadToken: string }> {
+      const response = await fetch(`/api/v1/hr-credentials/upload?companyCode=${encodeURIComponent(companyCode)}`, {
+        method: "POST",
+        headers: { Authorization: `Bearer ${getAccessToken()}`, "Content-Type": "application/json" },
+        body: JSON.stringify(value),
+        signal,
+      });
+      const body = await response.json();
+      if (!response.ok)
+        throw Object.assign(new Error(body.message || "Không tải được tài liệu chứng chỉ."), {
+          status: response.status,
+        });
+      if (!body.data?.url || !body.data?.uploadToken)
+        throw new Error("Chưa xác nhận được tệp tải lên. Vui lòng chọn lại.");
+      return body.data;
+    },
     async remove(companyCode: string, id: string): Promise<void> {
       const response = await fetch(
         `/api/v1/hr-credentials/${encodeURIComponent(id)}?companyCode=${encodeURIComponent(companyCode)}`,

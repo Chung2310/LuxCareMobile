@@ -65,7 +65,7 @@ export function credentialPayload(
 export function credentialChanges(value: CredentialInput, original: Credential): Partial<CredentialInput> {
   return Object.fromEntries(
     Object.entries(value).filter(
-      ([key, item]) => item !== (original[key as keyof CredentialInput] ?? (key === "expiryDate" ? null : "")),
+      ([key, item]) => item !== (original[key as keyof Credential] ?? (key === "expiryDate" ? null : "")),
     ),
   );
 }
