@@ -117,7 +117,7 @@ export function SyncRunAttendance({ run, onChanged }: { run: PayrollRun; onChang
       {locked && (
         <>
           <Text style={styles.text}>
-            Đã khóa bản công của {locked.employeeCount} nhân viên. Tiếp tục tính lương trên LuxCare web.
+            Đã khóa bản công của {locked.employeeCount} nhân viên. Tải lại kỳ rồi chọn Tính / tính lại lương.
           </Text>
           <Text selectable style={styles.muted}>
             Mã bản công: {locked.snapshotId}

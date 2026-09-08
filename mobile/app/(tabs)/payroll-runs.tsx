@@ -19,6 +19,7 @@ import { PayrollExport } from "../../src/features/payroll/PayrollExport";
 import { PayrollIssues } from "../../src/features/payroll/PayrollIssues";
 import { CreatePayrollRun } from "../../src/features/payroll/CreatePayrollRun";
 import { SyncRunAttendance } from "../../src/features/payroll/SyncRunAttendance";
+import { CalculatePayrollRun } from "../../src/features/payroll/CalculatePayrollRun";
 import { PayslipPublication } from "../../src/features/payroll/PayslipPublication";
 import { AdjustmentHistory } from "../../src/features/payroll/AdjustmentHistory";
 import { PayrollAuditHistory } from "../../src/features/payroll/PayrollAuditHistory";
@@ -154,6 +155,11 @@ export default function PayrollRuns() {
             }}
           />
           <PayrollExport key={`export:${run._id}:${revision}`} run={run} />
+          <CalculatePayrollRun
+            key={`calculate:${run._id}:${run.version}:${revision}`}
+            run={run}
+            onChanged={() => setRevision((value) => value + 1)}
+          />
           <SyncRunAttendance
             key={`sync:${run._id}:${run.version}:${revision}`}
             run={run}
