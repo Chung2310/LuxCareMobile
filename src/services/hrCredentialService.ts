@@ -49,6 +49,16 @@ export function createHrCredentialService({ fetch, getAccessToken }: ServiceTran
     return body.data;
   }
   return {
+    async remove(companyCode: string, id: string): Promise<void> {
+      const response = await fetch(
+        `/api/v1/hr-credentials/${encodeURIComponent(id)}?companyCode=${encodeURIComponent(companyCode)}`,
+        { method: "DELETE", headers: { Authorization: `Bearer ${getAccessToken()}` } },
+      );
+      const body = await response.json();
+      if (!response.ok)
+        throw Object.assign(new Error(body.message || "Không xóa được chứng chỉ."), { status: response.status });
+      if (body.status !== "success") throw new Error("Chưa xác nhận được kết quả xóa.");
+    },
     create: (companyCode: string, value: CredentialInput) => save(companyCode, value),
     update: (companyCode: string, id: string, value: Partial<CredentialInput>) => save(companyCode, value, id),
     async list(filters: CredentialFilters): Promise<CredentialList> {

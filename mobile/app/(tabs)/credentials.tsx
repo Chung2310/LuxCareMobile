@@ -4,6 +4,7 @@ import { Modal, Text } from "react-native";
 import { SafeAreaView } from "react-native-safe-area-context";
 import type { Credential } from "../../../src/types/hrCredential";
 import { CredentialForm } from "../../src/features/credentials/CredentialForm";
+import { DeleteCredentialForm } from "../../src/features/credentials/DeleteCredentialForm";
 import { canManageCredentials } from "../../src/features/credentials/model";
 import type { CredentialList } from "../../../src/services/hrCredentialService";
 import type { HRCredentialStatus, HRCredentialType } from "../../../shared/hr-credential";
@@ -18,7 +19,11 @@ export default function Credentials() {
   const { user, selectedBranch } = useSession();
   const allowed = canReadCredentials(user);
   const manage = canManageCredentials(user);
-  const [editing, setEditing] = useState<{ item?: Credential; employees: CredentialList["employees"] } | null>(null);
+  const [editing, setEditing] = useState<{
+    item?: Credential;
+    employees: CredentialList["employees"];
+    remove?: boolean;
+  } | null>(null);
   const formLock = useRef(false);
   const branchId = selectedBranch?._id || user?.branchId || undefined;
   const [data, setData] = useState<CredentialList | null>(null);
@@ -154,6 +159,9 @@ export default function Credentials() {
                         }
                       />
                     )}
+                    {manage && (
+                      <Button title="Xóa chứng chỉ" onPress={() => setEditing({ item, employees: [], remove: true })} />
+                    )}
                     <Text style={styles.text}>
                       Số hiệu: {item.credentialNumber || "—"}
                       {"\n"}Nơi cấp: {item.issuingOrganization}
@@ -198,26 +206,42 @@ export default function Credentials() {
         animationType="slide"
         onRequestClose={() => {
           if (!formLock.current) {
+            if (editing?.remove) setPage(1);
             setEditing(null);
             setRevision((value) => value + 1);
           }
         }}
       >
         <SafeAreaView style={styles.page}>
-          {editing && manage && (
-            <CredentialForm
-              item={editing.item}
-              employees={editing.employees}
-              companyCode={user!.companyCode!}
-              setLocked={(value) => {
-                formLock.current = value;
-              }}
-              onClose={() => {
-                setEditing(null);
-                setRevision((value) => value + 1);
-              }}
-            />
-          )}
+          {editing &&
+            manage &&
+            (editing.remove && editing.item ? (
+              <DeleteCredentialForm
+                item={editing.item}
+                companyCode={user!.companyCode!}
+                setLocked={(value) => {
+                  formLock.current = value;
+                }}
+                onClose={() => {
+                  setEditing(null);
+                  setPage(1);
+                  setRevision((value) => value + 1);
+                }}
+              />
+            ) : (
+              <CredentialForm
+                item={editing.item}
+                employees={editing.employees}
+                companyCode={user!.companyCode!}
+                setLocked={(value) => {
+                  formLock.current = value;
+                }}
+                onClose={() => {
+                  setEditing(null);
+                  setRevision((value) => value + 1);
+                }}
+              />
+            ))}
         </SafeAreaView>
       </Modal>
     </>

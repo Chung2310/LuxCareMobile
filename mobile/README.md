@@ -325,6 +325,14 @@ Kiểm tra: 13/13 test trong 5 file qua; TypeScript web/mobile và bundle Hermes
 - Chưa xóa/upload chứng chỉ hoặc UAT thiết bị/staging.
 - Kiểm tra: 136/136 test trong 32 file, TypeScript và export Hermes Android/iOS qua (không phải APK/IPA).
 
+## Đợt ba mươi sáu: xóa chứng chỉ
+
+- Xóa hồ sơ theo quyền quản lý, có màn hình xác nhận tên chứng chỉ và nhân viên; thông báo không thể khôi phục hồ sơ.
+- Khóa gửi trùng và đóng khi đang gửi. Nếu lỗi, yêu cầu đóng và tải lại trước thao tác tiếp; không tự gửi lại DELETE ở service.
+- Tải lại danh sách, thống kê và về trang đầu sau khi đóng màn hình xóa. Tệp liên kết cần kiểm tra lại trong LuxCare.
+- Kiểm tra: 142/142 test trong 33 file, TypeScript và export Hermes Android/iOS qua (không phải APK/IPA).
+- Chưa UAT trên thiết bị/staging thật.
+
 ## Quy tắc dùng lại FE (áp dụng cho các đợt tiếp)
 
 Service được xuất dưới dạng `createXService(transport)` cùng singleton mặc định cho web. Transport chỉ cung cấp `fetch` và `getAccessToken`; mobile inject API client, web giữ global fetch được interceptor hiện có bọc. Không polyfill localStorage/window, không sao chép service để tạo hai phiên bản endpoint. UI DOM/Tailwind phải chuyển thành component native. Trước khi chuyển service tiếp theo, rà soát các import gián tiếp tới Toast, auth, browser storage, window/document và file APIs.
@@ -347,7 +355,7 @@ Kết quả đợt ba ngày 2026-09-08: 90/90 kiểm thử trong 19 file qua, Ty
 
 ## Giới hạn hiện tại
 
-Đây là ba mươi lăm đợt triển khai trong phạm vi ứng dụng đầy đủ, chưa phải bản đầy đủ chức năng. Xem `IMPLEMENTATION.md`.
+Đây là ba mươi sáu đợt triển khai trong phạm vi ứng dụng đầy đủ, chưa phải bản đầy đủ chức năng. Xem `IMPLEMENTATION.md`.
 
 - Giữ chính sách một phiên của backend; đăng nhập mobile có thể thay thế phiên web. Chưa thay đổi mô hình phiên theo thiết bị.
 - Super Admin nhận challenge 202 được chặn an toàn, chưa có UI hoàn tất MFA. Không hạ yêu cầu xác thực.
