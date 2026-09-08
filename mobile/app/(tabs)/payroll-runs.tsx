@@ -16,6 +16,7 @@ import { payslipMoney } from "../../src/features/payroll/model";
 import { PayslipDetails } from "../../src/features/payroll/PayslipDetails";
 import { PaymentHistory } from "../../src/features/payroll/PaymentHistory";
 import { PayrollExport } from "../../src/features/payroll/PayrollExport";
+import { PayrollIssues } from "../../src/features/payroll/PayrollIssues";
 import { PayslipPublication } from "../../src/features/payroll/PayslipPublication";
 import { AdjustmentHistory } from "../../src/features/payroll/AdjustmentHistory";
 import { PayrollAuditHistory } from "../../src/features/payroll/PayrollAuditHistory";
@@ -30,6 +31,7 @@ export default function PayrollRuns() {
   });
   const [draft, setDraft] = useState(period);
   const [run, setRun] = useState<PayrollRun | null>(null);
+  const [issueRunId, setIssueRunId] = useState<string | null>(null);
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [inputError, setInputError] = useState<string | null>(null);
@@ -41,6 +43,7 @@ export default function PayrollRuns() {
     useCallback(() => {
       let active = true;
       setRun(null);
+      setIssueRunId(null);
       setError(null);
       setMissing(false);
       setExpanded(null);
@@ -51,6 +54,7 @@ export default function PayrollRuns() {
         .getRun(period)
         .then((value) => {
           if (!value?._id || value.periodKey !== period) throw new Error("Bảng lương trả về không khớp kỳ đã chọn.");
+          if (active) setIssueRunId(value._id);
           effectiveRunLines(value);
           if (active) setRun(value);
         })
@@ -108,6 +112,13 @@ export default function PayrollRuns() {
       />
       {loading && <Loading />}
       <ErrorText message={error} />
+      {issueRunId && (
+        <PayrollIssues
+          key={`issues:${issueRunId}:${revision}`}
+          runId={issueRunId}
+          employees={run?.effectiveLines || []}
+        />
+      )}
       {missing && <Text style={styles.text}>Chưa có bảng lương cho kỳ {period}.</Text>}
       <AdjustmentHistory
         key={`${period}:${revision}`}

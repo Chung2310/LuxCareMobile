@@ -1,6 +1,7 @@
 import { browserTransport, type ServiceTransport } from "./serviceTransport";
 import type { Payslip, PayslipDetail } from "../types/payslip";
 import type { PayrollRun } from "../types/payrollRun";
+import type { PayrollIssue } from "../types/payrollIssue";
 import type { PayrollAudit } from "../types/payrollAudit";
 import type { PayrollPayment } from "../types/payrollPayment";
 import type { PayrollAdjustment, PayrollAdjustmentInput } from "../types/payrollAdjustment";
@@ -100,6 +101,25 @@ export function createPayrollService({ fetch, getAccessToken }: ServiceTransport
     retirePolicy: (id: string) => request(`/policies/${id}/retire`, { method: "POST" }),
     deletePolicy: (id: string) => request(`/policies/${id}`, { method: "DELETE" }),
     getRun: (periodKey: string): Promise<PayrollRun> => request(`/periods/${encodeURIComponent(periodKey)}/run`),
+    getRunIssues: async (runId: string): Promise<PayrollIssue[]> => {
+      const result = await request(`/runs/${encodeURIComponent(runId)}/issues`);
+      if (
+        !Array.isArray(result) ||
+        result.some(
+          (item) =>
+            !item ||
+            typeof item.code !== "string" ||
+            typeof item.message !== "string" ||
+            typeof item.severity !== "string" ||
+            (item.runId !== undefined && item.runId !== runId) ||
+            ["employeeId", "field", "remediation"].some(
+              (key) => item[key] !== undefined && typeof item[key] !== "string",
+            ),
+        )
+      )
+        throw new Error("Danh sách lỗi kỳ lương không hợp lệ hoặc không khớp kỳ.");
+      return result;
+    },
     getLineDetail: (runId: string, employeeId: string): Promise<PayslipDetail> =>
       request(`/runs/${encodeURIComponent(runId)}/lines/${encodeURIComponent(employeeId)}`),
     getResults: (periodKey: string) => request(`/periods/${periodKey}/results`),
