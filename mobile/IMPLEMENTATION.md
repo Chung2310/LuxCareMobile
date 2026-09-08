@@ -64,6 +64,10 @@ Xóa chứng chỉ qua service dùng chung, xác nhận riêng và khóa thao t�
 
 Upload/thay tài liệu chứng chỉ PDF/JPG/PNG/WebP tối đa 10 MB trong form tạo/sửa. Dùng lại kiểm tra tệp hợp đồng, bổ sung giới hạn MIME chứng chỉ; gửi token pending và metadata theo API. Bỏ tệp mới giữ tài liệu cũ, PATCH chỉ tệp khi không sửa nội dung vẫn được gửi. Khóa thao tác khi tải, hủy theo lifecycle, dọn cache và dành 120 giây cho upload. Không xóa tài nguyên cũ hoặc pending từ mobile. Chưa gỡ tệp đã lưu, push nhắc hạn hoặc UAT thiết bị/staging.
 
+## Đợt ba mươi tám
+
+Tra cứu hợp đồng/chứng chỉ theo nhân viên bằng bộ chọn dùng chung có tìm tên/email. Tận dụng `employeeId` của service/API, kết hợp chi nhánh và phân trang; đặt lại bộ lọc về trang đầu. Giữ nhãn nhân viên khi tải lại hoặc không còn trong roster trả về, vẫn cho phép bỏ lựa chọn. Hợp đồng sắp hết hạn và thống kê chứng chỉ theo phạm vi nhân viên; không mở rộng quyền của tài khoản. Chưa UAT thiết bị/staging thật.
+
 ## Đợt tiếp theo
 
 1. Kiểm chứng đăng nhập/thông báo/phòng ban với staging và thiết bị thật; chốt hành vi phiên web/mobile.

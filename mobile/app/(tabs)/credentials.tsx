@@ -4,6 +4,8 @@ import { Modal, Text } from "react-native";
 import { SafeAreaView } from "react-native-safe-area-context";
 import type { Credential } from "../../../src/types/hrCredential";
 import { CredentialForm } from "../../src/features/credentials/CredentialForm";
+import { EmployeeFilter } from "../../src/features/contracts/EmployeeFilter";
+import { ALL_EMPLOYEES } from "../../src/features/contracts/employeeFilterModel";
 import { DeleteCredentialForm } from "../../src/features/credentials/DeleteCredentialForm";
 import { canManageCredentials } from "../../src/features/credentials/model";
 import type { CredentialList } from "../../../src/services/hrCredentialService";
@@ -28,6 +30,8 @@ export default function Credentials() {
   const branchId = selectedBranch?._id || user?.branchId || undefined;
   const [data, setData] = useState<CredentialList | null>(null);
   const [search, setSearch] = useState("");
+  const [employee, setEmployee] = useState(ALL_EMPLOYEES);
+  const [filterRevision, setFilterRevision] = useState(0);
   const [draft, setDraft] = useState("");
   const [status, setStatus] = useState<HRCredentialStatus | "">("");
   const [type, setType] = useState<HRCredentialType | "">("");
@@ -46,7 +50,16 @@ export default function Credentials() {
       if (!allowed || !user?.companyCode) return;
       setLoading(true);
       void credentials
-        .list({ companyCode: user.companyCode, branchId, search, status, type, page, limit: 20 })
+        .list({
+          companyCode: user.companyCode,
+          branchId,
+          search,
+          status,
+          type,
+          page,
+          limit: 20,
+          employeeId: employee.value,
+        })
         .then((result) => {
           if (active) setData(result);
         })
@@ -59,7 +72,7 @@ export default function Credentials() {
       return () => {
         active = false;
       };
-    }, [allowed, user?.companyCode, user?.uid, branchId, search, status, type, page, revision]),
+    }, [allowed, user?.companyCode, user?.uid, branchId, search, status, type, page, employee.value, revision]),
   );
   if (!allowed)
     return (
@@ -121,15 +134,39 @@ export default function Credentials() {
             setPage(1);
           }}
         />
+        <EmployeeFilter
+          key={filterRevision}
+          employees={(data?.employees || []).filter((item) => !branchId || item.branchId === branchId)}
+          value={employee}
+          disabled={loading || !data || !!error}
+          onChange={(value) => {
+            setEmployee(value);
+            setPage(1);
+          }}
+        />
+        <Button
+          title="Đặt lại bộ lọc"
+          disabled={loading}
+          onPress={() => {
+            setEmployee(ALL_EMPLOYEES);
+            setDraft("");
+            setSearch("");
+            setType("");
+            setStatus("");
+            setPage(1);
+            setFilterRevision((value) => value + 1);
+            setRevision((value) => value + 1);
+          }}
+        />
         <Button title="Tải lại" disabled={loading} onPress={() => setRevision((value) => value + 1)} />
         {loading && <Loading />}
         <ErrorText message={error} />
         {data && (
           <>
             <Text style={styles.muted}>
-              Toàn phạm vi: {data.summary.total} hồ sơ · {data.summary.active} còn hiệu lực · {data.summary.expiring}{" "}
-              sắp hết hạn · {data.summary.expired} hết hạn. Thống kê không giới hạn theo từ khóa/loại/trạng thái đang
-              lọc.
+              Theo phạm vi và nhân viên đang chọn: {data.summary.total} hồ sơ · {data.summary.active} còn hiệu lực ·{" "}
+              {data.summary.expiring} sắp hết hạn · {data.summary.expired} hết hạn. Thống kê không giới hạn theo từ
+              khóa/loại/trạng thái đang lọc.
             </Text>
             {!data.credentials.length && <Text style={styles.text}>Không có chứng chỉ phù hợp.</Text>}
             {data.credentials.map((item) => (

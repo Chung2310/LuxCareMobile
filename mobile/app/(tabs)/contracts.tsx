@@ -18,6 +18,8 @@ import {
 } from "../../src/features/contracts/model";
 import { ContractFiles } from "../../src/features/contracts/ContractFiles";
 import { ExtensionHistory } from "../../src/features/contracts/ExtensionHistory";
+import { EmployeeFilter } from "../../src/features/contracts/EmployeeFilter";
+import { ALL_EMPLOYEES } from "../../src/features/contracts/employeeFilterModel";
 
 export default function Contracts() {
   const { user, selectedBranch } = useSession();
@@ -36,6 +38,8 @@ export default function Contracts() {
   const [data, setData] = useState<ContractList | null>(null);
   const [draft, setDraft] = useState("");
   const [search, setSearch] = useState("");
+  const [employee, setEmployee] = useState(ALL_EMPLOYEES);
+  const [filterRevision, setFilterRevision] = useState(0);
   const [page, setPage] = useState(1);
   const [expiring, setExpiring] = useState(false);
   const [expanded, setExpanded] = useState<string | null>(null);
@@ -52,7 +56,7 @@ export default function Contracts() {
       if (!allowed || !user?.companyCode) return;
       setLoading(true);
       void contracts
-        .list({ companyCode: user.companyCode, branchId, page, limit: 10, search })
+        .list({ companyCode: user.companyCode, branchId, page, limit: 10, search, employeeId: employee.value })
         .then((result) => {
           if (active) setData(result);
         })
@@ -65,7 +69,7 @@ export default function Contracts() {
       return () => {
         active = false;
       };
-    }, [allowed, user?.companyCode, user?.uid, branchId, page, search, revision]),
+    }, [allowed, user?.companyCode, user?.uid, branchId, page, search, employee.value, revision]),
   );
   if (!allowed)
     return (
@@ -102,7 +106,8 @@ export default function Contracts() {
         />
         {expiring ? (
           <Text style={styles.muted}>
-            Các hợp đồng đang hiệu lực sắp hết hạn trong toàn bộ phạm vi, không phụ thuộc từ khóa hoặc trang danh sách.
+            Các hợp đồng đang hiệu lực sắp hết hạn theo chi nhánh và nhân viên đang chọn, không phụ thuộc từ khóa hoặc
+            trang danh sách.
           </Text>
         ) : (
           <>
@@ -118,6 +123,29 @@ export default function Contracts() {
             />
           </>
         )}
+        <EmployeeFilter
+          key={filterRevision}
+          employees={data?.employees || []}
+          value={employee}
+          disabled={loading || !data || !!error}
+          onChange={(value) => {
+            setEmployee(value);
+            setPage(1);
+          }}
+        />
+        <Button
+          title="Đặt lại bộ lọc"
+          disabled={loading}
+          onPress={() => {
+            setEmployee(ALL_EMPLOYEES);
+            setDraft("");
+            setSearch("");
+            setExpiring(false);
+            setPage(1);
+            setFilterRevision((value) => value + 1);
+            setRevision((value) => value + 1);
+          }}
+        />
         <Button title="Tải lại" disabled={loading} onPress={() => setRevision((value) => value + 1)} />
         {loading && <Loading />}
         <ErrorText message={error} />
