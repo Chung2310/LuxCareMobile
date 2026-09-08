@@ -168,6 +168,10 @@ Tra cứu dữ liệu đầu vào theo kỳ/chi nhánh bằng service FE, có t�
 
 Sửa sáu giá trị đối soát cơ bản trên bản ghi hiện có, lý do bắt buộc, xem trước thay đổi và gửi expectedVersion. Chỉ gửi giá trị thay đổi, ô trống giữ cũ/0 ghi đè; không gửi customValues. Kiểm tra phản hồi gồm giá trị đã giữ, khóa gửi trùng, tải lại cả kỳ sau kết quả/lỗi. Chưa thêm bản ghi, sửa customValues, clearFields, bulk hoặc UAT thiết bị/staging.
 
+## Đợt sáu mươi bốn
+
+Hoàn tác sáu trường đối soát cơ bản đã lưu về dữ liệu nguồn bằng clearFields. Chọn/bỏ chọn, xem trước và lý do bắt buộc; có thể kết hợp sửa trường khác trong một request có expectedVersion. Kiểm tra phản hồi trường đã gỡ và giá trị giữ nguyên, tải lại sau kết quả/lỗi. Chưa clear customValues/thêm bản ghi/bulk hoặc UAT thiết bị/staging.
+
 ## Đợt tiếp theo
 
 1. Kiểm chứng đăng nhập/thông báo/phòng ban với staging và thiết bị thật; chốt hành vi phiên web/mobile.
@@ -176,6 +180,8 @@ Sửa sáu giá trị đối soát cơ bản trên bản ghi hiện có, lý do 
 4. Tiếp tục các module còn lại trong bảng, ghi rõ màn hình và thao tác đã nghiệm thu.
 
 ## Tiêu chí nghiệm thu từng module
+
+Đợt sáu mươi bốn: 343/343 test trong 61 file qua; TypeScript và export Hermes Android/iOS qua. Kiểm tra clearFields/0, danh sách trường hợp lệ, kết hợp sửa/gỡ, phản hồi và payload PUT. Chưa UAT thiết bị/staging.
 
 Đợt sáu mươi ba: 338/338 test trong 60 file qua; TypeScript và export Hermes Android/iOS qua. Kiểm tra quyền/editable, payload chỉ trường thay đổi, 0/ô trống, phản hồi/version và lỗi không retry. Chưa UAT thiết bị/staging.
 

@@ -23,6 +23,7 @@ export function EditPeriodInput({
   const allowed = canEditPeriodInput(user, selectedBranch?._id || user?.branchId, editable, item);
   const [values, setValues] = useState<Record<string, string>>({});
   const [reason, setReason] = useState("");
+  const [clearFields, setClearFields] = useState<string[]>([]);
   const [payload, setPayload] = useState<ReturnType<typeof periodInputEditPayload> | null>(null);
   const [error, setError] = useState<string | null>(null);
   const [busy, setBusy] = useState(false);
@@ -58,25 +59,41 @@ export function EditPeriodInput({
       </Text>
       <Text style={styles.muted}>
         Chi nhánh: {selectedBranch?.name || "Chi nhánh của phiên đăng nhập"}. Ô trống giữ dữ liệu cũ; nhập 0 để ghi đè
-        bằng 0.
+        bằng 0. Chọn “Dùng dữ liệu nguồn” để bỏ giá trị đối soát đã lưu; giá trị nguồn sẽ được xác định khi tính lại
+        lương.
       </Text>
       {!payload ? (
         <>
           {(Object.keys(periodInputFields) as (keyof typeof periodInputFields)[]).map((key) => (
-            <Field
-              key={key}
-              label={`${periodInputFields[key]} · hiện tại: ${inputValue(item[key])}`}
-              value={values[key] || ""}
-              onChangeText={(value) => setValues((values) => ({ ...values, [key]: value }))}
-              keyboardType="decimal-pad"
-            />
+            <Card key={key}>
+              <Field
+                label={`${periodInputFields[key]} · hiện tại: ${inputValue(item[key])}`}
+                value={values[key] || ""}
+                onChangeText={(value) => setValues((values) => ({ ...values, [key]: value }))}
+                keyboardType="decimal-pad"
+                editable={!clearFields.includes(key)}
+              />
+              {item[key] !== undefined && (
+                <Button
+                  title={clearFields.includes(key) ? "Bỏ chọn hoàn tác" : "Dùng dữ liệu nguồn"}
+                  onPress={() =>
+                    setClearFields((fields) =>
+                      fields.includes(key) ? fields.filter((field) => field !== key) : [...fields, key],
+                    )
+                  }
+                />
+              )}
+              {clearFields.includes(key) && (
+                <Text style={styles.muted}>Sẽ bỏ giá trị đối soát riêng của trường này.</Text>
+              )}
+            </Card>
           ))}
           <Field label="Lý do đối soát (bắt buộc)" value={reason} onChangeText={setReason} multiline />
           <Button
             title="Xem lại thay đổi"
             onPress={() => {
               try {
-                setPayload(periodInputEditPayload(item, values, reason));
+                setPayload(periodInputEditPayload(item, values, reason, clearFields));
                 setError(null);
               } catch (error) {
                 setError(messageOf(error));
@@ -94,6 +111,11 @@ export function EditPeriodInput({
               </Text>
             ))}
           <Text style={styles.text}>Lý do: {payload.reason}</Text>
+          {payload.clearFields?.map((key) => (
+            <Text key={key} style={styles.text}>
+              {periodInputFields[key]}: {inputValue(item[key])} → Dùng dữ liệu nguồn
+            </Text>
+          ))}
           <Text style={styles.muted}>
             Lưu dữ liệu đầu vào chưa tính lại bảng lương. Tải lại kỳ để kiểm tra cờ cần cập nhật.
           </Text>
