@@ -13,3 +13,5 @@ Backend được triển khai từ repository LuxCare riêng. Đặt origin củ
 - Khung giờ check-in/out của ca hiện được lưu cấu hình nhưng backend chưa thực thi đầy đủ. Cờ xác nhận khuôn mặt lấy từ nguồn cấu hình chung, không tự bật ở mobile.
 
 Các sửa đổi backend không được tự triển khai khi push repository mobile. Đối chiếu [ma trận triển khai](../mobile/IMPLEMENTATION.md) và kiểm thử trên staging trước nghiệm thu.
+
+Upload hợp đồng mới/gia hạn hiện gửi các trường đơn (`contractFileUploadToken`, `signedImageUploadToken`, `extensionFileUploadToken`, `extensionSignedImageUploadToken`). Schema route hiện chưa nhận các mảng nhiều tệp dù controller/model có hỗ trợ mảng. Cần đồng bộ schema và hành vi cập nhật trước khi mở thay/gỡ tệp đã lưu trên mobile. Token pending hết hạn sau 24 giờ; bỏ chọn trên mobile không xóa tệp server.

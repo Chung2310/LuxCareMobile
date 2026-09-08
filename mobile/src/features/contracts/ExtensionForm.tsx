@@ -7,6 +7,8 @@ import { messageOf } from "../../auth/SessionProvider";
 import { Button, ErrorText, Field, Page, styles } from "../../ui";
 import { contractDate, contractStatuses } from "./model";
 import { extensionDraft, extensionPayload } from "./extensionModel";
+import { UploadFields } from "./UploadFields";
+import { contractUploadFields, type ContractUploads } from "./uploadModel";
 export function ExtensionForm({
   contract,
   scope,
@@ -23,6 +25,7 @@ export function ExtensionForm({
   const [blocked, setBlocked] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const lock = useRef(false);
+  const [uploads, setUploads] = useState<ContractUploads>({});
   const save = async () => {
     if (lock.current || blocked) return;
     let payload;
@@ -37,7 +40,7 @@ export function ExtensionForm({
     setLocked(true);
     setError(null);
     try {
-      const result = await contracts.extend(scope, contract._id, payload);
+      const result = await contracts.extend(scope, contract._id, { ...payload, ...contractUploadFields(uploads) });
       if (!result?.contract?._id || !result?.extension?._id) throw new Error("Chưa xác nhận được kết quả gia hạn.");
       onClose();
     } catch (error) {
@@ -83,7 +86,19 @@ export function ExtensionForm({
         onChangeText={(value) => setDraft((current) => ({ ...current, reason: value }))}
       />
       <ErrorText message={error} />
-      <Button title={busy ? "Đang gia hạn…" : "Lưu gia hạn"} disabled={busy || blocked} onPress={() => void save()} />
+      <UploadFields
+        extension
+        scope={scope}
+        value={uploads}
+        onChange={setUploads}
+        disabled={busy || blocked}
+        onBusy={(value) => {
+          lock.current = value;
+          setBusy(value);
+          setLocked(value);
+        }}
+      />
+      <Button title={busy ? "Đang xử lý…" : "Lưu gia hạn"} disabled={busy || blocked} onPress={() => void save()} />
       <Button title="Đóng và tải lại" disabled={busy} onPress={onClose} />
     </Page>
   );

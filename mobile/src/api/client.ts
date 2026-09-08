@@ -55,6 +55,7 @@ export class MobileApi {
     if (init.signal?.aborted) controller.abort();
     init.signal?.addEventListener("abort", cancel);
     const isFileTransfer =
+      input.startsWith("/api/v1/hr-contracts/upload?") ||
       input === "/api/v1/recruitment/files/public" ||
       /^\/api\/v1\/recruitment\/(jobs|applicants)\/[^/]+\/attachment$/.test(input) ||
       input.startsWith("/api/v1/hr/leave-files/upload") ||

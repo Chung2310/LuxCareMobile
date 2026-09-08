@@ -13,7 +13,7 @@ Mục tiêu cuối: đối chiếu mọi màn hình/thao tác/quyền/API của 
 | Nhân sự / hồ sơ | rosterService, authService, types/common | Có danh sách theo chi nhánh, tìm kiếm, xem/sửa hồ sơ cơ bản theo quyền; chưa tạo/xóa, sơ đồ tổ chức |
 | Chấm công / ca / lịch | companyWorkCalendarService, attendanceService, hrCalendarService, types/attendance, attendanceFaceCheck | Có trạng thái hôm nay, lịch sử cá nhân, check-in/out GPS và camera theo cờ chung; CRUD/phân ca, công chuẩn và cấu hình khung giờ vào/ra (backend chưa thực thi khung giờ); quản lý lịch nghỉ/làm bù, đồng bộ, bật/tắt và audit; chỉnh trạng thái/ghi chú công theo nhân viên/tháng, xem lịch sử theo quyền; xem/lọc/chi tiết lịch nhân sự; chưa sửa giờ vào/ra hoặc CRUD sự kiện; chờ UAT thiết bị |
 | Nghỉ phép / đơn từ | leaveService, types/leave, LeaveRequestsTab | Đã có 4 loại yêu cầu, nộp/duyệt/từ chối/xóa, số dư phép, biểu mẫu và tệp đính kèm; chờ UAT thiết bị/staging |
-| Hợp đồng / chứng chỉ | components/hr, shared/hr-credential, hrContractService, hrContractFiles, types/hrContract | Có tra cứu hợp đồng: tìm kiếm/phân trang, trạng thái/thời hạn/ghi chú, sắp hết hạn và lịch sử gia hạn; tạo/sửa thông tin cơ bản theo quyền, chọn nhân viên trong phạm vi; danh mục tệp mới/cũ dùng chung FE; tải/mở/chia sẻ tệp tối đa 20 MB qua ứng dụng thiết bị. Chưa tạo gia hạn, upload/gỡ tệp hoặc trình xem tích hợp; chứng chỉ chưa chuyển |
+| Hợp đồng / chứng chỉ | components/hr, shared/hr-credential, hrContractService, hrContractFiles, types/hrContract | Có tra cứu/tìm kiếm/phân trang, tạo/sửa cơ bản và tạo gia hạn theo quyền; upload tài liệu và ảnh đã ký khi tạo hợp đồng/gia hạn (10 MB/tệp); tải/mở/chia sẻ tệp đã lưu (20 MB/tệp). Chưa thay/gỡ tệp đã lưu, nhiều tệp mỗi nhóm hoặc trình xem tích hợp; chứng chỉ chưa chuyển |
 | Tuyển dụng | recruitmentService, rosterService, types/recruitment | Có tin tuyển dụng theo chi nhánh: tạo/sửa nội dung, tìm/lọc/phân trang, chi tiết, chuyển trạng thái, xóa mềm/khôi phục; ứng viên có tạo/sửa/cảnh báo trùng/tìm/lọc/phân trang/hồ sơ/lịch sử/chuyển bước/gán người phụ trách/xóa mềm/khôi phục; phỏng vấn có danh sách/lọc/phân trang/tạo/sửa/trạng thái/kết quả/gán người/xóa mềm/khôi phục; quản trị pipeline; upload/thay/tải/chia sẻ/gỡ attachment JD/CV riêng theo quyền; có xem/sửa/gỡ liên kết và upload JD/CV công khai; chờ UAT thiết bị/staging |
 | Tiền lương | payrollService, types/hr, components/hr/payroll | Chưa chuyển |
 | Công việc / Kanban / KPI | kanbanService, kanbanMediaService, monthlyKpiService, types/hr, kanbanTaskTime | Có CRUD công việc/dự án, lịch sử, tiến độ; CRUD/hoàn thành/gán người cho việc nhỏ; upload/link/gỡ/tải tệp; KPI tháng theo quyền; chưa bảng kéo thả, ghi âm/quay trực tiếp, socket |
@@ -43,6 +43,10 @@ Hoàn thành màn hình hợp đồng và lịch sử gia hạn có phân trang,
 ## Đợt 31 — tạo/sửa hợp đồng
 
 Form native chọn nhân viên, loại hợp đồng, thời hạn, trạng thái và ghi chú. Tái sử dụng types/API; kiểm tra ngày, phạm vi danh sách nhân viên và quyền đọc/quản lý HR. PATCH chỉ trường thay đổi, giữ timestamp ngày không sửa và các tệp đã có. Backend chưa có cơ chế version chống ghi đè đồng thời; lỗi lưu chưa xác định yêu cầu đóng/tải lại. 17 test/5 file và TypeScript mobile qua; chưa UAT thiết bị/staging.
+
+## Đợt 32–33 — gia hạn và tài liệu
+
+Đã có tạo gia hạn, kiểm tra ngày hết hạn mới, lý do và phản hồi gồm hợp đồng/lịch sử. Form hợp đồng mới/gia hạn nhận tài liệu và ảnh đã ký qua managed upload, lưu metadata/token theo schema tệp đơn. Hủy chọn không đồng nghĩa xóa tệp server; chưa hỗ trợ thay/gỡ tài liệu đã lưu hoặc sửa bản gia hạn. 129 test/30 file và TypeScript qua; chưa UAT thiết bị/staging.
 
 ## Đợt tiếp theo
 

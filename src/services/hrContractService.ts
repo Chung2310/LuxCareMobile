@@ -21,6 +21,26 @@ export interface ContractList {
 export type ContractInput = Pick<Contract, "contractType" | "employeeId" | "startDate" | "endDate" | "status" | "note">;
 export type ContractScope = Pick<ContractFilters, "companyCode" | "branchId">;
 export type ExtensionInput = Pick<Extension, "newEndDate" | "extensionDate" | "reason">;
+export type ContractUploadKind = "contract" | "signed" | "extension" | "extensionSigned";
+export type ContractFileFields = Partial<
+  Pick<
+    Contract,
+    | "contractFileUrl"
+    | "contractFileName"
+    | "contractFileMimeType"
+    | "contractFileSize"
+    | "signedImageUrl"
+    | "signedImageName"
+    | "signedImageMimeType"
+    | "signedImageSize"
+  > &
+    Pick<Extension, "extensionFileUrl" | "extensionFileName" | "extensionFileMimeType" | "extensionFileSize"> & {
+      contractFileUploadToken: string;
+      signedImageUploadToken: string;
+      extensionFileUploadToken: string;
+      extensionSignedImageUploadToken: string;
+    }
+>;
 export function createHrContractService({ fetch, getAccessToken }: ServiceTransport) {
   async function request(path: string, filters: object, init: RequestInit = {}) {
     const query = new URLSearchParams();
@@ -40,16 +60,22 @@ export function createHrContractService({ fetch, getAccessToken }: ServiceTransp
     return body;
   }
   return {
+    async upload(
+      scope: ContractScope,
+      value: { file: string; name: string; mimeType: string; size: number; kind: ContractUploadKind },
+    ): Promise<{ url: string; uploadToken: string }> {
+      return (await request("/upload", scope, { method: "POST", body: JSON.stringify(value) })).data;
+    },
     async extend(
       scope: ContractScope,
       id: string,
-      value: ExtensionInput,
+      value: ExtensionInput & ContractFileFields,
     ): Promise<{ contract: Contract; extension: Extension }> {
       return (
         await request(`/${encodeURIComponent(id)}/extensions`, scope, { method: "POST", body: JSON.stringify(value) })
       ).data;
     },
-    async create(scope: ContractScope, value: ContractInput): Promise<Contract> {
+    async create(scope: ContractScope, value: ContractInput & ContractFileFields): Promise<Contract> {
       return (await request("", scope, { method: "POST", body: JSON.stringify(value) })).data;
     },
     async update(scope: ContractScope, id: string, value: Partial<ContractInput>): Promise<Contract> {

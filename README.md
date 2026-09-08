@@ -36,6 +36,6 @@ Export tạo bundle JavaScript/Hermes cho Android và iOS, không tạo APK/IPA.
 
 Các nguồn dùng chung là bản sao tại thời điểm tách repository, không tự đồng bộ từ LuxCare. Khi cập nhật API hoặc kiểu dữ liệu, cần cập nhật cả hai repository và chạy lại kiểm thử.
 
-## Ki?m tra b?n t?ch repository
+## Kiểm tra repository
 
-Ng?y 2026-09-08: c?i ??t b? ph? thu?c ri?ng th?nh c?ng; 118/118 ki?m th? trong 28 file qua; TypeScript v? export Hermes Android/iOS qua trong repository n?y. Ch?a ki?m th? thi?t b?/staging th?t.
+Ngày 2026-09-08: 129/129 kiểm thử trong 30 file qua; TypeScript và export Hermes Android/iOS qua trong repository độc lập. Chưa kiểm thử thiết bị/staging thật.

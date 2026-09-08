@@ -1,8 +1,8 @@
 # LuxCare Mobile
 
-React Native + Expo SDK 57 + TypeScript. Dự án có package/lockfile riêng trong `mobile/`, dùng trực tiếp các nguồn TypeScript của FE LuxCare bên cạnh. Cần checkout toàn bộ repository; không sao chép riêng thư mục mobile.
+React Native + Expo SDK 57 + TypeScript. Dự án có package/lockfile riêng trong `mobile/`, dùng các nguồn TypeScript trong `src/` và `shared/` ở gốc repository LuxCareMobile. Clone toàn bộ repository này; không cần checkout repository web LuxCare.
 
-Trạng thái workspace: `.gitignore` của repository gốc hiện có `mobile/`. Các file mobile ở đây tồn tại trên ổ đĩa nhưng không được Git gốc theo dõi; cần đưa chúng vào phương án quản lý mã nguồn trước khi chuyển máy/clone dự án.
+Mã mobile và nguồn dùng chung đã được Git quản lý trong repository này. Các lệnh kiểm thử backend/web trong lịch sử triển khai bên dưới thuộc repository LuxCare gốc; xem README ở cấp gốc để chạy bộ kiểm thử mobile độc lập.
 
 ## Chạy ứng dụng
 
@@ -300,6 +300,14 @@ Kiểm tra: 13/13 test trong 5 file qua; TypeScript web/mobile và bundle Hermes
 - Khóa thao tác lưu/đóng trong lúc gửi. Với lỗi mạng/5xx hoặc phản hồi thiếu bản ghi, chặn gửi lại cho đến khi đóng và kiểm tra kết quả. Backend chưa có transaction/version/idempotency cho toàn bộ luồng, vì vậy lỗi có thể để lại lịch sử trước khi hạn hợp đồng được cập nhật; cần đối soát trên staging.
 - Kiểm tra độc lập: 123/123 test trong 29 file và TypeScript qua. Chưa UAT thiết bị/staging. Upload/gỡ tệp hợp đồng và gia hạn vẫn chưa chuyển.
 
+## Đợt 33: upload hợp đồng và phụ lục khi tạo
+
+- Hợp đồng mới và form gia hạn nhận một tài liệu PDF/DOC/DOCX/ảnh cùng một ảnh đã ký, tối đa 10 MB mỗi tệp. Có chọn lại/bỏ tệp chưa lưu, khóa lưu/đóng trong lúc upload.
+- Dùng endpoint upload hiện có, đọc kích thước thật trước khi mã hóa base64; gửi metadata và uploadToken qua các trường đơn được schema backend chấp nhận. Không gửi mảng nhiều tệp vốn chưa được schema route hiện tại hỗ trợ.
+- Các token chưa lưu phụ thuộc cơ chế pending upload của backend (hạn token 24 giờ); mobile chỉ dọn bản sao picker trong cache, không tự xóa tài nguyên server. Không giả định tệp đã bị xóa khi bỏ chọn hoặc đóng form.
+- Chưa thay/gỡ tệp đã lưu khi sửa hợp đồng: backend có dữ liệu mảng nhiều tệp nên cần hoàn thiện contract API trước để tránh ghi đè mất tệp. Chưa upload thêm vào bản gia hạn đã tồn tại.
+- 129 test/30 file, TypeScript và export Hermes Android/iOS qua (không phải APK/IPA); chưa UAT thiết bị/staging.
+
 ## Quy tắc dùng lại FE (áp dụng cho các đợt tiếp)
 
 Service được xuất dưới dạng `createXService(transport)` cùng singleton mặc định cho web. Transport chỉ cung cấp `fetch` và `getAccessToken`; mobile inject API client, web giữ global fetch được interceptor hiện có bọc. Không polyfill localStorage/window, không sao chép service để tạo hai phiên bản endpoint. UI DOM/Tailwind phải chuyển thành component native. Trước khi chuyển service tiếp theo, rà soát các import gián tiếp tới Toast, auth, browser storage, window/document và file APIs.
@@ -322,7 +330,7 @@ Kết quả đợt ba ngày 2026-09-08: 90/90 kiểm thử trong 19 file qua, Ty
 
 ## Giới hạn hiện tại
 
-Đây là ba mươi hai đợt triển khai trong phạm vi ứng dụng đầy đủ, chưa phải bản đầy đủ chức năng. Xem `IMPLEMENTATION.md`.
+Đây là ba mươi ba đợt triển khai trong phạm vi ứng dụng đầy đủ, chưa phải bản đầy đủ chức năng. Xem `IMPLEMENTATION.md`.
 
 - Giữ chính sách một phiên của backend; đăng nhập mobile có thể thay thế phiên web. Chưa thay đổi mô hình phiên theo thiết bị.
 - Super Admin nhận challenge 202 được chặn an toàn, chưa có UI hoàn tất MFA. Không hạ yêu cầu xác thực.

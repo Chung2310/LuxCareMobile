@@ -8,6 +8,8 @@ import { Button, ErrorText, Field, Page, styles } from "../../ui";
 import { ChoiceField } from "../leave/ChoiceField";
 import { contractDraft, contractPayload, contractChanges } from "./formModel";
 import { contractStatuses } from "./model";
+import { UploadFields } from "./UploadFields";
+import { contractUploadFields, type ContractUploads } from "./uploadModel";
 export function ContractForm({
   contract,
   employees,
@@ -27,6 +29,7 @@ export function ContractForm({
   const [blocked, setBlocked] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const lock = useRef(false);
+  const [uploads, setUploads] = useState<ContractUploads>({});
   const choices = employees
     .filter(
       (employee) =>
@@ -62,7 +65,7 @@ export function ContractForm({
     try {
       const saved = contract
         ? await contracts.update(scope, contract._id, patch)
-        : await contracts.create(scope, value);
+        : await contracts.create(scope, { ...value, ...contractUploadFields(uploads) });
       if (!saved?._id) throw new Error("Chưa xác nhận hợp đồng đã được lưu.");
       onClose();
     } catch (error) {
@@ -130,7 +133,20 @@ export function ContractForm({
         onChangeText={(value) => setDraft((current) => ({ ...current, note: value }))}
       />
       <ErrorText message={error} />
-      <Button title={busy ? "Đang lưu…" : "Lưu hợp đồng"} disabled={disabled} onPress={() => void save()} />
+      {!contract && (
+        <UploadFields
+          scope={scope}
+          value={uploads}
+          onChange={setUploads}
+          disabled={disabled}
+          onBusy={(value) => {
+            lock.current = value;
+            setBusy(value);
+            setLocked(value);
+          }}
+        />
+      )}
+      <Button title={busy ? "Đang xử lý…" : "Lưu hợp đồng"} disabled={disabled} onPress={() => void save()} />
       <Button title="Đóng và tải lại" disabled={busy} onPress={onClose} />
     </Page>
   );
