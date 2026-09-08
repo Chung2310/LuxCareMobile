@@ -27,6 +27,7 @@ import { PayslipPublication } from "../../src/features/payroll/PayslipPublicatio
 import { AdjustmentHistory } from "../../src/features/payroll/AdjustmentHistory";
 import { PayrollAuditHistory } from "../../src/features/payroll/PayrollAuditHistory";
 import { canReadRunPayments } from "../../src/features/payroll/paymentModel";
+import { PayrollPeriodInputs } from "../../src/features/payroll/PayrollPeriodInputs";
 export default function PayrollRuns() {
   const { user, selectedBranch } = useSession();
   const allowed = canReadPayrollRuns(user);
@@ -133,6 +134,7 @@ export default function PayrollRuns() {
           onChanged={() => setRevision((value) => value + 1)}
         />
       )}
+      <PayrollPeriodInputs key={`inputs:${period}:${revision}`} period={period} employees={lines} />
       <AdjustmentHistory
         key={`${period}:${revision}`}
         period={period}

@@ -53,8 +53,8 @@ export function CreatePayrollRun({ period, onChanged }: { period: string; onChan
           </Text>
           <Text style={styles.text}>Chi nhánh: {selectedBranch?.name || "Chi nhánh của phiên đăng nhập"}</Text>
           <Text style={styles.muted}>
-            Kỳ mới ở trạng thái nháp, chưa có dữ liệu công hoặc kết quả lương. Tiếp tục đồng bộ, khóa công và tính lương
-            trên LuxCare web.
+            Kỳ mới ở trạng thái nháp, chưa có dữ liệu công hoặc kết quả lương. Tải lại để tiếp tục đồng bộ, khóa công và
+            tính lương.
           </Text>
           {!confirming ? (
             <Button title="Tạo kỳ nháp theo tháng" onPress={() => setConfirming(true)} />

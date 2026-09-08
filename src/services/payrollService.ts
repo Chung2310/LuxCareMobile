@@ -77,7 +77,7 @@ export function createPayrollService({ fetch, getAccessToken }: ServiceTransport
       request(`/formulas/${id}/clone`, { method: "POST", body: JSON.stringify({ code }) }),
     activateFormula: (id: string) => request(`/formulas/${id}/activate`, { method: "POST" }),
     retireFormula: (id: string) => request(`/formulas/${id}/retire`, { method: "POST" }),
-    getPeriodInputs: (periodKey: string) => request(`/periods/${periodKey}/inputs`),
+    getPeriodInputs: (periodKey: string) => request(`/periods/${encodeURIComponent(periodKey)}/inputs`),
     savePeriodInput: (periodKey: string, employeeId: string, payload: unknown) =>
       request(`/periods/${periodKey}/inputs/${employeeId}`, { method: "PUT", body: JSON.stringify(payload) }),
     bulkSavePeriodInputs: (periodKey: string, rows: unknown[]) =>

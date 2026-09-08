@@ -160,6 +160,10 @@ Hủy khoản draft ở mọi trạng thái kỳ; đảo khoản confirmed có p
 
 Ngày thanh toán tùy chọn khi tạo/xác nhận, nhập ngày Việt Nam và gửi ISO UTC tương ứng. Liên kết chứng từ/ghi chú cho tạo và các chuyển trạng thái; ô trống bỏ khỏi payload để giữ metadata hiện có. Xem lại trước gửi, đối chiếu metadata phản hồi, giữ lời gọi FE không payload tương thích. Hủy/đảo không sửa ngày; chưa xóa metadata, upload chứng từ hoặc UAT thiết bị/staging.
 
+## Đợt sáu mươi hai
+
+Tra cứu dữ liệu đầu vào theo kỳ/chi nhánh bằng service FE, có tìm kiếm/chi tiết/xem thêm, phân biệt thiếu dữ liệu và số 0. Hiển thị biến tùy chỉnh/mặc định riêng, cờ khóa/cần cập nhật, lý do/phiên bản/người sửa. Kiểm tra phản hồi đúng kỳ và bỏ kết quả khi rời màn hình. Chưa ghi/chỉnh đầu vào, quản trị biến hoặc UAT thiết bị/staging.
+
 ## Đợt tiếp theo
 
 1. Kiểm chứng đăng nhập/thông báo/phòng ban với staging và thiết bị thật; chốt hành vi phiên web/mobile.
@@ -168,6 +172,8 @@ Ngày thanh toán tùy chọn khi tạo/xác nhận, nhập ngày Việt Nam và
 4. Tiếp tục các module còn lại trong bảng, ghi rõ màn hình và thao tác đã nghiệm thu.
 
 ## Tiêu chí nghiệm thu từng module
+
+Đợt sáu mươi hai: 330/330 test trong 59 file qua; TypeScript và export Hermes Android/iOS qua. Kiểm tra kỳ/cấu trúc/giá trị, phân biệt 0 và thiếu dữ liệu, GET có xác thực, lỗi API không chuyển thành rỗng. Chưa UAT thiết bị/staging.
 
 Đợt sáu mươi mốt: 323/323 test trong 58 file qua; TypeScript và export Hermes Android/iOS qua. Kiểm tra ngày/múi giờ/năm nhuận, URL/ghi chú, ô trống giữ dữ liệu cũ, metadata phản hồi và tương thích service FE. Chưa UAT thiết bị/staging.
 
