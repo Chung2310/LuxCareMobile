@@ -15,7 +15,7 @@ Mục tiêu cuối: đối chiếu mọi màn hình/thao tác/quyền/API của 
 | Nghỉ phép / đơn từ | leaveService, types/leave, LeaveRequestsTab | Đã có 4 loại yêu cầu, nộp/duyệt/từ chối/xóa, số dư phép, biểu mẫu và tệp đính kèm; chờ UAT thiết bị/staging |
 | Hợp đồng / chứng chỉ | components/hr, shared/hr-credential, hrContractService, hrContractFiles, hrCredentialService | Hợp đồng có tạo/sửa/gia hạn, upload khi tạo, tra cứu và tải/chia sẻ; chưa thay/gỡ tệp đã lưu hoặc nhiều tệp mỗi nhóm. Chứng chỉ có tạo/sửa/xóa, danh sách/tìm/lọc/phân trang, thống kê, chi tiết, upload/thay tài liệu và tải/chia sẻ; chưa gỡ tài liệu đã lưu hoặc push nhắc hạn |
 | Tuyển dụng | recruitmentService, rosterService, types/recruitment | Có tin tuyển dụng theo chi nhánh: tạo/sửa nội dung, tìm/lọc/phân trang, chi tiết, chuyển trạng thái, xóa mềm/khôi phục; ứng viên có tạo/sửa/cảnh báo trùng/tìm/lọc/phân trang/hồ sơ/lịch sử/chuyển bước/gán người phụ trách/xóa mềm/khôi phục; phỏng vấn có danh sách/lọc/phân trang/tạo/sửa/trạng thái/kết quả/gán người/xóa mềm/khôi phục; quản trị pipeline; upload/thay/tải/chia sẻ/gỡ attachment JD/CV riêng theo quyền; có xem/sửa/gỡ liên kết và upload JD/CV công khai; chờ UAT thiết bị/staging |
-| Tiền lương | payrollService, types/payslip, types/payrollRun, types/payrollPayment, types/payrollAdjustment, types/payrollAudit, types/payrollIssue, components/hr/payrollDetails | Có phiếu lương và chia sẻ HTML; tạo kỳ nháp thường theo tháng, đồng bộ công đã tổng hợp, khóa bản công, tính/tính lại lương và duyệt sang review; tra cứu kỳ, tổng tiền, nhân viên; lỗi/cảnh báo kỳ; lịch sử thanh toán; tạo/tra cứu/duyệt/từ chối điều chỉnh; nhật ký kỳ; xuất 4 mẫu Excel; phát hành và thu hồi phiếu theo nhân viên. Chưa tạo kỳ bổ sung/tổng hợp công kỳ/công thức/chốt/ghi thanh toán/sửa hoặc xóa điều chỉnh, PDF hoặc in native |
+| Tiền lương | payrollService, types/payslip, types/payrollRun, types/payrollPayment, types/payrollAdjustment, types/payrollAudit, types/payrollIssue, components/hr/payrollDetails | Có phiếu lương và chia sẻ HTML; tạo kỳ nháp thường theo tháng, đồng bộ công đã tổng hợp, khóa bản công, tính/tính lại lương, duyệt và chốt kỳ; tra cứu kỳ, tổng tiền, nhân viên; lỗi/cảnh báo kỳ; lịch sử thanh toán; tạo/tra cứu/duyệt/từ chối điều chỉnh; nhật ký kỳ; xuất 4 mẫu Excel; phát hành và thu hồi phiếu theo nhân viên. Chưa tạo kỳ bổ sung/tổng hợp công kỳ/công thức/mở lại kỳ/ghi thanh toán/sửa hoặc xóa điều chỉnh, PDF hoặc in native |
 | Công việc / Kanban / KPI | kanbanService, kanbanMediaService, monthlyKpiService, types/hr, kanbanTaskTime | Có CRUD công việc/dự án, lịch sử, tiến độ; CRUD/hoàn thành/gán người cho việc nhỏ; upload/link/gỡ/tải tệp; KPI tháng theo quyền; chưa bảng kéo thả, ghi âm/quay trực tiếp, socket |
 | Chat | internalChatService, socketService | Chưa chuyển; cần lifecycle/reconnect native |
 | AI / kho kiến thức | assistantService, assistantKnowledgeService, chatbotRequest | Chưa chuyển; cần streaming/upload native |
@@ -136,6 +136,10 @@ Tính/tính lại draft có version hợp lệ qua calculateOperationalRun với
 
 Duyệt kỳ draft sang review theo expectedVersion, quyền quản lý và phạm vi phiên. Xác nhận tổng thực nhận/số dòng, dùng effectiveLines của màn hình tra cứu; backend lưu effective snapshot. Khóa gửi và đối chiếu phản hồi đúng kỳ/trạng thái/version, tải lại sau kết quả hoặc lỗi; chưa chốt/mở lại kỳ hoặc UAT thiết bị/staging.
 
+## Đợt năm mươi sáu
+
+Chốt review sang closed theo quyền đọc/quản lý và expectedVersion. Tái sử dụng panel duyệt với xác nhận chốt riêng, tổng thực nhận từ effectiveLines, kiểm tra phản hồi đúng kỳ/version và tải lại sau kết quả/lỗi. Backend đối chiếu checksum/revision; không tự retry/thanh toán/phát hành. Chưa mở lại kỳ hoặc UAT thiết bị/staging.
+
 ## Đợt tiếp theo
 
 1. Kiểm chứng đăng nhập/thông báo/phòng ban với staging và thiết bị thật; chốt hành vi phiên web/mobile.
@@ -144,6 +148,8 @@ Duyệt kỳ draft sang review theo expectedVersion, quyền quản lý và ph�
 4. Tiếp tục các module còn lại trong bảng, ghi rõ màn hình và thao tác đã nghiệm thu.
 
 ## Tiêu chí nghiệm thu từng module
+
+Đợt năm mươi sáu: 277/277 test trong 53 file qua; TypeScript và export Hermes Android/iOS qua. Kiểm tra quyền/review/version, phản hồi closed đúng kỳ và lỗi checksum/revision/version không retry. Chưa UAT thiết bị/staging.
 
 Đợt năm mươi lăm: 271/271 test trong 52 file qua; TypeScript và export Hermes Android/iOS qua. Kiểm tra trạng thái/phiên bản/kỳ phản hồi, endpoint xác thực và lỗi không retry; quyền draft dùng guard đã có. Chưa UAT thiết bị/staging.
 

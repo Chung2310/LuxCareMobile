@@ -157,6 +157,12 @@ export default function PayrollRuns() {
           />
           <PayrollExport key={`export:${run._id}:${revision}`} run={run} />
           <ReviewPayrollRun
+            close
+            key={`close:${run._id}:${run.version}:${revision}`}
+            run={run}
+            onChanged={() => setRevision((value) => value + 1)}
+          />
+          <ReviewPayrollRun
             key={`review:${run._id}:${run.version}:${revision}`}
             run={run}
             onChanged={() => setRevision((value) => value + 1)}
