@@ -498,6 +498,14 @@ Kiểm tra: 13/13 test trong 5 file qua; TypeScript web/mobile và bundle Hermes
 - Mở lại bỏ effective snapshot đã lưu khi duyệt; phiếu không còn trong danh sách phát hành khi kỳ nháp. Các bản tải/chia sẻ trước đó vẫn tồn tại. Chưa ghi/đảo thanh toán hoặc UAT thiết bị/staging.
 - Kiểm tra: 284/284 test trong 54 file, TypeScript và export Hermes Android/iOS qua (không phải APK/IPA).
 
+## Đợt năm mươi tám: tạo thanh toán lương nháp
+
+- Tạo khoản nháp cho kỳ closed với quyền đọc kỳ/đọc và quản lý thanh toán, chi nhánh xác thực. Nhập phân bổ từng nhân viên, để trống người không chọn, ghi chú và xem lại tổng trước khi xác nhận.
+- Kiểm tra số tiền nguyên VND dương/tổng an toàn, nhân viên thuộc effectiveLines, ghi chú tối đa 1000 ký tự. Gửi amount/lines/note/idempotencyKey UUID qua createPayment dùng chung.
+- Đối chiếu phản hồi draft đúng kỳ/tổng/từng phân bổ, khóa gửi trùng, yêu cầu tải lại sau kết quả hoặc lỗi. Backend kiểm tra số dư; khoản nháp chưa ghi nhận đã trả hoặc chuyển tiền.
+- Chưa xác nhận/hủy/đảo thanh toán, nhập ngày/chứng từ hoặc UAT thiết bị/staging.
+- Kiểm tra: 292/292 test trong 55 file, TypeScript và export Hermes Android/iOS qua (không phải APK/IPA).
+
 ## Quy tắc dùng lại FE (áp dụng cho các đợt tiếp)
 
 Service được xuất dưới dạng `createXService(transport)` cùng singleton mặc định cho web. Transport chỉ cung cấp `fetch` và `getAccessToken`; mobile inject API client, web giữ global fetch được interceptor hiện có bọc. Không polyfill localStorage/window, không sao chép service để tạo hai phiên bản endpoint. UI DOM/Tailwind phải chuyển thành component native. Trước khi chuyển service tiếp theo, rà soát các import gián tiếp tới Toast, auth, browser storage, window/document và file APIs.
@@ -520,7 +528,7 @@ Kết quả đợt ba ngày 2026-09-08: 90/90 kiểm thử trong 19 file qua, Ty
 
 ## Giới hạn hiện tại
 
-Đây là năm mươi bảy đợt triển khai trong phạm vi ứng dụng đầy đủ, chưa phải bản đầy đủ chức năng. Xem `IMPLEMENTATION.md`.
+Đây là năm mươi tám đợt triển khai trong phạm vi ứng dụng đầy đủ, chưa phải bản đầy đủ chức năng. Xem `IMPLEMENTATION.md`.
 
 - Giữ chính sách một phiên của backend; đăng nhập mobile có thể thay thế phiên web. Chưa thay đổi mô hình phiên theo thiết bị.
 - Super Admin nhận challenge 202 được chặn an toàn, chưa có UI hoàn tất MFA. Không hạ yêu cầu xác thực.

@@ -190,7 +190,7 @@ export function createPayrollService({ fetch, getAccessToken }: ServiceTransport
       return result;
     },
     createPayment: (runId: string, payload: unknown) =>
-      request(`/runs/${runId}/payments`, { method: "POST", body: JSON.stringify(payload) }),
+      request(`/runs/${encodeURIComponent(runId)}/payments`, { method: "POST", body: JSON.stringify(payload) }),
     confirmPayment: (paymentId: string) => request(`/payments/${paymentId}/confirm`, { method: "POST" }),
     cancelPayment: (paymentId: string) => request(`/payments/${paymentId}/cancel`, { method: "POST" }),
     reversePayment: (paymentId: string) => request(`/payments/${paymentId}/reverse`, { method: "POST" }),
