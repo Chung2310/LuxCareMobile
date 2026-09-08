@@ -3,6 +3,8 @@ import { useFocusEffect } from "expo-router";
 import { Modal, Text } from "react-native";
 import { SafeAreaView } from "react-native-safe-area-context";
 import { AdjustmentDecision } from "./AdjustmentDecision";
+import { AdjustmentForm } from "./AdjustmentForm";
+import { hasPermission } from "../../auth/access";
 import { canDecideAdjustment } from "./adjustmentModel";
 import type { PayrollAdjustment } from "../../../../src/types/payrollAdjustment";
 import { payroll } from "../../api/services";
@@ -25,8 +27,10 @@ export function AdjustmentHistory({ period, onChanged }: { period: string; onCha
   const [revision, setRevision] = useState(0);
   const [decision, setDecision] = useState<{ item: PayrollAdjustment; approve: boolean } | null>(null);
   const lock = useRef(false);
+  const [creating, setCreating] = useState(false);
   const close = () => {
     setDecision(null);
+    setCreating(false);
     onChanged();
   };
   useFocusEffect(
@@ -58,6 +62,9 @@ export function AdjustmentHistory({ period, onChanged }: { period: string; onCha
   return (
     <Card>
       <Text style={styles.heading}>Điều chỉnh lương kỳ {period}</Text>
+      {hasPermission(user, "payroll-period:manage") && (
+        <Button title="Thêm điều chỉnh" onPress={() => setCreating(true)} />
+      )}
       <Text style={styles.muted}>
         Khoản đã duyệt chưa đồng nghĩa đã tính vào thực nhận. Kiểm tra trạng thái và bản tính lương tương ứng.
       </Text>
@@ -120,13 +127,22 @@ export function AdjustmentHistory({ period, onChanged }: { period: string; onCha
         </>
       )}
       <Modal
-        visible={!!decision}
+        visible={!!decision || creating}
         animationType="slide"
         onRequestClose={() => {
           if (!lock.current) close();
         }}
       >
         <SafeAreaView style={styles.page}>
+          {creating && (
+            <AdjustmentForm
+              period={period}
+              onClose={close}
+              setLocked={(value) => {
+                lock.current = value;
+              }}
+            />
+          )}
           {decision && (
             <AdjustmentDecision
               item={decision.item}

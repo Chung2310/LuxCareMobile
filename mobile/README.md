@@ -397,6 +397,14 @@ Kiểm tra: 13/13 test trong 5 file qua; TypeScript web/mobile và bundle Hermes
 - API chưa nhận lý do từ chối riêng, chưa có tạo điều chỉnh hoặc UAT thiết bị/staging.
 - Kiểm tra: 191/191 test trong 41 file, TypeScript và export Hermes Android/iOS qua (không phải APK/IPA).
 
+## Đợt bốn mươi lăm: tạo điều chỉnh lương
+
+- Thêm khoản phụ cấp/thưởng/khấu trừ/điều chỉnh khác cho kỳ đang tra cứu; chọn nhân viên từ roster theo chi nhánh, nhập số tiền VND nguyên không âm và lý do.
+- Dùng lại rosterService và payrollService; cần quyền đọc/quản lý kỳ và quyền API đọc danh sách nhân viên. Chỉ cho chọn người thuộc chi nhánh, không nhập mã tùy ý.
+- Gửi bốn trường nghiệp vụ, backend tạo trạng thái pending. Khóa gửi/đóng khi lưu, kiểm tra phản hồi đúng kỳ/nhân viên/trạng thái; lỗi yêu cầu đóng và tải lại để tránh gửi trùng. Đóng tải lại bảng lương và điều chỉnh.
+- Chưa sửa/xóa điều chỉnh hoặc UAT thiết bị/staging. Backend chưa có idempotency cho thao tác tạo.
+- Kiểm tra: 194/194 test trong 42 file, TypeScript và export Hermes Android/iOS qua (không phải APK/IPA).
+
 ## Quy tắc dùng lại FE (áp dụng cho các đợt tiếp)
 
 Service được xuất dưới dạng `createXService(transport)` cùng singleton mặc định cho web. Transport chỉ cung cấp `fetch` và `getAccessToken`; mobile inject API client, web giữ global fetch được interceptor hiện có bọc. Không polyfill localStorage/window, không sao chép service để tạo hai phiên bản endpoint. UI DOM/Tailwind phải chuyển thành component native. Trước khi chuyển service tiếp theo, rà soát các import gián tiếp tới Toast, auth, browser storage, window/document và file APIs.
@@ -419,7 +427,7 @@ Kết quả đợt ba ngày 2026-09-08: 90/90 kiểm thử trong 19 file qua, Ty
 
 ## Giới hạn hiện tại
 
-Đây là bốn mươi bốn đợt triển khai trong phạm vi ứng dụng đầy đủ, chưa phải bản đầy đủ chức năng. Xem `IMPLEMENTATION.md`.
+Đây là bốn mươi lăm đợt triển khai trong phạm vi ứng dụng đầy đủ, chưa phải bản đầy đủ chức năng. Xem `IMPLEMENTATION.md`.
 
 - Giữ chính sách một phiên của backend; đăng nhập mobile có thể thay thế phiên web. Chưa thay đổi mô hình phiên theo thiết bị.
 - Super Admin nhận challenge 202 được chặn an toàn, chưa có UI hoàn tất MFA. Không hạ yêu cầu xác thực.

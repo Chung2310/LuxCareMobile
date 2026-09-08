@@ -10,3 +10,4 @@ export interface PayrollAdjustment {
   createdAt?: string;
   snapshotAt?: string;
 }
+export type PayrollAdjustmentInput = Pick<PayrollAdjustment, "employeeId" | "kind" | "amount" | "reason">;
