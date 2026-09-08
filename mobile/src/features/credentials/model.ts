@@ -7,6 +7,9 @@ export function canReadCredentials(user: UserProfile | null) {
     (hasPermission(user, "credentials:read") || hasPermission(user, "hr:read"))
   );
 }
+export function canManageCredentials(user: UserProfile | null) {
+  return canReadCredentials(user) && (hasPermission(user, "credentials:manage") || hasPermission(user, "hr:manage"));
+}
 export const credentialTypes = {
   professional_degree: "Bằng chuyên môn",
   practice_certificate: "Chứng chỉ hành nghề",

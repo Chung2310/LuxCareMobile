@@ -20,8 +20,37 @@ export interface CredentialList {
   limit: number;
   summary: { total: number; active: number; expiring: number; expired: number };
 }
+export type CredentialInput = Pick<
+  Credential,
+  | "employeeId"
+  | "name"
+  | "type"
+  | "credentialNumber"
+  | "issuingOrganization"
+  | "issueDate"
+  | "expiryDate"
+  | "professionalScope"
+  | "note"
+  | "reminderDays"
+>;
 export function createHrCredentialService({ fetch, getAccessToken }: ServiceTransport) {
+  async function save(companyCode: string, value: Partial<CredentialInput>, id?: string): Promise<Credential> {
+    const response = await fetch(
+      `/api/v1/hr-credentials${id ? `/${encodeURIComponent(id)}` : ""}?companyCode=${encodeURIComponent(companyCode)}`,
+      {
+        method: id ? "PATCH" : "POST",
+        headers: { Authorization: `Bearer ${getAccessToken()}`, "Content-Type": "application/json" },
+        body: JSON.stringify(value),
+      },
+    );
+    const body = await response.json();
+    if (!response.ok)
+      throw Object.assign(new Error(body.message || "Không lưu được chứng chỉ."), { status: response.status });
+    return body.data;
+  }
   return {
+    create: (companyCode: string, value: CredentialInput) => save(companyCode, value),
+    update: (companyCode: string, id: string, value: Partial<CredentialInput>) => save(companyCode, value, id),
     async list(filters: CredentialFilters): Promise<CredentialList> {
       const query = new URLSearchParams();
       Object.entries(filters).forEach(([key, value]) => {

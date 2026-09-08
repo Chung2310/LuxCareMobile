@@ -13,7 +13,7 @@ Mục tiêu cuối: đối chiếu mọi màn hình/thao tác/quyền/API của 
 | Nhân sự / hồ sơ | rosterService, authService, types/common | Có danh sách theo chi nhánh, tìm kiếm, xem/sửa hồ sơ cơ bản theo quyền; chưa tạo/xóa, sơ đồ tổ chức |
 | Chấm công / ca / lịch | companyWorkCalendarService, attendanceService, hrCalendarService, types/attendance, attendanceFaceCheck | Có trạng thái hôm nay, lịch sử cá nhân, check-in/out GPS và camera theo cờ chung; CRUD/phân ca, công chuẩn và cấu hình khung giờ vào/ra (backend chưa thực thi khung giờ); quản lý lịch nghỉ/làm bù, đồng bộ, bật/tắt và audit; chỉnh trạng thái/ghi chú công theo nhân viên/tháng, xem lịch sử theo quyền; xem/lọc/chi tiết lịch nhân sự; chưa sửa giờ vào/ra hoặc CRUD sự kiện; chờ UAT thiết bị |
 | Nghỉ phép / đơn từ | leaveService, types/leave, LeaveRequestsTab | Đã có 4 loại yêu cầu, nộp/duyệt/từ chối/xóa, số dư phép, biểu mẫu và tệp đính kèm; chờ UAT thiết bị/staging |
-| Hợp đồng / chứng chỉ | components/hr, shared/hr-credential, hrContractService, hrContractFiles, hrCredentialService | Hợp đồng có tạo/sửa/gia hạn, upload khi tạo, tra cứu và tải/chia sẻ; chưa thay/gỡ tệp đã lưu hoặc nhiều tệp mỗi nhóm. Chứng chỉ có danh sách/tìm/lọc/phân trang, thống kê, chi tiết và tải/chia sẻ; chưa tạo/sửa/xóa/upload hoặc push nhắc hạn |
+| Hợp đồng / chứng chỉ | components/hr, shared/hr-credential, hrContractService, hrContractFiles, hrCredentialService | Hợp đồng có tạo/sửa/gia hạn, upload khi tạo, tra cứu và tải/chia sẻ; chưa thay/gỡ tệp đã lưu hoặc nhiều tệp mỗi nhóm. Chứng chỉ có tạo/sửa nội dung, danh sách/tìm/lọc/phân trang, thống kê, chi tiết và tải/chia sẻ; chưa xóa/upload hoặc push nhắc hạn |
 | Tuyển dụng | recruitmentService, rosterService, types/recruitment | Có tin tuyển dụng theo chi nhánh: tạo/sửa nội dung, tìm/lọc/phân trang, chi tiết, chuyển trạng thái, xóa mềm/khôi phục; ứng viên có tạo/sửa/cảnh báo trùng/tìm/lọc/phân trang/hồ sơ/lịch sử/chuyển bước/gán người phụ trách/xóa mềm/khôi phục; phỏng vấn có danh sách/lọc/phân trang/tạo/sửa/trạng thái/kết quả/gán người/xóa mềm/khôi phục; quản trị pipeline; upload/thay/tải/chia sẻ/gỡ attachment JD/CV riêng theo quyền; có xem/sửa/gỡ liên kết và upload JD/CV công khai; chờ UAT thiết bị/staging |
 | Tiền lương | payrollService, types/hr, components/hr/payroll | Chưa chuyển |
 | Công việc / Kanban / KPI | kanbanService, kanbanMediaService, monthlyKpiService, types/hr, kanbanTaskTime | Có CRUD công việc/dự án, lịch sử, tiến độ; CRUD/hoàn thành/gán người cho việc nhỏ; upload/link/gỡ/tải tệp; KPI tháng theo quyền; chưa bảng kéo thả, ghi âm/quay trực tiếp, socket |
@@ -51,6 +51,10 @@ Form native chọn nhân viên, loại hợp đồng, thời hạn, trạng thá
 ## Đợt 34 — văn bằng/chứng chỉ
 
 Đã có danh sách, tìm kiếm, bộ lọc loại/trạng thái, phân trang server, thống kê phạm vi, chi tiết và tải/chia sẻ tài liệu. Quyền đọc chứng chỉ hoặc HR; backend giới hạn nhân viên tự xem hồ sơ. Chưa tạo/sửa/xóa/upload chứng chỉ hoặc push nhắc hạn; chưa UAT thiết bị/staging.
+
+## Đợt 35 — tạo/sửa chứng chỉ
+
+Đã có form tạo/sửa nội dung chứng chỉ, chọn nhân viên, thời hạn hoặc không thời hạn, số ngày nhắc theo quyền. PATCH tối thiểu, giữ tệp hiện có và ngày không sửa. Chưa xóa/upload chứng chỉ hoặc UAT thiết bị/staging.
 
 ## Đợt tiếp theo
 
