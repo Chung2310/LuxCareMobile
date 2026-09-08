@@ -191,7 +191,8 @@ export function createPayrollService({ fetch, getAccessToken }: ServiceTransport
     },
     createPayment: (runId: string, payload: unknown) =>
       request(`/runs/${encodeURIComponent(runId)}/payments`, { method: "POST", body: JSON.stringify(payload) }),
-    confirmPayment: (paymentId: string) => request(`/payments/${paymentId}/confirm`, { method: "POST" }),
+    confirmPayment: (paymentId: string) =>
+      request(`/payments/${encodeURIComponent(paymentId)}/confirm`, { method: "POST" }),
     cancelPayment: (paymentId: string) => request(`/payments/${paymentId}/cancel`, { method: "POST" }),
     reversePayment: (paymentId: string) => request(`/payments/${paymentId}/reverse`, { method: "POST" }),
     withdrawPayslip: (runId: string, employeeId: string) =>

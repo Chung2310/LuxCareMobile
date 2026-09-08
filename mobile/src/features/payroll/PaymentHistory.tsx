@@ -10,7 +10,19 @@ import { ChoiceField } from "../leave/ChoiceField";
 import { contractDate } from "../contracts/model";
 import { payslipMoney } from "./model";
 import { canReadRunPayments, confirmedPaymentTotal, paymentStatuses } from "./paymentModel";
-export function PaymentHistory({ runId, employees }: { runId: string; employees: PayrollRunLine[] }) {
+import { canConfirmPayment } from "./confirmPaymentModel";
+import { ConfirmPayrollPayment } from "./ConfirmPayrollPayment";
+export function PaymentHistory({
+  runId,
+  runStatus,
+  employees,
+  onChanged,
+}: {
+  runId: string;
+  runStatus: string;
+  employees: PayrollRunLine[];
+  onChanged: () => void;
+}) {
   const { user, selectedBranch } = useSession();
   const allowed = canReadRunPayments(user);
   const [items, setItems] = useState<PayrollPayment[]>([]);
@@ -19,12 +31,14 @@ export function PaymentHistory({ runId, employees }: { runId: string; employees:
   const [status, setStatus] = useState<PayrollPayment["status"] | "">("");
   const [expanded, setExpanded] = useState<string | null>(null);
   const [revision, setRevision] = useState(0);
+  const [selected, setSelected] = useState<PayrollPayment | null>(null);
   useFocusEffect(
     useCallback(() => {
       let active = true;
       setItems([]);
       setError(null);
       setExpanded(null);
+      setSelected(null);
       setLoading(false);
       if (!allowed) return;
       setLoading(true);
@@ -61,13 +75,17 @@ export function PaymentHistory({ runId, employees }: { runId: string; employees:
             label,
           })),
         ]}
-        disabled={loading}
+        disabled={loading || !!selected}
         onChange={(value) => {
           setStatus(value);
           setExpanded(null);
         }}
       />
-      <Button title="Tải lại thanh toán" disabled={loading} onPress={() => setRevision((value) => value + 1)} />
+      <Button
+        title="Tải lại thanh toán"
+        disabled={loading || !!selected}
+        onPress={() => setRevision((value) => value + 1)}
+      />
       {loading && <Loading />}
       <ErrorText message={error} />
       {!loading && !error && (
@@ -87,6 +105,7 @@ export function PaymentHistory({ runId, employees }: { runId: string; employees:
               </Text>
               <Button
                 title={expanded === item._id ? "Thu gọn" : "Xem phân bổ và thông tin"}
+                disabled={!!selected}
                 onPress={() => setExpanded(expanded === item._id ? null : item._id)}
               />
               {expanded === item._id && (
@@ -101,6 +120,23 @@ export function PaymentHistory({ runId, employees }: { runId: string; employees:
                   ))}
                   {!item.lines?.length && <Text style={styles.muted}>API chưa có thông tin phân bổ nhân viên.</Text>}
                   <Text style={styles.text}>Ghi chú: {item.note || "—"}</Text>
+                  {selected?._id === item._id && (
+                    <ConfirmPayrollPayment
+                      payment={selected}
+                      runId={runId}
+                      runStatus={runStatus}
+                      employees={employees}
+                      onClose={() => setSelected(null)}
+                      onChanged={onChanged}
+                    />
+                  )}
+                  {canConfirmPayment(user, selectedBranch?._id || user?.branchId, runId, runStatus, item) && (
+                    <Button
+                      title="Xem lại để xác nhận thanh toán"
+                      disabled={!!selected}
+                      onPress={() => setSelected(item)}
+                    />
+                  )}
                   {(
                     [
                       ["Tạo", item.createdAt],

@@ -506,6 +506,13 @@ Kiểm tra: 13/13 test trong 5 file qua; TypeScript web/mobile và bundle Hermes
 - Chưa xác nhận/hủy/đảo thanh toán, nhập ngày/chứng từ hoặc UAT thiết bị/staging.
 - Kiểm tra: 292/292 test trong 55 file, TypeScript và export Hermes Android/iOS qua (không phải APK/IPA).
 
+## Đợt năm mươi chín: xác nhận thanh toán lương
+
+- Từ chi tiết lịch sử thanh toán, xem lại khoản nháp, phân bổ, chi nhánh và tổng tiền trước khi xác nhận đã chi trả. Chỉ kỳ closed, có quyền đọc kỳ/đọc và quản lý thanh toán.
+- Tận dụng confirmPayment của FE; đối chiếu phản hồi confirmed đúng khoản/kỳ/tổng/từng phân bổ. Khóa gửi trùng, tải lại cả kỳ và thanh toán sau kết quả hoặc lỗi; không tự retry.
+- Backend kiểm tra số dư, ghi nhận ngày thanh toán và cập nhật trạng thái kỳ theo quyết toán. Thao tác không chuyển tiền ngân hàng. Chưa hủy/đảo, nhập ngày/chứng từ hoặc UAT thiết bị/staging.
+- Kiểm tra: 300/300 test trong 56 file, TypeScript và export Hermes Android/iOS qua (không phải APK/IPA).
+
 ## Quy tắc dùng lại FE (áp dụng cho các đợt tiếp)
 
 Service được xuất dưới dạng `createXService(transport)` cùng singleton mặc định cho web. Transport chỉ cung cấp `fetch` và `getAccessToken`; mobile inject API client, web giữ global fetch được interceptor hiện có bọc. Không polyfill localStorage/window, không sao chép service để tạo hai phiên bản endpoint. UI DOM/Tailwind phải chuyển thành component native. Trước khi chuyển service tiếp theo, rà soát các import gián tiếp tới Toast, auth, browser storage, window/document và file APIs.
@@ -528,7 +535,7 @@ Kết quả đợt ba ngày 2026-09-08: 90/90 kiểm thử trong 19 file qua, Ty
 
 ## Giới hạn hiện tại
 
-Đây là năm mươi tám đợt triển khai trong phạm vi ứng dụng đầy đủ, chưa phải bản đầy đủ chức năng. Xem `IMPLEMENTATION.md`.
+Đây là năm mươi chín đợt triển khai trong phạm vi ứng dụng đầy đủ, chưa phải bản đầy đủ chức năng. Xem `IMPLEMENTATION.md`.
 
 - Giữ chính sách một phiên của backend; đăng nhập mobile có thể thay thế phiên web. Chưa thay đổi mô hình phiên theo thiết bị.
 - Super Admin nhận challenge 202 được chặn an toàn, chưa có UI hoàn tất MFA. Không hạ yêu cầu xác thực.

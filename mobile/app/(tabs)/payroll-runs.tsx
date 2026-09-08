@@ -194,7 +194,15 @@ export default function PayrollRuns() {
             run={run}
             onChanged={() => setRevision((value) => value + 1)}
           />
-          {canReadRunPayments(user) && <PaymentHistory key={run._id} runId={run._id} employees={lines} />}
+          {canReadRunPayments(user) && (
+            <PaymentHistory
+              key={`${run._id}:${revision}`}
+              runId={run._id}
+              runStatus={run.status}
+              employees={lines}
+              onChanged={() => setRevision((value) => value + 1)}
+            />
+          )}
           {!rows.length && <Text style={styles.text}>Không có dòng lương phù hợp.</Text>}
           {rows.map((line) => (
             <Card key={line.employeeId}>
