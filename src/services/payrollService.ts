@@ -1,6 +1,6 @@
 import { browserTransport, type ServiceTransport } from "./serviceTransport";
 import type { Payslip, PayslipDetail } from "../types/payslip";
-import type { PayrollRun } from "../types/payrollRun";
+import type { PayrollRun, CreatePayrollRunInput } from "../types/payrollRun";
 import type { PayrollIssue } from "../types/payrollIssue";
 import type { PayrollAudit } from "../types/payrollAudit";
 import type { PayrollPayment } from "../types/payrollPayment";
@@ -126,6 +126,8 @@ export function createPayrollService({ fetch, getAccessToken }: ServiceTransport
     snapshot: (periodKey: string) => request(`/periods/${periodKey}/snapshot`, { method: "POST" }),
     lock: (periodKey: string) => request(`/periods/${periodKey}/lock`, { method: "POST" }),
     createRun: (periodKey: string) => request(`/periods/${periodKey}/run`, { method: "POST" }),
+    createOperationalRun: (payload: CreatePayrollRunInput): Promise<PayrollRun> =>
+      request("/runs", { method: "POST", body: JSON.stringify(payload) }),
     processPeriod: (periodKey: string) => request(`/periods/${periodKey}/process`, { method: "POST" }),
     calculateRun: (runId: string, expectedVersion: number) =>
       request(`/runs/${runId}/calculate`, { method: "POST", body: JSON.stringify({ expectedVersion }) }),

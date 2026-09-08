@@ -17,6 +17,7 @@ import { PayslipDetails } from "../../src/features/payroll/PayslipDetails";
 import { PaymentHistory } from "../../src/features/payroll/PaymentHistory";
 import { PayrollExport } from "../../src/features/payroll/PayrollExport";
 import { PayrollIssues } from "../../src/features/payroll/PayrollIssues";
+import { CreatePayrollRun } from "../../src/features/payroll/CreatePayrollRun";
 import { PayslipPublication } from "../../src/features/payroll/PayslipPublication";
 import { AdjustmentHistory } from "../../src/features/payroll/AdjustmentHistory";
 import { PayrollAuditHistory } from "../../src/features/payroll/PayrollAuditHistory";
@@ -120,6 +121,13 @@ export default function PayrollRuns() {
         />
       )}
       {missing && <Text style={styles.text}>Chưa có bảng lương cho kỳ {period}.</Text>}
+      {missing && !loading && (
+        <CreatePayrollRun
+          key={`create:${period}:${revision}`}
+          period={period}
+          onChanged={() => setRevision((value) => value + 1)}
+        />
+      )}
       <AdjustmentHistory
         key={`${period}:${revision}`}
         period={period}

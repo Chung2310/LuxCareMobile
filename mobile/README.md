@@ -445,6 +445,14 @@ Kiểm tra: 13/13 test trong 5 file qua; TypeScript web/mobile và bundle Hermes
 - Chưa tự sửa lỗi/tính lại kỳ hoặc UAT thiết bị/staging.
 - Kiểm tra: 235/235 test trong 47 file, TypeScript và export Hermes Android/iOS qua (không phải APK/IPA).
 
+## Đợt năm mươi mốt: tạo kỳ lương thường theo tháng
+
+- Sau khi tra cứu xác nhận chưa có kỳ, người có quyền đọc/quản lý kỳ và chi nhánh có thể tạo kỳ regular ở trạng thái draft.
+- Tự lấy ngày đầu/cuối tháng, hỗ trợ năm nhuận; xác nhận khoảng ngày/chi nhánh, khóa gửi trùng và kiểm tra phản hồi đúng kỳ/loại/trạng thái. Có tải lại sau thành công hoặc lỗi, không tự retry.
+- Dùng API operational POST runs, giữ nguyên createRun legacy của FE. Kỳ mới chưa có dữ liệu công/kết quả lương; đồng bộ, khóa công và tính lương tiếp trên web.
+- Chưa tạo kỳ bổ sung/khoảng ngày tùy chỉnh hoặc UAT thiết bị/staging.
+- Kiểm tra: 246/246 test trong 48 file, TypeScript và export Hermes Android/iOS qua (không phải APK/IPA).
+
 ## Quy tắc dùng lại FE (áp dụng cho các đợt tiếp)
 
 Service được xuất dưới dạng `createXService(transport)` cùng singleton mặc định cho web. Transport chỉ cung cấp `fetch` và `getAccessToken`; mobile inject API client, web giữ global fetch được interceptor hiện có bọc. Không polyfill localStorage/window, không sao chép service để tạo hai phiên bản endpoint. UI DOM/Tailwind phải chuyển thành component native. Trước khi chuyển service tiếp theo, rà soát các import gián tiếp tới Toast, auth, browser storage, window/document và file APIs.
@@ -467,7 +475,7 @@ Kết quả đợt ba ngày 2026-09-08: 90/90 kiểm thử trong 19 file qua, Ty
 
 ## Giới hạn hiện tại
 
-Đây là năm mươi đợt triển khai trong phạm vi ứng dụng đầy đủ, chưa phải bản đầy đủ chức năng. Xem `IMPLEMENTATION.md`.
+Đây là năm mươi mốt đợt triển khai trong phạm vi ứng dụng đầy đủ, chưa phải bản đầy đủ chức năng. Xem `IMPLEMENTATION.md`.
 
 - Giữ chính sách một phiên của backend; đăng nhập mobile có thể thay thế phiên web. Chưa thay đổi mô hình phiên theo thiết bị.
 - Super Admin nhận challenge 202 được chặn an toàn, chưa có UI hoàn tất MFA. Không hạ yêu cầu xác thực.
