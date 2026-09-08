@@ -453,6 +453,14 @@ Kiểm tra: 13/13 test trong 5 file qua; TypeScript web/mobile và bundle Hermes
 - Chưa tạo kỳ bổ sung/khoảng ngày tùy chỉnh hoặc UAT thiết bị/staging.
 - Kiểm tra: 246/246 test trong 48 file, TypeScript và export Hermes Android/iOS qua (không phải APK/IPA).
 
+## Đợt năm mươi hai: đồng bộ công kỳ lương
+
+- Đồng bộ công cho kỳ draft có version hợp lệ, quyền đọc/quản lý kỳ và chi nhánh xác thực. Có xác nhận trước khi gửi, khóa gửi trùng và tải lại sau kết quả hoặc lỗi.
+- Gửi expectedVersion và Idempotency-Key UUID qua payrollService. Kiểm tra job đúng kỳ/thao tác/mã yêu cầu/phiên bản, trạng thái succeeded và số lượng hợp lệ.
+- Hiển thị số nhân viên và số lỗi chặn xử lý; đồng bộ thành công vẫn có thể còn lỗi công. Backend đọc kết quả công đã tổng hợp, cập nhật issues và version; chưa khóa công hoặc tính lương.
+- Chưa tổng hợp công kỳ trên mobile, khóa công hoặc UAT thiết bị/staging.
+- Kiểm tra: 253/253 test trong 49 file, TypeScript và export Hermes Android/iOS qua (không phải APK/IPA).
+
 ## Quy tắc dùng lại FE (áp dụng cho các đợt tiếp)
 
 Service được xuất dưới dạng `createXService(transport)` cùng singleton mặc định cho web. Transport chỉ cung cấp `fetch` và `getAccessToken`; mobile inject API client, web giữ global fetch được interceptor hiện có bọc. Không polyfill localStorage/window, không sao chép service để tạo hai phiên bản endpoint. UI DOM/Tailwind phải chuyển thành component native. Trước khi chuyển service tiếp theo, rà soát các import gián tiếp tới Toast, auth, browser storage, window/document và file APIs.
@@ -475,7 +483,7 @@ Kết quả đợt ba ngày 2026-09-08: 90/90 kiểm thử trong 19 file qua, Ty
 
 ## Giới hạn hiện tại
 
-Đây là năm mươi mốt đợt triển khai trong phạm vi ứng dụng đầy đủ, chưa phải bản đầy đủ chức năng. Xem `IMPLEMENTATION.md`.
+Đây là năm mươi hai đợt triển khai trong phạm vi ứng dụng đầy đủ, chưa phải bản đầy đủ chức năng. Xem `IMPLEMENTATION.md`.
 
 - Giữ chính sách một phiên của backend; đăng nhập mobile có thể thay thế phiên web. Chưa thay đổi mô hình phiên theo thiết bị.
 - Super Admin nhận challenge 202 được chặn an toàn, chưa có UI hoàn tất MFA. Không hạ yêu cầu xác thực.

@@ -128,6 +128,12 @@ export function createPayrollService({ fetch, getAccessToken }: ServiceTransport
     createRun: (periodKey: string) => request(`/periods/${periodKey}/run`, { method: "POST" }),
     createOperationalRun: (payload: CreatePayrollRunInput): Promise<PayrollRun> =>
       request("/runs", { method: "POST", body: JSON.stringify(payload) }),
+    syncRunAttendance: (runId: string, expectedVersion: number, idempotencyKey: string) =>
+      request(`/runs/${encodeURIComponent(runId)}/sync-attendance`, {
+        method: "POST",
+        body: JSON.stringify({ expectedVersion }),
+        headers: { "Idempotency-Key": idempotencyKey },
+      }),
     processPeriod: (periodKey: string) => request(`/periods/${periodKey}/process`, { method: "POST" }),
     calculateRun: (runId: string, expectedVersion: number) =>
       request(`/runs/${runId}/calculate`, { method: "POST", body: JSON.stringify({ expectedVersion }) }),
