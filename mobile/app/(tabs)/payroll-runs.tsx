@@ -106,7 +106,11 @@ export default function PayrollRuns() {
       {loading && <Loading />}
       <ErrorText message={error} />
       {missing && <Text style={styles.text}>Chưa có bảng lương cho kỳ {period}.</Text>}
-      <AdjustmentHistory key={`${period}:${revision}`} period={period} />
+      <AdjustmentHistory
+        key={`${period}:${revision}`}
+        period={period}
+        onChanged={() => setRevision((value) => value + 1)}
+      />
       {run && (
         <>
           <Card>

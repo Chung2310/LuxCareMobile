@@ -103,10 +103,14 @@ export function createPayrollService({ fetch, getAccessToken }: ServiceTransport
     },
     createAdjustment: (periodKey: string, payload: any) =>
       request(`/periods/${periodKey}/adjustments`, { method: "POST", body: JSON.stringify(payload) }),
-    approveAdjustment: (periodKey: string, adjustmentId: string) =>
-      request(`/periods/${periodKey}/adjustments/${adjustmentId}/approve`, { method: "POST" }),
-    rejectAdjustment: (periodKey: string, adjustmentId: string) =>
-      request(`/periods/${periodKey}/adjustments/${adjustmentId}/reject`, { method: "POST" }),
+    approveAdjustment: (periodKey: string, adjustmentId: string): Promise<PayrollAdjustment> =>
+      request(`/periods/${encodeURIComponent(periodKey)}/adjustments/${encodeURIComponent(adjustmentId)}/approve`, {
+        method: "POST",
+      }),
+    rejectAdjustment: (periodKey: string, adjustmentId: string): Promise<PayrollAdjustment> =>
+      request(`/periods/${encodeURIComponent(periodKey)}/adjustments/${encodeURIComponent(adjustmentId)}/reject`, {
+        method: "POST",
+      }),
     getPayments: async (runId: string): Promise<PayrollPayment[]> => {
       const result = await request(`/runs/${encodeURIComponent(runId)}/payments`);
       if (!Array.isArray(result)) throw new Error("Dữ liệu thanh toán không hợp lệ.");

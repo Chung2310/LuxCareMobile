@@ -2,6 +2,8 @@
 
 Backend được triển khai từ repository LuxCare riêng. Đặt origin của backend trong `mobile/.env`; không có tài khoản hoặc secrets mẫu trong repository mobile.
 
+Duyệt/từ chối điều chỉnh dùng POST `/api/v1/payroll/periods/:periodKey/adjustments/:id/approve` hoặc `/reject`, quyền `payroll-period:manage`. Backend cập nhật có điều kiện `status: pending`, trả 409 nếu đã xử lý và tăng version; không nhận expectedVersion hay lý do từ chối riêng. Cả hai route có thể tính lại kỳ draft legacy, lỗi tính lại được ghi log; phản hồi thành công xác nhận trạng thái điều chỉnh, không đảm bảo đã tính lại lương. Mobile tải lại cả kỳ và danh sách khi đóng xác nhận, không tự retry mutation.
+
 Điều chỉnh lương dùng GET `/api/v1/payroll/periods/:periodKey/adjustments`, quyền `payroll-period:read`, scope công ty/chi nhánh xác thực và kỳ. API trả tên nhân viên cùng mảng điều chỉnh, chưa phân trang. Trạng thái approved và snapshotted được hiển thị riêng; mobile không tự cộng vào thực nhận. Luồng tra cứu không yêu cầu kỳ đã tồn tại bảng lương.
 
 Lịch sử thanh toán gọi GET `/api/v1/payroll/runs/:id/payments` với quyền `payroll-payment:read`. API trả mảng sắp theo ngày tạo giảm dần trong phạm vi công ty/chi nhánh xác thực; mobile kiểm tra runId, lọc trạng thái tại máy và chỉ cộng amount của bản ghi confirmed. Dòng phân bổ dùng employeeId đối chiếu tên trong bảng lương, giữ mã nếu không tìm thấy tên. Chưa có API phân trang cho luồng này.

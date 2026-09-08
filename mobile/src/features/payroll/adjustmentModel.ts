@@ -1,4 +1,19 @@
 import type { PayrollAdjustment } from "../../../../src/types/payrollAdjustment";
+import type { UserProfile } from "../../../../src/types/common";
+import { hasPermission } from "../../auth/access";
+import { canReadPayrollRuns } from "./runModel";
+export function canDecideAdjustment(user: UserProfile | null, item: PayrollAdjustment) {
+  return canReadPayrollRuns(user) && hasPermission(user, "payroll-period:manage") && item.status === "pending";
+}
+export function validateAdjustmentDecision(saved: PayrollAdjustment, item: PayrollAdjustment, approve: boolean) {
+  if (
+    !saved ||
+    saved._id !== item._id ||
+    saved.periodKey !== item.periodKey ||
+    saved.status !== (approve ? "approved" : "rejected")
+  )
+    throw new Error("Chưa xác nhận được kết quả xử lý điều chỉnh.");
+}
 export const adjustmentKinds = {
   allowance: "Phụ cấp",
   bonus: "Thưởng",

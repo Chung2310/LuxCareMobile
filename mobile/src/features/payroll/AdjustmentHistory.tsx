@@ -1,6 +1,9 @@
-import { useCallback, useState } from "react";
+import { useCallback, useRef, useState } from "react";
 import { useFocusEffect } from "expo-router";
-import { Text } from "react-native";
+import { Modal, Text } from "react-native";
+import { SafeAreaView } from "react-native-safe-area-context";
+import { AdjustmentDecision } from "./AdjustmentDecision";
+import { canDecideAdjustment } from "./adjustmentModel";
 import type { PayrollAdjustment } from "../../../../src/types/payrollAdjustment";
 import { payroll } from "../../api/services";
 import { useSession, messageOf } from "../../auth/SessionProvider";
@@ -10,7 +13,7 @@ import { contractDate } from "../contracts/model";
 import { canReadPayrollRuns } from "./runModel";
 import { payslipMoney } from "./model";
 import { adjustmentKinds, adjustmentStatuses, filterAdjustments } from "./adjustmentModel";
-export function AdjustmentHistory({ period }: { period: string }) {
+export function AdjustmentHistory({ period, onChanged }: { period: string; onChanged: () => void }) {
   const { user, selectedBranch } = useSession();
   const allowed = canReadPayrollRuns(user);
   const [items, setItems] = useState<PayrollAdjustment[]>([]);
@@ -20,6 +23,12 @@ export function AdjustmentHistory({ period }: { period: string }) {
   const [status, setStatus] = useState("");
   const [kind, setKind] = useState("");
   const [revision, setRevision] = useState(0);
+  const [decision, setDecision] = useState<{ item: PayrollAdjustment; approve: boolean } | null>(null);
+  const lock = useRef(false);
+  const close = () => {
+    setDecision(null);
+    onChanged();
+  };
   useFocusEffect(
     useCallback(() => {
       let active = true;
@@ -96,6 +105,12 @@ export function AdjustmentHistory({ period }: { period: string }) {
               </Text>
               <Text style={styles.text}>{adjustmentStatuses[item.status] || item.status}</Text>
               <Text style={styles.text}>Lý do: {item.reason}</Text>
+              {canDecideAdjustment(user, item) && (
+                <>
+                  <Button title="Duyệt" onPress={() => setDecision({ item, approve: true })} />
+                  <Button title="Từ chối" onPress={() => setDecision({ item, approve: false })} />
+                </>
+              )}
               {item.createdAt && <Text style={styles.muted}>Ngày tạo: {contractDate(item.createdAt)}</Text>}
               {item.snapshotAt && (
                 <Text style={styles.muted}>Ngày đưa vào bản tính: {contractDate(item.snapshotAt)}</Text>
@@ -104,6 +119,26 @@ export function AdjustmentHistory({ period }: { period: string }) {
           ))}
         </>
       )}
+      <Modal
+        visible={!!decision}
+        animationType="slide"
+        onRequestClose={() => {
+          if (!lock.current) close();
+        }}
+      >
+        <SafeAreaView style={styles.page}>
+          {decision && (
+            <AdjustmentDecision
+              item={decision.item}
+              approve={decision.approve}
+              setLocked={(value) => {
+                lock.current = value;
+              }}
+              onClose={close}
+            />
+          )}
+        </SafeAreaView>
+      </Modal>
     </Card>
   );
 }
