@@ -4,7 +4,7 @@ import { Text } from "react-native";
 import { payroll } from "../../api/services";
 import { useSession, messageOf } from "../../auth/SessionProvider";
 import { Button, Card, ErrorText, Field, styles } from "../../ui";
-import { periodInputFields, inputValue, type PeriodInput } from "./periodInputModel";
+import { periodInputFields, inputValue, type PeriodInput, type PeriodInputs } from "./periodInputModel";
 import { canEditPeriodInput, periodInputEditPayload, validateEditedPeriodInput } from "./periodInputEditModel";
 export function EditPeriodInput({
   item,
@@ -12,16 +12,19 @@ export function EditPeriodInput({
   name,
   onClose,
   onChanged,
+  variables,
 }: {
   item: PeriodInput;
   editable: boolean;
   name: string;
   onClose: () => void;
   onChanged: () => void;
+  variables: PeriodInputs["variables"];
 }) {
   const { user, selectedBranch } = useSession();
   const allowed = canEditPeriodInput(user, selectedBranch?._id || user?.branchId, editable, item);
   const [values, setValues] = useState<Record<string, string>>({});
+  const [custom, setCustom] = useState<Record<string, string>>({});
   const [reason, setReason] = useState("");
   const [clearFields, setClearFields] = useState<string[]>([]);
   const [payload, setPayload] = useState<ReturnType<typeof periodInputEditPayload> | null>(null);
@@ -89,11 +92,41 @@ export function EditPeriodInput({
             </Card>
           ))}
           <Field label="Lý do đối soát (bắt buộc)" value={reason} onChangeText={setReason} multiline />
+          {variables.map((variable) => (
+            <Card key={variable.code}>
+              <Field
+                label={`${variable.name} (${variable.code}, ${variable.unit}) · hiện tại: ${item.customValues?.[variable.code] === undefined ? "Chưa nhập riêng" : inputValue(item.customValues[variable.code])}`}
+                value={custom[variable.code] || ""}
+                keyboardType="decimal-pad"
+                editable={!clearFields.includes(`custom.${variable.code}`)}
+                onChangeText={(value) => setCustom((values) => ({ ...values, [variable.code]: value }))}
+              />
+              <Text style={styles.muted}>
+                Mặc định: {variable.defaultValue === undefined ? "Chưa cấu hình" : inputValue(variable.defaultValue)}
+              </Text>
+              {item.customValues?.[variable.code] !== undefined && (
+                <Button
+                  title={
+                    clearFields.includes(`custom.${variable.code}`)
+                      ? "Bỏ chọn hoàn tác biến"
+                      : "Bỏ giá trị biến đã nhập"
+                  }
+                  onPress={() =>
+                    setClearFields((fields) =>
+                      fields.includes(`custom.${variable.code}`)
+                        ? fields.filter((field) => field !== `custom.${variable.code}`)
+                        : [...fields, `custom.${variable.code}`],
+                    )
+                  }
+                />
+              )}
+            </Card>
+          ))}
           <Button
             title="Xem lại thay đổi"
             onPress={() => {
               try {
-                setPayload(periodInputEditPayload(item, values, reason, clearFields));
+                setPayload(periodInputEditPayload(item, values, reason, clearFields, custom, variables));
                 setError(null);
               } catch (error) {
                 setError(messageOf(error));
@@ -111,11 +144,35 @@ export function EditPeriodInput({
               </Text>
             ))}
           <Text style={styles.text}>Lý do: {payload.reason}</Text>
-          {payload.clearFields?.map((key) => (
-            <Text key={key} style={styles.text}>
-              {periodInputFields[key]}: {inputValue(item[key])} → Dùng dữ liệu nguồn
-            </Text>
-          ))}
+          {payload.clearFields
+            ?.filter((key) => !key.startsWith("custom."))
+            .map((field) => {
+              const key = field as keyof typeof periodInputFields;
+              return (
+                <Text key={key} style={styles.text}>
+                  {periodInputFields[key]}: {inputValue(item[key])} → Dùng dữ liệu nguồn
+                </Text>
+              );
+            })}
+          {variables
+            .filter(
+              (variable) =>
+                payload.clearFields?.includes(`custom.${variable.code}`) ||
+                (payload.customValues?.[variable.code] !== undefined &&
+                  payload.customValues[variable.code] !== item.customValues?.[variable.code]),
+            )
+            .map((variable) => (
+              <Text key={variable.code} style={styles.text}>
+                {variable.name} ({variable.code}):{" "}
+                {item.customValues?.[variable.code] === undefined
+                  ? "Chưa nhập riêng"
+                  : inputValue(item.customValues[variable.code])}{" "}
+                →{" "}
+                {payload.clearFields?.includes(`custom.${variable.code}`)
+                  ? "Bỏ giá trị riêng, dùng mặc định khi tính lại"
+                  : inputValue(payload.customValues?.[variable.code])}
+              </Text>
+            ))}
           <Text style={styles.muted}>
             Lưu dữ liệu đầu vào chưa tính lại bảng lương. Tải lại kỳ để kiểm tra cờ cần cập nhật.
           </Text>

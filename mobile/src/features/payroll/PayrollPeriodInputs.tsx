@@ -133,6 +133,7 @@ export function PayrollPeriodInputs({
                   )}
                   {editing === item.employeeId && (
                     <EditPeriodInput
+                      variables={data.variables}
                       item={item}
                       editable={data.editable}
                       name={nameOf(item.employeeId)}

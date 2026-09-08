@@ -172,6 +172,10 @@ Sửa sáu giá trị đối soát cơ bản trên bản ghi hiện có, lý do 
 
 Hoàn tác sáu trường đối soát cơ bản đã lưu về dữ liệu nguồn bằng clearFields. Chọn/bỏ chọn, xem trước và lý do bắt buộc; có thể kết hợp sửa trường khác trong một request có expectedVersion. Kiểm tra phản hồi trường đã gỡ và giá trị giữ nguyên, tải lại sau kết quả/lỗi. Chưa clear customValues/thêm bản ghi/bulk hoặc UAT thiết bị/staging.
 
+## Đợt sáu mươi lăm
+
+Sửa/hoàn tác biến đang áp dụng trong form đối soát. Khi sửa gửi đầy đủ map để giữ biến cũ, hoàn tác dùng custom.CODE; chặn kết hợp sửa map và gỡ nhánh custom cùng request. Xem trước, lý do/version, kiểm tra phản hồi cả biến đã giữ. Chưa quản trị biến/ngưng áp dụng/thêm bản ghi/bulk hoặc UAT thiết bị/staging.
+
 ## Đợt tiếp theo
 
 1. Kiểm chứng đăng nhập/thông báo/phòng ban với staging và thiết bị thật; chốt hành vi phiên web/mobile.
@@ -180,6 +184,8 @@ Hoàn tác sáu trường đối soát cơ bản đã lưu về dữ liệu ngu�
 4. Tiếp tục các module còn lại trong bảng, ghi rõ màn hình và thao tác đã nghiệm thu.
 
 ## Tiêu chí nghiệm thu từng module
+
+Đợt sáu mươi lăm: 349/349 test trong 62 file qua; TypeScript và export Hermes Android/iOS qua. Kiểm tra giữ map/biến cũ, active/giá trị/phần trăm, clear custom, chặn path conflict và đối chiếu phản hồi. Chưa UAT thiết bị/staging.
 
 Đợt sáu mươi bốn: 343/343 test trong 61 file qua; TypeScript và export Hermes Android/iOS qua. Kiểm tra clearFields/0, danh sách trường hợp lệ, kết hợp sửa/gỡ, phản hồi và payload PUT. Chưa UAT thiết bị/staging.
 
