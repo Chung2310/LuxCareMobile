@@ -3,7 +3,7 @@ import type { Payslip, PayslipDetail } from "../types/payslip";
 import type { PayrollRun, CreatePayrollRunInput } from "../types/payrollRun";
 import type { PayrollIssue } from "../types/payrollIssue";
 import type { PayrollAudit } from "../types/payrollAudit";
-import type { PayrollPayment } from "../types/payrollPayment";
+import type { PayrollPayment, PayrollPaymentMetadata } from "../types/payrollPayment";
 import type { PayrollAdjustment, PayrollAdjustmentInput } from "../types/payrollAdjustment";
 
 export type PayrollExportType = "detailed" | "insurance" | "pit" | "bank_transfer";
@@ -191,12 +191,21 @@ export function createPayrollService({ fetch, getAccessToken }: ServiceTransport
     },
     createPayment: (runId: string, payload: unknown) =>
       request(`/runs/${encodeURIComponent(runId)}/payments`, { method: "POST", body: JSON.stringify(payload) }),
-    confirmPayment: (paymentId: string) =>
-      request(`/payments/${encodeURIComponent(paymentId)}/confirm`, { method: "POST" }),
-    cancelPayment: (paymentId: string) =>
-      request(`/payments/${encodeURIComponent(paymentId)}/cancel`, { method: "POST" }),
-    reversePayment: (paymentId: string) =>
-      request(`/payments/${encodeURIComponent(paymentId)}/reverse`, { method: "POST" }),
+    confirmPayment: (paymentId: string, payload?: PayrollPaymentMetadata) =>
+      request(`/payments/${encodeURIComponent(paymentId)}/confirm`, {
+        method: "POST",
+        ...(payload ? { body: JSON.stringify(payload) } : {}),
+      }),
+    cancelPayment: (paymentId: string, payload?: Omit<PayrollPaymentMetadata, "paymentDate">) =>
+      request(`/payments/${encodeURIComponent(paymentId)}/cancel`, {
+        method: "POST",
+        ...(payload ? { body: JSON.stringify(payload) } : {}),
+      }),
+    reversePayment: (paymentId: string, payload?: Omit<PayrollPaymentMetadata, "paymentDate">) =>
+      request(`/payments/${encodeURIComponent(paymentId)}/reverse`, {
+        method: "POST",
+        ...(payload ? { body: JSON.stringify(payload) } : {}),
+      }),
     withdrawPayslip: (runId: string, employeeId: string) =>
       request(`/runs/${encodeURIComponent(runId)}/payslips/${encodeURIComponent(employeeId)}/withdraw`, {
         method: "POST",

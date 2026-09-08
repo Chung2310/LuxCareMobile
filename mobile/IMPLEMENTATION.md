@@ -156,6 +156,10 @@ Xác nhận khoản thanh toán nháp từ lịch sử, xem lại phân bổ/chi
 
 Hủy khoản draft ở mọi trạng thái kỳ; đảo khoản confirmed có phân bổ hợp lệ trong kỳ closed/paid. Dùng lại panel xác nhận và service FE, đối chiếu phản hồi, khóa gửi trùng và tải lại cả kỳ sau kết quả/lỗi. Backend giữ trạng thái kỳ khi hủy; tính lại quyết toán khi đảo, không hoàn tiền ngân hàng. Chưa nhập ngày/chứng từ/ghi chú chuyển trạng thái hoặc UAT thiết bị/staging.
 
+## Đợt sáu mươi mốt
+
+Ngày thanh toán tùy chọn khi tạo/xác nhận, nhập ngày Việt Nam và gửi ISO UTC tương ứng. Liên kết chứng từ/ghi chú cho tạo và các chuyển trạng thái; ô trống bỏ khỏi payload để giữ metadata hiện có. Xem lại trước gửi, đối chiếu metadata phản hồi, giữ lời gọi FE không payload tương thích. Hủy/đảo không sửa ngày; chưa xóa metadata, upload chứng từ hoặc UAT thiết bị/staging.
+
 ## Đợt tiếp theo
 
 1. Kiểm chứng đăng nhập/thông báo/phòng ban với staging và thiết bị thật; chốt hành vi phiên web/mobile.
@@ -164,6 +168,8 @@ Hủy khoản draft ở mọi trạng thái kỳ; đảo khoản confirmed có p
 4. Tiếp tục các module còn lại trong bảng, ghi rõ màn hình và thao tác đã nghiệm thu.
 
 ## Tiêu chí nghiệm thu từng module
+
+Đợt sáu mươi mốt: 323/323 test trong 58 file qua; TypeScript và export Hermes Android/iOS qua. Kiểm tra ngày/múi giờ/năm nhuận, URL/ghi chú, ô trống giữ dữ liệu cũ, metadata phản hồi và tương thích service FE. Chưa UAT thiết bị/staging.
 
 Đợt sáu mươi: 313/313 test trong 57 file qua; TypeScript và export Hermes Android/iOS qua. Kiểm tra quyền/phạm vi/chuyển trạng thái, hủy nháp cũ, đối chiếu phản hồi và lỗi API không retry. Chưa UAT thiết bị/staging.
 

@@ -1,3 +1,4 @@
+export type PayrollPaymentMetadata = { paymentDate?: string; evidenceUrl?: string; note?: string };
 export interface PayrollPayment {
   _id: string;
   runId: string;

@@ -8,6 +8,8 @@ import { useSession, messageOf } from "../../auth/SessionProvider";
 import { Button, Card, ErrorText, Field, styles } from "../../ui";
 import { payslipMoney } from "./model";
 import { canCreatePayrollPayment, paymentDraftInput, validatePaymentDraft } from "./paymentFormModel";
+import { validatePaymentMetadata } from "./paymentMetadataModel";
+import { contractDate } from "../contracts/model";
 export function CreatePayrollPayment({ run, onChanged }: { run: PayrollRun; onChanged: () => void }) {
   const { user, selectedBranch } = useSession();
   const allowed = canCreatePayrollPayment(user, selectedBranch?._id || user?.branchId, run);
@@ -16,6 +18,8 @@ export function CreatePayrollPayment({ run, onChanged }: { run: PayrollRun; onCh
   const [open, setOpen] = useState(false);
   const [amounts, setAmounts] = useState<Record<string, string>>({});
   const [note, setNote] = useState("");
+  const [date, setDate] = useState("");
+  const [evidence, setEvidence] = useState("");
   const [payload, setPayload] = useState<ReturnType<typeof paymentDraftInput> | null>(null);
   const [busy, setBusy] = useState(false);
   const [done, setDone] = useState(false);
@@ -35,6 +39,7 @@ export function CreatePayrollPayment({ run, onChanged }: { run: PayrollRun; onCh
     try {
       const saved = await payroll.createPayment(run._id, { ...payload, idempotencyKey: randomUUID() });
       validatePaymentDraft(saved, run._id, payload);
+      validatePaymentMetadata(saved, payload);
       if (active.current) setDone(true);
     } catch (error) {
       if (active.current) setError(`${messageOf(error)} Tải lại thanh toán trước khi tạo tiếp.`);
@@ -69,11 +74,19 @@ export function CreatePayrollPayment({ run, onChanged }: { run: PayrollRun; onCh
                 />
               ))}
               <Field label="Ghi chú" value={note} onChangeText={setNote} multiline />
+              <Field label="Ngày thanh toán (YYYY-MM-DD, giờ Việt Nam, tùy chọn)" value={date} onChangeText={setDate} />
+              <Field
+                label="Liên kết chứng từ HTTP/HTTPS (tùy chọn)"
+                value={evidence}
+                onChangeText={setEvidence}
+                autoCapitalize="none"
+                keyboardType="url"
+              />
               <Button
                 title="Xem lại phân bổ"
                 onPress={() => {
                   try {
-                    setPayload(paymentDraftInput(run, amounts, note));
+                    setPayload(paymentDraftInput(run, amounts, note, date, evidence));
                     setError(null);
                   } catch (error) {
                     setError(messageOf(error));
@@ -93,6 +106,12 @@ export function CreatePayrollPayment({ run, onChanged }: { run: PayrollRun; onCh
               ))}
               <Text style={styles.heading}>Tổng: {payslipMoney(payload.amount)}</Text>
               <Text style={styles.text}>Ghi chú: {payload.note || "—"}</Text>
+              <Text style={styles.text}>
+                Ngày thanh toán: {payload.paymentDate ? contractDate(payload.paymentDate) : "Chưa ghi nhận"}
+              </Text>
+              <Text selectable style={styles.text}>
+                Chứng từ: {payload.evidenceUrl || "—"}
+              </Text>
               <Button
                 title={busy ? "Đang tạo…" : "Xác nhận tạo khoản nháp"}
                 disabled={busy || attempted.current}

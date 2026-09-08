@@ -3,12 +3,19 @@ import type { PayrollRun } from "../../../../src/types/payrollRun";
 import type { PayrollPayment } from "../../../../src/types/payrollPayment";
 import { canReadRunPayments } from "./paymentModel";
 import { hasPermission } from "../../auth/access";
+import { paymentMetadataInput } from "./paymentMetadataModel";
 export function canCreatePayrollPayment(user: UserProfile | null, branchId: string | undefined, run: PayrollRun) {
   return (
     canReadRunPayments(user) && hasPermission(user, "payroll-payment:manage") && !!branchId && run.status === "closed"
   );
 }
-export function paymentDraftInput(run: PayrollRun, amounts: Record<string, string>, note: string) {
+export function paymentDraftInput(
+  run: PayrollRun,
+  amounts: Record<string, string>,
+  note: string,
+  date = "",
+  evidence = "",
+) {
   if (run.status !== "closed" || run.effectiveError || !Array.isArray(run.effectiveLines))
     throw new Error("Cần kỳ đã chốt với số liệu có hiệu lực.");
   const eligible = new Set(run.effectiveLines.map((line) => line.employeeId));
@@ -22,8 +29,7 @@ export function paymentDraftInput(run: PayrollRun, amounts: Record<string, strin
     });
   const amount = lines.reduce((sum, line) => sum + line.amount, 0);
   if (!lines.length || !Number.isSafeInteger(amount)) throw new Error("Nhập ít nhất một khoản phân bổ hợp lệ.");
-  if (note.trim().length > 1000) throw new Error("Ghi chú tối đa 1000 ký tự.");
-  return { amount, lines, ...(note.trim() ? { note: note.trim() } : {}) };
+  return { amount, lines, ...paymentMetadataInput(date, evidence, note) };
 }
 export function validatePaymentDraft(value: unknown, runId: string, payload: ReturnType<typeof paymentDraftInput>) {
   const payment = value as PayrollPayment | null;
