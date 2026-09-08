@@ -12,6 +12,7 @@ import { payslipMoney } from "./model";
 import { canReadRunPayments, confirmedPaymentTotal, paymentStatuses } from "./paymentModel";
 import { canConfirmPayment } from "./confirmPaymentModel";
 import { ConfirmPayrollPayment } from "./ConfirmPayrollPayment";
+import { canUndoPayment, type UndoPaymentAction } from "./undoPaymentModel";
 export function PaymentHistory({
   runId,
   runStatus,
@@ -32,6 +33,7 @@ export function PaymentHistory({
   const [expanded, setExpanded] = useState<string | null>(null);
   const [revision, setRevision] = useState(0);
   const [selected, setSelected] = useState<PayrollPayment | null>(null);
+  const [action, setAction] = useState<"confirm" | UndoPaymentAction>("confirm");
   useFocusEffect(
     useCallback(() => {
       let active = true;
@@ -123,6 +125,7 @@ export function PaymentHistory({
                   {selected?._id === item._id && (
                     <ConfirmPayrollPayment
                       payment={selected}
+                      action={action}
                       runId={runId}
                       runStatus={runStatus}
                       employees={employees}
@@ -134,8 +137,32 @@ export function PaymentHistory({
                     <Button
                       title="Xem lại để xác nhận thanh toán"
                       disabled={!!selected}
-                      onPress={() => setSelected(item)}
+                      onPress={() => {
+                        setAction("confirm");
+                        setSelected(item);
+                      }}
                     />
+                  )}
+                  {(["cancel", "reverse"] as const).map(
+                    (nextAction) =>
+                      canUndoPayment(
+                        user,
+                        selectedBranch?._id || user?.branchId,
+                        runId,
+                        runStatus,
+                        item,
+                        nextAction,
+                      ) && (
+                        <Button
+                          key={nextAction}
+                          title={nextAction === "cancel" ? "Hủy khoản nháp" : "Đảo thanh toán"}
+                          disabled={!!selected}
+                          onPress={() => {
+                            setAction(nextAction);
+                            setSelected(item);
+                          }}
+                        />
+                      ),
                   )}
                   {(
                     [
