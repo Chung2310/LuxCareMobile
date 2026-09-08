@@ -134,7 +134,12 @@ export default function PayrollRuns() {
           onChanged={() => setRevision((value) => value + 1)}
         />
       )}
-      <PayrollPeriodInputs key={`inputs:${period}:${revision}`} period={period} employees={lines} />
+      <PayrollPeriodInputs
+        key={`inputs:${period}:${revision}`}
+        period={period}
+        employees={lines}
+        onChanged={() => setRevision((value) => value + 1)}
+      />
       <AdjustmentHistory
         key={`${period}:${revision}`}
         period={period}

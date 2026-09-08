@@ -79,7 +79,10 @@ export function createPayrollService({ fetch, getAccessToken }: ServiceTransport
     retireFormula: (id: string) => request(`/formulas/${id}/retire`, { method: "POST" }),
     getPeriodInputs: (periodKey: string) => request(`/periods/${encodeURIComponent(periodKey)}/inputs`),
     savePeriodInput: (periodKey: string, employeeId: string, payload: unknown) =>
-      request(`/periods/${periodKey}/inputs/${employeeId}`, { method: "PUT", body: JSON.stringify(payload) }),
+      request(`/periods/${encodeURIComponent(periodKey)}/inputs/${encodeURIComponent(employeeId)}`, {
+        method: "PUT",
+        body: JSON.stringify(payload),
+      }),
     bulkSavePeriodInputs: (periodKey: string, rows: unknown[]) =>
       request(`/periods/${periodKey}/inputs`, { method: "PUT", body: JSON.stringify({ rows }) }),
     getLineOverrides: (periodKey: string) => request(`/periods/${periodKey}/line-overrides`),

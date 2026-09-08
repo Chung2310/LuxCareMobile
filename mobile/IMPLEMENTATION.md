@@ -164,6 +164,10 @@ Ngày thanh toán tùy chọn khi tạo/xác nhận, nhập ngày Việt Nam và
 
 Tra cứu dữ liệu đầu vào theo kỳ/chi nhánh bằng service FE, có tìm kiếm/chi tiết/xem thêm, phân biệt thiếu dữ liệu và số 0. Hiển thị biến tùy chỉnh/mặc định riêng, cờ khóa/cần cập nhật, lý do/phiên bản/người sửa. Kiểm tra phản hồi đúng kỳ và bỏ kết quả khi rời màn hình. Chưa ghi/chỉnh đầu vào, quản trị biến hoặc UAT thiết bị/staging.
 
+## Đợt sáu mươi ba
+
+Sửa sáu giá trị đối soát cơ bản trên bản ghi hiện có, lý do bắt buộc, xem trước thay đổi và gửi expectedVersion. Chỉ gửi giá trị thay đổi, ô trống giữ cũ/0 ghi đè; không gửi customValues. Kiểm tra phản hồi gồm giá trị đã giữ, khóa gửi trùng, tải lại cả kỳ sau kết quả/lỗi. Chưa thêm bản ghi, sửa customValues, clearFields, bulk hoặc UAT thiết bị/staging.
+
 ## Đợt tiếp theo
 
 1. Kiểm chứng đăng nhập/thông báo/phòng ban với staging và thiết bị thật; chốt hành vi phiên web/mobile.
@@ -172,6 +176,8 @@ Tra cứu dữ liệu đầu vào theo kỳ/chi nhánh bằng service FE, có t�
 4. Tiếp tục các module còn lại trong bảng, ghi rõ màn hình và thao tác đã nghiệm thu.
 
 ## Tiêu chí nghiệm thu từng module
+
+Đợt sáu mươi ba: 338/338 test trong 60 file qua; TypeScript và export Hermes Android/iOS qua. Kiểm tra quyền/editable, payload chỉ trường thay đổi, 0/ô trống, phản hồi/version và lỗi không retry. Chưa UAT thiết bị/staging.
 
 Đợt sáu mươi hai: 330/330 test trong 59 file qua; TypeScript và export Hermes Android/iOS qua. Kiểm tra kỳ/cấu trúc/giá trị, phân biệt 0 và thiếu dữ liệu, GET có xác thực, lỗi API không chuyển thành rỗng. Chưa UAT thiết bị/staging.
 
