@@ -4,7 +4,7 @@ import { Text } from "react-native";
 import type { Payslip } from "../../../src/types/payslip";
 import { payroll } from "../../src/api/services";
 import { useSession, messageOf } from "../../src/auth/SessionProvider";
-import { Button, Card, ErrorText, Loading, Page, styles } from "../../src/ui";
+import { Button, Card, EmptyState, ErrorText, Loading, Page, styles } from "../../src/ui";
 import { ChoiceField } from "../../src/features/leave/ChoiceField";
 import { canReadPayslips, payslipMoney, payslipsForPeriod } from "../../src/features/payroll/model";
 import { PayslipDetails } from "../../src/features/payroll/PayslipDetails";
@@ -75,7 +75,7 @@ export default function Payslips() {
       {loading && <Loading />}
       <ErrorText message={error} />
       {!loading && !error && !rows.length && (
-        <Text style={styles.text}>Chưa có phiếu lương được phát hành phù hợp.</Text>
+        <EmptyState message="Chưa có phiếu lương được phát hành phù hợp" />
       )}
       {rows.map((item) => {
         const key = `${item.runId}:${item.employeeId}`;

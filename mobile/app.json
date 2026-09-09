@@ -36,8 +36,18 @@
       ],
       [
         "expo-location",
-        { "locationWhenInUsePermission": "LuxCare cần vị trí hiện tại để xác nhận địa điểm chấm công." }
-      ]
+        {
+          "locationWhenInUsePermission": "LuxCare cần vị trí hiện tại để xác nhận địa điểm chấm công."
+        }
+      ],
+      [
+        "expo-image-picker",
+        {
+          "photosPermission": "LuxCare cần quyền truy cập thư viện ảnh để tải lên ảnh đại diện.",
+          "cameraPermission": "LuxCare cần quyền truy cập máy ảnh để chụp ảnh đại diện."
+        }
+      ],
+      "expo-font"
     ]
   }
 }

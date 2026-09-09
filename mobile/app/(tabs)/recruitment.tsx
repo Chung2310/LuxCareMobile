@@ -9,7 +9,8 @@ import type { RecruitmentJob } from "../../../src/types/recruitment";
 import { emptyPagination } from "../../../src/types/pagination";
 import { recruitment } from "../../src/api/services";
 import { messageOf, useSession } from "../../src/auth/SessionProvider";
-import { Button, Card, ErrorText, Field, Loading, Page, styles } from "../../src/ui";
+import { RecruitmentSubnav } from "../../src/features/recruitment/RecruitmentSubnav";
+import { Button, Card, EmptyState, ErrorText, Field, Loading, Page, styles } from "../../src/ui";
 import { ChoiceField } from "../../src/features/leave/ChoiceField";
 import { JOB_STATUSES, recruitmentAccess } from "../../src/features/recruitment/access";
 export default function Recruitment() {
@@ -119,6 +120,7 @@ export default function Recruitment() {
   return (
     <>
       <Page title="Tin tuyển dụng">
+        <RecruitmentSubnav active="jobs" />
         {access.manage && (
           <Button title="Tạo tin tuyển dụng" disabled={disabled || uncertain} onPress={() => setEditing("new")} />
         )}
@@ -234,7 +236,12 @@ export default function Recruitment() {
             )}
           </Card>
         ))}
-        {!loading && !error && !jobs.length && <Text style={styles.muted}>Không có tin phù hợp.</Text>}
+        {!loading && !error && !jobs.length && (
+          <EmptyState
+            message="Không có tin tuyển dụng phù hợp"
+            subtitle={search ? "Không tìm thấy tin theo từ khóa." : undefined}
+          />
+        )}
         <Text style={styles.muted}>
           Trang {page}/{Math.max(1, pagination.totalPages)} · {pagination.total} tin
         </Text>

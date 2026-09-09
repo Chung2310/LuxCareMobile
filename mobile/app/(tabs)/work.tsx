@@ -6,12 +6,15 @@ import type { HRTask, Project } from "../../../src/types/hr";
 import { kanban } from "../../src/api/services";
 import { useSession, messageOf } from "../../src/auth/SessionProvider";
 import { canUseModule, hasPermission } from "../../src/auth/access";
-import { Button, Card, ErrorText, Field, Loading, Page, styles } from "../../src/ui";
+import { Button, Card, EmptyState, ErrorText, Field, Loading, Page, styles } from "../../src/ui";
 import { ChoiceField } from "../../src/features/leave/ChoiceField";
 import { shareLeaveFile } from "../../src/features/leave/files";
 import { TaskForm } from "../../src/features/work/TaskForm";
 import { SubtasksForm } from "../../src/features/work/SubtasksForm";
 import { AttachmentsForm } from "../../src/features/work/AttachmentsForm";
+import Projects from "./projects";
+import Kpi from "./kpi";
+import { WorkSectionTabs, type WorkSection } from "../../src/features/work/WorkSectionTabs";
 import {
   canUpdateTask,
   normalizePriority,
@@ -37,6 +40,7 @@ export default function Work() {
   const [editing, setEditing] = useState<HRTask | "new" | null>(null);
   const [subtasksTask, setSubtasksTask] = useState<HRTask | null>(null);
   const [attachmentTask, setAttachmentTask] = useState<HRTask | null>(null);
+  const [section, setSection] = useState<WorkSection>("tasks");
   const [busy, setBusy] = useState(false);
   const [detailError, setDetailError] = useState<string | null>(null);
   const lock = useRef(false);
@@ -103,6 +107,30 @@ export default function Work() {
         <Text style={styles.text}>Phân hệ nhân sự chưa được kích hoạt.</Text>
       </Page>
     );
+  if (section === "projects") {
+    return (
+      <SafeAreaView edges={["top"]} style={{ flex: 1 }}>
+        <WorkSectionTabs
+          value="projects"
+          canViewKpi={hasPermission(user, "work:read")}
+          onChange={setSection}
+        />
+        <Projects />
+      </SafeAreaView>
+    );
+  }
+  if (section === "kpi") {
+    return (
+      <SafeAreaView edges={["top"]} style={{ flex: 1 }}>
+        <WorkSectionTabs
+          value="kpi"
+          canViewKpi={hasPermission(user, "work:read")}
+          onChange={setSection}
+        />
+        <Kpi />
+      </SafeAreaView>
+    );
+  }
   const query = search.trim().toLocaleLowerCase("vi-VN");
   const filtered = items.filter(
     (task) =>
@@ -127,12 +155,18 @@ export default function Work() {
         onRefresh={() => setRevision((v) => v + 1)}
         ListHeaderComponent={
           <View style={{ gap: 14 }}>
+            <WorkSectionTabs
+              value="tasks"
+              canViewKpi={hasPermission(user, "work:read")}
+              onChange={setSection}
+            />
             <Text style={styles.title}>Công việc</Text>
             <Text style={styles.muted}>
               {selectedBranch?.name || user?.branchName} · {filtered.length} công việc
             </Text>
             {manage && <Button title="Giao việc mới" onPress={() => setEditing("new")} />}
-            <Button title="Xem dự án" onPress={() => router.push("/(tabs)/projects")} />
+            <Button title="Xem dự án" onPress={() => setSection("projects")} />
+            {hasPermission(user, "work:read") && <Button title="Xem KPI tháng" onPress={() => setSection("kpi")} />}
             <Field label="Tìm công việc hoặc người được giao" value={search} onChangeText={setSearch} />
             <ChoiceField
               label="Trạng thái"
@@ -159,7 +193,11 @@ export default function Work() {
           </View>
         }
         ListEmptyComponent={
-          loading ? <Loading /> : !error ? <Text style={styles.muted}>Không có công việc phù hợp.</Text> : null
+          loading ? (
+            <Loading />
+          ) : !error ? (
+            <EmptyState message="Không có công việc phù hợp" subtitle="Không tìm thấy công việc theo điều kiện lọc." />
+          ) : null
         }
         renderItem={({ item }) => (
           <Card>

@@ -9,7 +9,7 @@ import type {
 } from "../../../src/services/companyWorkCalendarService";
 import { workCalendar } from "../../src/api/services";
 import { messageOf, useSession } from "../../src/auth/SessionProvider";
-import { Button, Card, ErrorText, Field, Loading, Page, styles } from "../../src/ui";
+import { Button, Card, EmptyState, ErrorText, Field, Loading, Page, styles } from "../../src/ui";
 import { ChoiceField } from "../../src/features/leave/ChoiceField";
 import { calendarAccess, calendarInput, calendarToggle, DAY_TYPES } from "../../src/features/calendar/model";
 export default function WorkCalendar() {
@@ -188,7 +188,9 @@ export default function WorkCalendar() {
             />
           </Card>
         ))}
-        {!loading && !days.length && !error && <Text style={styles.muted}>Chưa có ngày đặc biệt trong năm.</Text>}
+        {!loading && !days.length && !error && (
+          <EmptyState message="Chưa có ngày đặc biệt trong năm" />
+        )}
         <Button title="Tải lại" disabled={busy || loading} onPress={() => setRevision((value) => value + 1)} />
       </Page>
       <Modal

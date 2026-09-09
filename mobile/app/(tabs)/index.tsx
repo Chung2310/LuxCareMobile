@@ -1,7 +1,10 @@
-import React, { useCallback, useMemo, useState } from "react";
+import React, { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import {
   Alert,
+  Animated,
   Dimensions,
+  ImageBackground,
+  Platform,
   Pressable,
   ScrollView,
   StyleSheet,
@@ -39,6 +42,47 @@ export default function Home() {
   const [actions, setActions] = useState<DashboardActionItems | null>(null);
   const [searchQuery, setSearchQuery] = useState("");
   const [showValues, setShowValues] = useState(true);
+
+  // === Typewriter animation cho sub-text chào hỏi ===
+  const TYPING_TEXT = "Chúc bạn một ngày làm việc thật hiệu quả!";
+  const [typedText, setTypedText] = useState("");
+  const typingRef = useRef<ReturnType<typeof setTimeout> | null>(null);
+  const cursorOpacity = useRef(new Animated.Value(1)).current;
+
+  useEffect(() => {
+    // Nhấp nháy con trỏ
+    const blink = Animated.loop(
+      Animated.sequence([
+        Animated.timing(cursorOpacity, { toValue: 0, duration: 500, useNativeDriver: true }),
+        Animated.timing(cursorOpacity, { toValue: 1, duration: 500, useNativeDriver: true }),
+      ])
+    );
+    blink.start();
+
+    // Hàm gõ từng ký tự
+    let idx = 0;
+    const typeNext = () => {
+      idx++;
+      setTypedText(TYPING_TEXT.slice(0, idx));
+      if (idx < TYPING_TEXT.length) {
+        typingRef.current = setTimeout(typeNext, 55);
+      } else {
+        // Sau khi gõ xong, chờ 2.5s rồi reset
+        typingRef.current = setTimeout(() => {
+          idx = 0;
+          setTypedText("");
+          typingRef.current = setTimeout(typeNext, 300);
+        }, 2500);
+      }
+    };
+    typingRef.current = setTimeout(typeNext, 800); // Delay ban đầu
+
+    return () => {
+      blink.stop();
+      if (typingRef.current) clearTimeout(typingRef.current);
+    };
+  }, []);
+  // =====================================================
 
   const allowed = user?.permissions?.some((p) => p === "*" || p === "dashboard:read") ?? false;
 
@@ -81,7 +125,7 @@ export default function Home() {
         id: "attendance",
         title: "Chấm công\n& Ca trực",
         icon: "time",
-        color: "#059669", // LuxCare Primary Emerald Green
+        color: "#059669", // Emerald xanh lá LuxCare
         bgColor: "#ecfdf5",
         route: "/(tabs)/attendance",
       },
@@ -89,8 +133,8 @@ export default function Home() {
         id: "leave",
         title: "Đơn từ\n& Nghỉ phép",
         icon: "receipt",
-        color: "#0d9488", // Teal y tế
-        bgColor: "#f0fdfa",
+        color: "#7c3aed", // Tím violet nổi bật
+        bgColor: "#f5f3ff",
         route: "/(tabs)/leave",
         badge: actions?.pendingApprovals.length ? `${actions.pendingApprovals.length}` : undefined,
       },
@@ -98,7 +142,7 @@ export default function Home() {
         id: "work",
         title: "Việc của tôi\ncần làm",
         icon: "checkbox",
-        color: "#2563eb", // Xanh dương việc cần làm
+        color: "#2563eb", // Xanh dương cobalt
         bgColor: "#eff6ff",
         route: "/(tabs)/work",
         badge: actions?.overdueTasks.length ? `${actions.overdueTasks.length}` : undefined,
@@ -107,8 +151,8 @@ export default function Home() {
         id: "payslips",
         title: "Phiếu lương\ncá nhân",
         icon: "wallet",
-        color: "#059669", // Xanh LuxCare
-        bgColor: "#ecfdf5",
+        color: "#d97706", // Cam vàng amber
+        bgColor: "#fffbeb",
         route: "/(tabs)/payslips",
       },
       {
@@ -123,24 +167,24 @@ export default function Home() {
         id: "equipment",
         title: "Thiết bị\ny tế",
         icon: "medkit",
-        color: "#0284c7", // Xanh y tế
+        color: "#0284c7", // Xanh sky y tế
         bgColor: "#f0f9ff",
-        route: "/(tabs)/modules",
+        route: "/(tabs)/equipment",
       },
       {
         id: "chat",
         title: "Trò chuyện\nnội bộ",
         icon: "chatbubble-ellipses",
-        color: "#0d9488", // Teal
-        bgColor: "#f0fdfa",
-        route: "/(tabs)/modules",
+        color: "#ec4899", // Hồng pink năng động
+        bgColor: "#fdf2f8",
+        route: "/(tabs)/chat",
       },
       {
         id: "modules",
         title: "Tất cả\nchức năng",
         icon: "apps",
-        color: "#475569", // Slate xám thanh lịch
-        bgColor: "#f8fafc",
+        color: "#6366f1", // Indigo tím xanh
+        bgColor: "#eef2ff",
         route: "/(tabs)/modules",
       },
     ],
@@ -203,23 +247,18 @@ export default function Home() {
         {/* ============================================================ */}
         <View style={uiStyles.luxcareHeaderContainer}>
           <SafeAreaView edges={["top"]} style={uiStyles.luxcareSafeArea}>
-            {/* Top Bar: Search Pill + Notification Bell + User Avatar */}
+            {/* Top Bar: Blog Button + Notification Bell + User Avatar */}
             <View style={uiStyles.searchHeaderRow}>
-              <View style={uiStyles.searchPill}>
-                <Ionicons name="search" size={17} color="#059669" style={{ marginRight: 8 }} />
-                <TextInput
-                  style={uiStyles.searchInput}
-                  placeholder="LuxCare - Trợ thủ y tế & nhân sự..."
-                  placeholderTextColor="#64748b"
-                  value={searchQuery}
-                  onChangeText={setSearchQuery}
-                />
-                {searchQuery.length > 0 && (
-                  <Pressable onPress={() => setSearchQuery("")} hitSlop={8}>
-                    <Ionicons name="close-circle" size={16} color="#94a3b8" />
-                  </Pressable>
-                )}
-              </View>
+              {/* Nút Truy cập Blog – thay thế thanh tìm kiếm */}
+              <Pressable
+                style={({ pressed }) => [uiStyles.blogBtn, pressed && { opacity: 0.82 }]}
+                onPress={() => router.push("/(tabs)/notifications")}
+                accessibilityLabel="Truy cập blog"
+              >
+                <Ionicons name="megaphone" size={18} color="#059669" />
+                <Text style={uiStyles.blogBtnText}>Truy cập blog</Text>
+                <Ionicons name="chevron-forward" size={14} color="#059669" />
+              </Pressable>
 
               <View style={uiStyles.headerRightIcons}>
                 <Pressable
@@ -248,14 +287,45 @@ export default function Home() {
               </View>
             </View>
 
+            {/* Thẻ chào hỏi cá nhân – nền ảnh bg-hello-dashboard */}
+            <ImageBackground
+              source={require("../../public/bg-hello-dashboard.png")}
+              style={uiStyles.greetingCard}
+              imageStyle={uiStyles.greetingCardImage}
+              resizeMode="cover"
+            >
+              {/* Hàng trên: tên + chip ngày bên phải */}
+              <View style={uiStyles.greetingTopRow}>
+                <View>
+                  <Text style={uiStyles.greetingXinChao}>Xin chào,</Text>
+                  <Text style={uiStyles.greetingName}>{user?.displayName || "bạn"}!</Text>
+                </View>
+                <View style={uiStyles.greetingDateChip}>
+                  <Ionicons name="sunny" size={13} color="#f59e0b" />
+                  <Text style={uiStyles.greetingDateText}>
+                    {new Date().toLocaleDateString("vi-VN", {
+                      weekday: "short",
+                      day: "2-digit",
+                      month: "2-digit",
+                    })}
+                  </Text>
+                </View>
+              </View>
+              {/* Typewriter sub-text */}
+              <View style={uiStyles.greetingSubRow}>
+                <Text style={uiStyles.greetingSubText}>{typedText}</Text>
+                <Animated.Text style={[uiStyles.greetingCursor, { opacity: cursorOpacity }]}>|</Animated.Text>
+              </View>
+            </ImageBackground>
+
             {/* Hàng 4 nút Thao tác nhanh (Chấm công, Nộp đơn, Việc tôi, Phiếu lương) */}
             <View style={uiStyles.topQuickRow}>
               <Pressable
                 style={({ pressed }) => [uiStyles.topQuickItem, pressed && { opacity: 0.8 }]}
                 onPress={() => router.push("/(tabs)/attendance")}
               >
-                <View style={uiStyles.topQuickIconBox}>
-                  <Ionicons name="qr-code-outline" size={25} color="#059669" />
+                <View style={[uiStyles.topQuickIconBox, { borderColor: "rgba(5, 150, 105, 0.18)" }]}>
+                  <Ionicons name="finger-print-outline" size={26} color="#059669" />
                 </View>
                 <Text style={uiStyles.topQuickLabel}>Chấm công</Text>
               </Pressable>
@@ -264,8 +334,8 @@ export default function Home() {
                 style={({ pressed }) => [uiStyles.topQuickItem, pressed && { opacity: 0.8 }]}
                 onPress={() => router.push("/(tabs)/leave")}
               >
-                <View style={uiStyles.topQuickIconBox}>
-                  <Ionicons name="document-text-outline" size={25} color="#059669" />
+                <View style={[uiStyles.topQuickIconBox, { borderColor: "rgba(124, 58, 237, 0.18)" }]}>
+                  <Ionicons name="document-text-outline" size={25} color="#7c3aed" />
                 </View>
                 <Text style={uiStyles.topQuickLabel}>Nộp đơn</Text>
               </Pressable>
@@ -274,8 +344,8 @@ export default function Home() {
                 style={({ pressed }) => [uiStyles.topQuickItem, pressed && { opacity: 0.8 }]}
                 onPress={() => router.push("/(tabs)/work")}
               >
-                <View style={uiStyles.topQuickIconBox}>
-                  <Ionicons name="checkbox-outline" size={25} color="#059669" />
+                <View style={[uiStyles.topQuickIconBox, { borderColor: "rgba(37, 99, 235, 0.18)" }]}>
+                  <Ionicons name="checkbox-outline" size={25} color="#2563eb" />
                 </View>
                 <Text style={uiStyles.topQuickLabel}>Việc của tôi</Text>
               </Pressable>
@@ -284,8 +354,8 @@ export default function Home() {
                 style={({ pressed }) => [uiStyles.topQuickItem, pressed && { opacity: 0.8 }]}
                 onPress={() => router.push("/(tabs)/payslips")}
               >
-                <View style={uiStyles.topQuickIconBox}>
-                  <Ionicons name="wallet-outline" size={25} color="#059669" />
+                <View style={[uiStyles.topQuickIconBox, { borderColor: "rgba(245, 158, 11, 0.18)" }]}>
+                  <Ionicons name="wallet-outline" size={25} color="#d97706" />
                 </View>
                 <Text style={uiStyles.topQuickLabel}>Phiếu lương</Text>
               </Pressable>
@@ -495,6 +565,84 @@ const uiStyles = StyleSheet.create({
     paddingHorizontal: 16,
     paddingTop: 8,
   },
+
+  // Thẻ chào hỏi cá nhân – nền ảnh bg-hello-dashboard
+  greetingCard: {
+    marginBottom: 14,
+    marginTop: 2,
+    borderRadius: 16,
+    overflow: "hidden",
+    paddingHorizontal: 16,
+    paddingVertical: 14,
+    minHeight: 100,
+    justifyContent: "flex-end",
+    backgroundColor: "#ecfdf5",
+  },
+  greetingCardImage: {
+    borderRadius: 16,
+    opacity: 0.95,
+  },
+  greetingTopRow: {
+    flexDirection: "row",
+    alignItems: "flex-start",
+    justifyContent: "space-between",
+    marginBottom: 4,
+  },
+  // Chữ "Xin chào" – font viết tay giống LuxCare ở trang đăng nhập
+  greetingXinChao: {
+    fontSize: 22,
+    fontFamily: Platform.select({ ios: "Snell Roundhand", android: "cursive" }),
+    color: "#111827",
+    lineHeight: 28,
+  },
+  // Tên user – đen đậm
+  greetingName: {
+    fontSize: 17,
+    fontWeight: "800",
+    color: "#111827",
+    letterSpacing: -0.3,
+  },
+  greetingHello: {
+    fontSize: 17,
+    fontWeight: "800",
+    color: "#111827",
+    letterSpacing: -0.3,
+    flex: 1,
+  },
+  greetingSubText: {
+    fontSize: 12,
+    fontWeight: "500",
+    color: "#374151",
+    marginTop: 2,
+  },
+  greetingSubRow: {
+    flexDirection: "row",
+    alignItems: "center",
+    marginTop: 4,
+    minHeight: 18,
+  },
+  greetingCursor: {
+    fontSize: 13,
+    fontWeight: "300",
+    color: "#059669",
+    marginLeft: 1,
+  },
+  greetingDateChip: {
+    flexDirection: "row",
+    alignItems: "center",
+    gap: 5,
+    backgroundColor: "rgba(255,255,255,0.85)",
+    paddingHorizontal: 9,
+    paddingVertical: 4,
+    borderRadius: 20,
+    borderWidth: 1,
+    borderColor: "rgba(5, 150, 105, 0.2)",
+  },
+  greetingDateText: {
+    fontSize: 11,
+    fontWeight: "700",
+    color: "#111827",
+  },
   searchHeaderRow: {
     flexDirection: "row",
     alignItems: "center",
@@ -502,13 +650,15 @@ const uiStyles = StyleSheet.create({
     gap: 10,
     marginBottom: 16,
   },
-  searchPill: {
+  // Nút Truy cập Blog – thay thế search bar
+  blogBtn: {
     flex: 1,
     flexDirection: "row",
     alignItems: "center",
+    gap: 7,
     backgroundColor: "#ffffff",
     borderRadius: 22,
-    paddingHorizontal: 12,
+    paddingHorizontal: 14,
     height: 40,
     shadowColor: "#059669",
     shadowOffset: { width: 0, height: 2 },
@@ -516,14 +666,13 @@ const uiStyles = StyleSheet.create({
     shadowRadius: 4,
     elevation: 2,
     borderWidth: 1,
-    borderColor: "rgba(5, 150, 105, 0.15)",
+    borderColor: "rgba(5, 150, 105, 0.18)",
   },
-  searchInput: {
+  blogBtnText: {
     flex: 1,
     fontSize: 13,
-    fontWeight: "500",
-    color: "#071629",
-    paddingVertical: 0,
+    fontWeight: "700",
+    color: "#059669",
   },
   headerRightIcons: {
     flexDirection: "row",

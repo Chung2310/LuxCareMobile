@@ -5,7 +5,8 @@ import { useFocusEffect } from "expo-router";
 import type { RecruitmentPipeline } from "../../../src/types/recruitment";
 import { recruitment } from "../../src/api/services";
 import { messageOf, useSession } from "../../src/auth/SessionProvider";
-import { Button, Card, ErrorText, Loading, Page, styles } from "../../src/ui";
+import { RecruitmentSubnav } from "../../src/features/recruitment/RecruitmentSubnav";
+import { Button, Card, EmptyState, ErrorText, Loading, Page, styles } from "../../src/ui";
 import { recruitmentAccess } from "../../src/features/recruitment/access";
 import { OUTCOMES } from "../../src/features/recruitment/applicantModel";
 import { PipelineForm } from "../../src/features/recruitment/PipelineForm";
@@ -57,8 +58,12 @@ export default function Pipeline() {
   return (
     <>
       <Page title="Quy trình tuyển dụng">
+        <RecruitmentSubnav active="pipeline" />
         <ErrorText message={error} />
         {loading && <Loading />}
+        {!loading && !error && (!pipeline || !pipeline.stages.length) && (
+          <EmptyState message="Chưa có quy trình tuyển dụng" />
+        )}
         {pipeline?.stages
           .slice()
           .sort((a, b) => a.position - b.position)
