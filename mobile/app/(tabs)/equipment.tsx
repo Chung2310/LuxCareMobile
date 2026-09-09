@@ -31,25 +31,23 @@ import type {
 // ── Helpers ───────────────────────────────────────────────────────────────────
 function getStatusBadge(status: string) {
   const s = (status || "").toLowerCase();
-  if (s.includes("using") || s.includes("dùng") || s.includes("đang") || s.includes("in_use"))
+  if (s.includes("using") || s.includes("in-use") || s.includes("dùng") || s.includes("đang"))
     return { label: "Đang dùng", color: "#047857", bg: "#f0fdf4" };
-  if (s.includes("ready") || s.includes("sẵn") || s.includes("avail"))
+  if (s.includes("avail") || s.includes("ready") || s.includes("sẵn"))
     return { label: "Sẵn sàng", color: "#0284c7", bg: "#f0f9ff" };
-  if (s.includes("booked") || s.includes("đơn") || s.includes("đặt") || s.includes("order"))
+  if (s.includes("request") || s.includes("booked") || s.includes("đơn") || s.includes("đặt"))
     return { label: "Đã có đơn", color: "#6366f1", bg: "#eef2ff" };
-  if (s.includes("maint") || s.includes("bảo trì") || s.includes("sửa") || s.includes("repair"))
+  if (s.includes("maint") || s.includes("bảo trì") || s.includes("sửa"))
     return { label: "Bảo trì", color: "#b45309", bg: "#fffbeb" };
-  if (s.includes("dispos") || s.includes("thanh lý") || s.includes("hỏng") || s.includes("scrap"))
+  if (s.includes("retire") || s.includes("dispos") || s.includes("thanh lý") || s.includes("hỏng"))
     return { label: "Thanh lý", color: "#64748b", bg: "#f8fafc" };
   return { label: status || "Khác", color: "#475569", bg: "#f1f5f9" };
 }
 
 const STATUS_OPTIONS = [
-  { label: "Sẵn sàng", value: "ready" },
-  { label: "Đang dùng", value: "using" },
-  { label: "Đã có đơn", value: "booked" },
+  { label: "Sẵn sàng", value: "available" },
   { label: "Bảo trì", value: "maintenance" },
-  { label: "Thanh lý", value: "disposed" },
+  { label: "Thanh lý", value: "retired" },
 ];
 
 const RISK_OPTIONS = [
@@ -65,6 +63,79 @@ const INSPECTION_RESULT_OPTIONS = [
   { label: "✗ Không đạt (Fail)", value: "Fail" },
   { label: "Chờ đánh giá", value: "Pending" },
 ];
+
+const DOC_TYPE_OPTIONS = [
+  { label: "Giấy chứng nhận xuất xứ & chất lượng (CO/CQ)", value: "Giấy chứng nhận xuất xứ & chất lượng (CO/CQ)" },
+  { label: "Hóa đơn mua bán thiết bị", value: "Hóa đơn mua bán thiết bị" },
+  { label: "Giấy phép nhập khẩu thiết bị y tế", value: "Giấy phép nhập khẩu thiết bị y tế" },
+  { label: "Tờ khai hải quan", value: "Tờ khai hải quan" },
+  { label: "Biên bản bàn giao & nghiệm thu", value: "Biên bản bàn giao & nghiệm thu" },
+  { label: "Hồ sơ kỹ thuật / Hướng dẫn sử dụng", value: "Hồ sơ kỹ thuật / Hướng dẫn sử dụng" },
+  { label: "Khác", value: "Khác" },
+];
+
+// ── App Rounded Alert Modal ──────────────────────────────────────────────────
+function AppAlertModal({
+  visible,
+  title,
+  message,
+  type = "info",
+  onClose,
+}: {
+  visible: boolean;
+  title: string;
+  message: string;
+  type?: "error" | "warning" | "success" | "info";
+  onClose: () => void;
+}) {
+  const isError = type === "error";
+  const isSuccess = type === "success";
+  const isWarning = type === "warning";
+
+  const iconName = isError
+    ? "alert-circle"
+    : isSuccess
+    ? "checkmark-circle"
+    : isWarning
+    ? "warning"
+    : "information-circle";
+
+  const iconColor = isError
+    ? "#dc2626"
+    : isSuccess
+    ? "#059669"
+    : isWarning
+    ? "#d97706"
+    : "#2563eb";
+
+  const iconBg = isError
+    ? "#fee2e2"
+    : isSuccess
+    ? "#dcfce7"
+    : isWarning
+    ? "#fef3c7"
+    : "#e0f2fe";
+
+  return (
+    <Modal visible={visible} transparent animationType="fade" onRequestClose={onClose}>
+      <View style={alertStyles.overlay}>
+        <View style={alertStyles.dialog}>
+          <View style={[alertStyles.iconCircle, { backgroundColor: iconBg }]}>
+            <Ionicons name={iconName} size={30} color={iconColor} />
+          </View>
+          <Text style={alertStyles.title}>{title}</Text>
+          <Text style={alertStyles.message}>{message}</Text>
+          <Pressable
+            style={({ pressed }) => [alertStyles.confirmBtn, pressed && { opacity: 0.7 }]}
+            onPress={onClose}
+          >
+            <Text style={alertStyles.confirmText}>Đã hiểu</Text>
+          </Pressable>
+        </View>
+      </View>
+    </Modal>
+  );
+}
 
 function formatDateDisplay(isoStr?: string): string {
   if (!isoStr) return "";
@@ -228,7 +299,7 @@ function EquipmentModal({
   const [name, setName] = useState("");
   const [code, setCode] = useState("");
   const [category, setCategory] = useState("");
-  const [status, setStatus] = useState("ready");
+  const [status, setStatus] = useState("available");
   const [riskClassification, setRiskClassification] = useState("Chưa phân nhóm");
   const [inspectionIntervalMonths, setInspectionIntervalMonths] = useState("12");
   const [manufacturer, setManufacturer] = useState("");
@@ -240,7 +311,7 @@ function EquipmentModal({
   const [inspectionResult, setInspectionResult] = useState("Pass");
   const [inspectionAgency, setInspectionAgency] = useState("");
   const [inspectionCertFile, setInspectionCertFile] = useState("");
-  const [documents, setDocuments] = useState<{ name: string; uri: string }[]>([]);
+  const [documents, setDocuments] = useState<{ name: string; uri: string; type?: string; code?: string; issueDate?: string; expiryDate?: string }[]>([]);
   const [location, setLocation] = useState("");
   const [purchaseDate, setPurchaseDate] = useState("");
   const [usageStartDate, setUsageStartDate] = useState("");
@@ -248,18 +319,42 @@ function EquipmentModal({
   const [imageUri, setImageUri] = useState("");
   const [saving, setSaving] = useState(false);
 
+  // Subform thêm hồ sơ / tải ảnh
+  const [showDocForm, setShowDocForm] = useState(false);
+  const [newDocType, setNewDocType] = useState("Giấy chứng nhận xuất xứ & chất lượng (CO/CQ)");
+  const [newDocTitle, setNewDocTitle] = useState("");
+  const [newDocCode, setNewDocCode] = useState("");
+  const [newDocIssueDate, setNewDocIssueDate] = useState("");
+  const [newDocExpiryDate, setNewDocExpiryDate] = useState("");
+  const [newDocFile, setNewDocFile] = useState<{ name: string; uri: string } | null>(null);
+
+  // Rounded Alert
+  const [formAlert, setFormAlert] = useState<{
+    visible: boolean;
+    title: string;
+    message: string;
+    type?: "error" | "warning" | "success" | "info";
+  }>({ visible: false, title: "", message: "", type: "info" });
+
+  const showFormAlert = (title: string, message: string, type: "error" | "warning" | "success" | "info" = "info") => {
+    setFormAlert({ visible: true, title, message, type });
+  };
+
   const [activeDatePicker, setActiveDatePicker] = useState<
-    "lastInspectionDate" | "nextInspectionDate" | "purchaseDate" | "usageStartDate" | null
+    "lastInspectionDate" | "nextInspectionDate" | "purchaseDate" | "usageStartDate" | "newDocIssueDate" | "newDocExpiryDate" | null
   >(null);
   const [activeSelectPicker, setActiveSelectPicker] = useState<
-    "status" | "riskClassification" | "inspectionResult" | null
+    "status" | "riskClassification" | "inspectionResult" | "docType" | null
   >(null);
 
   const resetToItem = useCallback(() => {
     setName(editItem?.name ?? "");
     setCode(editItem?.code ?? "");
     setCategory(editItem?.category ?? "");
-    setStatus(editItem?.status ?? "ready");
+    const rawStatus = (editItem?.status ?? "available").toLowerCase();
+    setStatus(
+      rawStatus.includes("maint") ? "maintenance" : rawStatus.includes("retire") || rawStatus.includes("dispos") ? "retired" : "available"
+    );
     setRiskClassification(editItem?.riskClassification ?? "Chưa phân nhóm");
     setInspectionIntervalMonths(editItem?.inspectionIntervalMonths ? String(editItem.inspectionIntervalMonths) : "12");
     setManufacturer(editItem?.manufacturer ?? "");
@@ -271,19 +366,20 @@ function EquipmentModal({
     setInspectionResult(editItem?.inspectionResult ?? "Pass");
     setInspectionAgency(editItem?.inspectionAgency ?? "");
     setInspectionCertFile(editItem?.inspectionCertFile ?? "");
-    setDocuments(editItem?.documents ?? []);
+    setDocuments((editItem?.documents as any) ?? []);
     setLocation(editItem?.location ?? "");
     setPurchaseDate(editItem?.purchaseDate ? editItem.purchaseDate.slice(0, 10) : "");
     setUsageStartDate(editItem?.usageStartDate ? editItem.usageStartDate.slice(0, 10) : "");
     setNotes(editItem?.notes ?? "");
     setImageUri(editItem?.imageUri ?? "");
+    setShowDocForm(false);
   }, [editItem]);
 
   const pickImage = async () => {
     try {
       const { status: perm } = await ImagePicker.requestMediaLibraryPermissionsAsync();
       if (perm !== "granted") {
-        Alert.alert("Quyền truy cập", "Cần quyền truy cập thư viện để chọn ảnh thiết bị.");
+        showFormAlert("Quyền truy cập", "Cần quyền truy cập thư viện để chọn ảnh thiết bị.", "warning");
         return;
       }
       const result = await ImagePicker.launchImageLibraryAsync({
@@ -295,7 +391,7 @@ function EquipmentModal({
         setImageUri(result.assets[0].uri);
       }
     } catch {
-      Alert.alert("Lỗi", "Không thể chọn ảnh.");
+      showFormAlert("Lỗi", "Không thể chọn ảnh.", "error");
     }
   };
 
@@ -313,7 +409,7 @@ function EquipmentModal({
     }
   };
 
-  const pickDocument = async () => {
+  const pickDocFile = async () => {
     try {
       const result = await DocumentPicker.getDocumentAsync({
         type: ["application/pdf", "image/*"],
@@ -321,47 +417,111 @@ function EquipmentModal({
       });
       if (!result.canceled && result.assets && result.assets.length > 0) {
         const file = result.assets[0];
-        setDocuments((prev) => [...prev, { name: file.name, uri: file.uri }]);
+        setNewDocFile({ name: file.name, uri: file.uri });
       }
     } catch {
       // ignore
     }
   };
 
+  const handleAddDocument = () => {
+    if (!newDocTitle.trim()) {
+      showFormAlert("Thiếu thông tin", "Vui lòng nhập tên tài liệu / văn bản.", "warning");
+      return;
+    }
+    if (!newDocFile) {
+      showFormAlert("Thiếu tệp đính kèm", "Vui lòng chọn ảnh hoặc tệp tài liệu đính kèm.", "warning");
+      return;
+    }
+    setDocuments((prev) => [
+      ...prev,
+      {
+        name: newDocTitle.trim(),
+        type: newDocType,
+        code: newDocCode.trim() || undefined,
+        issueDate: newDocIssueDate || undefined,
+        expiryDate: newDocExpiryDate || undefined,
+        uri: newDocFile.uri,
+      },
+    ]);
+    setNewDocTitle("");
+    setNewDocCode("");
+    setNewDocIssueDate("");
+    setNewDocExpiryDate("");
+    setNewDocFile(null);
+    setShowDocForm(false);
+  };
+
   const handleSave = async () => {
     if (!name.trim()) {
-      Alert.alert("Thiếu thông tin", "Vui lòng nhập tên thiết bị.");
+      showFormAlert("Thiếu thông tin", "Vui lòng nhập tên thiết bị.", "warning");
       return;
     }
     if (!code.trim()) {
-      Alert.alert("Thiếu thông tin", "Vui lòng nhập mã thiết bị.");
+      showFormAlert("Thiếu thông tin", "Vui lòng nhập mã thiết bị.", "warning");
       return;
     }
+    if (!category.trim()) {
+      showFormAlert("Thiếu thông tin", "Vui lòng nhập danh mục thiết bị.", "warning");
+      return;
+    }
+
     setSaving(true);
     try {
-      const payload: Partial<EquipmentRecord> = {
+      const serverStatus = ["available", "maintenance", "retired"].includes(status)
+        ? status
+        : "available";
+
+      const payload: Record<string, any> = {
         name: name.trim(),
         code: code.trim(),
-        category: category.trim() || undefined,
-        status,
-        riskClassification: riskClassification || undefined,
-        inspectionIntervalMonths: inspectionIntervalMonths.trim() || undefined,
-        manufacturer: manufacturer.trim() || undefined,
-        origin: origin.trim() || undefined,
-        model: model.trim() || undefined,
-        serialNumber: serialNumber.trim() || undefined,
-        lastInspectionDate: lastInspectionDate || undefined,
-        nextInspectionDate: nextInspectionDate || undefined,
-        inspectionResult: inspectionResult || undefined,
-        inspectionAgency: inspectionAgency.trim() || undefined,
-        inspectionCertFile: inspectionCertFile || undefined,
-        documents: documents.length > 0 ? documents : undefined,
-        location: location.trim() || undefined,
-        purchaseDate: purchaseDate || undefined,
-        usageStartDate: usageStartDate || undefined,
-        notes: notes.trim() || undefined,
-        imageUri: imageUri || undefined,
+        category: category.trim(),
+        status: serverStatus,
       };
+
+      if (location.trim()) payload.location = location.trim();
+      if (purchaseDate) payload.purchaseDate = purchaseDate;
+
+      // Đóng gói thông tin kỹ thuật & y tế vào notes để lưu trữ an toàn
+      const metaLines: string[] = [];
+      if (notes.trim()) metaLines.push(notes.trim());
+      if (riskClassification && riskClassification !== "Chưa phân nhóm")
+        metaLines.push(`[Phân loại rủi ro: ${riskClassification}]`);
+      if (inspectionIntervalMonths && inspectionIntervalMonths !== "12")
+        metaLines.push(`[Chu kỳ kiểm định: ${inspectionIntervalMonths} tháng]`);
+      if (manufacturer.trim()) metaLines.push(`[Hãng SX: ${manufacturer.trim()}]`);
+      if (origin.trim()) metaLines.push(`[Xuất xứ: ${origin.trim()}]`);
+      if (model.trim()) metaLines.push(`[Model: ${model.trim()}]`);
+      if (serialNumber.trim()) metaLines.push(`[Serial: ${serialNumber.trim()}]`);
+      if (lastInspectionDate) metaLines.push(`[Kiểm định gần nhất: ${lastInspectionDate}]`);
+      if (nextInspectionDate) metaLines.push(`[Hạn kiểm định tiếp theo: ${nextInspectionDate}]`);
+      if (inspectionResult) metaLines.push(`[Kết quả: ${inspectionResult}]`);
+      if (inspectionAgency.trim()) metaLines.push(`[Đơn vị kiểm định: ${inspectionAgency.trim()}]`);
+      if (inspectionCertFile) metaLines.push(`[Biên bản: ${inspectionCertFile}]`);
+      if (usageStartDate) metaLines.push(`[Ngày sử dụng: ${usageStartDate}]`);
+      if (documents.length > 0) {
+        metaLines.push(`[Hồ sơ: ${documents.map((d) => d.name).join(", ")}]`);
+      }
+
+      if (metaLines.length > 0) {
+        payload.notes = metaLines.join("\n");
+      }
+
+      // Gửi kèm các trường mở rộng
+      if (riskClassification) payload.riskClassification = riskClassification;
+      if (inspectionIntervalMonths) payload.inspectionIntervalMonths = Number(inspectionIntervalMonths) || 12;
+      if (manufacturer.trim()) payload.manufacturer = manufacturer.trim();
+      if (origin.trim()) payload.origin = origin.trim();
+      if (model.trim()) payload.model = model.trim();
+      if (serialNumber.trim()) payload.serialNumber = serialNumber.trim();
+      if (lastInspectionDate) payload.lastInspectionDate = lastInspectionDate;
+      if (nextInspectionDate) payload.nextInspectionDate = nextInspectionDate;
+      if (inspectionResult) payload.inspectionResult = inspectionResult;
+      if (inspectionAgency.trim()) payload.inspectionAgency = inspectionAgency.trim();
+      if (inspectionCertFile) payload.inspectionCertFile = inspectionCertFile;
+      if (usageStartDate) payload.usageStartDate = usageStartDate;
+      if (documents.length > 0) payload.documents = documents;
+
       if (isEdit && editItem) {
         await equipment.update(editItem._id, payload);
       } else {
@@ -369,8 +529,8 @@ function EquipmentModal({
       }
       onSaved();
       onClose();
-    } catch (e) {
-      Alert.alert("Lỗi", e instanceof Error ? e.message : "Không thể lưu thiết bị.");
+    } catch (e: any) {
+      showFormAlert("Không thể lưu thiết bị", e.message || "Lỗi xử lý dữ liệu từ máy chủ.", "error");
     } finally {
       setSaving(false);
     }
@@ -603,15 +763,95 @@ function EquipmentModal({
                 <View style={{ flexDirection: "row", alignItems: "center", gap: 6, flex: 1 }}>
                   <Ionicons name="document-text-outline" size={16} color="#9a3412" />
                   <Text style={modal.sectionTitleAmber} numberOfLines={1}>
-                    HÓA ĐƠN, CO/CQ, GIẤY TỜ NHẬP KHẨU ({documents.length})
+                    HÓA ĐƠN, CO/CQ, GIẤY TỜ NHẬP KHẨU & HỒ SƠ ({documents.length})
                   </Text>
                 </View>
-                <Pressable style={modal.addDocBtn} onPress={pickDocument}>
-                  <Text style={modal.addDocBtnText}>+ Thêm hồ sơ / tải ảnh</Text>
+                <Pressable
+                  style={[modal.addDocBtn, showDocForm && modal.closeDocBtn]}
+                  onPress={() => setShowDocForm((v) => !v)}
+                >
+                  <Text style={modal.addDocBtnText}>{showDocForm ? "+ Đóng form" : "+ Thêm hồ sơ / tải ảnh"}</Text>
                 </Pressable>
               </View>
 
-              {documents.length === 0 ? (
+              {/* Form thêm hồ sơ mở rộng khi bấm nút */}
+              {showDocForm && (
+                <View style={modal.subFormCard}>
+                  <View style={modal.twoCol}>
+                    <View style={modal.col}>
+                      <Text style={modal.subLabel}>Loại hồ sơ <Text style={modal.required}>*</Text></Text>
+                      <Pressable style={modal.selector} onPress={() => setActiveSelectPicker("docType")}>
+                        <Text style={modal.selectorText} numberOfLines={1}>
+                          {newDocType || "Giấy chứng nhận xuất xứ & chất..."}
+                        </Text>
+                        <Ionicons name="chevron-down" size={16} color="#64748b" />
+                      </Pressable>
+                    </View>
+                    <View style={modal.col}>
+                      <Text style={modal.subLabel}>Tên tài liệu / Văn bản <Text style={modal.required}>*</Text></Text>
+                      <TextInput
+                        style={modal.input}
+                        placeholder="VD: Hóa đơn mua máy, Giấy chứng nhận..."
+                        placeholderTextColor="#94a3b8"
+                        value={newDocTitle}
+                        onChangeText={setNewDocTitle}
+                      />
+                    </View>
+                  </View>
+
+                  <View style={modal.twoCol}>
+                    <View style={modal.col}>
+                      <Text style={modal.subLabel}>Số hiệu văn bản</Text>
+                      <TextInput
+                        style={modal.input}
+                        placeholder="VD: INV-2026-01, CQ-..."
+                        placeholderTextColor="#94a3b8"
+                        value={newDocCode}
+                        onChangeText={setNewDocCode}
+                      />
+                    </View>
+                    <View style={modal.col}>
+                      <Text style={modal.subLabel}>Ngày phát hành</Text>
+                      <Pressable style={modal.dateField} onPress={() => setActiveDatePicker("newDocIssueDate")}>
+                        <Text style={[modal.dateText, !newDocIssueDate && modal.placeholderText]}>
+                          {formatDateDisplay(newDocIssueDate) || "dd/mm/yyyy"}
+                        </Text>
+                        <Ionicons name="calendar-outline" size={16} color="#64748b" />
+                      </Pressable>
+                    </View>
+                    <View style={modal.col}>
+                      <Text style={modal.subLabel}>Ngày hết hạn (nếu có)</Text>
+                      <Pressable style={modal.dateField} onPress={() => setActiveDatePicker("newDocExpiryDate")}>
+                        <Text style={[modal.dateText, !newDocExpiryDate && modal.placeholderText]}>
+                          {formatDateDisplay(newDocExpiryDate) || "dd/mm/yyyy"}
+                        </Text>
+                        <Ionicons name="calendar-outline" size={16} color="#64748b" />
+                      </Pressable>
+                    </View>
+                  </View>
+
+                  <View style={{ marginTop: 4 }}>
+                    <Text style={modal.subLabel}>Tệp tài liệu / Hình ảnh Hóa đơn, CO/CQ (Ảnh, PDF) <Text style={modal.required}>*</Text></Text>
+                    <Pressable style={modal.uploadFileBtnAmber} onPress={pickDocFile}>
+                      <Ionicons name="cloud-upload-outline" size={16} color="#b45309" />
+                      <Text style={modal.uploadFileTextAmber} numberOfLines={1}>
+                        {newDocFile ? `Đã chọn: ${newDocFile.name}` : "Chọn ảnh / file đính kèm..."}
+                      </Text>
+                    </Pressable>
+                  </View>
+
+                  <View style={modal.subFormFooter}>
+                    <Pressable style={modal.subFormCancelBtn} onPress={() => setShowDocForm(false)}>
+                      <Text style={modal.subFormCancelText}>Hủy</Text>
+                    </Pressable>
+                    <Pressable style={modal.subFormSubmitBtn} onPress={handleAddDocument}>
+                      <Text style={modal.subFormSubmitText}>Thêm hồ sơ này</Text>
+                    </Pressable>
+                  </View>
+                </View>
+              )}
+
+              {documents.length === 0 && !showDocForm ? (
                 <Text style={modal.emptyDocText}>
                   Chưa đính kèm tài liệu nào. Bấm "Thêm hồ sơ / tải ảnh" để tải lên hóa đơn, CO/CQ hoặc giấy phép.
                 </Text>
@@ -709,6 +949,10 @@ function EquipmentModal({
             ? purchaseDate
             : activeDatePicker === "usageStartDate"
             ? usageStartDate
+            : activeDatePicker === "newDocIssueDate"
+            ? newDocIssueDate
+            : activeDatePicker === "newDocExpiryDate"
+            ? newDocExpiryDate
             : ""
         }
         onChange={(dateStr) => {
@@ -716,6 +960,8 @@ function EquipmentModal({
           else if (activeDatePicker === "nextInspectionDate") setNextInspectionDate(dateStr);
           else if (activeDatePicker === "purchaseDate") setPurchaseDate(dateStr);
           else if (activeDatePicker === "usageStartDate") setUsageStartDate(dateStr);
+          else if (activeDatePicker === "newDocIssueDate") setNewDocIssueDate(dateStr);
+          else if (activeDatePicker === "newDocExpiryDate") setNewDocExpiryDate(dateStr);
           setActiveDatePicker(null);
         }}
         title={
@@ -725,7 +971,11 @@ function EquipmentModal({
             ? "Ngày đến hạn kiểm định tiếp theo"
             : activeDatePicker === "purchaseDate"
             ? "Ngày mua thiết bị"
-            : "Ngày đưa vào sử dụng"
+            : activeDatePicker === "usageStartDate"
+            ? "Ngày đưa vào sử dụng"
+            : activeDatePicker === "newDocIssueDate"
+            ? "Ngày phát hành văn bản"
+            : "Ngày hết hạn văn bản"
         }
         allowClear
       />
@@ -738,6 +988,8 @@ function EquipmentModal({
             ? "Trạng thái vận hành"
             : activeSelectPicker === "riskClassification"
             ? "Phân loại mức độ rủi ro (Bộ Y tế)"
+            : activeSelectPicker === "docType"
+            ? "Loại hồ sơ"
             : "Kết quả thực hiện"
         }
         options={
@@ -745,6 +997,8 @@ function EquipmentModal({
             ? STATUS_OPTIONS
             : activeSelectPicker === "riskClassification"
             ? RISK_OPTIONS
+            : activeSelectPicker === "docType"
+            ? DOC_TYPE_OPTIONS
             : INSPECTION_RESULT_OPTIONS
         }
         selectedValue={
@@ -752,14 +1006,26 @@ function EquipmentModal({
             ? status
             : activeSelectPicker === "riskClassification"
             ? riskClassification
+            : activeSelectPicker === "docType"
+            ? newDocType
             : inspectionResult
         }
         onSelect={(val) => {
           if (activeSelectPicker === "status") setStatus(val);
           else if (activeSelectPicker === "riskClassification") setRiskClassification(val);
+          else if (activeSelectPicker === "docType") setNewDocType(val);
           else if (activeSelectPicker === "inspectionResult") setInspectionResult(val);
         }}
         onClose={() => setActiveSelectPicker(null)}
+      />
+
+      {/* Custom Rounded Alert Modal cho form */}
+      <AppAlertModal
+        visible={formAlert.visible}
+        title={formAlert.title}
+        message={formAlert.message}
+        type={formAlert.type}
+        onClose={() => setFormAlert((prev) => ({ ...prev, visible: false }))}
       />
     </Modal>
   );
@@ -830,6 +1096,18 @@ export default function EquipmentScreen() {
   const [deleteItem, setDeleteItem] = useState<EquipmentRecord | null>(null);
   const [deleting, setDeleting] = useState(false);
 
+  // Screen Rounded Alert Modal
+  const [alertState, setAlertState] = useState<{
+    visible: boolean;
+    title: string;
+    message: string;
+    type?: "error" | "warning" | "success" | "info";
+  }>({ visible: false, title: "", message: "", type: "info" });
+
+  const showAlert = (title: string, message: string, type: "error" | "warning" | "success" | "info" = "info") => {
+    setAlertState({ visible: true, title, message, type });
+  };
+
   const openAdd = () => { setEditItem(null); setModalVisible(true); };
   const openEdit = (item: EquipmentRecord) => { setEditItem(item); setModalVisible(true); };
 
@@ -844,8 +1122,8 @@ export default function EquipmentScreen() {
       await equipment.delete(deleteItem._id);
       setDeleteItem(null);
       setRevision((v) => v + 1);
-    } catch (e) {
-      Alert.alert("Lỗi", e instanceof Error ? e.message : "Không thể xóa thiết bị.");
+    } catch (e: any) {
+      showAlert("Lỗi xóa thiết bị", e.message || "Không thể xóa thiết bị.", "error");
     } finally {
       setDeleting(false);
     }
@@ -1050,6 +1328,13 @@ export default function EquipmentScreen() {
         onConfirm={confirmDelete}
         loading={deleting}
       />
+      <AppAlertModal
+        visible={alertState.visible}
+        title={alertState.title}
+        message={alertState.message}
+        type={alertState.type}
+        onClose={() => setAlertState((prev) => ({ ...prev, visible: false }))}
+      />
     </SafeAreaView>
   );
 }
@@ -1246,6 +1531,67 @@ const modal = StyleSheet.create({
   sectionTitleAmber: { fontSize: 11, fontWeight: "800", color: "#9a3412", fontFamily: "Inter-Bold" },
   addDocBtn: { backgroundColor: "#9a3412", paddingHorizontal: 9, paddingVertical: 5, borderRadius: 6 },
   addDocBtnText: { color: "#ffffff", fontSize: 11, fontWeight: "700", fontFamily: "Inter-Bold" },
+  closeDocBtn: { backgroundColor: "#7c2d12" },
+  subFormCard: {
+    backgroundColor: "#ffffff",
+    borderWidth: 1,
+    borderColor: "#fed7aa",
+    borderRadius: 12,
+    padding: 12,
+    marginTop: 8,
+    gap: 6,
+  },
+  uploadFileBtnAmber: {
+    borderWidth: 1,
+    borderColor: "#fed7aa",
+    borderRadius: 8,
+    backgroundColor: "#fffaf5",
+    paddingVertical: 9,
+    paddingHorizontal: 12,
+    flexDirection: "row",
+    alignItems: "center",
+    justifyContent: "center",
+    gap: 6,
+    marginTop: 4,
+  },
+  uploadFileTextAmber: {
+    fontSize: 12,
+    fontWeight: "600",
+    color: "#b45309",
+    fontFamily: "Inter-SemiBold",
+  },
+  subFormFooter: {
+    flexDirection: "row",
+    justifyContent: "flex-end",
+    alignItems: "center",
+    gap: 12,
+    marginTop: 8,
+    paddingTop: 8,
+    borderTopWidth: 1,
+    borderTopColor: "#fef3c7",
+  },
+  subFormCancelBtn: {
+    paddingVertical: 7,
+    paddingHorizontal: 12,
+  },
+  subFormCancelText: {
+    fontSize: 12.5,
+    fontWeight: "600",
+    color: "#64748b",
+    fontFamily: "Inter-SemiBold",
+  },
+  subFormSubmitBtn: {
+    backgroundColor: "#b45309",
+    paddingVertical: 8,
+    paddingHorizontal: 14,
+    borderRadius: 8,
+  },
+  subFormSubmitText: {
+    fontSize: 12.5,
+    fontWeight: "700",
+    color: "#ffffff",
+    fontFamily: "Inter-Bold",
+  },
   emptyDocText: { fontSize: 10.8, color: "#94a3b8", fontStyle: "italic", fontFamily: "Inter-Regular", marginTop: 4, lineHeight: 16 },
   docItem: { flexDirection: "row", alignItems: "center", justifyContent: "space-between", backgroundColor: "#ffffff", padding: 8, borderRadius: 8, borderWidth: 1, borderColor: "#fed7aa" },
   docName: { fontSize: 12, color: "#9a3412", fontFamily: "Inter-Medium", flex: 1, marginHorizontal: 8 },
@@ -1342,6 +1688,69 @@ const confirmStyles = StyleSheet.create({
   deleteText: {
     fontSize: 13.5,
     fontWeight: "700",
+    color: "#ffffff",
+    fontFamily: "Inter-Bold",
+  },
+});
+
+const alertStyles = StyleSheet.create({
+  overlay: {
+    flex: 1,
+    backgroundColor: "rgba(0, 0, 0, 0.45)",
+    justifyContent: "center",
+    alignItems: "center",
+    padding: 24,
+  },
+  dialog: {
+    width: "100%",
+    maxWidth: 320,
+    backgroundColor: "#ffffff",
+    borderRadius: 22,
+    paddingTop: 22,
+    paddingHorizontal: 20,
+    paddingBottom: 18,
+    alignItems: "center",
+    shadowColor: "#000",
+    shadowOffset: { width: 0, height: 8 },
+    shadowOpacity: 0.15,
+    shadowRadius: 16,
+    elevation: 8,
+  },
+  iconCircle: {
+    width: 52,
+    height: 52,
+    borderRadius: 26,
+    alignItems: "center",
+    justifyContent: "center",
+    marginBottom: 12,
+  },
+  title: {
+    fontSize: 17,
+    fontWeight: "800",
+    color: "#0f172a",
+    fontFamily: "Inter-Bold",
+    textAlign: "center",
+    marginBottom: 8,
+  },
+  message: {
+    fontSize: 13.5,
+    color: "#475569",
+    fontFamily: "Inter-Regular",
+    lineHeight: 20,
+    textAlign: "center",
+    marginBottom: 20,
+  },
+  confirmBtn: {
+    width: "100%",
+    paddingVertical: 12,
+    borderRadius: 12,
+    backgroundColor: "#008852",
+    alignItems: "center",
+    justifyContent: "center",
+  },
+  confirmText: {
+    fontSize: 14,
+    fontWeight: "800",
     color: "#ffffff",
     fontFamily: "Inter-Bold",
   },
