@@ -1,11 +1,13 @@
-import { useCallback, useRef, useState } from "react";
+import { useCallback, useEffect, useRef, useState } from "react";
 import {
   ActivityIndicator,
   Alert,
   Animated,
   Image,
+  KeyboardAvoidingView,
   Modal,
   PanResponder,
+  Platform,
   Pressable,
   RefreshControl,
   ScrollView,
@@ -16,12 +18,15 @@ import {
 } from "react-native";
 import { router, useFocusEffect } from "expo-router";
 import { SafeAreaView } from "react-native-safe-area-context";
-import { Ionicons } from "@expo/vector-icons";
+import { Ionicons, MaterialCommunityIcons } from "@expo/vector-icons";
 import * as ImagePicker from "expo-image-picker";
 import * as DocumentPicker from "expo-document-picker";
+import * as FileSystem from "expo-file-system";
+import * as Sharing from "expo-sharing";
+import * as Linking from "expo-linking";
 import { DatePickerModal } from "../../src/features/credentials/DatePickerModal";
 import { EmptyState } from "../../src/ui";
-import { equipment } from "../../src/api/services";
+import { equipment, departments } from "../../src/api/services";
 import type {
   EquipmentRecord,
   EquipmentSummary,
@@ -61,17 +66,37 @@ const RISK_OPTIONS = [
 const INSPECTION_RESULT_OPTIONS = [
   { label: "✓ Đạt chuẩn (Pass)", value: "Pass" },
   { label: "✗ Không đạt (Fail)", value: "Fail" },
-  { label: "Chờ đánh giá", value: "Pending" },
+  { label: "Chờ đánh giá (Pending)", value: "Pending" },
 ];
 
 const DOC_TYPE_OPTIONS = [
-  { label: "Giấy chứng nhận xuất xứ & chất lượng (CO/CQ)", value: "Giấy chứng nhận xuất xứ & chất lượng (CO/CQ)" },
+  { label: "Giấy chứng nhận CO/CQ", value: "Giấy chứng nhận xuất xứ & chất lượng (CO/CQ)" },
   { label: "Hóa đơn mua bán thiết bị", value: "Hóa đơn mua bán thiết bị" },
   { label: "Giấy phép nhập khẩu thiết bị y tế", value: "Giấy phép nhập khẩu thiết bị y tế" },
   { label: "Tờ khai hải quan", value: "Tờ khai hải quan" },
   { label: "Biên bản bàn giao & nghiệm thu", value: "Biên bản bàn giao & nghiệm thu" },
   { label: "Hồ sơ kỹ thuật / Hướng dẫn sử dụng", value: "Hồ sơ kỹ thuật / Hướng dẫn sử dụng" },
   { label: "Khác", value: "Khác" },
+];
+
+export interface ClinicRoom {
+  id: string;
+  name: string;
+  code: string;
+  category: string;
+  floor: string;
+}
+
+const DEFAULT_CLINIC_ROOMS: ClinicRoom[] = [
+  { id: "p101", name: "Lễ Tân", code: "P101", category: "Văn phòng / Làm việc", floor: "Tầng 1" },
+  { id: "p102", name: "Phòng HCNS", code: "P102", category: "Văn phòng / Làm việc", floor: "Tầng 1" },
+  { id: "p103", name: "Phòng Họp", code: "P103", category: "Phòng họp / Hội chẩn", floor: "Tầng 1" },
+  { id: "p104", name: "Phòng Khám Mắt", code: "P104", category: "Phòng khám", floor: "Tầng 1" },
+  { id: "p201", name: "Phòng Khám Da Liễu", code: "P201", category: "Phòng khám", floor: "Tầng 2" },
+  { id: "p202", name: "Phòng Laser & Thẩm mỹ", code: "P202", category: "Phòng thủ thuật", floor: "Tầng 2" },
+  { id: "p203", name: "Phòng Chăm Sóc Da", code: "P203", category: "Phòng dịch vụ", floor: "Tầng 2" },
+  { id: "p301", name: "Phòng Xét Nghiệm", code: "P301", category: "Cận lâm sàng", floor: "Tầng 3" },
+  { id: "k101", name: "Kho Dược & Thiết bị", code: "K101", category: "Kho vật tư", floor: "Tầng 1" },
 ];
 
 // ── App Rounded Alert Modal ──────────────────────────────────────────────────
@@ -137,6 +162,102 @@ function AppAlertModal({
   );
 }
 
+// ── File & Image Preview Modal ────────────────────────────────────────────────
+function FilePreviewModal({
+  visible,
+  file,
+  onClose,
+}: {
+  visible: boolean;
+  file: { name: string; uri?: string; type?: string } | null;
+  onClose: () => void;
+}) {
+  if (!file) return null;
+
+  const uri = file.uri || "";
+  const name = file.name || "Tài liệu đính kèm";
+
+  const isImage =
+    uri.startsWith("data:image") ||
+    uri.startsWith("file://") ||
+    uri.startsWith("content://") ||
+    uri.startsWith("http://") ||
+    uri.startsWith("https://") ||
+    /\.(jpg|jpeg|png|webp|gif|heic)$/i.test(name) ||
+    /\.(jpg|jpeg|png|webp|gif|heic)$/i.test(uri);
+
+  const handleShareOrOpen = async () => {
+    if (!uri) {
+      Alert.alert("Thông báo", "Tệp này chỉ có tên ghi chép, chưa có đường dẫn tệp đính kèm.");
+      return;
+    }
+    try {
+      if (await Sharing.isAvailableAsync()) {
+        await Sharing.shareAsync(uri);
+      } else {
+        await Linking.openURL(uri);
+      }
+    } catch (e: any) {
+      Alert.alert("Không thể mở tệp", e.message || "Không thể khởi động trình xem hoặc chia sẻ tệp.");
+    }
+  };
+
+  return (
+    <Modal visible={visible} transparent animationType="fade" onRequestClose={onClose}>
+      <View style={previewModalStyles.overlay}>
+        <SafeAreaView edges={["top"]} style={previewModalStyles.topBar}>
+          <View style={previewModalStyles.headerContent}>
+            <Text style={previewModalStyles.fileName} numberOfLines={1}>
+              {name}
+            </Text>
+            <View style={{ flexDirection: "row", alignItems: "center", gap: 12 }}>
+              {uri ? (
+                <Pressable style={previewModalStyles.actionIconBtn} onPress={handleShareOrOpen}>
+                  <Ionicons name="share-outline" size={20} color="#ffffff" />
+                </Pressable>
+              ) : null}
+              <Pressable style={previewModalStyles.actionIconBtn} onPress={onClose}>
+                <Ionicons name="close" size={24} color="#ffffff" />
+              </Pressable>
+            </View>
+          </View>
+        </SafeAreaView>
+
+        <View style={previewModalStyles.body}>
+          {isImage && uri ? (
+            <Image source={{ uri }} style={previewModalStyles.fullImage} resizeMode="contain" />
+          ) : (
+            <View style={previewModalStyles.docPlaceholder}>
+              <View style={previewModalStyles.docIconBg}>
+                <Ionicons
+                  name={name.toLowerCase().includes("pdf") ? "document-text" : "document-attach"}
+                  size={54}
+                  color="#008852"
+                />
+              </View>
+              <Text style={previewModalStyles.docTitle}>{name}</Text>
+              <Text style={previewModalStyles.docSubtitle}>
+                {uri ? "Tệp đính kèm văn bản / PDF" : "Hồ sơ đính kèm"}
+              </Text>
+
+              {uri ? (
+                <Pressable style={previewModalStyles.openBtn} onPress={handleShareOrOpen}>
+                  <Ionicons name="open-outline" size={18} color="#ffffff" />
+                  <Text style={previewModalStyles.openBtnText}>Mở / Chia sẻ tệp</Text>
+                </Pressable>
+              ) : (
+                <Text style={previewModalStyles.noUriText}>
+                  (Tệp chưa có liên kết tin đính kèm trực tiếp)
+                </Text>
+              )}
+            </View>
+          )}
+        </View>
+      </View>
+    </Modal>
+  );
+}
+
 function formatDateDisplay(isoStr?: string): string {
   if (!isoStr) return "";
   const clean = isoStr.slice(0, 10);
@@ -147,15 +268,36 @@ function formatDateDisplay(isoStr?: string): string {
   return isoStr;
 }
 
+function parseEquipmentNotes(rawNotes?: string) {
+  if (!rawNotes) return { cleanNotes: "", meta: {} as Record<string, string> };
+  const lines = rawNotes.split("\n");
+  const cleanLines: string[] = [];
+  const meta: Record<string, string> = {};
+
+  for (const line of lines) {
+    const trimmed = line.trim();
+    const match = trimmed.match(/^\[(.*?):\s*(.*)\]$/);
+    if (match) {
+      meta[match[1]] = match[2];
+    } else {
+      cleanLines.push(line);
+    }
+  }
+
+  return { cleanNotes: cleanLines.join("\n").trim(), meta };
+}
+
 // ── SwipeableItem ─────────────────────────────────────────────────────────────
 function SwipeableItem({
   item,
   onEdit,
   onDelete,
+  onViewDetail,
 }: {
   item: EquipmentRecord;
   onEdit: (item: EquipmentRecord) => void;
   onDelete: (item: EquipmentRecord) => void;
+  onViewDetail: (item: EquipmentRecord) => void;
 }) {
   const translateX = useRef(new Animated.Value(0)).current;
   const isOpen = useRef(false);
@@ -204,28 +346,39 @@ function SwipeableItem({
         </Pressable>
       </View>
       <Animated.View style={[styles.itemCard, { transform: [{ translateX }] }]} {...panResponder.panHandlers}>
-        <View style={styles.itemCardTop}>
-          <View style={styles.itemInfo}>
-            <Text style={styles.itemName}>{item.name}</Text>
-            <Text style={styles.itemCode}>
-              {item.code || "N/A"}
-              {item.department || item.departmentName ? ` · ${item.department || item.departmentName}` : ""}
-            </Text>
-          </View>
-          <View style={[styles.itemBadge, { backgroundColor: badge.bg }]}>
-            <Text style={[styles.itemBadgeText, { color: badge.color }]}>{badge.label}</Text>
-          </View>
-        </View>
-        <View style={styles.itemFooter}>
-          <Text style={styles.itemMeta}>
-            Hạn kiểm định: <Text style={styles.normalDate}>{inspectionDate}</Text>
-          </Text>
-          {item.category ? (
-            <View style={styles.categoryBadge}>
-              <Text style={styles.categoryBadgeText}>{item.category}</Text>
+        <Pressable
+          onPress={() => {
+            if (isOpen.current) {
+              close();
+            } else {
+              onViewDetail(item);
+            }
+          }}
+          style={{ width: "100%" }}
+        >
+          <View style={styles.itemCardTop}>
+            <View style={styles.itemInfo}>
+              <Text style={styles.itemName}>{item.name}</Text>
+              <Text style={styles.itemCode}>
+                {item.code || "N/A"}
+                {item.department || item.departmentName ? ` · ${item.department || item.departmentName}` : ""}
+              </Text>
             </View>
-          ) : null}
-        </View>
+            <View style={[styles.itemBadge, { backgroundColor: badge.bg }]}>
+              <Text style={[styles.itemBadgeText, { color: badge.color }]}>{badge.label}</Text>
+            </View>
+          </View>
+          <View style={styles.itemFooter}>
+            <Text style={styles.itemMeta}>
+              Hạn kiểm định: <Text style={styles.normalDate}>{inspectionDate}</Text>
+            </Text>
+            {item.category ? (
+              <View style={styles.categoryBadge}>
+                <Text style={styles.categoryBadgeText}>{item.category}</Text>
+              </View>
+            ) : null}
+          </View>
+        </Pressable>
       </Animated.View>
     </View>
   );
@@ -283,6 +436,85 @@ function SelectModal({
   );
 }
 
+// ── Media Source Selector Modal (Camera / Library / Files) ───────────────────
+interface MediaSourceModalProps {
+  visible: boolean;
+  title: string;
+  subtitle?: string;
+  allowDocument?: boolean;
+  onTakePhoto: () => void;
+  onChooseGallery: () => void;
+  onChooseDocument?: () => void;
+  onClose: () => void;
+}
+
+function MediaSourceModal({
+  visible,
+  title,
+  subtitle,
+  allowDocument = false,
+  onTakePhoto,
+  onChooseGallery,
+  onChooseDocument,
+  onClose,
+}: MediaSourceModalProps) {
+  return (
+    <Modal visible={visible} transparent animationType="fade" onRequestClose={onClose}>
+      <Pressable style={mediaModalStyles.overlay} onPress={onClose}>
+        <Pressable style={mediaModalStyles.sheet} onPress={(e) => e.stopPropagation()}>
+          <View style={mediaModalStyles.handleBar} />
+          <Text style={mediaModalStyles.title}>{title}</Text>
+          {subtitle ? <Text style={mediaModalStyles.subtitle}>{subtitle}</Text> : null}
+
+          <View style={mediaModalStyles.btnList}>
+            {/* Chụp ảnh mới */}
+            <Pressable style={mediaModalStyles.optionBtn} onPress={onTakePhoto}>
+              <View style={[mediaModalStyles.iconWrap, { backgroundColor: "#ecfdf5", borderColor: "#a7f3d0" }]}>
+                <Ionicons name="camera" size={22} color="#059669" />
+              </View>
+              <View style={{ flex: 1 }}>
+                <Text style={mediaModalStyles.optionTitle}>Chụp ảnh mới</Text>
+                <Text style={mediaModalStyles.optionDesc}>Sử dụng camera điện thoại chụp trực tiếp</Text>
+              </View>
+              <Ionicons name="chevron-forward" size={18} color="#94a3b8" />
+            </Pressable>
+
+            {/* Chọn từ thư viện */}
+            <Pressable style={mediaModalStyles.optionBtn} onPress={onChooseGallery}>
+              <View style={[mediaModalStyles.iconWrap, { backgroundColor: "#f0f9ff", borderColor: "#bae6fd" }]}>
+                <Ionicons name="images" size={22} color="#0284c7" />
+              </View>
+              <View style={{ flex: 1 }}>
+                <Text style={mediaModalStyles.optionTitle}>Chọn từ thư viện ảnh</Text>
+                <Text style={mediaModalStyles.optionDesc}>Chọn ảnh có sẵn trong album thiết bị</Text>
+              </View>
+              <Ionicons name="chevron-forward" size={18} color="#94a3b8" />
+            </Pressable>
+
+            {/* Chọn tệp tài liệu PDF */}
+            {allowDocument && onChooseDocument && (
+              <Pressable style={mediaModalStyles.optionBtn} onPress={onChooseDocument}>
+                <View style={[mediaModalStyles.iconWrap, { backgroundColor: "#fffbeb", borderColor: "#fde68a" }]}>
+                  <Ionicons name="document-text" size={22} color="#d97706" />
+                </View>
+                <View style={{ flex: 1 }}>
+                  <Text style={mediaModalStyles.optionTitle}>Chọn file tài liệu / PDF</Text>
+                  <Text style={mediaModalStyles.optionDesc}>Tải lên tệp PDF hoặc tài liệu quét từ máy</Text>
+                </View>
+                <Ionicons name="chevron-forward" size={18} color="#94a3b8" />
+              </Pressable>
+            )}
+          </View>
+
+          <Pressable style={mediaModalStyles.cancelBtn} onPress={onClose}>
+            <Text style={mediaModalStyles.cancelText}>Hủy bỏ</Text>
+          </Pressable>
+        </Pressable>
+      </Pressable>
+    </Modal>
+  );
+}
+
 // ── Equipment Form Modal ──────────────────────────────────────────────────────
 function EquipmentModal({
   visible,
@@ -300,6 +532,7 @@ function EquipmentModal({
   const [code, setCode] = useState("");
   const [category, setCategory] = useState("");
   const [status, setStatus] = useState("available");
+  const [formPreviewFile, setFormPreviewFile] = useState<{ name: string; uri?: string; type?: string } | null>(null);
   const [riskClassification, setRiskClassification] = useState("Chưa phân nhóm");
   const [inspectionIntervalMonths, setInspectionIntervalMonths] = useState("12");
   const [manufacturer, setManufacturer] = useState("");
@@ -311,6 +544,7 @@ function EquipmentModal({
   const [inspectionResult, setInspectionResult] = useState("Pass");
   const [inspectionAgency, setInspectionAgency] = useState("");
   const [inspectionCertFile, setInspectionCertFile] = useState("");
+  const [inspectionCertFileName, setInspectionCertFileName] = useState("");
   const [documents, setDocuments] = useState<{ name: string; uri: string; type?: string; code?: string; issueDate?: string; expiryDate?: string }[]>([]);
   const [location, setLocation] = useState("");
   const [purchaseDate, setPurchaseDate] = useState("");
@@ -327,6 +561,55 @@ function EquipmentModal({
   const [newDocIssueDate, setNewDocIssueDate] = useState("");
   const [newDocExpiryDate, setNewDocExpiryDate] = useState("");
   const [newDocFile, setNewDocFile] = useState<{ name: string; uri: string } | null>(null);
+
+  // Vị trí phòng ban
+  const [roomList, setRoomList] = useState<ClinicRoom[]>(DEFAULT_CLINIC_ROOMS);
+  const [deptDropdownOpen, setDeptDropdownOpen] = useState(false);
+  const [deptSearch, setDeptSearch] = useState("");
+
+  useEffect(() => {
+    let active = true;
+    departments
+      .list({ activeOnly: true })
+      .then((data) => {
+        if (!active || !data || data.length === 0) return;
+        const mapped: ClinicRoom[] = data.map((d, idx) => ({
+          id: d._id || `dept_${idx}`,
+          name: d.name,
+          code: d.code || `P${101 + idx}`,
+          category: d.description?.includes("/")
+            ? d.description
+            : d.name.toLowerCase().includes("khám")
+            ? "Phòng khám"
+            : d.name.toLowerCase().includes("họp")
+            ? "Phòng họp / Hội chẩn"
+            : "Văn phòng / Làm việc",
+          floor: d.description?.toLowerCase().includes("tầng") ? d.description : "Tầng 1",
+        }));
+        const merged = [...mapped];
+        DEFAULT_CLINIC_ROOMS.forEach((def) => {
+          if (!merged.some((m) => m.name.toLowerCase() === def.name.toLowerCase())) {
+            merged.push(def);
+          }
+        });
+        setRoomList(merged);
+      })
+      .catch(() => {});
+    return () => {
+      active = false;
+    };
+  }, []);
+
+  const filteredRooms = roomList.filter((r) => {
+    if (!deptSearch.trim()) return true;
+    const q = deptSearch.trim().toLowerCase();
+    return (
+      r.name.toLowerCase().includes(q) ||
+      r.code.toLowerCase().includes(q) ||
+      r.category.toLowerCase().includes(q) ||
+      r.floor.toLowerCase().includes(q)
+    );
+  });
 
   // Rounded Alert
   const [formAlert, setFormAlert] = useState<{
@@ -355,61 +638,159 @@ function EquipmentModal({
     setStatus(
       rawStatus.includes("maint") ? "maintenance" : rawStatus.includes("retire") || rawStatus.includes("dispos") ? "retired" : "available"
     );
-    setRiskClassification(editItem?.riskClassification ?? "Chưa phân nhóm");
-    setInspectionIntervalMonths(editItem?.inspectionIntervalMonths ? String(editItem.inspectionIntervalMonths) : "12");
-    setManufacturer(editItem?.manufacturer ?? "");
-    setOrigin(editItem?.origin ?? "");
-    setModel(editItem?.model ?? "");
-    setSerialNumber(editItem?.serialNumber ?? "");
-    setLastInspectionDate(editItem?.lastInspectionDate ? editItem.lastInspectionDate.slice(0, 10) : "");
-    setNextInspectionDate(editItem?.nextInspectionDate ? editItem.nextInspectionDate.slice(0, 10) : "");
-    setInspectionResult(editItem?.inspectionResult ?? "Pass");
-    setInspectionAgency(editItem?.inspectionAgency ?? "");
-    setInspectionCertFile(editItem?.inspectionCertFile ?? "");
-    setDocuments((editItem?.documents as any) ?? []);
+
+    // Trích xuất metadata từ trường notes nếu có
+    const rawNotes = editItem?.notes ?? "";
+    const cleanLines: string[] = [];
+    const meta: Record<string, string> = {};
+    if (rawNotes) {
+      for (const line of rawNotes.split("\n")) {
+        const trimmed = line.trim();
+        const match = trimmed.match(/^\[(.*?):\s*(.*)\]$/);
+        if (match) {
+          meta[match[1]] = match[2];
+        } else {
+          cleanLines.push(line);
+        }
+      }
+    }
+
+    setRiskClassification(editItem?.riskClassification || meta["Phân loại rủi ro"] || "Chưa phân nhóm");
+    setInspectionIntervalMonths(
+      editItem?.inspectionIntervalMonths
+        ? String(editItem.inspectionIntervalMonths)
+        : meta["Chu kỳ kiểm định"] ? meta["Chu kỳ kiểm định"].replace(/\D/g, "") || "12" : "12"
+    );
+    setManufacturer(editItem?.manufacturer || meta["Hãng SX"] || "");
+    setOrigin(editItem?.origin || meta["Xuất xứ"] || "");
+    setModel(editItem?.model || meta["Model"] || "");
+    setSerialNumber(editItem?.serialNumber || meta["Serial"] || "");
+    setLastInspectionDate(
+      editItem?.lastInspectionDate
+        ? editItem.lastInspectionDate.slice(0, 10)
+        : meta["Kiểm định gần nhất"] || ""
+    );
+    setNextInspectionDate(
+      editItem?.nextInspectionDate
+        ? editItem.nextInspectionDate.slice(0, 10)
+        : meta["Hạn kiểm định tiếp theo"] || ""
+    );
+    setInspectionResult(editItem?.inspectionResult || meta["Kết quả"] || "Pass");
+    setInspectionAgency(editItem?.inspectionAgency || meta["Đơn vị kiểm định"] || "");
+    const certFileVal = editItem?.inspectionCertFile || meta["Biên bản"] || "";
+    setInspectionCertFile(certFileVal);
+    setInspectionCertFileName(certFileVal ? (certFileVal.startsWith("data:") ? "Biên bản đã tải lên" : certFileVal.split("/").pop() || "Biên bản") : "");
+
+    let docs = (editItem?.documents as any) ?? [];
+    if (docs.length === 0 && meta["Tài liệu JSON"]) {
+      try {
+        docs = JSON.parse(meta["Tài liệu JSON"]);
+      } catch {}
+    }
+    if (docs.length === 0 && meta["Hồ sơ"]) {
+      docs = meta["Hồ sơ"].split(",").map((dName: string) => ({ name: dName.trim(), uri: "" }));
+    }
+    setDocuments(docs);
+
     setLocation(editItem?.location ?? "");
     setPurchaseDate(editItem?.purchaseDate ? editItem.purchaseDate.slice(0, 10) : "");
-    setUsageStartDate(editItem?.usageStartDate ? editItem.usageStartDate.slice(0, 10) : "");
-    setNotes(editItem?.notes ?? "");
-    setImageUri(editItem?.imageUri ?? "");
+    setUsageStartDate(
+      editItem?.usageStartDate
+        ? editItem.usageStartDate.slice(0, 10)
+        : meta["Ngày sử dụng"] || ""
+    );
+    setNotes(cleanLines.join("\n").trim());
+
+    const initialImg = editItem?.imageUri || (editItem as any)?.imageUrl || meta["Ảnh thiết bị"] || "";
+    setImageUri(initialImg);
     setShowDocForm(false);
+    setDeptDropdownOpen(false);
+    setDeptSearch("");
   }, [editItem]);
 
-  const pickImage = async () => {
+  const [mediaPickerTarget, setMediaPickerTarget] = useState<"equipmentImage" | "certFile" | "docFile" | null>(null);
+
+  const handleTakePhoto = async () => {
+    const target = mediaPickerTarget;
+    setMediaPickerTarget(null);
+    if (!target) return;
+
+    try {
+      const { status: perm } = await ImagePicker.requestCameraPermissionsAsync();
+      if (perm !== "granted") {
+        showFormAlert("Quyền máy ảnh", "Ứng dụng cần quyền camera để chụp ảnh trực tiếp.", "warning");
+        return;
+      }
+      const result = await ImagePicker.launchCameraAsync({
+        mediaTypes: ['images'],
+        allowsEditing: target === "equipmentImage",
+        quality: 0.6,
+        base64: true,
+      });
+      if (!result.canceled && result.assets && result.assets.length > 0) {
+        const asset = result.assets[0];
+        const filename = asset.fileName || `camera_${Date.now()}.jpg`;
+        const fileUri = asset.base64
+          ? `data:image/jpeg;base64,${asset.base64}`
+          : asset.uri;
+
+        if (target === "equipmentImage") {
+          setImageUri(fileUri);
+        } else if (target === "certFile") {
+          setInspectionCertFile(fileUri);
+          setInspectionCertFileName(filename);
+        } else if (target === "docFile") {
+          setNewDocFile({ name: filename, uri: fileUri });
+        }
+      }
+    } catch {
+      showFormAlert("Lỗi máy ảnh", "Không thể khởi động camera trên thiết bị.", "error");
+    }
+  };
+
+  const handleChooseGallery = async () => {
+    const target = mediaPickerTarget;
+    setMediaPickerTarget(null);
+    if (!target) return;
+
     try {
       const { status: perm } = await ImagePicker.requestMediaLibraryPermissionsAsync();
       if (perm !== "granted") {
-        showFormAlert("Quyền truy cập", "Cần quyền truy cập thư viện để chọn ảnh thiết bị.", "warning");
+        showFormAlert("Quyền thư viện", "Cần quyền truy cập thư viện để chọn ảnh.", "warning");
         return;
       }
       const result = await ImagePicker.launchImageLibraryAsync({
         mediaTypes: ['images'],
-        allowsEditing: true,
-        quality: 0.8,
+        allowsEditing: target === "equipmentImage",
+        quality: 0.6,
+        base64: true,
       });
       if (!result.canceled && result.assets && result.assets.length > 0) {
-        setImageUri(result.assets[0].uri);
+        const asset = result.assets[0];
+        const filename = asset.fileName || `image_${Date.now()}.jpg`;
+        const fileUri = asset.base64
+          ? `data:image/jpeg;base64,${asset.base64}`
+          : asset.uri;
+
+        if (target === "equipmentImage") {
+          setImageUri(fileUri);
+        } else if (target === "certFile") {
+          setInspectionCertFile(fileUri);
+          setInspectionCertFileName(filename);
+        } else if (target === "docFile") {
+          setNewDocFile({ name: filename, uri: fileUri });
+        }
       }
     } catch {
-      showFormAlert("Lỗi", "Không thể chọn ảnh.", "error");
+      showFormAlert("Lỗi thư viện", "Không thể chọn ảnh từ thiết bị.", "error");
     }
   };
 
-  const pickCertFile = async () => {
-    try {
-      const result = await DocumentPicker.getDocumentAsync({
-        type: ["application/pdf", "image/*"],
-        copyToCacheDirectory: true,
-      });
-      if (!result.canceled && result.assets && result.assets.length > 0) {
-        setInspectionCertFile(result.assets[0].name);
-      }
-    } catch {
-      // ignore
-    }
-  };
+  const handleChooseDocument = async () => {
+    const target = mediaPickerTarget;
+    setMediaPickerTarget(null);
+    if (!target) return;
 
-  const pickDocFile = async () => {
     try {
       const result = await DocumentPicker.getDocumentAsync({
         type: ["application/pdf", "image/*"],
@@ -417,7 +798,25 @@ function EquipmentModal({
       });
       if (!result.canceled && result.assets && result.assets.length > 0) {
         const file = result.assets[0];
-        setNewDocFile({ name: file.name, uri: file.uri });
+        let fileUri = file.uri;
+        try {
+          if (file.uri && !file.uri.startsWith("data:")) {
+            const base64 = await FileSystem.readAsStringAsync(file.uri, {
+              encoding: FileSystem.EncodingType.Base64,
+            });
+            const mime = file.mimeType || (file.name.toLowerCase().endsWith(".pdf") ? "application/pdf" : "image/jpeg");
+            fileUri = `data:${mime};base64,${base64}`;
+          }
+        } catch {
+          fileUri = file.uri;
+        }
+
+        if (target === "certFile") {
+          setInspectionCertFile(fileUri);
+          setInspectionCertFileName(file.name);
+        } else if (target === "docFile") {
+          setNewDocFile({ name: file.name, uri: fileUri });
+        }
       }
     } catch {
       // ignore
@@ -482,9 +881,21 @@ function EquipmentModal({
       if (location.trim()) payload.location = location.trim();
       if (purchaseDate) payload.purchaseDate = purchaseDate;
 
+      if (imageUri.trim()) {
+        payload.imageUri = imageUri.trim();
+        payload.imageUrl = imageUri.trim();
+      }
+      if (inspectionCertFile.trim()) {
+        payload.inspectionCertFile = inspectionCertFile.trim();
+      }
+      if (documents.length > 0) {
+        payload.documents = documents;
+      }
+
       // Đóng gói thông tin kỹ thuật & y tế vào notes để lưu trữ an toàn
       const metaLines: string[] = [];
       if (notes.trim()) metaLines.push(notes.trim());
+      if (imageUri.trim()) metaLines.push(`[Ảnh thiết bị: ${imageUri.trim()}]`);
       if (riskClassification && riskClassification !== "Chưa phân nhóm")
         metaLines.push(`[Phân loại rủi ro: ${riskClassification}]`);
       if (inspectionIntervalMonths && inspectionIntervalMonths !== "12")
@@ -497,33 +908,23 @@ function EquipmentModal({
       if (nextInspectionDate) metaLines.push(`[Hạn kiểm định tiếp theo: ${nextInspectionDate}]`);
       if (inspectionResult) metaLines.push(`[Kết quả: ${inspectionResult}]`);
       if (inspectionAgency.trim()) metaLines.push(`[Đơn vị kiểm định: ${inspectionAgency.trim()}]`);
-      if (inspectionCertFile) metaLines.push(`[Biên bản: ${inspectionCertFile}]`);
+      if (inspectionCertFile.trim()) metaLines.push(`[Biên bản: ${inspectionCertFile.trim()}]`);
       if (usageStartDate) metaLines.push(`[Ngày sử dụng: ${usageStartDate}]`);
       if (documents.length > 0) {
         metaLines.push(`[Hồ sơ: ${documents.map((d) => d.name).join(", ")}]`);
+        try {
+          metaLines.push(`[Tài liệu JSON: ${JSON.stringify(documents)}]`);
+        } catch {}
       }
 
       if (metaLines.length > 0) {
         payload.notes = metaLines.join("\n");
       }
 
-      // Gửi kèm các trường mở rộng
-      if (riskClassification) payload.riskClassification = riskClassification;
-      if (inspectionIntervalMonths) payload.inspectionIntervalMonths = Number(inspectionIntervalMonths) || 12;
-      if (manufacturer.trim()) payload.manufacturer = manufacturer.trim();
-      if (origin.trim()) payload.origin = origin.trim();
-      if (model.trim()) payload.model = model.trim();
-      if (serialNumber.trim()) payload.serialNumber = serialNumber.trim();
-      if (lastInspectionDate) payload.lastInspectionDate = lastInspectionDate;
-      if (nextInspectionDate) payload.nextInspectionDate = nextInspectionDate;
-      if (inspectionResult) payload.inspectionResult = inspectionResult;
-      if (inspectionAgency.trim()) payload.inspectionAgency = inspectionAgency.trim();
-      if (inspectionCertFile) payload.inspectionCertFile = inspectionCertFile;
-      if (usageStartDate) payload.usageStartDate = usageStartDate;
-      if (documents.length > 0) payload.documents = documents;
-
       if (isEdit && editItem) {
-        await equipment.update(editItem._id, payload);
+        const equipId = editItem._id || editItem.id || "";
+        if (!equipId) throw new Error("Không xác định được ID thiết bị. Vui lòng thử lại.");
+        await equipment.update(equipId, payload);
       } else {
         await equipment.create(payload);
       }
@@ -537,37 +938,40 @@ function EquipmentModal({
   };
 
   return (
-    <Modal visible={visible} animationType="slide" transparent onShow={resetToItem} onRequestClose={onClose}>
-      <View style={modal.overlay}>
+    <Modal visible={visible} animationType="fade" transparent onShow={resetToItem} onRequestClose={onClose}>
+      <KeyboardAvoidingView
+        behavior={Platform.OS === "ios" ? "padding" : undefined}
+        style={modal.overlay}
+      >
         <View style={modal.sheet}>
-          <View style={modal.handleBar} />
+          {/* Header */}
           <View style={modal.header}>
-            <View style={{ flex: 1, paddingRight: 12 }}>
-              <Text style={modal.title}>{isEdit ? "Chỉnh sửa Thiết bị" : "Thêm Thiết bị Mới"}</Text>
-              <Text style={modal.subtitle}>Điền thông tin định danh, kỹ thuật, vị trí và chu kỳ kiểm định</Text>
+            <View style={{ flex: 1 }}>
+              <Text style={modal.title}>{isEdit ? "Sửa thiết bị" : "Thêm thiết bị"}</Text>
+              <Text style={modal.subtitle}>
+                {isEdit ? "Cập nhật hồ sơ & thông số thiết bị y tế" : "Thêm mới hồ sơ trang thiết bị y tế"}
+              </Text>
             </View>
             <Pressable onPress={onClose} hitSlop={10} style={modal.closeBtn}>
               <Ionicons name="close" size={20} color="#64748b" />
             </Pressable>
           </View>
 
-          <ScrollView showsVerticalScrollIndicator={false} contentContainerStyle={{ paddingBottom: 30 }}>
-            {/* Ảnh thiết bị */}
-            <Pressable style={modal.uploadBox} onPress={pickImage}>
+          {/* Form nội dung cuộn */}
+          <ScrollView style={{ flex: 1 }} showsVerticalScrollIndicator={false} contentContainerStyle={{ paddingBottom: 12 }}>
+            {/* Ảnh thiết bị gọn */}
+            <Pressable style={modal.uploadBoxCompact} onPress={() => setMediaPickerTarget("equipmentImage")}>
               {imageUri ? (
                 <View style={modal.previewWrap}>
                   <Image source={{ uri: imageUri }} style={modal.imagePreview} resizeMode="cover" />
                   <Pressable style={modal.removeImageBtn} onPress={() => setImageUri("")}>
-                    <Ionicons name="close-circle" size={22} color="#dc2626" />
+                    <Ionicons name="close-circle" size={20} color="#dc2626" />
                   </Pressable>
                 </View>
               ) : (
-                <View style={modal.uploadContent}>
-                  <View style={modal.uploadIconWrap}>
-                    <Ionicons name="image-outline" size={24} color="#64748b" />
-                  </View>
-                  <Text style={modal.uploadTitle}>Bấm để tải lên ảnh thiết bị</Text>
-                  <Text style={modal.uploadSubtitle}>Hỗ trợ PNG, JPG, JPEG, WEBP (tối đa 10MB)</Text>
+                <View style={modal.uploadContentCompact}>
+                  <Ionicons name="camera-outline" size={18} color="#64748b" />
+                  <Text style={modal.uploadTitleCompact}>Tải ảnh thiết bị</Text>
                 </View>
               )}
             </Pressable>
@@ -578,7 +982,7 @@ function EquipmentModal({
                 <Text style={modal.label}>Tên thiết bị <Text style={modal.required}>*</Text></Text>
                 <TextInput
                   style={modal.input}
-                  placeholder="VD: Máy Laser CO2 Fractional"
+                  placeholder="VD: Máy Laser CO2 Fractional..."
                   placeholderTextColor="#94a3b8"
                   value={name}
                   onChangeText={setName}
@@ -602,7 +1006,7 @@ function EquipmentModal({
                 <Text style={modal.label}>Danh mục thiết bị <Text style={modal.required}>*</Text></Text>
                 <TextInput
                   style={modal.input}
-                  placeholder="VD: Thiết bị laser, Máy soi da..."
+                  placeholder="VD: Thiết bị laser, Máy thẩm mỹ..."
                   placeholderTextColor="#94a3b8"
                   value={category}
                   onChangeText={setCategory}
@@ -614,7 +1018,7 @@ function EquipmentModal({
                   <Text style={modal.selectorText} numberOfLines={1}>
                     {STATUS_OPTIONS.find((o) => o.value === status)?.label || "Sẵn sàng"}
                   </Text>
-                  <Ionicons name="chevron-down" size={16} color="#64748b" />
+                  <Ionicons name="chevron-down" size={15} color="#64748b" />
                 </Pressable>
               </View>
             </View>
@@ -622,22 +1026,22 @@ function EquipmentModal({
             {/* HỒ SƠ & PHÂN LOẠI THIẾT BỊ Y TẾ */}
             <View style={modal.sectionGreen}>
               <View style={modal.sectionHeader}>
-                <Ionicons name="shield-checkmark-outline" size={16} color="#059669" />
+                <Ionicons name="shield-checkmark-outline" size={14} color="#059669" />
                 <Text style={modal.sectionTitleGreen}>HỒ SƠ & PHÂN LOẠI THIẾT BỊ Y TẾ</Text>
               </View>
 
               <View style={modal.twoCol}>
                 <View style={modal.col}>
-                  <Text style={modal.subLabel}>Phân loại mức độ rủi ro (Bộ Y tế)</Text>
+                  <Text style={modal.subLabel}>Phân loại mức độ rủi ro</Text>
                   <Pressable style={modal.selector} onPress={() => setActiveSelectPicker("riskClassification")}>
                     <Text style={modal.selectorText} numberOfLines={1}>
                       {riskClassification || "Chưa phân nhóm"}
                     </Text>
-                    <Ionicons name="chevron-down" size={16} color="#64748b" />
+                    <Ionicons name="chevron-down" size={15} color="#64748b" />
                   </Pressable>
                 </View>
                 <View style={modal.col}>
-                  <Text style={modal.subLabel}>Chu kỳ kiểm định định kỳ (tháng)</Text>
+                  <Text style={modal.subLabel}>Chu kỳ kiểm định (tháng) </Text>
                   <TextInput
                     style={modal.input}
                     placeholder="12"
@@ -684,7 +1088,7 @@ function EquipmentModal({
                   />
                 </View>
                 <View style={modal.col}>
-                  <Text style={modal.subLabel}>Số Seri (Serial No.)</Text>
+                  <Text style={modal.subLabel}>Số Seri </Text>
                   <TextInput
                     style={modal.input}
                     placeholder="VD: SN-2026-99"
@@ -699,8 +1103,8 @@ function EquipmentModal({
             {/* LỊCH KIỂM ĐỊNH & HIỆU CHUẨN & BẢO TRÌ */}
             <View style={modal.sectionGreen}>
               <View style={modal.sectionHeader}>
-                <Ionicons name="time-outline" size={16} color="#059669" />
-                <Text style={modal.sectionTitleGreen}>LỊCH KIỂM ĐỊNH & HIỆU CHUẨN & BẢO TRÌ</Text>
+                <Ionicons name="time-outline" size={14} color="#059669" />
+                <Text style={modal.sectionTitleGreen}>LỊCH KIỂM ĐỊNH & BẢO TRÌ</Text>
               </View>
 
               <View style={modal.twoCol}>
@@ -710,16 +1114,16 @@ function EquipmentModal({
                     <Text style={[modal.dateText, !lastInspectionDate && modal.placeholderText]}>
                       {formatDateDisplay(lastInspectionDate) || "dd/mm/yyyy"}
                     </Text>
-                    <Ionicons name="calendar-outline" size={16} color="#64748b" />
+                    <Ionicons name="calendar-outline" size={15} color="#64748b" />
                   </Pressable>
                 </View>
                 <View style={modal.col}>
-                  <Text style={modal.subLabel}>Ngày đến hạn kiểm định tiếp theo</Text>
+                  <Text style={modal.subLabel}>Hạn kiểm định tiếp theo</Text>
                   <Pressable style={modal.dateField} onPress={() => setActiveDatePicker("nextInspectionDate")}>
                     <Text style={[modal.dateText, !nextInspectionDate && modal.placeholderText]}>
                       {formatDateDisplay(nextInspectionDate) || "dd/mm/yyyy"}
                     </Text>
-                    <Ionicons name="calendar-outline" size={16} color="#64748b" />
+                    <Ionicons name="calendar-outline" size={15} color="#64748b" />
                   </Pressable>
                 </View>
               </View>
@@ -731,14 +1135,14 @@ function EquipmentModal({
                     <Text style={modal.selectorText} numberOfLines={1}>
                       {INSPECTION_RESULT_OPTIONS.find((o) => o.value === inspectionResult)?.label || inspectionResult || "✓ Đạt chuẩn (Pass)"}
                     </Text>
-                    <Ionicons name="chevron-down" size={16} color="#64748b" />
+                    <Ionicons name="chevron-down" size={15} color="#64748b" />
                   </Pressable>
                 </View>
                 <View style={modal.col}>
-                  <Text style={modal.subLabel}>Đơn vị thực hiện</Text>
+                  <Text style={modal.subLabel}>Đơn vị thực hiện kiểm định</Text>
                   <TextInput
                     style={modal.input}
-                    placeholder="VD: Viện Trang thiết bị Y tế..."
+                    placeholder="VD: Trung tâm kiểm định KTAT KV2..."
                     placeholderTextColor="#94a3b8"
                     value={inspectionAgency}
                     onChangeText={setInspectionAgency}
@@ -746,96 +1150,122 @@ function EquipmentModal({
                 </View>
               </View>
 
-              <View style={{ marginTop: 8 }}>
-                <Text style={modal.subLabel}>File biên bản kiểm định / Giấy chứng nhận (PDF hoặc Ảnh)</Text>
-                <Pressable style={modal.uploadFileBtn} onPress={pickCertFile}>
-                  <Ionicons name="cloud-upload-outline" size={16} color="#059669" />
-                  <Text style={modal.uploadFileText} numberOfLines={1}>
-                    {inspectionCertFile ? `Đã chọn: ${inspectionCertFile}` : "Tải file biên bản / ảnh..."}
+              <View style={{ marginTop: 6 }}>
+                <Text style={modal.subLabel}>Biên bản kiểm định / Giấy chứng nhận (PDF hoặc Ảnh)</Text>
+                <Pressable style={modal.uploadFileBtn} onPress={() => setMediaPickerTarget("certFile")}>
+                  <Ionicons
+                    name={inspectionCertFile ? "checkmark-circle-outline" : "cloud-upload-outline"}
+                    size={15}
+                    color={inspectionCertFile ? "#008852" : "#059669"}
+                  />
+                  <Text
+                    style={[modal.uploadFileText, inspectionCertFile ? { color: "#008852", fontWeight: "700" } : {}]}
+                    numberOfLines={1}
+                  >
+                    {inspectionCertFileName || (inspectionCertFile ? "Biên bản đã tải lên" : "Tải lên biên bản / giấy chứng nhận...")}
                   </Text>
+                  {inspectionCertFile ? (
+                    <Pressable
+                      onPress={(e) => { e.stopPropagation?.(); setInspectionCertFile(""); setInspectionCertFileName(""); }}
+                      hitSlop={8}
+                    >
+                      <Ionicons name="close-circle" size={16} color="#ef4444" />
+                    </Pressable>
+                  ) : null}
                 </Pressable>
               </View>
             </View>
 
-            {/* HÓA ĐƠN, CO/CQ, GIẤY TỜ NHẬP KHẨU */}
+            {/* HÓA ĐƠN, CO/CQ, GIẤY TỜ NHẬP KHẨU & HỒ SƠ */}
             <View style={modal.sectionAmber}>
               <View style={modal.sectionHeaderBetween}>
                 <View style={{ flexDirection: "row", alignItems: "center", gap: 6, flex: 1 }}>
-                  <Ionicons name="document-text-outline" size={16} color="#9a3412" />
+                  <Ionicons name="document-text-outline" size={14} color="#008852" />
                   <Text style={modal.sectionTitleAmber} numberOfLines={1}>
-                    HÓA ĐƠN, CO/CQ, GIẤY TỜ NHẬP KHẨU & HỒ SƠ ({documents.length})
+                    HÓA ĐƠN, CO/CQ,GIẤY TỜ ({documents.length})
                   </Text>
                 </View>
                 <Pressable
                   style={[modal.addDocBtn, showDocForm && modal.closeDocBtn]}
                   onPress={() => setShowDocForm((v) => !v)}
                 >
-                  <Text style={modal.addDocBtnText}>{showDocForm ? "+ Đóng form" : "+ Thêm hồ sơ / tải ảnh"}</Text>
+                  <Text style={modal.addDocBtnText}>{showDocForm ? "Đóng" : "+ Thêm hồ sơ"}</Text>
                 </Pressable>
               </View>
 
-              {/* Form thêm hồ sơ mở rộng khi bấm nút */}
+              {/* Form thêm hồ sơ mở rộng */}
               {showDocForm && (
                 <View style={modal.subFormCard}>
+                  {/* 1. Loại hồ sơ 1 hàng riêng để hiển thị trọn vẹn tên văn bản dài */}
+                  <View>
+                    <Text style={modal.subLabel}>Loại hồ sơ <Text style={modal.required}>*</Text></Text>
+                    <Pressable style={modal.selector} onPress={() => setActiveSelectPicker("docType")}>
+                      <Text style={modal.selectorText} numberOfLines={1}>
+                        {DOC_TYPE_OPTIONS.find((o) => o.value === newDocType)?.label || newDocType || "Chọn loại hồ sơ..."}
+                      </Text>
+                      <Ionicons name="chevron-down" size={15} color="#64748b" />
+                    </Pressable>
+                  </View>
+
+                  {/* 2. Tên tài liệu & Số hiệu (2 cột cân đối 50% - 50%) */}
                   <View style={modal.twoCol}>
                     <View style={modal.col}>
-                      <Text style={modal.subLabel}>Loại hồ sơ <Text style={modal.required}>*</Text></Text>
-                      <Pressable style={modal.selector} onPress={() => setActiveSelectPicker("docType")}>
-                        <Text style={modal.selectorText} numberOfLines={1}>
-                          {newDocType || "Giấy chứng nhận xuất xứ & chất..."}
-                        </Text>
-                        <Ionicons name="chevron-down" size={16} color="#64748b" />
-                      </Pressable>
-                    </View>
-                    <View style={modal.col}>
-                      <Text style={modal.subLabel}>Tên tài liệu / Văn bản <Text style={modal.required}>*</Text></Text>
+                      <Text style={modal.subLabel}>Tên tài liệu <Text style={modal.required}>*</Text></Text>
                       <TextInput
                         style={modal.input}
-                        placeholder="VD: Hóa đơn mua máy, Giấy chứng nhận..."
+                        placeholder="VD: Hóa đơn GTGT số..."
                         placeholderTextColor="#94a3b8"
                         value={newDocTitle}
                         onChangeText={setNewDocTitle}
                       />
                     </View>
-                  </View>
-
-                  <View style={modal.twoCol}>
                     <View style={modal.col}>
-                      <Text style={modal.subLabel}>Số hiệu văn bản</Text>
+                      <Text style={modal.subLabel}>Số hiệu / Ký hiệu</Text>
                       <TextInput
                         style={modal.input}
-                        placeholder="VD: INV-2026-01, CQ-..."
+                        placeholder="VD: INV-2024-88..."
                         placeholderTextColor="#94a3b8"
                         value={newDocCode}
                         onChangeText={setNewDocCode}
                       />
                     </View>
+                  </View>
+
+                  {/* 3. Ngày phát hành & Ngày hết hạn (Tách riêng 1 hàng 2 cột rộng rãi, không bị đè chữ) */}
+                  <View style={modal.twoCol}>
                     <View style={modal.col}>
                       <Text style={modal.subLabel}>Ngày phát hành</Text>
                       <Pressable style={modal.dateField} onPress={() => setActiveDatePicker("newDocIssueDate")}>
-                        <Text style={[modal.dateText, !newDocIssueDate && modal.placeholderText]}>
+                        <Text style={[modal.dateText, !newDocIssueDate && modal.placeholderText]} numberOfLines={1}>
                           {formatDateDisplay(newDocIssueDate) || "dd/mm/yyyy"}
                         </Text>
-                        <Ionicons name="calendar-outline" size={16} color="#64748b" />
+                        <Ionicons name="calendar-outline" size={15} color="#64748b" />
                       </Pressable>
                     </View>
                     <View style={modal.col}>
-                      <Text style={modal.subLabel}>Ngày hết hạn (nếu có)</Text>
+                      <View style={{ flexDirection: "row", justifyContent: "space-between", alignItems: "center" }}>
+                        <Text style={modal.subLabel}>Ngày hết hạn</Text>
+                        {newDocExpiryDate ? (
+                          <Pressable onPress={() => setNewDocExpiryDate("")} hitSlop={6}>
+                            <Text style={{ fontSize: 9.5, color: "#94a3b8", fontFamily: "Inter-Medium" }}>Xóa</Text>
+                          </Pressable>
+                        ) : null}
+                      </View>
                       <Pressable style={modal.dateField} onPress={() => setActiveDatePicker("newDocExpiryDate")}>
-                        <Text style={[modal.dateText, !newDocExpiryDate && modal.placeholderText]}>
+                        <Text style={[modal.dateText, !newDocExpiryDate && modal.placeholderText]} numberOfLines={1}>
                           {formatDateDisplay(newDocExpiryDate) || "dd/mm/yyyy"}
                         </Text>
-                        <Ionicons name="calendar-outline" size={16} color="#64748b" />
+                        <Ionicons name="calendar-outline" size={15} color="#64748b" />
                       </Pressable>
                     </View>
                   </View>
 
                   <View style={{ marginTop: 4 }}>
-                    <Text style={modal.subLabel}>Tệp tài liệu / Hình ảnh Hóa đơn, CO/CQ (Ảnh, PDF) <Text style={modal.required}>*</Text></Text>
-                    <Pressable style={modal.uploadFileBtnAmber} onPress={pickDocFile}>
-                      <Ionicons name="cloud-upload-outline" size={16} color="#b45309" />
+                    <Text style={modal.subLabel}>Tệp đính kèm văn bản *</Text>
+                    <Pressable style={modal.uploadFileBtnAmber} onPress={() => setMediaPickerTarget("docFile")}>
+                      <Ionicons name="cloud-upload-outline" size={15} color="#b45309" />
                       <Text style={modal.uploadFileTextAmber} numberOfLines={1}>
-                        {newDocFile ? `Đã chọn: ${newDocFile.name}` : "Chọn ảnh / file đính kèm..."}
+                        {newDocFile ? newDocFile.name : "Tải lên tệp tài liệu / Ảnh..."}
                       </Text>
                     </Pressable>
                   </View>
@@ -845,7 +1275,7 @@ function EquipmentModal({
                       <Text style={modal.subFormCancelText}>Hủy</Text>
                     </Pressable>
                     <Pressable style={modal.subFormSubmitBtn} onPress={handleAddDocument}>
-                      <Text style={modal.subFormSubmitText}>Thêm hồ sơ này</Text>
+                      <Text style={modal.subFormSubmitText}>Thêm hồ sơ</Text>
                     </Pressable>
                   </View>
                 </View>
@@ -853,16 +1283,16 @@ function EquipmentModal({
 
               {documents.length === 0 && !showDocForm ? (
                 <Text style={modal.emptyDocText}>
-                  Chưa đính kèm tài liệu nào. Bấm "Thêm hồ sơ / tải ảnh" để tải lên hóa đơn, CO/CQ hoặc giấy phép.
+                  Chưa có tài liệu / hóa đơn đính kèm. Bấm "+ Thêm hồ sơ" để tải lên giấy tờ.
                 </Text>
               ) : (
-                <View style={{ gap: 6, marginTop: 8 }}>
+                <View style={{ gap: 5, marginTop: 6 }}>
                   {documents.map((doc, idx) => (
                     <View key={idx} style={modal.docItem}>
-                      <Ionicons name="document-attach-outline" size={16} color="#9a3412" />
+                      <Ionicons name="document-attach-outline" size={15} color="#9a3412" />
                       <Text style={modal.docName} numberOfLines={1}>{doc.name}</Text>
                       <Pressable onPress={() => setDocuments((prev) => prev.filter((_, i) => i !== idx))}>
-                        <Ionicons name="trash-outline" size={16} color="#dc2626" />
+                        <Ionicons name="trash-outline" size={15} color="#dc2626" />
                       </Pressable>
                     </View>
                   ))}
@@ -870,18 +1300,102 @@ function EquipmentModal({
               )}
             </View>
 
-            {/* Vị trí phòng & Ngày mua / sử dụng */}
-            <Text style={modal.label}>Vị trí phòng (Chi nhánh)</Text>
-            <View style={modal.iconInputWrap}>
-              <Ionicons name="business-outline" size={16} color="#64748b" style={{ marginLeft: 12, marginRight: 8 }} />
-              <TextInput
-                style={modal.iconInput}
-                placeholder="Chọn phòng đặt thiết bị..."
-                placeholderTextColor="#94a3b8"
-                value={location}
-                onChangeText={setLocation}
-              />
-            </View>
+            {/* Vị trí phòng (Chi nhánh) */}
+            <Text style={modal.label}>Vị trí phòng </Text>
+            <Pressable
+              style={[
+                modal.selector,
+                deptDropdownOpen && {
+                  borderColor: "#008852",
+                  borderBottomLeftRadius: 0,
+                  borderBottomRightRadius: 0,
+                },
+              ]}
+              onPress={() => setDeptDropdownOpen((v) => !v)}
+            >
+              <View style={{ flexDirection: "row", alignItems: "center", gap: 8, flex: 1 }}>
+                <Ionicons name="business-outline" size={15} color={location ? "#008852" : "#94a3b8"} />
+                <Text style={[modal.selectorText, !location && modal.placeholderText]} numberOfLines={1}>
+                  {location || "Chọn phòng đặt thiết bị..."}
+                </Text>
+              </View>
+              {location ? (
+                <Pressable
+                  onPress={(e) => {
+                    e.stopPropagation();
+                    setLocation("");
+                  }}
+                  hitSlop={8}
+                  style={{ marginRight: 6 }}
+                >
+                  <Ionicons name="close-circle" size={15} color="#94a3b8" />
+                </Pressable>
+              ) : null}
+              <Ionicons name={deptDropdownOpen ? "chevron-up" : "chevron-down"} size={15} color="#64748b" />
+            </Pressable>
+
+            {/* Dropdown danh sách phòng ban có tìm kiếm */}
+            {deptDropdownOpen && (
+              <View style={modal.deptDropdownContainer}>
+                <View style={modal.deptSearchWrap}>
+                  <Ionicons name="search-outline" size={15} color="#64748b" />
+                  <TextInput
+                    style={modal.deptSearchInput}
+                    placeholder="Tìm mã hoặc tên phòng..."
+                    placeholderTextColor="#94a3b8"
+                    value={deptSearch}
+                    onChangeText={setDeptSearch}
+                    autoCapitalize="none"
+                  />
+                  {deptSearch ? (
+                    <Pressable onPress={() => setDeptSearch("")} hitSlop={6}>
+                      <Ionicons name="close-circle" size={15} color="#94a3b8" />
+                    </Pressable>
+                  ) : null}
+                </View>
+
+                <View style={modal.deptList}>
+                  {filteredRooms.length === 0 ? (
+                    <View style={{ padding: 12, alignItems: "center" }}>
+                      <Text style={{ fontSize: 11.5, color: "#94a3b8", fontStyle: "italic" }}>
+                        Không tìm thấy phòng phù hợp
+                      </Text>
+                    </View>
+                  ) : (
+                    filteredRooms.map((room) => {
+                      const isSelected =
+                        location === `${room.name} (${room.code})` || location === room.name;
+                      return (
+                        <Pressable
+                          key={room.id}
+                          style={({ pressed }) => [
+                            modal.deptItem,
+                            isSelected && { backgroundColor: "#f0fdf4" },
+                            pressed && { backgroundColor: "#f1f5f9" },
+                          ]}
+                          onPress={() => {
+                            setLocation(`${room.name} (${room.code})`);
+                            setDeptDropdownOpen(false);
+                            setDeptSearch("");
+                          }}
+                        >
+                          <View style={modal.deptItemHeader}>
+                            <Text style={modal.deptItemName}>{room.name}</Text>
+                            <View style={modal.deptCodeBadge}>
+                              <Text style={modal.deptCodeText}>{room.code}</Text>
+                            </View>
+                            <View style={modal.deptCategoryBadge}>
+                              <Text style={modal.deptCategoryText}>{room.category}</Text>
+                            </View>
+                          </View>
+                          <Text style={modal.deptFloorText}>{room.floor}</Text>
+                        </Pressable>
+                      );
+                    })
+                  )}
+                </View>
+              </View>
+            )}
 
             <View style={modal.twoCol}>
               <View style={modal.col}>
@@ -890,7 +1404,7 @@ function EquipmentModal({
                   <Text style={[modal.dateText, !purchaseDate && modal.placeholderText]}>
                     {formatDateDisplay(purchaseDate) || "dd/mm/yyyy"}
                   </Text>
-                  <Ionicons name="calendar-outline" size={16} color="#64748b" />
+                  <Ionicons name="calendar-outline" size={15} color="#64748b" />
                 </Pressable>
               </View>
               <View style={modal.col}>
@@ -899,42 +1413,42 @@ function EquipmentModal({
                   <Text style={[modal.dateText, !usageStartDate && modal.placeholderText]}>
                     {formatDateDisplay(usageStartDate) || "dd/mm/yyyy"}
                   </Text>
-                  <Ionicons name="calendar-outline" size={16} color="#64748b" />
+                  <Ionicons name="calendar-outline" size={15} color="#64748b" />
                 </Pressable>
               </View>
             </View>
 
             {/* Ghi chú */}
-            <Text style={modal.label}>Ghi chú</Text>
+            <Text style={modal.label}>Ghi chú thêm</Text>
             <TextInput
-              style={[modal.input, { height: 80, textAlignVertical: "top" }]}
-              placeholder="Ghi chú thêm về thiết bị..."
+              style={[modal.input, { height: 56, textAlignVertical: "top" }]}
+              placeholder="Ghi chú tình trạng, linh kiện kèm theo..."
               placeholderTextColor="#94a3b8"
               value={notes}
               onChangeText={setNotes}
               multiline
             />
-
-            {/* Nút hành động chân trang */}
-            <View style={modal.footerActions}>
-              <Pressable style={modal.cancelActionBtn} onPress={onClose} disabled={saving}>
-                <Text style={modal.cancelActionText}>Hủy bỏ</Text>
-              </Pressable>
-              <Pressable
-                style={[modal.saveActionBtn, saving && { opacity: 0.7 }]}
-                onPress={handleSave}
-                disabled={saving}
-              >
-                {saving ? (
-                  <ActivityIndicator color="#fff" size="small" />
-                ) : (
-                  <Text style={modal.saveActionText}>{isEdit ? "Lưu thay đổi" : "Tạo thiết bị mới"}</Text>
-                )}
-              </Pressable>
-            </View>
           </ScrollView>
+
+          {/* Chân trang CỐ ĐỊNH - Luôn hiển thị trên màn hình */}
+          <View style={modal.stickyFooter}>
+            <Pressable style={modal.cancelActionBtn} onPress={onClose} disabled={saving}>
+              <Text style={modal.cancelActionText}>Hủy</Text>
+            </Pressable>
+            <Pressable
+              style={[modal.saveActionBtn, saving && { opacity: 0.7 }]}
+              onPress={handleSave}
+              disabled={saving}
+            >
+              {saving ? (
+                <ActivityIndicator color="#fff" size="small" />
+              ) : (
+                <Text style={modal.saveActionText}>{isEdit ? "Lưu thay đổi" : "Tạo thiết bị"}</Text>
+              )}
+            </Pressable>
+          </View>
         </View>
-      </View>
+      </KeyboardAvoidingView>
 
       {/* DatePickerModal cho việc chọn ngày tiện lợi, không cần gõ phím */}
       <DatePickerModal
@@ -968,14 +1482,14 @@ function EquipmentModal({
           activeDatePicker === "lastInspectionDate"
             ? "Ngày kiểm định gần nhất"
             : activeDatePicker === "nextInspectionDate"
-            ? "Ngày đến hạn kiểm định tiếp theo"
+            ? "Ngày đến hạn kiểm định"
             : activeDatePicker === "purchaseDate"
-            ? "Ngày mua thiết bị"
+            ? "Ngày mua"
             : activeDatePicker === "usageStartDate"
             ? "Ngày đưa vào sử dụng"
             : activeDatePicker === "newDocIssueDate"
-            ? "Ngày phát hành văn bản"
-            : "Ngày hết hạn văn bản"
+            ? "Ngày phát hành"
+            : "Ngày hết hạn"
         }
         allowClear
       />
@@ -987,7 +1501,7 @@ function EquipmentModal({
           activeSelectPicker === "status"
             ? "Trạng thái vận hành"
             : activeSelectPicker === "riskClassification"
-            ? "Phân loại mức độ rủi ro (Bộ Y tế)"
+            ? "Phân loại rủi ro"
             : activeSelectPicker === "docType"
             ? "Loại hồ sơ"
             : "Kết quả thực hiện"
@@ -1026,6 +1540,290 @@ function EquipmentModal({
         message={formAlert.message}
         type={formAlert.type}
         onClose={() => setFormAlert((prev) => ({ ...prev, visible: false }))}
+      />
+
+      {/* Modal chọn nguồn Ảnh / Chụp Camera / Tài liệu */}
+      <MediaSourceModal
+        visible={mediaPickerTarget !== null}
+        title={
+          mediaPickerTarget === "equipmentImage"
+            ? "Tải lên ảnh thiết bị"
+            : mediaPickerTarget === "certFile"
+            ? "Tải lên biên bản kiểm định"
+            : "Tải lên tài liệu / hóa đơn"
+        }
+        subtitle={
+          mediaPickerTarget === "equipmentImage"
+            ? "Chụp ảnh thiết bị trực tiếp bằng máy ảnh hoặc chọn từ thư viện"
+            : "Chụp ảnh giấy tờ trực tiếp, chọn từ thư viện hoặc tải lên tệp PDF"
+        }
+        allowDocument={mediaPickerTarget !== "equipmentImage"}
+        onTakePhoto={handleTakePhoto}
+        onChooseGallery={handleChooseGallery}
+        onChooseDocument={handleChooseDocument}
+        onClose={() => setMediaPickerTarget(null)}
+      />
+
+      {/* Modal xem / xem trước tệp tài liệu trong form */}
+      <FilePreviewModal
+        visible={formPreviewFile !== null}
+        file={formPreviewFile}
+        onClose={() => setFormPreviewFile(null)}
+      />
+    </Modal>
+  );
+}
+
+// ── Equipment Detail Modal ───────────────────────────────────────────────────
+function EquipmentDetailModal({
+  visible,
+  item,
+  onClose,
+  onEdit,
+}: {
+  visible: boolean;
+  item: EquipmentRecord | null;
+  onClose: () => void;
+  onEdit: (item: EquipmentRecord) => void;
+}) {
+  if (!item) return null;
+
+  const [previewFile, setPreviewFile] = useState<{ name: string; uri?: string; type?: string } | null>(null);
+
+  const badge = getStatusBadge(item.status);
+  const { cleanNotes, meta } = parseEquipmentNotes(item.notes);
+
+  const displayImageUri = item.imageUri || (item as any)?.imageUrl || meta["Ảnh thiết bị"] || "";
+  const risk = item.riskClassification || meta["Phân loại rủi ro"] || "Chưa phân nhóm";
+  const interval = item.inspectionIntervalMonths || (meta["Chu kỳ kiểm định"] ? meta["Chu kỳ kiểm định"].replace(/\D/g, "") : "") || "12";
+  const manufacturer = item.manufacturer || meta["Hãng SX"] || "-";
+  const origin = item.origin || meta["Xuất xứ"] || "-";
+  const model = item.model || meta["Model"] || "-";
+  const serial = item.serialNumber || meta["Serial"] || "-";
+  const lastInspection = item.lastInspectionDate ? formatDateDisplay(item.lastInspectionDate.slice(0, 10)) : meta["Kiểm định gần nhất"] ? formatDateDisplay(meta["Kiểm định gần nhất"]) : "-";
+  const nextInspection = item.nextInspectionDate ? formatDateDisplay(item.nextInspectionDate.slice(0, 10)) : meta["Hạn kiểm định tiếp theo"] ? formatDateDisplay(meta["Hạn kiểm định tiếp theo"]) : "-";
+  const result = item.inspectionResult || meta["Kết quả"] || "Pass";
+  const agency = item.inspectionAgency || meta["Đơn vị kiểm định"] || "-";
+  const certFile = item.inspectionCertFile || meta["Biên bản"] || "";
+  const purchase = item.purchaseDate ? formatDateDisplay(item.purchaseDate.slice(0, 10)) : "-";
+  const usageStart = item.usageStartDate ? formatDateDisplay(item.usageStartDate.slice(0, 10)) : meta["Ngày sử dụng"] ? formatDateDisplay(meta["Ngày sử dụng"]) : "-";
+
+  let docs = (item.documents as any) ?? [];
+  if (docs.length === 0 && meta["Tài liệu JSON"]) {
+    try {
+      docs = JSON.parse(meta["Tài liệu JSON"]);
+    } catch {}
+  }
+  if (docs.length === 0 && meta["Hồ sơ"]) {
+    docs = meta["Hồ sơ"].split(",").map((dName: string) => ({ name: dName.trim() }));
+  }
+
+  return (
+    <Modal visible={visible} animationType="slide" transparent onRequestClose={onClose}>
+      <View style={detailStyles.overlay}>
+        <View style={detailStyles.sheet}>
+          <View style={detailStyles.handleBar} />
+
+          {/* Header */}
+          <View style={detailStyles.header}>
+            <View style={{ flex: 1, paddingRight: 10 }}>
+              <Text style={detailStyles.headerTitle} numberOfLines={1}>Chi tiết thiết bị</Text>
+              <Text style={detailStyles.headerSubtitle}>Mã: {item.code || "N/A"}</Text>
+            </View>
+            <Pressable onPress={onClose} hitSlop={10} style={detailStyles.closeBtn}>
+              <Ionicons name="close" size={20} color="#64748b" />
+            </Pressable>
+          </View>
+
+          <ScrollView showsVerticalScrollIndicator={false} contentContainerStyle={{ paddingBottom: 28 }}>
+            {/* Ảnh thiết bị nếu có */}
+            {displayImageUri ? (
+              <Pressable
+                style={detailStyles.imageWrap}
+                onPress={() => setPreviewFile({ name: item.name, uri: displayImageUri })}
+              >
+                <Image source={{ uri: displayImageUri }} style={detailStyles.image} resizeMode="cover" />
+                <View style={detailStyles.imageOverlayHint}>
+                  <Ionicons name="expand-outline" size={14} color="#ffffff" />
+                  <Text style={detailStyles.imageHintText}>Xem ảnh gốc</Text>
+                </View>
+              </Pressable>
+            ) : null}
+
+            {/* Thẻ định danh & Trạng thái */}
+            <View style={detailStyles.cardBasic}>
+              <View style={detailStyles.rowBetween}>
+                <Text style={detailStyles.nameText}>{item.name}</Text>
+                <View style={[detailStyles.badge, { backgroundColor: badge.bg }]}>
+                  <Text style={[detailStyles.badgeText, { color: badge.color }]}>{badge.label}</Text>
+                </View>
+              </View>
+              <View style={detailStyles.tagsRow}>
+                {item.category ? (
+                  <View style={detailStyles.tag}>
+                    <Ionicons name="pricetag-outline" size={12} color="#475569" />
+                    <Text style={detailStyles.tagText}>{item.category}</Text>
+                  </View>
+                ) : null}
+                {item.location ? (
+                  <View style={detailStyles.tag}>
+                    <Ionicons name="business-outline" size={12} color="#475569" />
+                    <Text style={detailStyles.tagText}>{item.location}</Text>
+                  </View>
+                ) : null}
+              </View>
+            </View>
+
+            {/* Thông số kỹ thuật y tế */}
+            <View style={detailStyles.sectionGreen}>
+              <View style={detailStyles.sectionHeader}>
+                <Ionicons name="shield-checkmark-outline" size={16} color="#059669" />
+                <Text style={detailStyles.sectionTitleGreen}>HỒ SƠ & PHÂN LOẠI THIẾT BỊ Y TẾ</Text>
+              </View>
+              <View style={detailStyles.grid2}>
+                <View style={detailStyles.infoItem}>
+                  <Text style={detailStyles.infoLabel}>Phân loại rủi ro (BYT)</Text>
+                  <Text style={detailStyles.infoValue}>{risk}</Text>
+                </View>
+                <View style={detailStyles.infoItem}>
+                  <Text style={detailStyles.infoLabel}>Chu kỳ kiểm định</Text>
+                  <Text style={detailStyles.infoValue}>{interval} tháng</Text>
+                </View>
+                <View style={detailStyles.infoItem}>
+                  <Text style={detailStyles.infoLabel}>Hãng sản xuất</Text>
+                  <Text style={detailStyles.infoValue}>{manufacturer}</Text>
+                </View>
+                <View style={detailStyles.infoItem}>
+                  <Text style={detailStyles.infoLabel}>Xuất xứ</Text>
+                  <Text style={detailStyles.infoValue}>{origin}</Text>
+                </View>
+                <View style={detailStyles.infoItem}>
+                  <Text style={detailStyles.infoLabel}>Model</Text>
+                  <Text style={detailStyles.infoValue}>{model}</Text>
+                </View>
+                <View style={detailStyles.infoItem}>
+                  <Text style={detailStyles.infoLabel}>Số Serial</Text>
+                  <Text style={detailStyles.infoValue}>{serial}</Text>
+                </View>
+              </View>
+            </View>
+
+            {/* Lịch kiểm định & Hiệu chuẩn */}
+            <View style={detailStyles.sectionGreen}>
+              <View style={detailStyles.sectionHeader}>
+                <Ionicons name="time-outline" size={16} color="#059669" />
+                <Text style={detailStyles.sectionTitleGreen}>LỊCH KIỂM ĐỊNH & BẢO TRÌ</Text>
+              </View>
+              <View style={detailStyles.grid2}>
+                <View style={detailStyles.infoItem}>
+                  <Text style={detailStyles.infoLabel}>Kiểm định gần nhất</Text>
+                  <Text style={detailStyles.infoValue}>{lastInspection}</Text>
+                </View>
+                <View style={detailStyles.infoItem}>
+                  <Text style={detailStyles.infoLabel}>Hạn tiếp theo</Text>
+                  <Text style={[detailStyles.infoValue, { color: "#008852", fontWeight: "800" }]}>{nextInspection}</Text>
+                </View>
+                <View style={detailStyles.infoItem}>
+                  <Text style={detailStyles.infoLabel}>Kết quả thực hiện</Text>
+                  <Text style={detailStyles.infoValue}>{result}</Text>
+                </View>
+                <View style={detailStyles.infoItem}>
+                  <Text style={detailStyles.infoLabel}>Đơn vị thực hiện</Text>
+                  <Text style={detailStyles.infoValue}>{agency}</Text>
+                </View>
+              </View>
+              {certFile ? (
+                <Pressable
+                  style={detailStyles.fileAttachBox}
+                  onPress={() =>
+                    setPreviewFile({
+                      name: `Biên bản: ${certFile}`,
+                      uri: certFile.includes("/") || certFile.includes(":") ? certFile : "",
+                    })
+                  }
+                >
+                  <Ionicons name="document-attach-outline" size={16} color="#059669" />
+                  <Text style={detailStyles.fileAttachText} numberOfLines={1}>Biên bản: {certFile}</Text>
+                  <Ionicons name="eye-outline" size={16} color="#059669" />
+                </Pressable>
+              ) : null}
+            </View>
+
+            {/* Hóa đơn, CO/CQ, Hồ sơ */}
+            <View style={detailStyles.sectionAmber}>
+              <View style={detailStyles.sectionHeader}>
+                <Ionicons name="document-text-outline" size={16} color="#9a3412" />
+                <Text style={detailStyles.sectionTitleAmber}>HỒ SƠ, HÓA ĐƠN & CO/CQ ({docs.length})</Text>
+              </View>
+              {docs.length === 0 ? (
+                <Text style={detailStyles.emptyText}>Chưa có tài liệu / hóa đơn đính kèm.</Text>
+              ) : (
+                <View style={{ gap: 6, marginTop: 4 }}>
+                  {docs.map((doc: any, i: number) => (
+                    <Pressable
+                      key={i}
+                      style={detailStyles.docRow}
+                      onPress={() =>
+                        setPreviewFile({
+                          name: doc.name || `Tài liệu ${i + 1}`,
+                          uri: doc.uri || (doc.name?.includes("/") || doc.name?.includes(":") ? doc.name : ""),
+                        })
+                      }
+                    >
+                      <Ionicons name="document-attach-outline" size={15} color="#9a3412" />
+                      <Text style={detailStyles.docText} numberOfLines={1}>{doc.name}</Text>
+                      <Ionicons name="eye-outline" size={15} color="#9a3412" />
+                    </Pressable>
+                  ))}
+                </View>
+              )}
+            </View>
+
+            {/* Vị trí, thời gian & ghi chú */}
+            <View style={detailStyles.sectionCard}>
+              <View style={detailStyles.grid2}>
+                <View style={detailStyles.infoItem}>
+                  <Text style={detailStyles.infoLabel}>Ngày mua thiết bị</Text>
+                  <Text style={detailStyles.infoValue}>{purchase}</Text>
+                </View>
+                <View style={detailStyles.infoItem}>
+                  <Text style={detailStyles.infoLabel}>Ngày đưa vào sử dụng</Text>
+                  <Text style={detailStyles.infoValue}>{usageStart}</Text>
+                </View>
+              </View>
+              {cleanNotes ? (
+                <View style={{ marginTop: 8 }}>
+                  <Text style={detailStyles.infoLabel}>Ghi chú thêm</Text>
+                  <Text style={detailStyles.notesText}>{cleanNotes}</Text>
+                </View>
+              ) : null}
+            </View>
+
+            {/* Footer Buttons */}
+            <View style={detailStyles.footer}>
+              <Pressable style={detailStyles.closeBtnBottom} onPress={onClose}>
+                <Text style={detailStyles.closeBtnText}>Đóng</Text>
+              </Pressable>
+              <Pressable
+                style={detailStyles.editBtnBottom}
+                onPress={() => {
+                  onClose();
+                  onEdit(item);
+                }}
+              >
+                <Ionicons name="pencil" size={16} color="#ffffff" />
+                <Text style={detailStyles.editBtnText}>Chỉnh sửa</Text>
+              </Pressable>
+            </View>
+          </ScrollView>
+        </View>
+      </View>
+
+      {/* File & Image Preview Modal */}
+      <FilePreviewModal
+        visible={previewFile !== null}
+        file={previewFile}
+        onClose={() => setPreviewFile(null)}
       />
     </Modal>
   );
@@ -1083,6 +1881,8 @@ function DeleteConfirmModal({
 export default function EquipmentScreen() {
   const [items, setItems] = useState<EquipmentRecord[]>([]);
   const [serverTotal, setServerTotal] = useState<number | null>(null);
+  const [globalItems, setGlobalItems] = useState<EquipmentRecord[]>([]);
+  const [globalTotal, setGlobalTotal] = useState<number | null>(null);
   const [summary, setSummary] = useState<EquipmentSummary | null>(null);
   const [compliance, setCompliance] = useState<EquipmentComplianceSummary | null>(null);
   const [loading, setLoading] = useState(true);
@@ -1093,6 +1893,7 @@ export default function EquipmentScreen() {
   const [revision, setRevision] = useState(0);
   const [modalVisible, setModalVisible] = useState(false);
   const [editItem, setEditItem] = useState<EquipmentRecord | null>(null);
+  const [viewDetailItem, setViewDetailItem] = useState<EquipmentRecord | null>(null);
   const [deleteItem, setDeleteItem] = useState<EquipmentRecord | null>(null);
   const [deleting, setDeleting] = useState(false);
 
@@ -1119,7 +1920,9 @@ export default function EquipmentScreen() {
     if (!deleteItem) return;
     setDeleting(true);
     try {
-      await equipment.delete(deleteItem._id);
+      const equipId = deleteItem._id || deleteItem.id || "";
+      if (!equipId) throw new Error("Không xác định được ID thiết bị.");
+      await equipment.delete(equipId);
       setDeleteItem(null);
       setRevision((v) => v + 1);
     } catch (e: any) {
@@ -1131,20 +1934,45 @@ export default function EquipmentScreen() {
 
   const loadData = useCallback(async () => {
     setError(null);
+    const isSearching = !!search.trim();
     try {
-      const [sumRes, compRes, listRes] = await Promise.allSettled([
+      const promises: Promise<any>[] = [
         equipment.getSummary(),
         equipment.getCompliance(),
-        equipment.list({ search: search.trim() || undefined, status: selectedFilter !== "all" ? selectedFilter : undefined }),
-      ]);
-      if (sumRes.status === "fulfilled") setSummary(sumRes.value);
-      if (compRes.status === "fulfilled") setCompliance(compRes.value);
+        equipment.list({ search: isSearching ? search.trim() : undefined }),
+      ];
+
+      // Nếu đang tìm kiếm, luôn tải song song danh sách đầy đủ để 6 thẻ thống kê luôn chính xác
+      if (isSearching) {
+        promises.push(equipment.list());
+      }
+
+      const results = await Promise.allSettled(promises);
+      const [sumRes, compRes, listRes, fullRes] = results;
+
+      if (sumRes.status === "fulfilled" && sumRes.value) setSummary(sumRes.value);
+      if (compRes.status === "fulfilled" && compRes.value) setCompliance(compRes.value);
+
       if (listRes.status === "fulfilled") {
-        setItems(listRes.value.items || []);
+        const fetchedItems = listRes.value.items || [];
+        setItems(fetchedItems);
         if (typeof listRes.value.total === "number") setServerTotal(listRes.value.total);
+
+        // Nếu không có tìm kiếm, danh sách này chính là danh sách toàn bộ thiết bị
+        if (!isSearching) {
+          setGlobalItems(fetchedItems);
+          setGlobalTotal(typeof listRes.value.total === "number" ? listRes.value.total : fetchedItems.length);
+        }
       } else {
         const err = listRes.reason;
         setError(err instanceof Error ? err.message : "Không thể tải danh sách thiết bị.");
+      }
+
+      // Nhận kết quả danh sách toàn cục khi đang tìm kiếm
+      if (fullRes && fullRes.status === "fulfilled") {
+        const fullItems = fullRes.value.items || [];
+        setGlobalItems(fullItems);
+        setGlobalTotal(typeof fullRes.value.total === "number" ? fullRes.value.total : fullItems.length);
       }
     } catch (e) {
       setError(e instanceof Error ? e.message : "Lỗi kết nối máy chủ.");
@@ -1152,7 +1980,7 @@ export default function EquipmentScreen() {
       setLoading(false);
       setRefreshing(false);
     }
-  }, [search, selectedFilter]);
+  }, [search]);
 
   useFocusEffect(
     useCallback(() => {
@@ -1162,20 +1990,38 @@ export default function EquipmentScreen() {
     }, [loadData, revision]),
   );
 
-  const totalCount = summary?.total ?? serverTotal ?? items.length;
+  // Dữ liệu cho 6 thẻ thống kê trên cùng và 3 thẻ tuân thủ:
+  // Luôn lấy từ globalItems / globalTotal / summary gốc, KHÔNG bị thay đổi theo từ khóa tìm kiếm
+  const baseItemsForStats = globalItems.length > 0 ? globalItems : items;
+  const totalCount = summary?.total ?? globalTotal ?? (globalItems.length > 0 ? globalItems.length : (serverTotal ?? items.length));
+
   const countByStatus = (...keywords: string[]) => {
     if (summary?.byStatus && Array.isArray(summary.byStatus)) {
       const found = summary.byStatus.find((s) => keywords.some((k) => s.status.toLowerCase().includes(k.toLowerCase())));
       if (found) return found.count;
     }
-    return items.filter((item) => { const s = (item.status || "").toLowerCase(); return keywords.some((k) => s.includes(k.toLowerCase())); }).length;
+    return baseItemsForStats.filter((item) => {
+      const s = (item.status || "").toLowerCase();
+      return keywords.some((k) => s.includes(k.toLowerCase()));
+    }).length;
   };
 
-  const bookedCount = summary?.booked ?? countByStatus("đơn", "booked", "order");
+  const bookedCount = summary?.booked ?? countByStatus("đơn", "booked", "order", "request");
   const readyCount = summary?.ready ?? countByStatus("sẵn", "ready", "avail");
-  const usingCount = summary?.using ?? countByStatus("dùng", "using", "in_use");
+  const usingCount = summary?.using ?? countByStatus("dùng", "using", "in_use", "in-use");
   const maintenanceCount = summary?.maintenance ?? countByStatus("trì", "maint", "repair");
-  const disposedCount = summary?.disposed ?? countByStatus("lý", "dispos", "scrap");
+  const disposedCount = summary?.disposed ?? countByStatus("lý", "dispos", "scrap", "retire");
+
+  const displayedItems = items.filter((item) => {
+    if (selectedFilter === "all") return true;
+    const s = (item.status || "").toLowerCase();
+    if (selectedFilter === "booked") return s.includes("đơn") || s.includes("booked") || s.includes("order") || s.includes("request");
+    if (selectedFilter === "ready") return s.includes("sẵn") || s.includes("ready") || s.includes("avail");
+    if (selectedFilter === "using") return s.includes("dùng") || s.includes("using") || s.includes("in_use") || s.includes("in-use");
+    if (selectedFilter === "maintenance") return s.includes("trì") || s.includes("maint") || s.includes("repair");
+    if (selectedFilter === "disposed") return s.includes("lý") || s.includes("dispos") || s.includes("scrap") || s.includes("retire");
+    return true;
+  });
 
   let computedOverdue = compliance?.overdue ?? 0;
   let computedUpcoming = compliance?.upcoming ?? 0;
@@ -1184,7 +2030,7 @@ export default function EquipmentScreen() {
   if (!compliance || (computedOverdue === 0 && computedUpcoming === 0 && computedValid === 0)) {
     const now = Date.now();
     const thirtyDaysMs = 30 * 24 * 60 * 60 * 1000;
-    items.forEach((item) => {
+    baseItemsForStats.forEach((item) => {
       const cs = (item.complianceStatus || "").toLowerCase();
       if (cs.includes("valid") || cs.includes("đạt")) { computedValid++; return; }
       if (cs.includes("overdue") || cs.includes("quá hạn")) { computedOverdue++; return; }
@@ -1229,18 +2075,77 @@ export default function EquipmentScreen() {
 
         <View style={styles.statusGrid}>
           {[
-            { label: "TỔNG SỐ", value: totalCount, filter: "all", cs: styles.cardGray, ct: styles.textGray, vt: styles.textDark },
-            { label: "ĐÃ CÓ ĐƠN", value: bookedCount, filter: "booked", cs: styles.cardGreen, ct: styles.textGreen, vt: styles.textGreen },
-            { label: "SẴN SÀNG", value: readyCount, filter: "ready", cs: styles.cardGreen, ct: styles.textGreen, vt: styles.textGreen },
-            { label: "ĐANG DÙNG", value: usingCount, filter: "using", cs: styles.cardGreen, ct: styles.textGreen, vt: styles.textGreen },
-            { label: "BẢO TRÌ", value: maintenanceCount, filter: "maintenance", cs: styles.cardAmber, ct: styles.textAmber, vt: styles.textAmber },
-            { label: "THANH LÝ", value: disposedCount, filter: "disposed", cs: styles.cardGray, ct: styles.textGray, vt: styles.textGray },
-          ].map((c) => (
-            <Pressable key={c.filter} onPress={() => setSelectedFilter(selectedFilter === c.filter ? "all" : c.filter)} style={[styles.statusCard, c.cs, selectedFilter === c.filter && styles.cardActive]}>
-              <Text style={[styles.statusLabel, c.ct]} numberOfLines={1}>{c.label}</Text>
-              <Text style={[styles.statusValue, c.vt]}>{c.value}</Text>
-            </Pressable>
-          ))}
+            {
+              label: "THIẾT BỊ",
+              value: totalCount,
+              filter: "all",
+              family: "mci",
+              icon: "needle",
+              iconColor: "#2563eb",
+            },
+            {
+              label: "ĐƠN MƯỢN",
+              value: bookedCount,
+              filter: "booked",
+              family: "ionicons",
+              icon: "receipt",
+              iconColor: "#7c3aed",
+            },
+            {
+              label: "CÓ SẴN",
+              value: readyCount,
+              filter: "ready",
+              family: "ionicons",
+              icon: "checkmark-circle",
+              iconColor: "#059669",
+            },
+            {
+              label: "ĐANG DÙNG",
+              value: usingCount,
+              filter: "using",
+              family: "mci",
+              icon: "stethoscope",
+              iconColor: "#0284c7",
+            },
+            {
+              label: "BẢO TRÌ",
+              value: maintenanceCount,
+              filter: "maintenance",
+              family: "ionicons",
+              icon: "construct",
+              iconColor: "#d97706",
+            },
+            {
+              label: "THANH LÝ",
+              value: disposedCount,
+              filter: "disposed",
+              family: "ionicons",
+              icon: "trash",
+              iconColor: "#dc2626",
+            },
+          ].map((c) => {
+            const IconComp = c.family === "mci" ? MaterialCommunityIcons : Ionicons;
+            return (
+              <Pressable
+                key={c.filter}
+                onPress={() => setSelectedFilter(selectedFilter === c.filter ? "all" : c.filter)}
+                style={[styles.statusCard, selectedFilter === c.filter && styles.cardActive]}
+              >
+                <IconComp name={c.icon as any} size={24} color={c.iconColor} />
+                <Text style={styles.statusValue}>{c.value}</Text>
+                <Text
+                  style={[
+                    styles.statusLabel,
+                    selectedFilter === c.filter && styles.statusLabelActive,
+                  ]}
+                  numberOfLines={1}
+                >
+                  {c.label}
+                </Text>
+                {selectedFilter === c.filter && <View style={styles.activeIndicator} />}
+              </Pressable>
+            );
+          })}
         </View>
 
         <Text style={styles.statusSectionTitle}>Trạng thái</Text>
@@ -1279,13 +2184,26 @@ export default function EquipmentScreen() {
         </View>
 
         <View style={styles.searchBar}>
-          <Ionicons name="search" size={16} color="#94a3b8" style={{ marginRight: 8 }} />
-          <TextInput value={search} onChangeText={setSearch} onSubmitEditing={() => loadData()} placeholder="Tìm theo tên, mã thiết bị, khoa..." placeholderTextColor="#94a3b8" style={styles.searchInput} returnKeyType="search" />
+          <Ionicons name="search" size={15} color="#94a3b8" style={{ marginRight: 8 }} />
+          <TextInput
+            value={search}
+            onChangeText={setSearch}
+            onSubmitEditing={() => loadData()}
+            placeholder="Tìm theo tên, mã thiết bị, khoa..."
+            placeholderTextColor="#94a3b8"
+            style={styles.searchInput}
+            returnKeyType="search"
+          />
+          {search ? (
+            <Pressable onPress={() => { setSearch(""); void loadData(); }} hitSlop={8}>
+              <Ionicons name="close-circle" size={16} color="#94a3b8" />
+            </Pressable>
+          ) : null}
         </View>
 
         <View style={styles.listSection}>
           <View style={styles.listHeader}>
-            <Text style={styles.listTitle}>Danh sách thiết bị ({items.length})</Text>
+            <Text style={styles.listTitle}>Danh sách thiết bị ({displayedItems.length})</Text>
             <View style={styles.listHeaderRight}>
               {selectedFilter !== "all" && (
                 <Pressable onPress={() => setSelectedFilter("all")} style={{ marginRight: 10 }}>
@@ -1298,7 +2216,7 @@ export default function EquipmentScreen() {
             </View>
           </View>
 
-          {items.length > 0 && !loading && (
+          {displayedItems.length > 0 && !loading && (
             <Text style={styles.swipeHint}>← Vuốt trái để sửa / xóa</Text>
           )}
 
@@ -1307,20 +2225,38 @@ export default function EquipmentScreen() {
               <ActivityIndicator size="small" color="#008852" />
               <Text style={styles.loadingText}>Đang tải dữ liệu từ máy chủ...</Text>
             </View>
-          ) : items.length === 0 ? (
+          ) : displayedItems.length === 0 ? (
             <EmptyState
               message="Chưa có thiết bị nào"
-              subtitle={search ? "Không tìm thấy thiết bị phù hợp với từ khóa." : "Danh sách thiết bị trống trên hệ thống."}
+              subtitle={
+                selectedFilter !== "all"
+                  ? "Không có thiết bị thuộc trạng thái này."
+                  : search
+                  ? "Không tìm thấy thiết bị phù hợp với từ khóa."
+                  : "Danh sách thiết bị trống trên hệ thống."
+              }
             />
           ) : (
-            items.map((item) => (
-              <SwipeableItem key={item._id || item.id || item.code} item={item} onEdit={openEdit} onDelete={handleDelete} />
+            displayedItems.map((item) => (
+              <SwipeableItem
+                key={item._id || item.id || item.code}
+                item={item}
+                onEdit={openEdit}
+                onDelete={handleDelete}
+                onViewDetail={(i) => setViewDetailItem(i)}
+              />
             ))
           )}
         </View>
       </ScrollView>
 
       <EquipmentModal visible={modalVisible} onClose={() => setModalVisible(false)} onSaved={() => setRevision((v) => v + 1)} editItem={editItem} />
+      <EquipmentDetailModal
+        visible={!!viewDetailItem}
+        item={viewDetailItem}
+        onClose={() => setViewDetailItem(null)}
+        onEdit={openEdit}
+      />
       <DeleteConfirmModal
         visible={!!deleteItem}
         itemName={deleteItem?.name || ""}
@@ -1353,10 +2289,23 @@ const styles = StyleSheet.create({
   errorRetryBtn: { backgroundColor: "#be123c", paddingHorizontal: 10, paddingVertical: 5, borderRadius: 8 },
   errorRetryText: { fontSize: 11, fontWeight: "700", color: "#ffffff", fontFamily: "Inter-Bold" },
   statusGrid: { flexDirection: "row", flexWrap: "wrap", justifyContent: "space-between", rowGap: 8 },
-  statusCard: { width: "31.6%", borderRadius: 12, borderWidth: 1.5, paddingVertical: 9, paddingHorizontal: 8, alignItems: "center", justifyContent: "space-between", minHeight: 62 },
-  cardActive: { borderColor: "#008852", borderWidth: 2 },
-  statusLabel: { fontSize: 9.5, fontWeight: "700", fontFamily: "Inter-Bold", letterSpacing: 0.2, textAlign: "center" },
-  statusValue: { fontSize: 20, fontWeight: "800", fontFamily: "Inter-Bold", marginTop: 3, textAlign: "center" },
+  statusCard: {
+    width: "31.6%",
+    backgroundColor: "transparent",
+    paddingVertical: 6,
+    paddingHorizontal: 4,
+    alignItems: "center",
+    justifyContent: "center",
+    minHeight: 62,
+    borderRadius: 10,
+  },
+  cardActive: {
+    backgroundColor: "rgba(0, 136, 82, 0.08)",
+  },
+  statusValue: { fontSize: 18, fontWeight: "800", fontFamily: "Inter-Bold", color: "#0f172a", marginTop: 2 },
+  statusLabel: { fontSize: 9.5, fontWeight: "700", fontFamily: "Inter-Bold", color: "#64748b", letterSpacing: 0.1, textAlign: "center", marginTop: 1 },
+  statusLabelActive: { color: "#008852", fontWeight: "800" },
+  activeIndicator: { width: 16, height: 2.5, borderRadius: 2, backgroundColor: "#008852", marginTop: 3 },
   statusSectionTitle: { fontSize: 16, fontWeight: "700", color: "#0f172a", fontFamily: "Inter-Bold", marginTop: 14, marginBottom: 8 },
   cardGray: { backgroundColor: "#ffffff", borderColor: "#e2e8f0" },
   cardGreen: { backgroundColor: "#f0fdf4", borderColor: "#bbf7d0" },
@@ -1385,8 +2334,25 @@ const styles = StyleSheet.create({
   complianceSubAmber: { color: "#b45309" },
   complianceTextGreen: { color: "#047857" },
   complianceSubGreen: { color: "#059669" },
-  searchBar: { backgroundColor: "#ffffff", borderRadius: 12, borderWidth: 1, borderColor: "#e2e8f0", paddingHorizontal: 12, paddingVertical: 10, marginTop: 12, flexDirection: "row", alignItems: "center" },
-  searchInput: { flex: 1, fontSize: 13, fontFamily: "Inter-Medium", color: "#1e293b" },
+  searchBar: {
+    backgroundColor: "#ffffff",
+    borderRadius: 24,
+    borderWidth: 1,
+    borderColor: "#e2e8f0",
+    paddingHorizontal: 14,
+    paddingVertical: 7,
+    marginTop: 12,
+    flexDirection: "row",
+    alignItems: "center",
+    width: "88%",
+    alignSelf: "center",
+    shadowColor: "#000",
+    shadowOffset: { width: 0, height: 1 },
+    shadowOpacity: 0.05,
+    shadowRadius: 3,
+    elevation: 1,
+  },
+  searchInput: { flex: 1, fontSize: 12.5, fontFamily: "Inter-Medium", color: "#1e293b", paddingVertical: 2 },
   listSection: { gap: 8, marginTop: 6 },
   listHeader: { flexDirection: "row", justifyContent: "space-between", alignItems: "center", paddingHorizontal: 2 },
   listHeaderRight: { flexDirection: "row", alignItems: "center" },
@@ -1416,146 +2382,181 @@ const styles = StyleSheet.create({
 });
 
 const modal = StyleSheet.create({
-  overlay: { flex: 1, backgroundColor: "rgba(0,0,0,0.5)", justifyContent: "flex-end" },
+  overlay: {
+    flex: 1,
+    backgroundColor: "rgba(0, 0, 0, 0.55)",
+    justifyContent: "center",
+    alignItems: "center",
+    paddingHorizontal: 16,
+    paddingVertical: Platform.OS === "ios" ? 36 : 20,
+  },
   sheet: {
     backgroundColor: "#ffffff",
-    borderTopLeftRadius: 24,
-    borderTopRightRadius: 24,
+    borderRadius: 20,
+    width: "100%",
+    maxWidth: 500,
+    height: "88%",
+    maxHeight: "92%",
     paddingHorizontal: 16,
-    paddingTop: 10,
-    maxHeight: "94%",
+    paddingTop: 14,
+    paddingBottom: 14,
+    overflow: "hidden",
+    shadowColor: "#000",
+    shadowOffset: { width: 0, height: 10 },
+    shadowOpacity: 0.22,
+    shadowRadius: 18,
+    elevation: 12,
   },
-  handleBar: { width: 38, height: 4, borderRadius: 2, backgroundColor: "#e2e8f0", alignSelf: "center", marginBottom: 12 },
-  header: { flexDirection: "row", justifyContent: "space-between", alignItems: "flex-start", marginBottom: 14 },
-  title: { fontSize: 18, fontWeight: "800", color: "#0f172a", fontFamily: "Inter-Bold" },
-  subtitle: { fontSize: 11.5, color: "#64748b", fontFamily: "Inter-Regular", marginTop: 2 },
-  closeBtn: { padding: 4 },
-  uploadBox: {
-    borderWidth: 1.5,
+  handleBar: { width: 36, height: 4, borderRadius: 2, backgroundColor: "#cbd5e1", alignSelf: "center", marginBottom: 8 },
+  header: {
+    flexDirection: "row",
+    justifyContent: "space-between",
+    alignItems: "center",
+    marginBottom: 10,
+    paddingBottom: 8,
+    borderBottomWidth: 1,
+    borderBottomColor: "#f1f5f9",
+  },
+  title: { fontSize: 16, fontWeight: "800", color: "#0f172a", fontFamily: "Inter-Bold" },
+  subtitle: { fontSize: 11, color: "#64748b", fontFamily: "Inter-Regular", marginTop: 2 },
+  closeBtn: {
+    padding: 6,
+    borderRadius: 20,
+    backgroundColor: "#f1f5f9",
+  },
+  uploadBoxCompact: {
+    borderWidth: 1,
     borderStyle: "dashed",
     borderColor: "#cbd5e1",
-    borderRadius: 12,
-    backgroundColor: "#fafafa",
-    paddingVertical: 18,
+    borderRadius: 8,
+    backgroundColor: "#f8fafc",
+    paddingVertical: 7,
     paddingHorizontal: 12,
     alignItems: "center",
     justifyContent: "center",
-    marginBottom: 8,
+    marginBottom: 6,
   },
-  uploadContent: { alignItems: "center", gap: 4 },
-  uploadIconWrap: { width: 42, height: 42, borderRadius: 10, backgroundColor: "#f1f5f9", alignItems: "center", justifyContent: "center", marginBottom: 2 },
-  uploadTitle: { fontSize: 12.5, fontWeight: "700", color: "#334155", fontFamily: "Inter-Bold" },
-  uploadSubtitle: { fontSize: 10.5, color: "#94a3b8", fontFamily: "Inter-Regular" },
-  previewWrap: { position: "relative", width: "100%", height: 140, borderRadius: 10, overflow: "hidden" },
-  imagePreview: { width: "100%", height: "100%", borderRadius: 10 },
-  removeImageBtn: { position: "absolute", top: 8, right: 8, backgroundColor: "#ffffff", borderRadius: 12 },
-  label: { fontSize: 11.5, fontWeight: "700", color: "#334155", fontFamily: "Inter-Bold", marginTop: 10, marginBottom: 4 },
-  subLabel: { fontSize: 11, fontWeight: "600", color: "#475569", fontFamily: "Inter-SemiBold", marginTop: 6, marginBottom: 3 },
+  uploadContentCompact: {
+    flexDirection: "row",
+    alignItems: "center",
+    gap: 6,
+  },
+  uploadTitleCompact: {
+    fontSize: 11.5,
+    fontWeight: "600",
+    color: "#475569",
+    fontFamily: "Inter-SemiBold",
+  },
+  previewWrap: { position: "relative", width: "100%", height: 100, borderRadius: 8, overflow: "hidden" },
+  imagePreview: { width: "100%", height: "100%", borderRadius: 8 },
+  removeImageBtn: { position: "absolute", top: 6, right: 6, backgroundColor: "#ffffff", borderRadius: 12 },
+  label: { fontSize: 11, fontWeight: "700", color: "#334155", fontFamily: "Inter-Bold", marginTop: 8, marginBottom: 3 },
+  subLabel: { fontSize: 10.5, fontWeight: "600", color: "#475569", fontFamily: "Inter-SemiBold", marginTop: 5, marginBottom: 2 },
   required: { color: "#dc2626" },
   input: {
     borderWidth: 1,
     borderColor: "#e2e8f0",
-    borderRadius: 9,
-    paddingHorizontal: 10,
-    paddingVertical: 8,
-    fontSize: 12.5,
+    borderRadius: 8,
+    paddingHorizontal: 8,
+    paddingVertical: 4,
+    fontSize: 11.5,
     color: "#1e293b",
     backgroundColor: "#ffffff",
     fontFamily: "Inter-Medium",
-    minHeight: 38,
+    minHeight: 34,
   },
   selector: {
     borderWidth: 1,
     borderColor: "#e2e8f0",
-    borderRadius: 9,
-    paddingHorizontal: 10,
-    paddingVertical: 8,
+    borderRadius: 8,
+    paddingHorizontal: 8,
+    paddingVertical: 4,
     flexDirection: "row",
     alignItems: "center",
     justifyContent: "space-between",
     backgroundColor: "#ffffff",
-    minHeight: 38,
+    minHeight: 34,
   },
-  selectorText: { fontSize: 12.5, color: "#1e293b", fontFamily: "Inter-Medium", flex: 1 },
+  selectorText: { fontSize: 11.5, color: "#1e293b", fontFamily: "Inter-Medium", flex: 1 },
   dateField: {
     borderWidth: 1,
     borderColor: "#e2e8f0",
-    borderRadius: 9,
-    paddingHorizontal: 10,
-    paddingVertical: 8,
+    borderRadius: 8,
+    paddingHorizontal: 8,
+    paddingVertical: 4,
     flexDirection: "row",
     alignItems: "center",
     justifyContent: "space-between",
     backgroundColor: "#ffffff",
-    minHeight: 38,
+    minHeight: 34,
   },
-  dateText: { fontSize: 12.5, color: "#1e293b", fontFamily: "Inter-Medium" },
+  dateText: { fontSize: 11.5, color: "#1e293b", fontFamily: "Inter-Medium" },
   placeholderText: { color: "#94a3b8" },
-  twoCol: { flexDirection: "row", gap: 10 },
+  twoCol: { flexDirection: "row", gap: 8 },
   col: { flex: 1 },
   sectionGreen: {
-    borderWidth: 1.2,
+    borderWidth: 1,
     borderColor: "#bbf7d0",
-    borderRadius: 12,
+    borderRadius: 10,
     backgroundColor: "#fcfdfc",
-    padding: 12,
-    marginTop: 12,
-    gap: 4,
+    padding: 9,
+    marginTop: 8,
+    gap: 3,
   },
-  sectionHeader: { flexDirection: "row", alignItems: "center", gap: 6, marginBottom: 4 },
-  sectionTitleGreen: { fontSize: 11.5, fontWeight: "800", color: "#059669", fontFamily: "Inter-Bold" },
+  sectionHeader: { flexDirection: "row", alignItems: "center", gap: 5, marginBottom: 2 },
+  sectionTitleGreen: { fontSize: 10.5, fontWeight: "800", color: "#059669", fontFamily: "Inter-Bold" },
   uploadFileBtn: {
     borderWidth: 1,
     borderColor: "#bbf7d0",
-    borderRadius: 8,
+    borderRadius: 7,
     backgroundColor: "#f0fdf4",
-    paddingVertical: 9,
-    paddingHorizontal: 12,
+    paddingVertical: 6,
+    paddingHorizontal: 10,
     flexDirection: "row",
     alignItems: "center",
     justifyContent: "center",
-    gap: 6,
-    marginTop: 4,
+    gap: 5,
+    marginTop: 3,
   },
-  uploadFileText: { fontSize: 12, fontWeight: "600", color: "#059669", fontFamily: "Inter-SemiBold" },
+  uploadFileText: { fontSize: 11, fontWeight: "600", color: "#059669", fontFamily: "Inter-SemiBold" },
   sectionAmber: {
-    borderWidth: 1.2,
+    borderWidth: 1,
     borderColor: "#fed7aa",
-    borderRadius: 12,
+    borderRadius: 10,
     backgroundColor: "#fffbf7",
-    padding: 12,
-    marginTop: 12,
-    gap: 6,
+    padding: 9,
+    marginTop: 8,
+    gap: 4,
   },
   sectionHeaderBetween: { flexDirection: "row", justifyContent: "space-between", alignItems: "center" },
-  sectionTitleAmber: { fontSize: 11, fontWeight: "800", color: "#9a3412", fontFamily: "Inter-Bold" },
-  addDocBtn: { backgroundColor: "#9a3412", paddingHorizontal: 9, paddingVertical: 5, borderRadius: 6 },
-  addDocBtnText: { color: "#ffffff", fontSize: 11, fontWeight: "700", fontFamily: "Inter-Bold" },
+  sectionTitleAmber: { fontSize: 10.5, fontWeight: "800", color: "#9a3412", fontFamily: "Inter-Bold" },
+  addDocBtn: { backgroundColor: "#9a3412", paddingHorizontal: 8, paddingVertical: 4, borderRadius: 5 },
+  addDocBtnText: { color: "#ffffff", fontSize: 10.5, fontWeight: "700", fontFamily: "Inter-Bold" },
   closeDocBtn: { backgroundColor: "#7c2d12" },
   subFormCard: {
     backgroundColor: "#ffffff",
     borderWidth: 1,
     borderColor: "#fed7aa",
-    borderRadius: 12,
-    padding: 12,
-    marginTop: 8,
+    borderRadius: 9,
+    padding: 10,
+    marginTop: 6,
     gap: 6,
   },
   uploadFileBtnAmber: {
     borderWidth: 1,
     borderColor: "#fed7aa",
-    borderRadius: 8,
+    borderRadius: 7,
     backgroundColor: "#fffaf5",
-    paddingVertical: 9,
-    paddingHorizontal: 12,
+    paddingVertical: 6,
+    paddingHorizontal: 10,
     flexDirection: "row",
     alignItems: "center",
     justifyContent: "center",
-    gap: 6,
-    marginTop: 4,
+    gap: 5,
+    marginTop: 3,
   },
   uploadFileTextAmber: {
-    fontSize: 12,
+    fontSize: 11,
     fontWeight: "600",
     color: "#b45309",
     fontFamily: "Inter-SemiBold",
@@ -1564,52 +2565,144 @@ const modal = StyleSheet.create({
     flexDirection: "row",
     justifyContent: "flex-end",
     alignItems: "center",
-    gap: 12,
-    marginTop: 8,
-    paddingTop: 8,
+    gap: 10,
+    marginTop: 6,
+    paddingTop: 6,
     borderTopWidth: 1,
     borderTopColor: "#fef3c7",
   },
   subFormCancelBtn: {
-    paddingVertical: 7,
-    paddingHorizontal: 12,
+    paddingVertical: 5,
+    paddingHorizontal: 10,
   },
   subFormCancelText: {
-    fontSize: 12.5,
+    fontSize: 11.5,
     fontWeight: "600",
     color: "#64748b",
     fontFamily: "Inter-SemiBold",
   },
   subFormSubmitBtn: {
     backgroundColor: "#b45309",
-    paddingVertical: 8,
-    paddingHorizontal: 14,
-    borderRadius: 8,
+    paddingVertical: 5,
+    paddingHorizontal: 12,
+    borderRadius: 6,
   },
   subFormSubmitText: {
-    fontSize: 12.5,
+    fontSize: 11.5,
     fontWeight: "700",
     color: "#ffffff",
     fontFamily: "Inter-Bold",
   },
-  emptyDocText: { fontSize: 10.8, color: "#94a3b8", fontStyle: "italic", fontFamily: "Inter-Regular", marginTop: 4, lineHeight: 16 },
-  docItem: { flexDirection: "row", alignItems: "center", justifyContent: "space-between", backgroundColor: "#ffffff", padding: 8, borderRadius: 8, borderWidth: 1, borderColor: "#fed7aa" },
-  docName: { fontSize: 12, color: "#9a3412", fontFamily: "Inter-Medium", flex: 1, marginHorizontal: 8 },
+  emptyDocText: { fontSize: 10.5, color: "#94a3b8", fontStyle: "italic", fontFamily: "Inter-Regular", marginTop: 2 },
+  docItem: { flexDirection: "row", alignItems: "center", justifyContent: "space-between", backgroundColor: "#ffffff", padding: 6, borderRadius: 6, borderWidth: 1, borderColor: "#fed7aa" },
+  docName: { fontSize: 11, color: "#9a3412", fontFamily: "Inter-Medium", flex: 1, marginHorizontal: 6 },
   iconInputWrap: {
     borderWidth: 1,
     borderColor: "#e2e8f0",
-    borderRadius: 9,
+    borderRadius: 8,
     flexDirection: "row",
     alignItems: "center",
     backgroundColor: "#ffffff",
-    minHeight: 38,
+    minHeight: 34,
   },
-  iconInput: { flex: 1, fontSize: 12.5, color: "#1e293b", paddingVertical: 8, paddingRight: 10, fontFamily: "Inter-Medium" },
-  footerActions: { flexDirection: "row", gap: 10, marginTop: 22, alignItems: "center" },
-  cancelActionBtn: { paddingVertical: 12, paddingHorizontal: 20, borderRadius: 10, backgroundColor: "#f1f5f9", alignItems: "center" },
-  cancelActionText: { fontSize: 13.5, fontWeight: "700", color: "#475569", fontFamily: "Inter-Bold" },
-  saveActionBtn: { flex: 1, paddingVertical: 12, borderRadius: 10, backgroundColor: "#008852", alignItems: "center", justifyContent: "center" },
-  saveActionText: { color: "#ffffff", fontSize: 14, fontWeight: "800", fontFamily: "Inter-Bold" },
+  iconInput: { flex: 1, fontSize: 11.5, color: "#1e293b", paddingVertical: 4, paddingRight: 8, fontFamily: "Inter-Medium" },
+  stickyFooter: {
+    flexDirection: "row",
+    alignItems: "center",
+    gap: 8,
+    paddingTop: 10,
+    paddingBottom: 2,
+    borderTopWidth: 1,
+    borderTopColor: "#f1f5f9",
+    backgroundColor: "#ffffff",
+  },
+  cancelActionBtn: { paddingVertical: 9, paddingHorizontal: 16, borderRadius: 8, backgroundColor: "#f1f5f9", alignItems: "center" },
+  cancelActionText: { fontSize: 12.5, fontWeight: "700", color: "#475569", fontFamily: "Inter-Bold" },
+  saveActionBtn: { flex: 1, paddingVertical: 9, borderRadius: 8, backgroundColor: "#008852", alignItems: "center", justifyContent: "center" },
+  saveActionText: { color: "#ffffff", fontSize: 13, fontWeight: "800", fontFamily: "Inter-Bold" },
+
+  // Styles cho dropdown phòng ban
+  deptDropdownContainer: {
+    borderWidth: 1,
+    borderColor: "#10b981",
+    borderTopWidth: 0,
+    borderBottomLeftRadius: 10,
+    borderBottomRightRadius: 10,
+    backgroundColor: "#ffffff",
+    padding: 8,
+    marginBottom: 6,
+  },
+  deptSearchWrap: {
+    flexDirection: "row",
+    alignItems: "center",
+    borderWidth: 1.2,
+    borderColor: "#10b981",
+    borderRadius: 8,
+    paddingHorizontal: 8,
+    paddingVertical: 5,
+    marginBottom: 6,
+    gap: 6,
+    backgroundColor: "#ffffff",
+  },
+  deptSearchInput: {
+    flex: 1,
+    fontSize: 12,
+    color: "#0f172a",
+    fontFamily: "Inter-Medium",
+    paddingVertical: 0,
+  },
+  deptList: {
+    maxHeight: 220,
+  },
+  deptItem: {
+    paddingVertical: 7,
+    paddingHorizontal: 6,
+    borderBottomWidth: 1,
+    borderBottomColor: "#f1f5f9",
+    borderRadius: 6,
+  },
+  deptItemHeader: {
+    flexDirection: "row",
+    alignItems: "center",
+    gap: 6,
+    flexWrap: "wrap",
+  },
+  deptItemName: {
+    fontSize: 12.5,
+    fontWeight: "800",
+    color: "#0f172a",
+    fontFamily: "Inter-Bold",
+  },
+  deptCodeBadge: {
+    backgroundColor: "#f1f5f9",
+    paddingHorizontal: 6,
+    paddingVertical: 2,
+    borderRadius: 4,
+  },
+  deptCodeText: {
+    fontSize: 10.5,
+    color: "#475569",
+    fontWeight: "700",
+    fontFamily: "Inter-SemiBold",
+  },
+  deptCategoryBadge: {
+    backgroundColor: "#f0f9ff",
+    paddingHorizontal: 6,
+    paddingVertical: 2,
+    borderRadius: 4,
+  },
+  deptCategoryText: {
+    fontSize: 10.5,
+    color: "#0284c7",
+    fontWeight: "600",
+    fontFamily: "Inter-SemiBold",
+  },
+  deptFloorText: {
+    fontSize: 11,
+    color: "#94a3b8",
+    fontFamily: "Inter-Regular",
+    marginTop: 2,
+  },
 });
 
 const selectStyles = StyleSheet.create({
@@ -1753,5 +2846,499 @@ const alertStyles = StyleSheet.create({
     fontWeight: "800",
     color: "#ffffff",
     fontFamily: "Inter-Bold",
+  },
+});
+
+const mediaModalStyles = StyleSheet.create({
+  overlay: {
+    flex: 1,
+    backgroundColor: "rgba(0, 0, 0, 0.45)",
+    justifyContent: "flex-end",
+  },
+  sheet: {
+    backgroundColor: "#ffffff",
+    borderTopLeftRadius: 24,
+    borderTopRightRadius: 24,
+    paddingTop: 12,
+    paddingHorizontal: 20,
+    paddingBottom: 28,
+    shadowColor: "#000",
+    shadowOffset: { width: 0, height: -4 },
+    shadowOpacity: 0.12,
+    shadowRadius: 14,
+    elevation: 10,
+  },
+  handleBar: {
+    width: 40,
+    height: 4,
+    borderRadius: 2,
+    backgroundColor: "#cbd5e1",
+    alignSelf: "center",
+    marginBottom: 14,
+  },
+  title: {
+    fontSize: 17,
+    fontWeight: "800",
+    color: "#0f172a",
+    fontFamily: "Inter-Bold",
+    textAlign: "center",
+  },
+  subtitle: {
+    fontSize: 12.5,
+    color: "#64748b",
+    fontFamily: "Inter-Regular",
+    textAlign: "center",
+    marginTop: 4,
+    marginBottom: 16,
+  },
+  btnList: {
+    gap: 10,
+    marginBottom: 16,
+  },
+  optionBtn: {
+    flexDirection: "row",
+    alignItems: "center",
+    padding: 12,
+    backgroundColor: "#f8fafc",
+    borderRadius: 14,
+    borderWidth: 1,
+    borderColor: "#e2e8f0",
+    gap: 12,
+  },
+  iconWrap: {
+    width: 44,
+    height: 44,
+    borderRadius: 12,
+    borderWidth: 1,
+    alignItems: "center",
+    justifyContent: "center",
+  },
+  optionTitle: {
+    fontSize: 14,
+    fontWeight: "700",
+    color: "#0f172a",
+    fontFamily: "Inter-Bold",
+    marginBottom: 2,
+  },
+  optionDesc: {
+    fontSize: 11.5,
+    color: "#64748b",
+    fontFamily: "Inter-Regular",
+  },
+  cancelBtn: {
+    paddingVertical: 12,
+    borderRadius: 12,
+    backgroundColor: "#f1f5f9",
+    alignItems: "center",
+    justifyContent: "center",
+  },
+  cancelText: {
+    fontSize: 14,
+    fontWeight: "700",
+    color: "#475569",
+    fontFamily: "Inter-Bold",
+  },
+});
+
+const detailStyles = StyleSheet.create({
+  overlay: {
+    flex: 1,
+    backgroundColor: "rgba(0, 0, 0, 0.45)",
+    justifyContent: "flex-end",
+  },
+  sheet: {
+    backgroundColor: "#f8fafc",
+    borderTopLeftRadius: 24,
+    borderTopRightRadius: 24,
+    maxHeight: "90%",
+    paddingTop: 12,
+    paddingHorizontal: 16,
+    shadowColor: "#000",
+    shadowOffset: { width: 0, height: -4 },
+    shadowOpacity: 0.12,
+    shadowRadius: 16,
+    elevation: 12,
+  },
+  handleBar: {
+    width: 40,
+    height: 4,
+    borderRadius: 2,
+    backgroundColor: "#cbd5e1",
+    alignSelf: "center",
+    marginBottom: 12,
+  },
+  header: {
+    flexDirection: "row",
+    alignItems: "center",
+    justifyContent: "space-between",
+    marginBottom: 12,
+    paddingBottom: 10,
+    borderBottomWidth: 1,
+    borderBottomColor: "#e2e8f0",
+  },
+  headerTitle: {
+    fontSize: 17,
+    fontWeight: "800",
+    color: "#0f172a",
+    fontFamily: "Inter-Bold",
+  },
+  headerSubtitle: {
+    fontSize: 12,
+    color: "#64748b",
+    fontFamily: "Inter-Regular",
+    marginTop: 2,
+  },
+  editHeaderBtn: {
+    flexDirection: "row",
+    alignItems: "center",
+    backgroundColor: "#ecfdf5",
+    borderWidth: 1,
+    borderColor: "#a7f3d0",
+    paddingVertical: 6,
+    paddingHorizontal: 10,
+    borderRadius: 8,
+    gap: 4,
+    marginRight: 8,
+  },
+  editHeaderText: {
+    fontSize: 12,
+    fontWeight: "700",
+    color: "#008852",
+    fontFamily: "Inter-Bold",
+  },
+  closeBtn: {
+    width: 32,
+    height: 32,
+    borderRadius: 16,
+    backgroundColor: "#f1f5f9",
+    alignItems: "center",
+    justifyContent: "center",
+  },
+  imageWrap: {
+    width: "100%",
+    height: 180,
+    borderRadius: 14,
+    overflow: "hidden",
+    marginBottom: 12,
+    backgroundColor: "#e2e8f0",
+  },
+  image: {
+    width: "100%",
+    height: "100%",
+  },
+  cardBasic: {
+    backgroundColor: "#ffffff",
+    borderRadius: 14,
+    padding: 14,
+    borderWidth: 1,
+    borderColor: "#e2e8f0",
+    marginBottom: 10,
+  },
+  rowBetween: {
+    flexDirection: "row",
+    alignItems: "center",
+    justifyContent: "space-between",
+    gap: 8,
+  },
+  nameText: {
+    fontSize: 17,
+    fontWeight: "800",
+    color: "#0f172a",
+    fontFamily: "Inter-Bold",
+    flex: 1,
+  },
+  badge: {
+    paddingHorizontal: 9,
+    paddingVertical: 4,
+    borderRadius: 6,
+  },
+  badgeText: {
+    fontSize: 11,
+    fontWeight: "700",
+    fontFamily: "Inter-Bold",
+  },
+  tagsRow: {
+    flexDirection: "row",
+    flexWrap: "wrap",
+    gap: 6,
+    marginTop: 8,
+  },
+  tag: {
+    flexDirection: "row",
+    alignItems: "center",
+    gap: 4,
+    backgroundColor: "#f1f5f9",
+    paddingHorizontal: 8,
+    paddingVertical: 4,
+    borderRadius: 6,
+  },
+  tagText: {
+    fontSize: 11.5,
+    color: "#475569",
+    fontFamily: "Inter-Medium",
+  },
+  sectionGreen: {
+    backgroundColor: "#f0fdf4",
+    borderWidth: 1,
+    borderColor: "#bbf7d0",
+    borderRadius: 14,
+    padding: 12,
+    marginBottom: 10,
+  },
+  sectionAmber: {
+    backgroundColor: "#fffaf5",
+    borderWidth: 1,
+    borderColor: "#fed7aa",
+    borderRadius: 14,
+    padding: 12,
+    marginBottom: 10,
+  },
+  sectionCard: {
+    backgroundColor: "#ffffff",
+    borderWidth: 1,
+    borderColor: "#e2e8f0",
+    borderRadius: 14,
+    padding: 12,
+    marginBottom: 10,
+  },
+  sectionHeader: {
+    flexDirection: "row",
+    alignItems: "center",
+    gap: 6,
+    marginBottom: 10,
+  },
+  sectionTitleGreen: {
+    fontSize: 11.5,
+    fontWeight: "800",
+    color: "#047857",
+    fontFamily: "Inter-Bold",
+  },
+  sectionTitleAmber: {
+    fontSize: 11.5,
+    fontWeight: "800",
+    color: "#9a3412",
+    fontFamily: "Inter-Bold",
+  },
+  grid2: {
+    flexDirection: "row",
+    flexWrap: "wrap",
+    rowGap: 8,
+    justifyContent: "space-between",
+  },
+  infoItem: {
+    width: "48%",
+  },
+  infoLabel: {
+    fontSize: 11,
+    color: "#64748b",
+    fontFamily: "Inter-Regular",
+    marginBottom: 2,
+  },
+  infoValue: {
+    fontSize: 13,
+    fontWeight: "700",
+    color: "#0f172a",
+    fontFamily: "Inter-SemiBold",
+  },
+  fileAttachBox: {
+    flexDirection: "row",
+    alignItems: "center",
+    gap: 6,
+    marginTop: 10,
+    paddingTop: 8,
+    borderTopWidth: 1,
+    borderTopColor: "#dcfce7",
+  },
+  fileAttachText: {
+    fontSize: 12,
+    fontWeight: "600",
+    color: "#047857",
+    fontFamily: "Inter-SemiBold",
+    flex: 1,
+  },
+  emptyText: {
+    fontSize: 11.5,
+    color: "#94a3b8",
+    fontStyle: "italic",
+    fontFamily: "Inter-Regular",
+  },
+  docRow: {
+    flexDirection: "row",
+    alignItems: "center",
+    gap: 6,
+    backgroundColor: "#ffffff",
+    padding: 8,
+    borderRadius: 8,
+    borderWidth: 1,
+    borderColor: "#fed7aa",
+  },
+  docText: {
+    fontSize: 12,
+    color: "#9a3412",
+    fontFamily: "Inter-Medium",
+    flex: 1,
+  },
+  imageOverlayHint: {
+    position: "absolute",
+    bottom: 8,
+    right: 8,
+    backgroundColor: "rgba(15, 23, 42, 0.7)",
+    flexDirection: "row",
+    alignItems: "center",
+    gap: 4,
+    paddingHorizontal: 8,
+    paddingVertical: 4,
+    borderRadius: 6,
+  },
+  imageHintText: {
+    color: "#ffffff",
+    fontSize: 10.5,
+    fontFamily: "Inter-Medium",
+  },
+  notesText: {
+    fontSize: 12.5,
+    color: "#334155",
+    fontFamily: "Inter-Regular",
+    lineHeight: 18,
+    backgroundColor: "#f8fafc",
+    padding: 8,
+    borderRadius: 8,
+    marginTop: 2,
+  },
+  footer: {
+    flexDirection: "row",
+    alignItems: "center",
+    justifyContent: "space-between",
+    gap: 12,
+    marginTop: 12,
+  },
+  closeBtnBottom: {
+    flex: 1,
+    paddingVertical: 12,
+    borderRadius: 12,
+    backgroundColor: "#f1f5f9",
+    alignItems: "center",
+    justifyContent: "center",
+  },
+  closeBtnText: {
+    fontSize: 13.5,
+    fontWeight: "700",
+    color: "#64748b",
+    fontFamily: "Inter-Bold",
+  },
+  editBtnBottom: {
+    flex: 1.5,
+    flexDirection: "row",
+    alignItems: "center",
+    justifyContent: "center",
+    gap: 6,
+    paddingVertical: 12,
+    borderRadius: 12,
+    backgroundColor: "#008852",
+  },
+  editBtnText: {
+    fontSize: 13.5,
+    fontWeight: "800",
+    color: "#ffffff",
+    fontFamily: "Inter-Bold",
+  },
+});
+
+const previewModalStyles = StyleSheet.create({
+  overlay: {
+    flex: 1,
+    backgroundColor: "rgba(0, 0, 0, 0.92)",
+    justifyContent: "space-between",
+  },
+  topBar: {
+    backgroundColor: "rgba(15, 23, 42, 0.8)",
+  },
+  headerContent: {
+    flexDirection: "row",
+    alignItems: "center",
+    justifyContent: "space-between",
+    paddingHorizontal: 16,
+    paddingVertical: 12,
+  },
+  fileName: {
+    flex: 1,
+    fontSize: 15,
+    fontWeight: "700",
+    color: "#ffffff",
+    fontFamily: "Inter-Bold",
+    marginRight: 12,
+  },
+  actionIconBtn: {
+    padding: 6,
+  },
+  body: {
+    flex: 1,
+    alignItems: "center",
+    justifyContent: "center",
+    padding: 16,
+  },
+  fullImage: {
+    width: "100%",
+    height: "100%",
+  },
+  docPlaceholder: {
+    alignItems: "center",
+    justifyContent: "center",
+    backgroundColor: "#ffffff",
+    borderRadius: 20,
+    padding: 24,
+    width: "100%",
+    maxWidth: 340,
+    shadowColor: "#000",
+    shadowOffset: { width: 0, height: 6 },
+    shadowOpacity: 0.2,
+    shadowRadius: 16,
+    elevation: 10,
+  },
+  docIconBg: {
+    width: 80,
+    height: 80,
+    borderRadius: 40,
+    backgroundColor: "#ecfdf5",
+    alignItems: "center",
+    justifyContent: "center",
+    marginBottom: 16,
+  },
+  docTitle: {
+    fontSize: 16,
+    fontWeight: "800",
+    color: "#0f172a",
+    fontFamily: "Inter-Bold",
+    textAlign: "center",
+    marginBottom: 6,
+  },
+  docSubtitle: {
+    fontSize: 12.5,
+    color: "#64748b",
+    fontFamily: "Inter-Regular",
+    textAlign: "center",
+    marginBottom: 20,
+  },
+  openBtn: {
+    flexDirection: "row",
+    alignItems: "center",
+    gap: 8,
+    backgroundColor: "#008852",
+    paddingVertical: 12,
+    paddingHorizontal: 20,
+    borderRadius: 12,
+  },
+  openBtnText: {
+    fontSize: 14,
+    fontWeight: "800",
+    color: "#ffffff",
+    fontFamily: "Inter-Bold",
+  },
+  noUriText: {
+    fontSize: 11.5,
+    color: "#94a3b8",
+    fontStyle: "italic",
+    textAlign: "center",
+    marginTop: 8,
   },
 });

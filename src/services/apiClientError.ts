@@ -65,19 +65,33 @@ export async function parseApiErrorResponse(response: Response): Promise<ApiClie
     });
   }
 
-  if (isRecord(payload) && typeof payload.error === "string") {
-    return new ApiClientError({
-      status: response.status,
-      code: "API_ERROR",
-      message: payload.error,
-    });
-  }
+  if (isRecord(payload) && (typeof payload.message === "string" || typeof payload.error === "string")) {
+    const baseMsg = typeof payload.message === "string" ? payload.message : (payload.error as string);
+    let detailMsg = "";
+    if (isRecord(payload.errors)) {
+      const parts: string[] = [];
+      for (const [, v] of Object.entries(payload.errors)) {
+        if (Array.isArray(v)) {
+          parts.push(...v.filter((item) => typeof item === "string"));
+        } else if (typeof v === "string") {
+          parts.push(v);
+        }
+      }
+      if (parts.length > 0) {
+        detailMsg = parts.join("\n• ");
+      }
+    } else if (Array.isArray(payload.errors)) {
+      detailMsg = payload.errors.filter((item) => typeof item === "string").join("\n• ");
+    } else if (typeof payload.errors === "string") {
+      detailMsg = payload.errors;
+    }
 
-  if (isRecord(payload) && typeof payload.message === "string") {
+    const fullMessage = detailMsg ? `${baseMsg}:\n• ${detailMsg}` : baseMsg;
     return new ApiClientError({
       status: response.status,
       code: "API_ERROR",
-      message: payload.message,
+      message: fullMessage,
+      details: isRecord(payload.errors) ? (payload.errors as Record<string, unknown>) : undefined,
     });
   }
 
