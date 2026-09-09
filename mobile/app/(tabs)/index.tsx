@@ -226,6 +226,146 @@ export default function Home() {
           </Card>
         ) : (
         <>
+          {/* 5 Thẻ thống kê KPI tổng quan ngay phía dưới bảng tin */}
+          <View style={localStyles.metricsGrid}>
+            {/* 1. Nhân sự đi làm */}
+            <Pressable
+              onPress={() => router.push("/(tabs)/attendance")}
+              style={({ pressed }) => [
+                localStyles.metricCard,
+                pressed && { opacity: 0.85 },
+              ]}
+              accessibilityRole="button"
+              accessibilityLabel="Nhân sự đi làm"
+            >
+              <View style={localStyles.metricCardTop}>
+                <View style={[localStyles.metricBadge, { backgroundColor: "#ecfdf5" }]}>
+                  <Image
+                    source={require("../../assets/metric-users.png")}
+                    style={localStyles.metricIcon}
+                    resizeMode="contain"
+                  />
+                </View>
+                <Text style={localStyles.metricLabel} numberOfLines={1}>
+                  NHÂN SỰ ĐI LÀM
+                </Text>
+              </View>
+              <Text style={[localStyles.metricValue, { color: "#059669" }]}>
+                {data?.timekeeping
+                  ? `${data.timekeeping.checkedInToday}/${data.timekeeping.totalEmployees}`
+                  : "0/0"}
+              </Text>
+            </Pressable>
+
+            {/* 2. Task đang làm */}
+            <Pressable
+              onPress={() => router.push("/(tabs)/work")}
+              style={({ pressed }) => [
+                localStyles.metricCard,
+                pressed && { opacity: 0.85 },
+              ]}
+              accessibilityRole="button"
+              accessibilityLabel="Task đang làm"
+            >
+              <View style={localStyles.metricCardTop}>
+                <View style={[localStyles.metricBadge, { backgroundColor: "#eff6ff" }]}>
+                  <Image
+                    source={require("../../assets/metric-activity.png")}
+                    style={localStyles.metricIcon}
+                    resizeMode="contain"
+                  />
+                </View>
+                <Text style={localStyles.metricLabel} numberOfLines={1}>
+                  TASK ĐANG LÀM
+                </Text>
+              </View>
+              <Text style={[localStyles.metricValue, { color: "#10b981" }]}>
+                {data?.projects?.tasks?.doing ?? 0}
+              </Text>
+            </Pressable>
+
+            {/* 3. Task quá hạn */}
+            <Pressable
+              onPress={() => router.push("/(tabs)/work")}
+              style={({ pressed }) => [
+                localStyles.metricCard,
+                pressed && { opacity: 0.85 },
+              ]}
+              accessibilityRole="button"
+              accessibilityLabel="Task quá hạn"
+            >
+              <View style={localStyles.metricCardTop}>
+                <View style={[localStyles.metricBadge, { backgroundColor: "#fef2f2" }]}>
+                  <Image
+                    source={require("../../assets/metric-clock.png")}
+                    style={localStyles.metricIcon}
+                    resizeMode="contain"
+                  />
+                </View>
+                <Text style={localStyles.metricLabel} numberOfLines={1}>
+                  TASK QUÁ HẠN
+                </Text>
+              </View>
+              <Text style={[localStyles.metricValue, { color: "#dc2626" }]}>
+                {data?.projects?.overdueTasks ?? 0}
+              </Text>
+            </Pressable>
+
+            {/* 4. Khóa đào tạo */}
+            <Pressable
+              onPress={() => Alert.alert("Đào tạo", `Hiện có ${data?.training?.totalCourses ?? 0} khóa đào tạo.`)}
+              style={({ pressed }) => [
+                localStyles.metricCard,
+                pressed && { opacity: 0.85 },
+              ]}
+              accessibilityRole="button"
+              accessibilityLabel="Khóa đào tạo"
+            >
+              <View style={localStyles.metricCardTop}>
+                <View style={[localStyles.metricBadge, { backgroundColor: "#fffbeb" }]}>
+                  <Image
+                    source={require("../../assets/metric-graduation.png")}
+                    style={localStyles.metricIcon}
+                    resizeMode="contain"
+                  />
+                </View>
+                <Text style={localStyles.metricLabel} numberOfLines={1}>
+                  KHÓA ĐÀO TẠO
+                </Text>
+              </View>
+              <Text style={[localStyles.metricValue, { color: "#ea580c" }]}>
+                {data?.training?.totalCourses ?? 0}
+              </Text>
+            </Pressable>
+
+            {/* 5. Thiết bị */}
+            <Pressable
+              onPress={() => Alert.alert("Thiết bị", `Hiện có ${data?.equipment?.total ?? 0} thiết bị trong hệ thống.`)}
+              style={({ pressed }) => [
+                localStyles.metricCard,
+                pressed && { opacity: 0.85 },
+              ]}
+              accessibilityRole="button"
+              accessibilityLabel="Thiết bị"
+            >
+              <View style={localStyles.metricCardTop}>
+                <View style={[localStyles.metricBadge, { backgroundColor: "#f5f3ff" }]}>
+                  <Image
+                    source={require("../../assets/metric-file-text.png")}
+                    style={localStyles.metricIcon}
+                    resizeMode="contain"
+                  />
+                </View>
+                <Text style={localStyles.metricLabel} numberOfLines={1}>
+                  THIẾT BỊ
+                </Text>
+              </View>
+              <Text style={[localStyles.metricValue, { color: "#059669" }]}>
+                {data?.equipment?.total ?? 0}
+              </Text>
+            </Pressable>
+          </View>
+
           <View style={localStyles.filterRow}>
             {(["day", "week", "year"] as const).map((value, i) => (
               <View key={value} style={{ flex: 1 }}>
@@ -420,15 +560,71 @@ const localStyles = StyleSheet.create({
     tintColor: "#065f46",
   },
   newsfeedText: {
-    fontSize: 14,
+    fontSize: 12,
     fontWeight: "700",
     color: "#0f172a",
+    fontFamily: "Inter-Bold",
     letterSpacing: 0.1,
   },
   newsfeedChevronIcon: {
     width: 16,
     height: 16,
     tintColor: "#065f46",
+  },
+  metricsGrid: {
+    flexDirection: "row",
+    flexWrap: "wrap",
+    justifyContent: "space-between",
+    rowGap: 12,
+    marginTop: 2,
+    marginBottom: 4,
+  },
+  metricCard: {
+    width: "48%",
+    backgroundColor: "#ffffff",
+    borderRadius: 16,
+    paddingVertical: 14,
+    paddingHorizontal: 12,
+    borderWidth: 1,
+    borderColor: "#e2e8f0",
+    shadowColor: "#059669",
+    shadowOffset: { width: 0, height: 2 },
+    shadowOpacity: 0.06,
+    shadowRadius: 6,
+    elevation: 2,
+    minHeight: 92,
+    justifyContent: "space-between",
+  },
+  metricCardTop: {
+    flexDirection: "row",
+    alignItems: "center",
+    gap: 8,
+  },
+  metricBadge: {
+    width: 32,
+    height: 32,
+    borderRadius: 9,
+    alignItems: "center",
+    justifyContent: "center",
+  },
+  metricIcon: {
+    width: 18,
+    height: 18,
+  },
+  metricLabel: {
+    flex: 1,
+    fontSize: 9,
+    fontWeight: "800",
+    color: "#334155",
+    fontFamily: "Inter-Bold",
+    letterSpacing: 0.2,
+  },
+  metricValue: {
+    fontSize: 24,
+    fontWeight: "800",
+    marginTop: 8,
+    fontFamily: "Inter-Bold",
+    letterSpacing: -0.5,
   },
   iconButton: {
     width: 40,
@@ -469,36 +665,40 @@ const localStyles = StyleSheet.create({
   },
   greetingCursive: {
     fontFamily: Platform.select({ ios: "Snell Roundhand", android: "cursive" }),
-    fontSize: 26,
+    fontSize: 24,
     fontWeight: "bold",
     color: "#065f46",
   },
   greetingTitle: {
-    fontSize: 20,
+    fontSize: 18,
     fontWeight: "800",
     color: "#0f172a", // Màu đen đậm dứt khoát
+    fontFamily: "Inter-Bold",
     marginBottom: 2,
     textShadowColor: "rgba(255, 255, 255, 0.9)",
     textShadowOffset: { width: 0, height: 1 },
     textShadowRadius: 3,
   },
   greetingUserName: {
-    fontSize: 20,
+    fontSize: 18,
     fontWeight: "800",
     color: "#0f172a", // Tên user màu đen đậm
+    fontFamily: "Inter-Bold",
   },
   greetingSubtitle: {
-    fontSize: 14,
+    fontSize: 12,
     fontWeight: "700",
     color: "#0f172a", // Lời chúc màu đen đậm, rõ nét
+    fontFamily: "Inter-SemiBold",
     textShadowColor: "rgba(255, 255, 255, 0.9)",
     textShadowOffset: { width: 0, height: 1 },
     textShadowRadius: 2,
   },
   greetingMeta: {
-    fontSize: 12,
+    fontSize: 10,
     fontWeight: "600",
     color: "#047857",
+    fontFamily: "Inter-SemiBold",
     marginTop: 4,
     backgroundColor: "rgba(255, 255, 255, 0.75)",
     alignSelf: "flex-start",
@@ -533,7 +733,8 @@ const localStyles = StyleSheet.create({
   roundedButtonText: {
     color: "#ffffff",
     fontWeight: "700",
-    fontSize: 15,
+    fontSize: 13,
+    fontFamily: "Inter-Bold",
     letterSpacing: 0.2,
   },
 });

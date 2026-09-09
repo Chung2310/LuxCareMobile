@@ -2,6 +2,7 @@ import { useEffect, useRef, useState } from "react";
 import { Animated, Image, StyleSheet, View } from "react-native";
 import { Stack } from "expo-router";
 import { StatusBar } from "expo-status-bar";
+import { useFonts } from "expo-font";
 import { SafeAreaProvider } from "react-native-safe-area-context";
 import { SessionProvider, useSession } from "../src/auth/SessionProvider";
 import { Button, ErrorText, Page } from "../src/ui";
@@ -12,6 +13,14 @@ function Routes() {
   const [splashFinished, setSplashFinished] = useState(false);
   const fadeAnim = useRef(new Animated.Value(1)).current;
 
+  const [fontsLoaded] = useFonts({
+    Inter: require("../assets/fonts/Inter-Regular.ttf"),
+    "Inter-Regular": require("../assets/fonts/Inter-Regular.ttf"),
+    "Inter-Medium": require("../assets/fonts/Inter-Medium.ttf"),
+    "Inter-SemiBold": require("../assets/fonts/Inter-SemiBold.ttf"),
+    "Inter-Bold": require("../assets/fonts/Inter-Bold.ttf"),
+  });
+
   useEffect(() => {
     // Hiển thị logo thương hiệu trong tối thiểu 1.8 giây mỗi lần mở app
     const timer = setTimeout(() => {
@@ -21,7 +30,7 @@ function Routes() {
   }, []);
 
   useEffect(() => {
-    if (!minTimeElapsed || loading) return;
+    if (!minTimeElapsed || loading || !fontsLoaded) return;
     Animated.timing(fadeAnim, {
       toValue: 0,
       duration: 350,
@@ -29,9 +38,9 @@ function Routes() {
     }).start(() => {
       setSplashFinished(true);
     });
-  }, [minTimeElapsed, loading, fadeAnim]);
+  }, [minTimeElapsed, loading, fontsLoaded, fadeAnim]);
 
-  if (!splashFinished && loading) {
+  if ((!splashFinished && loading) || !fontsLoaded) {
     return (
       <View style={splashStyles.container}>
         <StatusBar style="dark" />

@@ -12,7 +12,7 @@ export default function TabLayout() {
         tabBarActiveTintColor: colors.primary,
         headerTitle: "LuxCare",
         tabBarIconStyle: { display: "none" },
-        tabBarLabelStyle: { fontSize: 12 },
+        tabBarLabelStyle: { fontSize: 10, fontFamily: "Inter-Medium" },
       }}
     >
       <Tabs.Screen name="index" options={{ title: "Tổng quan", headerShown: false }} />

@@ -22,10 +22,10 @@ export const colors = {
 export const styles = StyleSheet.create({
   page: { flex: 1, backgroundColor: colors.background },
   content: { padding: 22, gap: 16, paddingBottom: 36 },
-  title: { fontSize: 28, fontWeight: "700", color: colors.ink },
-  heading: { fontSize: 18, fontWeight: "600", color: colors.ink },
-  text: { fontSize: 15, lineHeight: 23, color: colors.ink },
-  muted: { fontSize: 14, lineHeight: 21, color: colors.muted },
+  title: { fontSize: 26, fontWeight: "700", color: colors.ink, fontFamily: "Inter-Bold" },
+  heading: { fontSize: 16, fontWeight: "600", color: colors.ink, fontFamily: "Inter-SemiBold" },
+  text: { fontSize: 13, lineHeight: 21, color: colors.ink, fontFamily: "Inter-Regular" },
+  muted: { fontSize: 12, lineHeight: 19, color: colors.muted, fontFamily: "Inter-Regular" },
   card: {
     padding: 18,
     borderRadius: 18,
@@ -41,8 +41,9 @@ export const styles = StyleSheet.create({
     backgroundColor: "white",
     padding: 14,
     borderRadius: 12,
-    fontSize: 16,
+    fontSize: 14,
     color: colors.ink,
+    fontFamily: "Inter-Regular",
   },
   button: {
     borderRadius: 12,
@@ -52,8 +53,8 @@ export const styles = StyleSheet.create({
     backgroundColor: colors.primary,
     minHeight: 48,
   },
-  buttonText: { color: "white", fontWeight: "600", fontSize: 15 },
-  error: { color: colors.error, backgroundColor: "#fff1f2", borderRadius: 12, padding: 14, lineHeight: 22 },
+  buttonText: { color: "white", fontWeight: "600", fontSize: 13, fontFamily: "Inter-SemiBold" },
+  error: { color: colors.error, backgroundColor: "#fff1f2", borderRadius: 12, padding: 14, lineHeight: 22, fontFamily: "Inter-Regular" },
 });
 export function Page({ title, children }: React.PropsWithChildren<{ title: string }>) {
   return (
