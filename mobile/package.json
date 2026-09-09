@@ -4,6 +4,7 @@
   "main": "expo-router/entry",
   "dependencies": {
     "@expo/metro-runtime": "~57.0.15",
+    "@expo/vector-icons": "^15.1.1",
     "expo": "~57.0.20",
     "expo-camera": "~57.0.4",
     "expo-constants": "~57.0.17",
@@ -32,8 +33,8 @@
   "scripts": {
     "typecheck": "tsc --noEmit",
     "export:native": "expo export --platform android --platform ios",
-    "start": "expo start",
-    "android": "expo start --android",
+    "start": "expo start --port 8088",
+    "android": "expo start --port 8088 --android",
     "ios": "expo start --ios",
     "web": "expo start --web"
   },
