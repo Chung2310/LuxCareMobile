@@ -1,5 +1,6 @@
 import { Pressable, ScrollView, StyleSheet, Text, View } from "react-native";
 import { Redirect, Tabs } from "expo-router";
+import { Ionicons } from "@expo/vector-icons";
 import { useSession } from "../../src/auth/SessionProvider";
 import { colors } from "../../src/ui";
 import { canUseModule } from "../../src/auth/access";
@@ -41,6 +42,14 @@ function ScrollableTabBar({ state, descriptors, navigation, insets }: any) {
             }
           };
 
+          const icon = options.tabBarIcon
+            ? options.tabBarIcon({
+                color: isFocused ? "#008852" : "#94a3b8",
+                focused: isFocused,
+                size: 20,
+              })
+            : null;
+
           return (
             <Pressable
               key={route.key}
@@ -54,6 +63,7 @@ function ScrollableTabBar({ state, descriptors, navigation, insets }: any) {
               ]}
               hitSlop={{ top: 8, bottom: 8 }}
             >
+              {icon}
               <Text
                 style={[
                   tabBarStyles.tabLabel,
@@ -91,17 +101,18 @@ const tabBarStyles = StyleSheet.create({
     flexDirection: "row",
     alignItems: "center",
     paddingHorizontal: 8,
-    paddingTop: 8,
-    gap: 4,
+    paddingTop: 6,
+    gap: 2,
   },
   tabItem: {
-    paddingHorizontal: 14,
+    paddingHorizontal: 12,
     paddingVertical: 4,
     alignItems: "center",
     justifyContent: "center",
+    gap: 3,
   },
   tabLabel: {
-    fontSize: 12.5,
+    fontSize: 11,
     fontFamily: "Inter-Medium",
   },
   tabLabelActive: {
@@ -115,9 +126,9 @@ const tabBarStyles = StyleSheet.create({
   },
   indicator: {
     height: 2.5,
-    width: 18,
+    width: 16,
     borderRadius: 2,
-    marginTop: 4,
+    marginTop: 2,
   },
   indicatorActive: {
     backgroundColor: "#008852",
@@ -130,22 +141,92 @@ const tabBarStyles = StyleSheet.create({
 export default function TabLayout() {
   const { user, selectedBranch } = useSession();
   if (!user) return <Redirect href="/login" />;
+
   return (
     <Tabs
       key={`${user.uid}:${user.companyCode || ""}:${selectedBranch?._id || "default"}`}
       tabBar={(props) => <ScrollableTabBar {...props} />}
       screenOptions={{
         tabBarActiveTintColor: colors.primary,
+        tabBarInactiveTintColor: "#94a3b8",
         headerTitle: "LuxCare",
-        headerShown: true,
+        headerShown: false,
       }}
     >
-      <Tabs.Screen name="index" options={{ title: "Tổng quan", headerShown: false }} />
-      <Tabs.Screen name="work" options={{ title: "Công việc", href: canUseModule(user, "hr") ? undefined : null }} />
-      <Tabs.Screen name="equipment" options={{ title: "Thiết bị", headerShown: false }} />
-      <Tabs.Screen name="notifications" options={{ title: "Thông báo" }} />
-      <Tabs.Screen name="modules" options={{ title: "Chức năng" }} />
-      <Tabs.Screen name="profile" options={{ title: "Tài khoản" }} />
+      <Tabs.Screen
+        name="index"
+        options={{
+          title: "Trang chủ",
+          headerShown: false,
+          tabBarIcon: ({ color, focused }) => (
+            <Ionicons name={focused ? "home" : "home-outline"} size={20} color={color} />
+          ),
+        }}
+      />
+      <Tabs.Screen
+        name="work"
+        options={{
+          title: "Công việc",
+          headerShown: true,
+          href: canUseModule(user, "hr") ? undefined : null,
+          tabBarIcon: ({ color, focused }) => (
+            <Ionicons name={focused ? "briefcase" : "briefcase-outline"} size={20} color={color} />
+          ),
+        }}
+      />
+      <Tabs.Screen
+        name="equipment"
+        options={{
+          title: "Thiết bị",
+          headerShown: false,
+          tabBarIcon: ({ color, focused }) => (
+            <Ionicons name={focused ? "medkit" : "medkit-outline"} size={20} color={color} />
+          ),
+        }}
+      />
+      <Tabs.Screen
+        name="chat"
+        options={{
+          title: "Trò chuyện",
+          headerShown: false,
+          tabBarIcon: ({ color, focused }) => (
+            <Ionicons name={focused ? "chatbubble-ellipses" : "chatbubble-ellipses-outline"} size={20} color={color} />
+          ),
+        }}
+      />
+      <Tabs.Screen
+        name="notifications"
+        options={{
+          title: "Thông báo",
+          headerShown: true,
+          tabBarIcon: ({ color, focused }) => (
+            <Ionicons name={focused ? "notifications" : "notifications-outline"} size={20} color={color} />
+          ),
+        }}
+      />
+      <Tabs.Screen
+        name="modules"
+        options={{
+          title: "Chức năng",
+          headerShown: false,
+          tabBarIcon: ({ color, focused }) => (
+            <Ionicons name={focused ? "apps" : "apps-outline"} size={20} color={color} />
+          ),
+        }}
+      />
+      <Tabs.Screen
+        name="profile"
+        options={{
+          title: "Tài khoản",
+          headerShown: true,
+          tabBarIcon: ({ color, focused }) => (
+            <Ionicons name={focused ? "person" : "person-outline"} size={20} color={color} />
+          ),
+        }}
+      />
+
+      {/* Các phân hệ phụ không hiển thị trên Tab Bar */}
+      <Tabs.Screen name="attendance" options={{ title: "Chấm công", href: null }} />
       <Tabs.Screen name="leave" options={{ title: "Đơn từ", href: null }} />
       <Tabs.Screen name="departments" options={{ title: "Phòng ban", href: null }} />
       <Tabs.Screen name="employees" options={{ title: "Nhân sự", href: null }} />
@@ -156,7 +237,6 @@ export default function TabLayout() {
       <Tabs.Screen name="projects" options={{ title: "Dự án", href: null }} />
       <Tabs.Screen name="work-calendar" options={{ title: "Lịch doanh nghiệp", href: null }} />
       <Tabs.Screen name="shifts" options={{ title: "Quản lý ca", href: null }} />
-      <Tabs.Screen name="attendance" options={{ title: "Lịch & chấm công", href: null }} />
       <Tabs.Screen name="recruitment" options={{ title: "Tuyển dụng", href: null }} />
       <Tabs.Screen name="recruitment-pipeline" options={{ title: "Quy trình tuyển dụng", href: null }} />
       <Tabs.Screen name="applicants" options={{ title: "Ứng viên", href: null }} />
@@ -167,4 +247,3 @@ export default function TabLayout() {
     </Tabs>
   );
 }
-
