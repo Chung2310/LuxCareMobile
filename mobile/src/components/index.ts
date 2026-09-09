@@ -9,3 +9,6 @@ export * from "./modules/ServiceGridItem";
 export * from "./modules/ModuleSection";
 export * from "./modules/PinnedServicesSection";
 export * from "./modules/EditPinnedModal";
+
+// Inventory Components
+export * from "./inventory";
