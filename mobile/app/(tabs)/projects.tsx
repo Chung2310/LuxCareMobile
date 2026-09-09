@@ -1,7 +1,7 @@
 import { useCallback, useRef, useState } from "react";
 import { Alert, FlatList, Modal, Text, View } from "react-native";
 import { SafeAreaView } from "react-native-safe-area-context";
-import { useFocusEffect } from "expo-router";
+import { router, useFocusEffect } from "expo-router";
 import type { Project } from "../../../src/types/hr";
 import { kanban } from "../../src/api/services";
 import { useSession, messageOf } from "../../src/auth/SessionProvider";

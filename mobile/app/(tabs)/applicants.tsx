@@ -6,6 +6,7 @@ import type { RecruitmentApplicant, RecruitmentStage } from "../../../src/types/
 import { emptyPagination } from "../../../src/types/pagination";
 import { recruitment } from "../../src/api/services";
 import { messageOf, useSession } from "../../src/auth/SessionProvider";
+import { RecruitmentSubnav } from "../../src/features/recruitment/RecruitmentSubnav";
 import { Button, Card, EmptyState, ErrorText, Field, Loading, Page, styles } from "../../src/ui";
 import { ChoiceField } from "../../src/features/leave/ChoiceField";
 import { recruitmentAccess } from "../../src/features/recruitment/access";
@@ -105,6 +106,7 @@ export default function Applicants() {
   return (
     <>
       <Page title="Ứng viên">
+        <RecruitmentSubnav active="applicants" />
         {access.manage &&
           !deleted &&
           (jobId ? (

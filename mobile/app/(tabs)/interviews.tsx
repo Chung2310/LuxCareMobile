@@ -1,3 +1,4 @@
+import { RecruitmentSubnav } from "../../src/features/recruitment/RecruitmentSubnav";
 import { useCallback, useEffect, useRef, useState } from "react";
 import { Modal, Text } from "react-native";
 import { SafeAreaView } from "react-native-safe-area-context";
@@ -81,6 +82,7 @@ export default function Interviews() {
   return (
     <>
       <Page title="Lịch phỏng vấn">
+        <RecruitmentSubnav active="interviews" />
         <Button
           title={deleted ? "✓ Thùng rác · Xem lịch hiện tại" : "Xem thùng rác"}
           disabled={loading || trashBusy}

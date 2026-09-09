@@ -9,6 +9,7 @@ import type { RecruitmentJob } from "../../../src/types/recruitment";
 import { emptyPagination } from "../../../src/types/pagination";
 import { recruitment } from "../../src/api/services";
 import { messageOf, useSession } from "../../src/auth/SessionProvider";
+import { RecruitmentSubnav } from "../../src/features/recruitment/RecruitmentSubnav";
 import { Button, Card, EmptyState, ErrorText, Field, Loading, Page, styles } from "../../src/ui";
 import { ChoiceField } from "../../src/features/leave/ChoiceField";
 import { JOB_STATUSES, recruitmentAccess } from "../../src/features/recruitment/access";
@@ -119,6 +120,7 @@ export default function Recruitment() {
   return (
     <>
       <Page title="Tin tuyển dụng">
+        <RecruitmentSubnav active="jobs" />
         {access.manage && (
           <Button title="Tạo tin tuyển dụng" disabled={disabled || uncertain} onPress={() => setEditing("new")} />
         )}

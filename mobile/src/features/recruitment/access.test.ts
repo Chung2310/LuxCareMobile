@@ -10,3 +10,7 @@ it("requires read permission separately from manage permission and HR", () => {
   expect(recruitmentAccess({ ...user, enabledModules: ["chat"], permissions: ["*"] }).read).toBe(false);
   expect(recruitmentAccess({ ...user, companyCode: "", permissions: ["*"] }).read).toBe(false);
 });
+it("allows admin accounts to use recruitment within the HR module", () => {
+  expect(recruitmentAccess({ ...user, role: "admin", permissions: [] })).toEqual({ read: true, manage: true });
+  expect(recruitmentAccess({ ...user, role: "superadmin", permissions: [] })).toEqual({ read: true, manage: true });
+});

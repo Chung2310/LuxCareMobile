@@ -1,228 +1,112 @@
-import React, { useMemo, useState } from "react";
-import {
-  Alert,
-  ScrollView,
-  StyleSheet,
-  Text,
-  View,
-} from "react-native";
 import { router } from "expo-router";
-import { SafeAreaView } from "react-native-safe-area-context";
-import { Ionicons } from "@expo/vector-icons";
+import { Pressable, StyleSheet, Text, View } from "react-native";
+import { useSession } from "../../src/auth/SessionProvider";
+import { availableModules } from "../../src/features/navigation/modules";
+import { Button, Card, Page, styles } from "../../src/ui";
 
-// Tái sử dụng các components đã tách biệt
-import {
-  CategoryTabs,
-  DEFAULT_PINNED_IDS,
-  EditPinnedModal,
-  getAllServicesFlat,
-  LUXCARE_MODULES,
-  ModuleSection,
-  PinnedServicesSection,
-  SearchBar,
-  type CategoryTabItem,
-  type ServiceItem,
-  type ServiceModule,
-} from "../../src/components";
+const recruitmentSections = [
+  { label: "Tin tuyển dụng", href: "/(tabs)/recruitment" as const },
+  { label: "Ứng viên", href: "/(tabs)/applicants" as const },
+  { label: "Lịch phỏng vấn", href: "/(tabs)/interviews" as const },
+];
 
-export default function ModulesScreen() {
-  const [searchQuery, setSearchQuery] = useState("");
-  const [selectedCategory, setSelectedCategory] = useState<string>("all");
-  const [isEditModalOpen, setIsEditModalOpen] = useState(false);
-  const [pinnedIds, setPinnedIds] = useState<string[]>(DEFAULT_PINNED_IDS);
-
-  // Danh sách phẳng tất cả dịch vụ
-  const allServicesList = useMemo(() => getAllServicesFlat(LUXCARE_MODULES), []);
-
-  // Danh sách các dịch vụ được ghim hiện tại
-  const pinnedServices = useMemo(() => {
-    return pinnedIds
-      .map((id) => allServicesList.find((s) => s.id === id))
-      .filter((s): s is ServiceItem => Boolean(s));
-  }, [pinnedIds, allServicesList]);
-
-  // Danh sách tabs lọc phân hệ
-  const categoryTabs: CategoryTabItem[] = useMemo(() => {
-    return [
-      { id: "all", label: "Tất cả" },
-      ...LUXCARE_MODULES.map((mod) => ({
-        id: mod.id,
-        label: mod.shortTitle,
-      })),
-    ];
-  }, []);
-
-  // Bộ lọc danh mục & tìm kiếm
-  const filteredModules = useMemo(() => {
-    const q = searchQuery.toLowerCase().trim();
-
-    return LUXCARE_MODULES
-      .map((mod) => {
-        if (selectedCategory !== "all" && mod.id !== selectedCategory) {
-          return null;
-        }
-
-        if (!q) return mod;
-
-        const matchedItems = mod.items.filter((item) =>
-          item.title.toLowerCase().replace("\n", " ").includes(q),
-        );
-
-        if (matchedItems.length === 0) return null;
-
-        return {
-          ...mod,
-          items: matchedItems,
-        };
-      })
-      .filter((m): m is ServiceModule => Boolean(m));
-  }, [selectedCategory, searchQuery]);
-
-  const handleBack = () => {
-    if (router.canGoBack()) {
-      router.back();
-    } else {
-      router.push("/(tabs)");
-    }
-  };
-
-  const handleItemPress = (item: ServiceItem) => {
-    if (item.status === "coming_soon") {
-      Alert.alert(
-        item.title.replace(/\n/g, " "),
-        "Phân hệ này đang được hoàn thiện và đồng bộ từ phiên bản LuxCare Web. Sẽ sớm sẵn sàng trong bản cập nhật kế tiếp!",
-        [{ text: "Đã hiểu", style: "default" }]
-      );
-      return;
-    }
-    router.push(item.route as any);
-  };
-
-  const togglePinItem = (id: string) => {
-    if (pinnedIds.includes(id)) {
-      if (pinnedIds.length <= 1) return;
-      setPinnedIds(pinnedIds.filter((p) => p !== id));
-    } else {
-      if (pinnedIds.length >= 8) return;
-      setPinnedIds([...pinnedIds, id]);
-    }
-  };
+export default function Modules() {
+  const { user } = useSession();
+  const modules = availableModules(user);
+  const recruitment = modules.find((item) => item.href === "/(tabs)/recruitment");
+  const otherModules = modules.filter((item) => item.href !== "/(tabs)/recruitment");
 
   return (
-    <SafeAreaView style={styles.safeArea} edges={["top"]}>
-      {/* Component SearchBar dùng chung */}
-      <SearchBar
-        value={searchQuery}
-        onChangeText={setSearchQuery}
-        onBack={handleBack}
-        placeholder="Tìm mọi dịch vụ trên LuxCare"
-      />
-
-      <ScrollView
-        style={styles.container}
-        contentContainerStyle={styles.scrollContent}
-        showsVerticalScrollIndicator={false}
-        keyboardShouldPersistTaps="handled"
-        stickyHeaderIndices={!searchQuery.trim() ? [1] : undefined}
-      >
-        {/* Component Dịch vụ được ghim */}
-        {!searchQuery.trim() && (
-          <PinnedServicesSection
-            pinnedServices={pinnedServices}
-            onEditPress={() => setIsEditModalOpen(true)}
-            onItemPress={handleItemPress}
-          />
-        )}
-
-        {/* Component Thanh phân loại ngang */}
-        {!searchQuery.trim() && (
-          <CategoryTabs
-            categories={categoryTabs}
-            selectedId={selectedCategory}
-            onSelect={setSelectedCategory}
-          />
-        )}
-
-        {/* Phản hồi khi đang tìm kiếm */}
-        {searchQuery.trim().length > 0 && (
-          <View style={styles.searchFeedback}>
-            <Text style={styles.searchFeedbackText}>
-              Kết quả tìm kiếm cho "{searchQuery}":
-            </Text>
+    <Page title="Chức năng">
+      {recruitment && (
+        <Card>
+          <View style={moduleStyles.recruitmentHeader}>
+            <View style={moduleStyles.recruitmentIcon}>
+              <Text style={moduleStyles.recruitmentIconText}>↗</Text>
+            </View>
+            <View style={{ flex: 1 }}>
+              <Text style={styles.heading}>Tuyển dụng</Text>
+              <Text style={styles.muted}>{recruitment.description}</Text>
+            </View>
           </View>
-        )}
 
-        {/* Danh sách từng Module với 4 cột icon */}
-        {filteredModules.length === 0 ? (
-          <View style={styles.emptyContainer}>
-            <Ionicons name="search-outline" size={48} color="#cbd5e1" />
-            <Text style={styles.emptyTitle}>Không tìm thấy dịch vụ nào</Text>
-            <Text style={styles.emptySubtitle}>
-              Vui lòng kiểm tra lại từ khóa hoặc chuyển sang danh mục khác
-            </Text>
+          <View style={moduleStyles.sectionGrid}>
+            {recruitmentSections.map((section) => (
+              <Pressable
+                key={section.href}
+                accessibilityRole="button"
+                onPress={() => router.push(section.href)}
+                style={({ pressed }) => [moduleStyles.sectionButton, pressed && { opacity: 0.75 }]}
+              >
+                <Text style={moduleStyles.sectionButtonText}>{section.label}</Text>
+                <Text style={moduleStyles.sectionArrow}>›</Text>
+              </Pressable>
+            ))}
           </View>
-        ) : (
-          filteredModules.map((mod) => (
-            <ModuleSection
-              key={mod.id}
-              module={mod}
-              onItemPress={handleItemPress}
-            />
-          ))
-        )}
+        </Card>
+      )}
 
-        <View style={{ height: 40 }} />
-      </ScrollView>
-
-      {/* Component Modal Tùy Chỉnh Dịch Vụ Ghim */}
-      <EditPinnedModal
-        visible={isEditModalOpen}
-        onClose={() => setIsEditModalOpen(false)}
-        allServices={allServicesList}
-        pinnedIds={pinnedIds}
-        onTogglePin={togglePinItem}
-      />
-    </SafeAreaView>
+      {otherModules.map((item) => (
+        <Card key={item.href}>
+          <Text style={styles.heading}>{item.title}</Text>
+          <Text style={styles.muted}>{item.description}</Text>
+          <Button title={"Mở " + item.title.toLowerCase()} onPress={() => router.push(item.href)} />
+        </Card>
+      ))}
+    </Page>
   );
 }
 
-const styles = StyleSheet.create({
-  safeArea: {
-    flex: 1,
-    backgroundColor: "#ffffff",
+const moduleStyles = StyleSheet.create({
+  recruitmentHeader: {
+    flexDirection: "row",
+    alignItems: "center",
+    gap: 10,
   },
-  container: {
-    flex: 1,
-    backgroundColor: "#ffffff",
-  },
-  scrollContent: {
-    paddingBottom: 30,
-  },
-  searchFeedback: {
-    paddingHorizontal: 16,
-    paddingTop: 16,
-    paddingBottom: 8,
-  },
-  searchFeedbackText: {
-    fontSize: 14,
-    color: "#64748b",
-  },
-  emptyContainer: {
+  recruitmentIcon: {
+    width: 38,
+    height: 38,
+    borderRadius: 12,
+    backgroundColor: "#ecfdf5",
+    borderWidth: 1,
+    borderColor: "#a7f3d0",
     alignItems: "center",
     justifyContent: "center",
-    paddingVertical: 60,
-    paddingHorizontal: 24,
-    gap: 12,
   },
-  emptyTitle: {
-    fontSize: 16,
-    fontWeight: "600",
+  recruitmentIconText: {
+    color: "#047857",
+    fontSize: 20,
+    fontWeight: "800",
+  },
+  sectionGrid: {
+    flexDirection: "row",
+    flexWrap: "wrap",
+    gap: 8,
+    marginTop: 4,
+  },
+  sectionButton: {
+    width: "48%",
+    minHeight: 44,
+    flexDirection: "row",
+    alignItems: "center",
+    justifyContent: "space-between",
+    backgroundColor: "#f1f5f9",
+    borderWidth: 1,
+    borderColor: "#e2e8f0",
+    borderRadius: 10,
+    paddingHorizontal: 11,
+    paddingVertical: 9,
+  },
+  sectionButtonText: {
+    flex: 1,
     color: "#334155",
+    fontSize: 12,
+    fontWeight: "700",
   },
-  emptySubtitle: {
-    fontSize: 13,
-    color: "#94a3b8",
-    textAlign: "center",
-    lineHeight: 18,
+  sectionArrow: {
+    color: "#059669",
+    fontSize: 19,
+    lineHeight: 19,
+    fontWeight: "700",
   },
 });

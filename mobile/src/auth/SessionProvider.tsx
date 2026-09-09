@@ -12,6 +12,7 @@ type Session = {
   login: (email: string, password: string) => Promise<void>;
   logout: () => Promise<void>;
   updateDisplayName: (uid: string, name: string) => void;
+  updateUserProfile: (uid: string, data: Partial<UserProfile>) => void;
   selectedBranch: BranchRecord | null;
   selectBranch: (branch: BranchRecord | null) => void;
 };
@@ -78,6 +79,8 @@ export function SessionProvider({ children }: React.PropsWithChildren) {
         selectedBranch,
         updateDisplayName: (uid, name) =>
           setUser((current) => (current?.uid === uid ? { ...current, displayName: name } : current)),
+        updateUserProfile: (uid, data) =>
+          setUser((current) => (current?.uid === uid ? { ...current, ...data } : current)),
         selectBranch: (branch) => {
           if (user?.role !== "admin") throw new Error("Tài khoản không được chuyển chi nhánh.");
           if (branch && (!branch.isActive || branch.companyCode.toUpperCase() !== user.companyCode?.toUpperCase()))
