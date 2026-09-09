@@ -1,13 +1,11 @@
-import React from "react";
-import { Pressable, ScrollView, Text } from "react-native";
-import { colors } from "../../ui";
+import { Pressable, ScrollView, StyleSheet, Text, View } from "react-native";
 
 export type WorkSection = "tasks" | "projects" | "kpi";
 
-const sections: Array<{ value: WorkSection; label: string }> = [
-  { value: "tasks", label: "Công việc" },
-  { value: "projects", label: "Dự án" },
-  { value: "kpi", label: "KPI tháng" },
+const sections: Array<{ value: WorkSection; label: string; icon: string }> = [
+  { value: "tasks", label: "Công việc", icon: "📋" },
+  { value: "projects", label: "Dự án", icon: "📁" },
+  { value: "kpi", label: "KPI tháng", icon: "📊" },
 ];
 
 export function WorkSectionTabs({
@@ -20,38 +18,83 @@ export function WorkSectionTabs({
   onChange: (section: WorkSection) => void;
 }) {
   return (
-    <ScrollView
-      horizontal
-      showsHorizontalScrollIndicator={false}
-      contentContainerStyle={{ gap: 8, paddingHorizontal: 16, paddingVertical: 12 }}
-      style={{ backgroundColor: colors.background }}
-    >
-      {sections
-        .filter((section) => section.value !== "kpi" || canViewKpi)
-        .map((section) => {
-          const active = section.value === value;
-          return (
-            <Pressable
-              key={section.value}
-              accessibilityRole="tab"
-              accessibilityState={{ selected: active }}
-              onPress={() => onChange(section.value)}
-              style={({ pressed }) => ({
-                borderRadius: 999,
-                borderWidth: 1,
-                borderColor: active ? colors.primary : colors.border,
-                backgroundColor: active ? colors.primary : "white",
-                opacity: pressed ? 0.75 : 1,
-                paddingHorizontal: 16,
-                paddingVertical: 10,
-              })}
-            >
-              <Text style={{ color: active ? "white" : colors.ink, fontWeight: "600", fontSize: 14 }}>
-                {section.label}
-              </Text>
-            </Pressable>
-          );
-        })}
-    </ScrollView>
+    <View style={styles.wrapper}>
+      <ScrollView
+        horizontal
+        showsHorizontalScrollIndicator={false}
+        contentContainerStyle={styles.container}
+      >
+        {sections
+          .filter((section) => section.value !== "kpi" || canViewKpi)
+          .map((section) => {
+            const active = section.value === value;
+            return (
+              <Pressable
+                key={section.value}
+                accessibilityRole="tab"
+                accessibilityState={{ selected: active }}
+                onPress={() => onChange(section.value)}
+                style={({ pressed }) => [
+                  styles.tabPill,
+                  active && styles.tabPillActive,
+                  pressed && { opacity: 0.8 },
+                ]}
+              >
+                <Text style={styles.tabIcon}>{section.icon}</Text>
+                <Text
+                  style={[
+                    styles.tabLabel,
+                    active && styles.tabLabelActive,
+                  ]}
+                >
+                  {section.label}
+                </Text>
+              </Pressable>
+            );
+          })}
+      </ScrollView>
+    </View>
   );
 }
+
+const styles = StyleSheet.create({
+  wrapper: {
+    backgroundColor: "#ffffff",
+    borderBottomWidth: 1,
+    borderBottomColor: "#e2e8f0",
+  },
+  container: {
+    gap: 8,
+    paddingHorizontal: 16,
+    paddingVertical: 10,
+    flexDirection: "row",
+    alignItems: "center",
+  },
+  tabPill: {
+    flexDirection: "row",
+    alignItems: "center",
+    gap: 6,
+    paddingHorizontal: 14,
+    paddingVertical: 8,
+    borderRadius: 20,
+    backgroundColor: "#f1f5f9",
+    borderWidth: 1,
+    borderColor: "#e2e8f0",
+  },
+  tabPillActive: {
+    backgroundColor: "#059669",
+    borderColor: "#059669",
+  },
+  tabIcon: {
+    fontSize: 13,
+  },
+  tabLabel: {
+    fontSize: 13,
+    fontWeight: "600",
+    color: "#475569",
+  },
+  tabLabelActive: {
+    color: "#ffffff",
+    fontWeight: "700",
+  },
+});

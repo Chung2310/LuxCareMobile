@@ -12,7 +12,7 @@ import {
   View,
 } from "react-native";
 import { SafeAreaView } from "react-native-safe-area-context";
-import { useFocusEffect } from "expo-router";
+import { router, useFocusEffect } from "expo-router";
 import type { DepartmentRecord } from "../../../src/services/departmentService";
 import type { UserProfile } from "../../../src/types/common";
 import { departments, roster } from "../../src/api/services";
@@ -164,14 +164,23 @@ export default function Departments() {
           <Text style={styles.pageSubtitle}>Sơ đồ tổ chức & phân bổ nhân sự</Text>
         </View>
 
-        {canManage && (
+        <View style={{ flexDirection: "row", alignItems: "center", gap: 8 }}>
           <Pressable
-            style={({ pressed }) => [styles.addBtn, pressed && { opacity: 0.85 }]}
-            onPress={() => setEditing("new")}
+            style={({ pressed }) => [styles.orgChartBtn, pressed && { opacity: 0.85 }]}
+            onPress={() => router.push("/(tabs)/org-chart" as any)}
           >
-            <Text style={styles.addBtnText}>+ Thêm mới</Text>
+            <Text style={styles.orgChartBtnText}>🌳 Sơ đồ</Text>
           </Pressable>
-        )}
+
+          {canManage && (
+            <Pressable
+              style={({ pressed }) => [styles.addBtn, pressed && { opacity: 0.85 }]}
+              onPress={() => setEditing("new")}
+            >
+              <Text style={styles.addBtnText}>+ Thêm mới</Text>
+            </Pressable>
+          )}
+        </View>
       </View>
 
       {/* FlatList for all content */}
@@ -538,6 +547,19 @@ const styles = StyleSheet.create({
   },
   addBtnText: {
     color: "#ffffff",
+    fontSize: 13,
+    fontWeight: "700",
+  },
+  orgChartBtn: {
+    backgroundColor: "#eff6ff",
+    borderWidth: 1,
+    borderColor: "#bfdbfe",
+    paddingVertical: 9,
+    paddingHorizontal: 12,
+    borderRadius: 12,
+  },
+  orgChartBtnText: {
+    color: "#2563eb",
     fontSize: 13,
     fontWeight: "700",
   },
