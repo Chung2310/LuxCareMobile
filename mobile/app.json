@@ -36,8 +36,11 @@
       ],
       [
         "expo-location",
-        { "locationWhenInUsePermission": "LuxCare cần vị trí hiện tại để xác nhận địa điểm chấm công." }
-      ]
+        {
+          "locationWhenInUsePermission": "LuxCare cần vị trí hiện tại để xác nhận địa điểm chấm công."
+        }
+      ],
+      "expo-font"
     ]
   }
 }
