@@ -273,6 +273,54 @@ function EquipmentModal({
   );
 }
 
+// ── Delete Confirmation Modal ────────────────────────────────────────────────
+function DeleteConfirmModal({
+  visible,
+  itemName,
+  onClose,
+  onConfirm,
+  loading,
+}: {
+  visible: boolean;
+  itemName: string;
+  onClose: () => void;
+  onConfirm: () => void;
+  loading?: boolean;
+}) {
+  return (
+    <Modal visible={visible} transparent animationType="fade" onRequestClose={onClose}>
+      <View style={confirmStyles.overlay}>
+        <View style={confirmStyles.dialog}>
+          <Text style={confirmStyles.title}>Xóa thiết bị</Text>
+          <Text style={confirmStyles.message}>
+            Bạn có chắc muốn xóa "{itemName}"?
+          </Text>
+          <View style={confirmStyles.actions}>
+            <Pressable
+              style={({ pressed }) => [confirmStyles.cancelBtn, pressed && { opacity: 0.7 }]}
+              onPress={onClose}
+              disabled={loading}
+            >
+              <Text style={confirmStyles.cancelText}>Hủy</Text>
+            </Pressable>
+            <Pressable
+              style={({ pressed }) => [confirmStyles.deleteBtn, pressed && { opacity: 0.7 }]}
+              onPress={onConfirm}
+              disabled={loading}
+            >
+              {loading ? (
+                <ActivityIndicator size="small" color="#ffffff" />
+              ) : (
+                <Text style={confirmStyles.deleteText}>Xóa</Text>
+              )}
+            </Pressable>
+          </View>
+        </View>
+      </View>
+    </Modal>
+  );
+}
+
 // ── Main Screen ───────────────────────────────────────────────────────────────
 export default function EquipmentScreen() {
   const [items, setItems] = useState<EquipmentRecord[]>([]);
@@ -287,30 +335,28 @@ export default function EquipmentScreen() {
   const [revision, setRevision] = useState(0);
   const [modalVisible, setModalVisible] = useState(false);
   const [editItem, setEditItem] = useState<EquipmentRecord | null>(null);
+  const [deleteItem, setDeleteItem] = useState<EquipmentRecord | null>(null);
+  const [deleting, setDeleting] = useState(false);
 
   const openAdd = () => { setEditItem(null); setModalVisible(true); };
   const openEdit = (item: EquipmentRecord) => { setEditItem(item); setModalVisible(true); };
 
   const handleDelete = (item: EquipmentRecord) => {
-    Alert.alert(
-      "Xóa thiết bị",
-      `Bạn có chắc muốn xóa "${item.name}"?\nThao tác này không thể hoàn tác.`,
-      [
-        { text: "Hủy", style: "cancel" },
-        {
-          text: "Xóa",
-          style: "destructive",
-          onPress: async () => {
-            try {
-              await equipment.delete(item._id);
-              setRevision((v) => v + 1);
-            } catch (e) {
-              Alert.alert("Lỗi", e instanceof Error ? e.message : "Không thể xóa thiết bị.");
-            }
-          },
-        },
-      ],
-    );
+    setDeleteItem(item);
+  };
+
+  const confirmDelete = async () => {
+    if (!deleteItem) return;
+    setDeleting(true);
+    try {
+      await equipment.delete(deleteItem._id);
+      setDeleteItem(null);
+      setRevision((v) => v + 1);
+    } catch (e) {
+      Alert.alert("Lỗi", e instanceof Error ? e.message : "Không thể xóa thiết bị.");
+    } finally {
+      setDeleting(false);
+    }
   };
 
   const loadData = useCallback(async () => {
@@ -505,6 +551,13 @@ export default function EquipmentScreen() {
       </ScrollView>
 
       <EquipmentModal visible={modalVisible} onClose={() => setModalVisible(false)} onSaved={() => setRevision((v) => v + 1)} editItem={editItem} />
+      <DeleteConfirmModal
+        visible={!!deleteItem}
+        itemName={deleteItem?.name || ""}
+        onClose={() => setDeleteItem(null)}
+        onConfirm={confirmDelete}
+        loading={deleting}
+      />
     </SafeAreaView>
   );
 }
@@ -601,4 +654,74 @@ const modal = StyleSheet.create({
   statusChipTextActive: { color: "#008852", fontWeight: "700" },
   saveBtn: { backgroundColor: "#008852", borderRadius: 14, paddingVertical: 14, marginTop: 20, flexDirection: "row", alignItems: "center", justifyContent: "center", gap: 8, shadowColor: "#008852", shadowOffset: { width: 0, height: 3 }, shadowOpacity: 0.25, shadowRadius: 6, elevation: 4 },
   saveBtnText: { color: "#ffffff", fontSize: 15, fontWeight: "800", fontFamily: "Inter-Bold" },
+});
+
+const confirmStyles = StyleSheet.create({
+  overlay: {
+    flex: 1,
+    backgroundColor: "rgba(0, 0, 0, 0.45)",
+    justifyContent: "center",
+    alignItems: "center",
+    padding: 24,
+  },
+  dialog: {
+    width: "100%",
+    maxWidth: 320,
+    backgroundColor: "#ffffff",
+    borderRadius: 22,
+    paddingTop: 22,
+    paddingHorizontal: 20,
+    paddingBottom: 18,
+    shadowColor: "#000",
+    shadowOffset: { width: 0, height: 8 },
+    shadowOpacity: 0.15,
+    shadowRadius: 16,
+    elevation: 8,
+  },
+  title: {
+    fontSize: 18,
+    fontWeight: "700",
+    color: "#0f172a",
+    fontFamily: "Inter-Bold",
+    marginBottom: 8,
+  },
+  message: {
+    fontSize: 14,
+    color: "#475569",
+    fontFamily: "Inter-Regular",
+    lineHeight: 20,
+    marginBottom: 20,
+  },
+  actions: {
+    flexDirection: "row",
+    justifyContent: "flex-end",
+    alignItems: "center",
+    gap: 10,
+  },
+  cancelBtn: {
+    paddingVertical: 9,
+    paddingHorizontal: 16,
+    borderRadius: 10,
+    backgroundColor: "#f1f5f9",
+  },
+  cancelText: {
+    fontSize: 13.5,
+    fontWeight: "600",
+    color: "#475569",
+    fontFamily: "Inter-SemiBold",
+  },
+  deleteBtn: {
+    paddingVertical: 9,
+    paddingHorizontal: 18,
+    borderRadius: 10,
+    backgroundColor: "#dc2626",
+    minWidth: 64,
+    alignItems: "center",
+  },
+  deleteText: {
+    fontSize: 13.5,
+    fontWeight: "700",
+    color: "#ffffff",
+    fontFamily: "Inter-Bold",
+  },
 });
