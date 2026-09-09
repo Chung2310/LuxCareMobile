@@ -15,7 +15,7 @@ export default function TabLayout() {
         tabBarLabelStyle: { fontSize: 12 },
       }}
     >
-      <Tabs.Screen name="index" options={{ title: "Tổng quan" }} />
+      <Tabs.Screen name="index" options={{ title: "Tổng quan", headerShown: false }} />
       <Tabs.Screen name="work" options={{ title: "Công việc", href: canUseModule(user, "hr") ? undefined : null }} />
       <Tabs.Screen name="notifications" options={{ title: "Thông báo" }} />
       <Tabs.Screen name="modules" options={{ title: "Chức năng" }} />

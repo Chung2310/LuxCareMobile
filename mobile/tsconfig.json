@@ -3,6 +3,13 @@
   "compilerOptions": {
     "strict": true
   },
-  "include": ["app/**/*.tsx", "src/**/*.ts", "src/**/*.tsx", ".expo/types/**/*.ts"],
-  "exclude": ["node_modules", "src/**/*.test.ts"]
+  "include": [
+    "app/**/*.tsx",
+    "src/**/*.ts",
+    "src/**/*.tsx"
+  ],
+  "exclude": [
+    "node_modules",
+    "src/**/*.test.ts"
+  ]
 }

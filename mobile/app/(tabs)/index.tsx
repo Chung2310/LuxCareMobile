@@ -1,13 +1,40 @@
 import { useCallback, useState } from "react";
-import { Text, View } from "react-native";
+import { Alert, Image, ImageBackground, Platform, Pressable, ScrollView, StyleSheet, Text, View } from "react-native";
 import { router, useFocusEffect } from "expo-router";
+import { SafeAreaView } from "react-native-safe-area-context";
 import type { DashboardSummary, DashboardActionItems } from "../../../src/types/dashboard";
 import type { DashboardSummaryParams } from "../../../src/services/dashboardService";
 import { dashboard } from "../../src/api/services";
 import { messageOf, useSession } from "../../src/auth/SessionProvider";
-import { Button, Card, ErrorText, Field, Loading, Page, styles } from "../../src/ui";
+import { Card, ErrorText, Field, Loading, colors, styles } from "../../src/ui";
 import { customDashboardRange } from "../../src/features/dashboard/range";
 import { canUseModule } from "../../src/auth/access";
+
+function Button({
+  title,
+  onPress,
+  disabled = false,
+}: {
+  title: string;
+  onPress: () => void;
+  disabled?: boolean;
+}) {
+  return (
+    <Pressable
+      accessibilityRole="button"
+      accessibilityState={{ disabled }}
+      disabled={disabled}
+      onPress={onPress}
+      style={({ pressed }) => [
+        localStyles.roundedButton,
+        disabled && localStyles.roundedButtonDisabled,
+        pressed && { opacity: 0.8 },
+      ]}
+    >
+      <Text style={localStyles.roundedButtonText}>{title}</Text>
+    </Pressable>
+  );
+}
 export default function Home() {
   const { user, selectedBranch } = useSession();
   const [data, setData] = useState<DashboardSummary | null>(null);
@@ -70,28 +97,147 @@ export default function Home() {
     }, [allowed, user?.uid, selectedBranch?._id, actionsRevision]),
   );
   return (
-    <Page title={`Xin chào, ${user?.displayName || "bạn"}`}>
-      <Text style={styles.muted}>
-        {user?.companyName || "LuxCare"}
-        {selectedBranch?.name || user?.branchName ? ` · ${selectedBranch?.name || user?.branchName}` : ""}
-      </Text>
-      {!allowed ? (
-        <Card>
-          <Text style={styles.text}>Tài khoản của bạn chưa được cấp quyền xem tổng quan.</Text>
-        </Card>
-      ) : (
-        <>
-          <View style={styles.row}>
-            {(["day", "week", "year"] as const).map((value, i) => (
-              <Button
-                key={value}
-                title={["Hôm nay", "Tuần", "Năm"][i]}
-                disabled={params.filter === value}
-                onPress={() => {
-                  setParams({ filter: value });
-                  setRangeError(null);
-                }}
+    <View style={localStyles.container}>
+      {/* 1/4 Gradient xanh lá phía trên, nhạt dần xuống màu trắng */}
+      <Image
+        source={require("../../assets/gradient-top.png")}
+        style={localStyles.topGradient}
+        resizeMode="stretch"
+      />
+
+      <SafeAreaView edges={["top"]} style={localStyles.safeArea}>
+        <ScrollView
+          style={localStyles.scrollView}
+          contentContainerStyle={localStyles.scrollContent}
+          keyboardShouldPersistTaps="handled"
+          showsVerticalScrollIndicator={false}
+        >
+          {/* Top Bar with Settings on the left, User and Bell on the right */}
+          <View style={localStyles.topBar}>
+            <Pressable
+              onPress={() => router.push("/(tabs)/profile")}
+              style={({ pressed }) => [
+                localStyles.iconButton,
+                pressed && { opacity: 0.7 },
+              ]}
+              hitSlop={8}
+              accessibilityRole="button"
+              accessibilityLabel="Cài đặt"
+            >
+              <Image
+                source={require("../../assets/lucide-settings.png")}
+                style={localStyles.topBarIcon}
+                resizeMode="contain"
               />
+            </Pressable>
+
+            <View style={localStyles.topBarRight}>
+              <Pressable
+                onPress={() => router.push("/(tabs)/profile")}
+                style={({ pressed }) => [
+                  localStyles.iconButton,
+                  pressed && { opacity: 0.7 },
+                ]}
+                hitSlop={8}
+                accessibilityRole="button"
+                accessibilityLabel="Tài khoản"
+              >
+                <Image
+                  source={require("../../assets/lucide-user.png")}
+                  style={localStyles.topBarIcon}
+                  resizeMode="contain"
+                />
+              </Pressable>
+              <Pressable
+                onPress={() => router.push("/(tabs)/notifications")}
+                style={({ pressed }) => [
+                  localStyles.iconButton,
+                  pressed && { opacity: 0.7 },
+                ]}
+                hitSlop={8}
+                accessibilityRole="button"
+                accessibilityLabel="Thông báo"
+              >
+                <Image
+                  source={require("../../assets/lucide-bell.png")}
+                  style={localStyles.topBarIcon}
+                  resizeMode="contain"
+                />
+              </Pressable>
+            </View>
+          </View>
+
+          {/* Greeting Header Card with bg-hello-dashboard.png */}
+        <View style={localStyles.greetingCard}>
+          <ImageBackground
+            source={require("../../public/bg-hello-dashboard.png")}
+            style={localStyles.greetingBackground}
+            imageStyle={localStyles.greetingBackgroundImage}
+            resizeMode="cover"
+          >
+            <View style={localStyles.greetingContent}>
+              <Text style={localStyles.greetingTitle}>
+                <Text style={localStyles.greetingCursive}>Xin chào</Text>,{" "}
+                <Text style={localStyles.greetingUserName}>{user?.displayName || "bạn"}!</Text>
+              </Text>
+              <Text style={localStyles.greetingSubtitle}>
+                Chúc bạn có một ngày làm việc hiệu quả!
+              </Text>
+              {(user?.companyName || selectedBranch?.name || user?.branchName) && (
+                <Text style={localStyles.greetingMeta}>
+                  {user?.companyName || ""}
+                  {selectedBranch?.name || user?.branchName
+                    ? ` · ${selectedBranch?.name || user?.branchName}`
+                    : ""}
+                </Text>
+              )}
+            </View>
+          </ImageBackground>
+        </View>
+
+        {/* Thẻ Đi đến bảng tin nằm ngay dưới Card Hello */}
+        <Pressable
+          onPress={() => Alert.alert("Bảng tin", "Tính năng bảng tin đang được hoàn thiện.")}
+          style={({ pressed }) => [
+            localStyles.newsfeedCard,
+            pressed && { opacity: 0.8 },
+          ]}
+          accessibilityRole="button"
+          accessibilityLabel="Đi đến bảng tin"
+        >
+          <View style={localStyles.newsfeedCardLeft}>
+            <Image
+              source={require("../../assets/lucide-megaphone.png")}
+              style={localStyles.newsfeedIcon}
+              resizeMode="contain"
+            />
+            <Text style={localStyles.newsfeedText}>Đi đến bảng tin</Text>
+          </View>
+          <Image
+            source={require("../../assets/lucide-chevron-right.png")}
+            style={localStyles.newsfeedChevronIcon}
+            resizeMode="contain"
+          />
+        </Pressable>
+
+        {!allowed ? (
+          <Card>
+            <Text style={styles.text}>Tài khoản của bạn chưa được cấp quyền xem tổng quan.</Text>
+          </Card>
+        ) : (
+        <>
+          <View style={localStyles.filterRow}>
+            {(["day", "week", "year"] as const).map((value, i) => (
+              <View key={value} style={{ flex: 1 }}>
+                <Button
+                  title={["Hôm nay", "Tuần", "Năm"][i]}
+                  disabled={params.filter === value}
+                  onPress={() => {
+                    setParams({ filter: value });
+                    setRangeError(null);
+                  }}
+                />
+              </View>
             ))}
           </View>
           <Card>
@@ -210,6 +356,184 @@ export default function Home() {
           />
         </>
       )}
-    </Page>
+        </ScrollView>
+      </SafeAreaView>
+    </View>
   );
 }
+
+const localStyles = StyleSheet.create({
+  container: {
+    flex: 1,
+    backgroundColor: "#ffffff", // 3/4 màn hình còn lại màu trắng
+  },
+  topGradient: {
+    position: "absolute",
+    top: 0,
+    left: 0,
+    right: 0,
+    width: "100%", // Kéo dãn 100% chiều ngang màn hình
+    height: 350, // Chiều cao bao trọn cả thanh icon và Card Xin chào
+  },
+  safeArea: {
+    flex: 1,
+  },
+  scrollView: {
+    flex: 1,
+  },
+  scrollContent: {
+    padding: 16,
+    gap: 16,
+    paddingBottom: 36,
+  },
+  topBar: {
+    flexDirection: "row",
+    justifyContent: "space-between",
+    alignItems: "center",
+    marginBottom: -4,
+  },
+  topBarRight: {
+    flexDirection: "row",
+    alignItems: "center",
+    gap: 10,
+  },
+  newsfeedCard: {
+    flexDirection: "row",
+    alignItems: "center",
+    justifyContent: "space-between",
+    paddingVertical: 12,
+    paddingHorizontal: 16,
+    borderRadius: 8, // Viền vuông bo góc tinh tế
+    backgroundColor: "transparent", // Trong suốt hoàn toàn, không màu nền
+    borderWidth: 1,
+    borderColor: "rgba(6, 95, 70, 0.25)", // Viền vuông tinh tế
+    marginTop: -4,
+  },
+  newsfeedCardLeft: {
+    flexDirection: "row",
+    alignItems: "center",
+    gap: 10,
+  },
+  newsfeedIcon: {
+    width: 20,
+    height: 20,
+    tintColor: "#065f46",
+  },
+  newsfeedText: {
+    fontSize: 14,
+    fontWeight: "700",
+    color: "#0f172a",
+    letterSpacing: 0.1,
+  },
+  newsfeedChevronIcon: {
+    width: 16,
+    height: 16,
+    tintColor: "#065f46",
+  },
+  iconButton: {
+    width: 40,
+    height: 40,
+    borderRadius: 20,
+    backgroundColor: "rgba(255, 255, 255, 0.18)", // Siêu mờ nhạt, trong suốt nhìn rõ trọn vẹn background
+    alignItems: "center",
+    justifyContent: "center",
+    borderWidth: 1,
+    borderColor: "rgba(255, 255, 255, 0.35)", // Viền mờ nhẹ nhàng tinh tế
+  },
+  topBarIcon: {
+    width: 22,
+    height: 22,
+    tintColor: "#0f172a", // Icon màu đậm nét, tương phản rõ trên nền trong suốt
+  },
+  greetingCard: {
+    borderRadius: 22, // Bo góc mềm mại
+    overflow: "hidden",
+    backgroundColor: "#ffffff",
+    shadowColor: "#059669",
+    shadowOffset: { width: 0, height: 4 },
+    shadowOpacity: 0.12,
+    shadowRadius: 10,
+    elevation: 3, // Card nổi
+    marginBottom: 4,
+  },
+  greetingBackground: {
+    padding: 18,
+    minHeight: 120,
+    justifyContent: "center",
+  },
+  greetingBackgroundImage: {
+    borderRadius: 22,
+  },
+  greetingContent: {
+    gap: 4,
+  },
+  greetingCursive: {
+    fontFamily: Platform.select({ ios: "Snell Roundhand", android: "cursive" }),
+    fontSize: 26,
+    fontWeight: "bold",
+    color: "#065f46",
+  },
+  greetingTitle: {
+    fontSize: 20,
+    fontWeight: "800",
+    color: "#0f172a", // Màu đen đậm dứt khoát
+    marginBottom: 2,
+    textShadowColor: "rgba(255, 255, 255, 0.9)",
+    textShadowOffset: { width: 0, height: 1 },
+    textShadowRadius: 3,
+  },
+  greetingUserName: {
+    fontSize: 20,
+    fontWeight: "800",
+    color: "#0f172a", // Tên user màu đen đậm
+  },
+  greetingSubtitle: {
+    fontSize: 14,
+    fontWeight: "700",
+    color: "#0f172a", // Lời chúc màu đen đậm, rõ nét
+    textShadowColor: "rgba(255, 255, 255, 0.9)",
+    textShadowOffset: { width: 0, height: 1 },
+    textShadowRadius: 2,
+  },
+  greetingMeta: {
+    fontSize: 12,
+    fontWeight: "600",
+    color: "#047857",
+    marginTop: 4,
+    backgroundColor: "rgba(255, 255, 255, 0.75)",
+    alignSelf: "flex-start",
+    paddingHorizontal: 8,
+    paddingVertical: 2,
+    borderRadius: 10,
+  },
+  filterRow: {
+    flexDirection: "row",
+    gap: 10,
+    alignItems: "center",
+  },
+  roundedButton: {
+    backgroundColor: "#059669",
+    borderRadius: 24, // Bo tròn toàn bộ
+    paddingVertical: 13,
+    paddingHorizontal: 20,
+    alignItems: "center",
+    justifyContent: "center",
+    minHeight: 46,
+    shadowColor: "#059669",
+    shadowOffset: { width: 0, height: 2 },
+    shadowOpacity: 0.15,
+    shadowRadius: 4,
+    elevation: 2,
+  },
+  roundedButtonDisabled: {
+    opacity: 0.5,
+    shadowOpacity: 0,
+    elevation: 0,
+  },
+  roundedButtonText: {
+    color: "#ffffff",
+    fontWeight: "700",
+    fontSize: 15,
+    letterSpacing: 0.2,
+  },
+});
