@@ -117,7 +117,7 @@ export default function Home() {
         icon: "cube",
         color: "#10b981", // Xanh bạc hà
         bgColor: "#ecfdf5",
-        route: "/(tabs)/modules",
+        route: "/(tabs)/inventory",
       },
       {
         id: "equipment",

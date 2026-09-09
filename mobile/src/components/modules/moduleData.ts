@@ -62,7 +62,7 @@ export const LUXCARE_MODULES: ServiceModule[] = [
         route: "/(tabs)/inventory",
         moduleId: "popular",
         badge: "Mới",
-        status: "coming_soon",
+        status: "active",
       },
       {
         id: "pop-equipment",
@@ -279,7 +279,7 @@ export const LUXCARE_MODULES: ServiceModule[] = [
         route: "/(tabs)/inventory",
         moduleId: "operations",
         badge: "Web ERP",
-        status: "coming_soon",
+        status: "active",
       },
       {
         id: "op-stock",
