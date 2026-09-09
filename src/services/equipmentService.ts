@@ -21,7 +21,29 @@ export function createEquipmentService({ fetch, getAccessToken }: ServiceTranspo
 
     const body = await res.json().catch(() => ({}));
     if (!res.ok) {
-      throw new Error(body.message || `Lỗi tải dữ liệu thiết bị (${res.status})`);
+      let detailMsg = "";
+      if (body.errors) {
+        if (typeof body.errors === "object" && body.errors !== null) {
+          const parts: string[] = [];
+          for (const [, v] of Object.entries(body.errors)) {
+            if (Array.isArray(v)) {
+              parts.push(v.join("\n"));
+            } else if (typeof v === "string") {
+              parts.push(v);
+            } else {
+              parts.push(JSON.stringify(v));
+            }
+          }
+          detailMsg = parts.join("\n");
+        } else if (typeof body.errors === "string") {
+          detailMsg = body.errors;
+        }
+      } else if (body.details) {
+        detailMsg = typeof body.details === "string" ? body.details : JSON.stringify(body.details);
+      }
+      const mainMsg = body.message || body.error || `Lỗi yêu cầu thiết bị (${res.status})`;
+      const fullMsg = detailMsg ? `${mainMsg}:\n${detailMsg}` : mainMsg;
+      throw new Error(fullMsg);
     }
     return (body.data !== undefined ? body.data : body) as T;
   }
@@ -65,6 +87,26 @@ export function createEquipmentService({ fetch, getAccessToken }: ServiceTranspo
 
     getById: async (id: string): Promise<EquipmentRecord> => {
       return request<EquipmentRecord>(`/api/v1/equipment/${encodeURIComponent(id)}`);
+    },
+
+    create: async (payload: Partial<EquipmentRecord>): Promise<EquipmentRecord> => {
+      return request<EquipmentRecord>("/api/v1/equipment", {
+        method: "POST",
+        body: JSON.stringify(payload),
+      });
+    },
+
+    update: async (id: string, payload: Partial<EquipmentRecord>): Promise<EquipmentRecord> => {
+      return request<EquipmentRecord>(`/api/v1/equipment/${encodeURIComponent(id)}`, {
+        method: "PUT",
+        body: JSON.stringify(payload),
+      });
+    },
+
+    delete: async (id: string): Promise<void> => {
+      await request<unknown>(`/api/v1/equipment/${encodeURIComponent(id)}`, {
+        method: "DELETE",
+      });
     },
   };
 }

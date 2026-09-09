@@ -18,6 +18,9 @@ export class MobileApi {
   getBranchId() {
     return this.branchId;
   }
+  getOrigin() {
+    return this.origin;
+  }
   setBranchId(branchId: string | null) {
     if (branchId !== null && !/^[0-9a-f]{24}$/i.test(branchId)) throw new Error("Mã chi nhánh không hợp lệ.");
     if (this.branchId !== branchId) {
@@ -63,7 +66,8 @@ export class MobileApi {
       /^\/api\/v1\/recruitment\/(jobs|applicants)\/[^/]+\/attachment$/.test(input) ||
       input.startsWith("/api/v1/hr/leave-files/upload") ||
       input === "/api/v1/media/upload" ||
-      input.startsWith("/api/v1/media/download?");
+      input.startsWith("/api/v1/media/download?") ||
+      input === "/api/v1/supplies/upload-files";
     const timeout = setTimeout(cancel, isFileTransfer ? 120000 : 20000);
     try {
       const headers = new Headers(init.headers);

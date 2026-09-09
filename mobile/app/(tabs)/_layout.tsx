@@ -226,6 +226,7 @@ export default function TabLayout() {
       />
 
       {/* Các phân hệ phụ không hiển thị trên Tab Bar */}
+      <Tabs.Screen name="inventory" options={{ title: "Vật tư & Dược phẩm", href: null }} />
       <Tabs.Screen name="attendance" options={{ title: "Chấm công", href: null }} />
       <Tabs.Screen name="leave" options={{ title: "Đơn từ", href: null }} />
       <Tabs.Screen name="departments" options={{ title: "Phòng ban", href: null }} />
