@@ -2073,79 +2073,78 @@ export default function EquipmentScreen() {
           </View>
         ) : null}
 
-        <View style={styles.statusGrid}>
-          {[
-            {
-              label: "THIẾT BỊ",
-              value: totalCount,
-              filter: "all",
-              family: "mci",
-              icon: "needle",
-              iconColor: "#2563eb",
-            },
-            {
-              label: "ĐƠN MƯỢN",
-              value: bookedCount,
-              filter: "booked",
-              family: "ionicons",
-              icon: "receipt",
-              iconColor: "#7c3aed",
-            },
-            {
-              label: "CÓ SẴN",
-              value: readyCount,
-              filter: "ready",
-              family: "ionicons",
-              icon: "checkmark-circle",
-              iconColor: "#059669",
-            },
-            {
-              label: "ĐANG DÙNG",
-              value: usingCount,
-              filter: "using",
-              family: "mci",
-              icon: "stethoscope",
-              iconColor: "#0284c7",
-            },
-            {
-              label: "BẢO TRÌ",
-              value: maintenanceCount,
-              filter: "maintenance",
-              family: "ionicons",
-              icon: "construct",
-              iconColor: "#d97706",
-            },
-            {
-              label: "THANH LÝ",
-              value: disposedCount,
-              filter: "disposed",
-              family: "ionicons",
-              icon: "trash",
-              iconColor: "#dc2626",
-            },
-          ].map((c) => {
-            const IconComp = c.family === "mci" ? MaterialCommunityIcons : Ionicons;
-            return (
-              <Pressable
-                key={c.filter}
-                onPress={() => setSelectedFilter(selectedFilter === c.filter ? "all" : c.filter)}
-                style={[styles.statusCard, selectedFilter === c.filter && styles.cardActive]}
-              >
-                <IconComp name={c.icon as any} size={24} color={c.iconColor} />
-                <Text style={styles.statusValue}>{c.value}</Text>
-                <Text
-                  style={[
-                    styles.statusLabel,
-                    selectedFilter === c.filter && styles.statusLabelActive,
-                  ]}
-                  numberOfLines={1}
+        {/* Card trắng bọc 6 thẻ con */}
+        <View style={styles.statsWrapperCard}>
+          <View style={styles.statusGrid}>
+            {[
+              {
+                label: "THIẾT BỊ",
+                value: totalCount,
+                filter: "all",
+                family: "mci",
+                icon: "needle",
+                color: "#2563eb",
+              },
+              {
+                label: "ĐƠN MƯỢN",
+                value: bookedCount,
+                filter: "booked",
+                family: "ionicons",
+                icon: "receipt",
+                color: "#7c3aed",
+              },
+              {
+                label: "CÓ SẴN",
+                value: readyCount,
+                filter: "ready",
+                family: "ionicons",
+                icon: "checkmark-circle",
+                color: "#059669",
+              },
+              {
+                label: "ĐANG DÙNG",
+                value: usingCount,
+                filter: "using",
+                family: "mci",
+                icon: "stethoscope",
+                color: "#0284c7",
+              },
+              {
+                label: "BẢO TRÌ",
+                value: maintenanceCount,
+                filter: "maintenance",
+                family: "ionicons",
+                icon: "construct",
+                color: "#d97706",
+              },
+              {
+                label: "THANH LÝ",
+                value: disposedCount,
+                filter: "disposed",
+                family: "ionicons",
+                icon: "trash",
+                color: "#dc2626",
+              },
+            ].map((c) => {
+              const IconComp = c.family === "mci" ? MaterialCommunityIcons : Ionicons;
+              const isSelected = selectedFilter === c.filter;
+              return (
+                <Pressable
+                  key={c.filter}
+                  onPress={() => setSelectedFilter(isSelected ? "all" : c.filter)}
+                  style={[styles.statusCard, isSelected && styles.cardActive]}
                 >
-                  {c.label}
-                </Text>
-                {selectedFilter === c.filter && <View style={styles.activeIndicator} />}
-              </Pressable>
-            );
-          })}
+                  <View style={styles.statusIconValRow}>
+                    <IconComp name={c.icon as any} size={15} color={c.color} />
+                    <Text style={[styles.statusValue, { color: c.color }]}>{c.value}</Text>
+                  </View>
+                  <Text style={styles.statusLabel} numberOfLines={1}>
+                    {c.label}
+                  </Text>
+                </Pressable>
+              );
+            })}
+          </View>
         </View>
 
         <Text style={styles.statusSectionTitle}>Trạng thái</Text>
@@ -2283,30 +2282,66 @@ const styles = StyleSheet.create({
   headerTitle: { fontSize: 16, fontWeight: "700", color: "#0f172a", fontFamily: "Inter-Bold" },
   headerRightSpacer: { width: 36 },
   scrollView: { flex: 1 },
-  scrollContent: { padding: 16, gap: 12, paddingBottom: 40 },
+  scrollContent: { padding: 16, gap: 8, paddingBottom: 40 },
   errorBanner: { backgroundColor: "#fff1f2", borderRadius: 12, borderWidth: 1, borderColor: "#fecdd3", padding: 12, flexDirection: "row", alignItems: "center", justifyContent: "space-between", gap: 8 },
   errorBannerText: { fontSize: 12, color: "#be123c", fontFamily: "Inter-Medium", flex: 1 },
   errorRetryBtn: { backgroundColor: "#be123c", paddingHorizontal: 10, paddingVertical: 5, borderRadius: 8 },
   errorRetryText: { fontSize: 11, fontWeight: "700", color: "#ffffff", fontFamily: "Inter-Bold" },
-  statusGrid: { flexDirection: "row", flexWrap: "wrap", justifyContent: "space-between", rowGap: 8 },
+  statsWrapperCard: {
+    backgroundColor: "#ffffff",
+    borderRadius: 14,
+    padding: 8,
+    borderWidth: 1,
+    borderColor: "#e2e8f0",
+    shadowColor: "#000",
+    shadowOffset: { width: 0, height: 1 },
+    shadowOpacity: 0.04,
+    shadowRadius: 3,
+    elevation: 1,
+  },
+  statusGrid: {
+    flexDirection: "row",
+    flexWrap: "wrap",
+    justifyContent: "space-between",
+    rowGap: 6,
+  },
   statusCard: {
-    width: "31.6%",
-    backgroundColor: "transparent",
+    width: "32%",
+    backgroundColor: "#ffffff",
+    borderWidth: 1,
+    borderColor: "#f1f5f9",
+    borderRadius: 8,
     paddingVertical: 6,
-    paddingHorizontal: 4,
+    paddingHorizontal: 3,
     alignItems: "center",
     justifyContent: "center",
-    minHeight: 62,
-    borderRadius: 10,
+    minHeight: 46,
   },
   cardActive: {
-    backgroundColor: "rgba(0, 136, 82, 0.08)",
+    borderColor: "#008852",
+    backgroundColor: "#f0fdf4",
   },
-  statusValue: { fontSize: 18, fontWeight: "800", fontFamily: "Inter-Bold", color: "#0f172a", marginTop: 2 },
-  statusLabel: { fontSize: 9.5, fontWeight: "700", fontFamily: "Inter-Bold", color: "#64748b", letterSpacing: 0.1, textAlign: "center", marginTop: 1 },
-  statusLabelActive: { color: "#008852", fontWeight: "800" },
-  activeIndicator: { width: 16, height: 2.5, borderRadius: 2, backgroundColor: "#008852", marginTop: 3 },
-  statusSectionTitle: { fontSize: 16, fontWeight: "700", color: "#0f172a", fontFamily: "Inter-Bold", marginTop: 14, marginBottom: 8 },
+  statusIconValRow: {
+    flexDirection: "row",
+    alignItems: "center",
+    justifyContent: "center",
+    gap: 4,
+  },
+  statusValue: {
+    fontSize: 15,
+    fontWeight: "800",
+    fontFamily: "Inter-Bold",
+  },
+  statusLabel: {
+    fontSize: 9.5,
+    fontWeight: "800",
+    fontFamily: "Inter-Bold",
+    color: "#0f172a",
+    letterSpacing: 0.1,
+    textAlign: "center",
+    marginTop: 2,
+  },
+  statusSectionTitle: { fontSize: 13.5, fontWeight: "700", color: "#0f172a", fontFamily: "Inter-Bold", marginTop: 6, marginBottom: 2 },
   cardGray: { backgroundColor: "#ffffff", borderColor: "#e2e8f0" },
   cardGreen: { backgroundColor: "#f0fdf4", borderColor: "#bbf7d0" },
   cardAmber: { backgroundColor: "#fffbeb", borderColor: "#fed7aa" },
@@ -2314,17 +2349,25 @@ const styles = StyleSheet.create({
   textGreen: { color: "#047857" },
   textAmber: { color: "#b45309" },
   textDark: { color: "#0f172a" },
-  complianceGrid: { flexDirection: "row", justifyContent: "space-between", marginTop: 2 },
-  complianceCard: { width: "31.6%", borderRadius: 12, borderWidth: 1.5, paddingVertical: 8, paddingHorizontal: 8, justifyContent: "space-between", minHeight: 78 },
+  complianceGrid: { flexDirection: "row", justifyContent: "space-between", marginTop: 1 },
+  complianceCard: {
+    width: "31.6%",
+    borderRadius: 10,
+    borderWidth: 1,
+    paddingVertical: 5,
+    paddingHorizontal: 6,
+    justifyContent: "space-between",
+    minHeight: 52,
+  },
   complianceCardHeader: { flexDirection: "row", justifyContent: "space-between", alignItems: "center" },
-  complianceCardTitle: { fontSize: 10, fontWeight: "700", fontFamily: "Inter-Bold", flex: 1 },
-  complianceIconWrap: { width: 18, height: 18, borderRadius: 9, alignItems: "center", justifyContent: "center" },
+  complianceCardTitle: { fontSize: 9.5, fontWeight: "700", fontFamily: "Inter-Bold", flex: 1 },
+  complianceIconWrap: { width: 15, height: 15, borderRadius: 7.5, alignItems: "center", justifyContent: "center" },
   complianceIconWrapRed: { backgroundColor: "#ffe4e6" },
   complianceIconWrapAmber: { backgroundColor: "#fef3c7" },
   complianceIconWrapGreen: { backgroundColor: "#dcfce7" },
-  complianceIcon: { width: 11, height: 11 },
-  complianceValue: { fontSize: 20, fontWeight: "800", fontFamily: "Inter-Bold", marginTop: 3, marginBottom: 2, textAlign: "center" },
-  complianceSubtitle: { fontSize: 8.8, fontWeight: "600", fontFamily: "Inter-SemiBold", textAlign: "center" },
+  complianceIcon: { width: 9, height: 9 },
+  complianceValue: { fontSize: 16, fontWeight: "800", fontFamily: "Inter-Bold", marginTop: 1, marginBottom: 1, textAlign: "center" },
+  complianceSubtitle: { fontSize: 8, fontWeight: "600", fontFamily: "Inter-SemiBold", textAlign: "center" },
   complianceCardRed: { backgroundColor: "#fff1f2", borderColor: "#fecdd3" },
   complianceCardAmber: { backgroundColor: "#fffbeb", borderColor: "#fed7aa" },
   complianceCardGreen: { backgroundColor: "#f0fdf4", borderColor: "#bbf7d0" },
@@ -2341,7 +2384,7 @@ const styles = StyleSheet.create({
     borderColor: "#e2e8f0",
     paddingHorizontal: 14,
     paddingVertical: 7,
-    marginTop: 12,
+    marginTop: 8,
     flexDirection: "row",
     alignItems: "center",
     width: "88%",
