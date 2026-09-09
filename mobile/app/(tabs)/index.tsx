@@ -159,8 +159,8 @@ export default function Home() {
         id: "inventory",
         title: "Vật tư\n& Dược phẩm",
         icon: "cube",
-        color: "#10b981", // Xanh bạc hà
-        bgColor: "#ecfdf5",
+        color: "#dc2626", // Đỏ tươi nổi bật
+        bgColor: "#fef2f2",
         route: "/(tabs)/inventory",
       },
       {
