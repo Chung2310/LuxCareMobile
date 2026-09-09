@@ -167,7 +167,7 @@ export default function TabLayout() {
         name="work"
         options={{
           title: "Công việc",
-          headerShown: true,
+          headerShown: false,
           href: canUseModule(user, "hr") ? undefined : null,
           tabBarIcon: ({ color, focused }) => (
             <Ionicons name={focused ? "briefcase" : "briefcase-outline"} size={20} color={color} />
@@ -239,11 +239,13 @@ export default function TabLayout() {
       <Tabs.Screen name="shifts" options={{ title: "Quản lý ca", href: null }} />
       <Tabs.Screen name="recruitment" options={{ title: "Tuyển dụng", href: null }} />
       <Tabs.Screen name="recruitment-pipeline" options={{ title: "Quy trình tuyển dụng", href: null }} />
+      <Tabs.Screen name="workflow" options={{ title: "Quy trình làm việc", href: null }} />
       <Tabs.Screen name="applicants" options={{ title: "Ứng viên", href: null }} />
       <Tabs.Screen name="interviews" options={{ title: "Phỏng vấn", href: null }} />
-      <Tabs.Screen name="calendar-events" options={{ title: "Lịch nhân sự", href: null }} />
+      <Tabs.Screen name="calendar-events" options={{ title: "Lịch làm việc", href: null }} />
       <Tabs.Screen name="attendance-management" options={{ title: "Quản lý công", href: null }} />
       <Tabs.Screen name="kpi" options={{ title: "KPI tháng", href: null }} />
+      <Tabs.Screen name="org-chart" options={{ title: "Sơ đồ tổ chức", href: null }} />
     </Tabs>
   );
 }

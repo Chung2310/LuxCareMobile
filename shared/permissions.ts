@@ -52,6 +52,10 @@ export const PERMISSION_CATALOG: PermissionCatalogEntry[] = [
     read: "Xem tổng quan và dữ liệu nhân sự.",
     manage: "Quản lý hợp đồng và hồ sơ nhân sự.",
   }),
+  ...readManage("workflow", { read: "Xem quy trình", manage: "Quản lý quy trình" }, "Nhân sự", {
+    read: "Xem các bước và nhánh quy trình nhân sự.",
+    manage: "Tạo, cập nhật, xóa và quản lý quy trình nhân sự.",
+  }),
   ...readManage("contracts", { read: "Xem hợp đồng lao động", manage: "Quản lý hợp đồng lao động" }, "Nhân sự", {
     read: "Xem hợp đồng lao động trong phạm vi được phép.",
     manage: "Tải lên, cập nhật và gia hạn hợp đồng lao động.",

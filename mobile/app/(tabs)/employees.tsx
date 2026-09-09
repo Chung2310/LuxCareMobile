@@ -1,7 +1,7 @@
 import { useCallback, useRef, useState } from "react";
-import { FlatList, Modal, Text, View } from "react-native";
+import { FlatList, Modal, Pressable, Text, View } from "react-native";
 import { SafeAreaView } from "react-native-safe-area-context";
-import { useFocusEffect } from "expo-router";
+import { router, useFocusEffect } from "expo-router";
 import type { UserProfile } from "../../../src/types/common";
 import type { EmployeeProfileInput } from "../../../src/services/rosterService";
 import { getRoleDisplayName } from "../../../src/utils/permissionUtils";
@@ -87,10 +87,30 @@ export default function Employees() {
         onRefresh={() => setRevision((v) => v + 1)}
         ListHeaderComponent={
           <View style={{ gap: 14 }}>
-            <Text style={styles.title}>Nhân sự</Text>
-            <Text style={styles.muted}>
-              {selectedBranch?.name || user?.branchName || user?.companyName} · {data.length} nhân viên
-            </Text>
+            <View style={{ flexDirection: "row", justifyContent: "space-between", alignItems: "center" }}>
+              <View style={{ flex: 1, paddingRight: 8 }}>
+                <Text style={styles.title}>Nhân sự</Text>
+                <Text style={styles.muted}>
+                  {selectedBranch?.name || user?.branchName || user?.companyName} · {data.length} nhân viên
+                </Text>
+              </View>
+              <Pressable
+                style={({ pressed }) => [
+                  {
+                    backgroundColor: "#eff6ff",
+                    borderColor: "#bfdbfe",
+                    borderWidth: 1,
+                    borderRadius: 12,
+                    paddingHorizontal: 12,
+                    paddingVertical: 8,
+                  },
+                  pressed && { opacity: 0.8 },
+                ]}
+                onPress={() => router.push("/(tabs)/org-chart" as any)}
+              >
+                <Text style={{ color: "#2563eb", fontWeight: "700", fontSize: 13 }}>🌳 Sơ đồ tổ chức</Text>
+              </Pressable>
+            </View>
             <Field label="Tìm tên, email, phòng ban" value={search} onChangeText={setSearch} />
             <ErrorText message={error} />
             {error && <Button title="Thử lại" onPress={() => setRevision((v) => v + 1)} />}

@@ -20,10 +20,10 @@ it("restricts attendance management to HR managers with a company", () => {
   expect(visible({ ...user, companyCode: "", permissions: ["timekeeping:manage"] })).toBe(false);
   expect(visible({ ...user, enabledModules: ["chat"], permissions: ["timekeeping:manage"] })).toBe(false);
 });
-it("requires both HR access and work read permission for KPI navigation", () => {
-  const hasKpi = (profile: UserProfile | null) => availableModules(profile).some((item) => item.href === "/(tabs)/kpi");
-  expect(hasKpi(null)).toBe(false);
-  expect(hasKpi(user)).toBe(false);
-  expect(hasKpi({ ...user, permissions: ["work:read"] })).toBe(true);
-  expect(hasKpi({ ...user, enabledModules: ["chat"], permissions: ["work:read"] })).toBe(false);
+it("groups work, projects and monthly KPI under one mobile module", () => {
+  const modules = availableModules({ ...user, permissions: ["work:read"] });
+  expect(modules.filter((item) => item.href === "/(tabs)/work")).toHaveLength(1);
+  expect(modules.some((item) => item.href === "/(tabs)/projects")).toBe(false);
+  expect(modules.some((item) => item.href === "/(tabs)/kpi")).toBe(false);
+  expect(availableModules({ ...user, enabledModules: ["chat"], permissions: ["work:read"] }).some((item) => item.href === "/(tabs)/work")).toBe(false);
 });

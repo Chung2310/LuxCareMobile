@@ -6,10 +6,12 @@ import { canReadContracts } from "../contracts/model";
 import { canReadCredentials } from "../credentials/model";
 import { canReadPayslips } from "../payroll/model";
 import { canReadPayrollRuns } from "../payroll/runModel";
+import { workflowAccess } from "../workflow/access";
 
 export function availableModules(user: UserProfile | null) {
   const hr = canUseModule(user, "hr");
   const recruitment = recruitmentAccess(user).read;
+  const workflow = workflowAccess(user);
 
   return [
     {
@@ -43,8 +45,14 @@ export function availableModules(user: UserProfile | null) {
       visible: recruitment,
     },
     {
-      title: "Lịch nhân sự",
-      description: "Sự kiện, nghỉ phép, làm tại nhà và nhắc việc",
+      title: "Quy trình làm việc",
+      description: "Xây dựng quy trình, các bước và hướng xử lý",
+      href: "/(tabs)/workflow" as const,
+      visible: workflow.read,
+    },
+    {
+      title: "Lịch làm việc",
+      description: "Lịch trình, chấm công, đơn từ và ca làm việc",
       href: "/(tabs)/calendar-events" as const,
       visible: hr && !!user?.companyCode,
     },
@@ -62,14 +70,8 @@ export function availableModules(user: UserProfile | null) {
     },
     {
       title: "Công việc",
-      description: "Giao việc, tiến độ và lịch sử",
+      description: "Công việc, dự án và KPI tháng",
       href: "/(tabs)/work" as const,
-      visible: hr,
-    },
-    {
-      title: "Dự án",
-      description: "Danh sách và tiến độ dự án",
-      href: "/(tabs)/projects" as const,
       visible: hr,
     },
     {
@@ -91,12 +93,6 @@ export function availableModules(user: UserProfile | null) {
       visible: hr,
     },
     {
-      title: "KPI tháng",
-      description: "Báo cáo công việc hoàn thành đúng hạn",
-      href: "/(tabs)/kpi" as const,
-      visible: hr && hasPermission(user, "work:read"),
-    },
-    {
       title: "Đơn từ & phép",
       description: "Nộp đơn, biểu mẫu và phê duyệt",
       href: "/(tabs)/leave" as const,
@@ -106,6 +102,12 @@ export function availableModules(user: UserProfile | null) {
       title: "Phòng ban",
       description: "Danh mục phòng ban của doanh nghiệp",
       href: "/(tabs)/departments" as const,
+      visible: !!user,
+    },
+    {
+      title: "Sơ đồ tổ chức",
+      description: "Cơ cấu phân cấp phòng ban và nhân sự",
+      href: "/(tabs)/org-chart" as const,
       visible: !!user,
     },
   ].filter((item) => item.visible);
