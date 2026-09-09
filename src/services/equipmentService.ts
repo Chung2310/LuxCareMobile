@@ -66,6 +66,26 @@ export function createEquipmentService({ fetch, getAccessToken }: ServiceTranspo
     getById: async (id: string): Promise<EquipmentRecord> => {
       return request<EquipmentRecord>(`/api/v1/equipment/${encodeURIComponent(id)}`);
     },
+
+    create: async (payload: Partial<EquipmentRecord>): Promise<EquipmentRecord> => {
+      return request<EquipmentRecord>("/api/v1/equipment", {
+        method: "POST",
+        body: JSON.stringify(payload),
+      });
+    },
+
+    update: async (id: string, payload: Partial<EquipmentRecord>): Promise<EquipmentRecord> => {
+      return request<EquipmentRecord>(`/api/v1/equipment/${encodeURIComponent(id)}`, {
+        method: "PUT",
+        body: JSON.stringify(payload),
+      });
+    },
+
+    delete: async (id: string): Promise<void> => {
+      await request<unknown>(`/api/v1/equipment/${encodeURIComponent(id)}`, {
+        method: "DELETE",
+      });
+    },
   };
 }
 
