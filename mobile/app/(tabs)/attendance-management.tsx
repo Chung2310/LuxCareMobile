@@ -7,7 +7,7 @@ import { currentKpiPeriod, validateKpiPeriod } from "../../../src/services/month
 import { attendance } from "../../src/api/services";
 import { canUseModule, hasPermission } from "../../src/auth/access";
 import { messageOf, useSession } from "../../src/auth/SessionProvider";
-import { Button, Card, ErrorText, Field, Loading, Page, styles } from "../../src/ui";
+import { Button, Card, EmptyState, ErrorText, Field, Loading, Page, styles } from "../../src/ui";
 import { ChoiceField } from "../../src/features/leave/ChoiceField";
 import { AdjustmentForm } from "../../src/features/attendance/AdjustmentForm";
 import { ATTENDANCE_STATUSES } from "../../src/features/attendance/adjustment";
@@ -132,7 +132,7 @@ export default function AttendanceManagement() {
           </Card>
         ))}
         {!loading && !error && employee && !rows.length && (
-          <Text style={styles.muted}>Không có bản ghi trong tháng.</Text>
+          <EmptyState message="Không có bản ghi trong tháng" />
         )}
         <Button title="Tải lại" disabled={loading} onPress={() => setRevision((value) => value + 1)} />
       </Page>

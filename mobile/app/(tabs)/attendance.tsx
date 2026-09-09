@@ -10,7 +10,7 @@ import { currentKpiPeriod, validateKpiPeriod } from "../../../src/services/month
 import { messageOf, useSession } from "../../src/auth/SessionProvider";
 import { canUseModule, hasPermission } from "../../src/auth/access";
 import { calendarAccess } from "../../src/features/calendar/model";
-import { Button, Card, ErrorText, Field, Loading, Page, styles } from "../../src/ui";
+import { Button, Card, EmptyState, ErrorText, Field, Loading, Page, styles } from "../../src/ui";
 export default function Attendance() {
   const [action, setAction] = useState<"check-in" | "check-out" | null>(null);
   const actionLock = useRef(false);
@@ -157,7 +157,7 @@ export default function Attendance() {
             </Card>
           ))}
           {!loading && !logs.length && !errors.some((error) => error.startsWith("Lịch sử:")) && (
-            <Text style={styles.muted}>Không có bản ghi trong tháng.</Text>
+            <EmptyState message="Không có bản ghi trong tháng" />
           )}
         </Card>
         <Card>

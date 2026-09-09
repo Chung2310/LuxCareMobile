@@ -6,7 +6,7 @@ import type { WorkShift, ShiftEmployee } from "../../../src/services/attendanceS
 import { attendance } from "../../src/api/services";
 import { canUseModule, hasPermission } from "../../src/auth/access";
 import { messageOf, useSession } from "../../src/auth/SessionProvider";
-import { Button, Card, ErrorText, Field, Loading, Page, styles } from "../../src/ui";
+import { Button, Card, EmptyState, ErrorText, Field, Loading, Page, styles } from "../../src/ui";
 import { ChoiceField } from "../../src/features/leave/ChoiceField";
 import { ShiftForm } from "../../src/features/shifts/ShiftForm";
 import { assignmentDates } from "../../src/features/shifts/model";
@@ -100,6 +100,7 @@ export default function Shifts() {
         {success && <Text style={styles.text}>{success}</Text>}
         {loading && <Loading />}
         <Button title="Thêm ca" disabled={disabled} onPress={() => setEditing("new")} />
+        {!loading && !shifts.length && <EmptyState message="Chưa có ca làm việc nào" />}
         {shifts.map((shift) => (
           <Card key={shift._id}>
             <Text style={styles.heading}>
@@ -171,6 +172,17 @@ export default function Shifts() {
                 />
               </Card>
             ))}
+          {people.length > 0 &&
+            people.filter((person) =>
+              `${person.displayName} ${person.email}`
+                .toLocaleLowerCase("vi-VN")
+                .includes(search.toLocaleLowerCase("vi-VN")),
+            ).length === 0 && (
+              <EmptyState
+                message="Không tìm thấy nhân viên"
+                subtitle="Không có nhân sự nào phù hợp với từ khóa."
+              />
+            )}
           <Button
             title="Xác nhận phân ca"
             disabled={disabled || !selected.length || !target}

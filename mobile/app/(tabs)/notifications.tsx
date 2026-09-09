@@ -6,7 +6,7 @@ import { notifications } from "../../src/api/services";
 import { messageOf, useSession } from "../../src/auth/SessionProvider";
 import { notificationTarget } from "../../src/features/navigation/notificationTarget";
 import { ChoiceField } from "../../src/features/leave/ChoiceField";
-import { Button, Card, ErrorText, Loading, styles } from "../../src/ui";
+import { Button, Card, EmptyState, ErrorText, Loading, styles } from "../../src/ui";
 export default function Notifications() {
   const { user } = useSession();
   const lock = useRef(false);
@@ -123,7 +123,7 @@ export default function Notifications() {
         loading ? (
           <Loading />
         ) : !error ? (
-          <Text style={styles.muted}>Không có thông báo.</Text>
+          <EmptyState message="Không có thông báo" subtitle="Hiện tại không có thông báo nào." />
         ) : (
           <Button title="Thử lại" onPress={() => setRevision((v) => v + 1)} />
         )

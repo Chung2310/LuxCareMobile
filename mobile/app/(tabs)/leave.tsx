@@ -13,7 +13,7 @@ import {
 import { leave } from "../../src/api/services";
 import { messageOf, useSession } from "../../src/auth/SessionProvider";
 import { canUseModule, hasPermission } from "../../src/auth/access";
-import { Button, Card, ErrorText, Field, Loading, Page, styles } from "../../src/ui";
+import { Button, Card, EmptyState, ErrorText, Field, Loading, Page, styles } from "../../src/ui";
 import { ChoiceField } from "../../src/features/leave/ChoiceField";
 import { LeaveForm } from "../../src/features/leave/LeaveForm";
 import { LeaveTemplates } from "../../src/features/leave/LeaveTemplates";
@@ -150,7 +150,7 @@ export default function LeaveScreen() {
           loading ? (
             <Loading />
           ) : !error ? (
-            <Text style={styles.muted}>Không có đơn phù hợp trong trang này.</Text>
+            <EmptyState message="Không có đơn phù hợp trong trang này" />
           ) : null
         }
         renderItem={({ item }) => (

@@ -6,7 +6,7 @@ import type { RecruitmentInterview } from "../../../src/types/recruitment";
 import { emptyPagination } from "../../../src/types/pagination";
 import { recruitment } from "../../src/api/services";
 import { messageOf, useSession } from "../../src/auth/SessionProvider";
-import { Button, Card, ErrorText, Loading, Page, styles } from "../../src/ui";
+import { Button, Card, EmptyState, ErrorText, Loading, Page, styles } from "../../src/ui";
 import { ChoiceField } from "../../src/features/leave/ChoiceField";
 import { recruitmentAccess } from "../../src/features/recruitment/access";
 import { INTERVIEW_STATUSES } from "../../src/features/recruitment/interviewModel";
@@ -158,7 +158,9 @@ export default function Interviews() {
             )}
           </Card>
         ))}
-        {!loading && !error && !rows.length && <Text style={styles.muted}>Không có lịch phỏng vấn phù hợp.</Text>}
+        {!loading && !error && !rows.length && (
+          <EmptyState message="Không có lịch phỏng vấn phù hợp" />
+        )}
         <Text style={styles.muted}>
           Trang {page}/{Math.max(1, pagination.totalPages)} · {pagination.total} lịch
         </Text>

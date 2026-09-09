@@ -8,7 +8,7 @@ import type { UserProfile } from "../../../src/types/common";
 import { ChoiceField } from "../../src/features/leave/ChoiceField";
 import { LegacyForm } from "../../src/features/departments/LegacyForm";
 import { messageOf, useSession } from "../../src/auth/SessionProvider";
-import { Button, Card, ErrorText, Field, Loading, Page, styles } from "../../src/ui";
+import { Button, Card, EmptyState, ErrorText, Field, Loading, Page, styles } from "../../src/ui";
 export default function Departments() {
   const { user } = useSession();
   const canManage = ["admin", "superadmin"].includes(user?.role || "");
@@ -154,7 +154,10 @@ export default function Departments() {
           ) : error ? (
             <Button title="Thử lại" onPress={() => setRevision((v) => v + 1)} />
           ) : (
-            <Text style={styles.muted}>Không có phòng ban phù hợp.</Text>
+            <EmptyState
+              message="Không có phòng ban phù hợp"
+              subtitle={query ? "Không tìm thấy phòng ban nào theo từ khóa." : undefined}
+            />
           )
         }
         renderItem={({ item }) => (

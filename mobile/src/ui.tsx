@@ -1,6 +1,7 @@
 import React from "react";
 import {
   ActivityIndicator,
+  Image,
   Pressable,
   ScrollView,
   StyleSheet,
@@ -84,7 +85,18 @@ export function Button({
       accessibilityState={{ disabled }}
       disabled={disabled}
       onPress={onPress}
-      style={({ pressed }) => [styles.button, { opacity: disabled ? 0.45 : pressed ? 0.75 : 1 }]}
+      style={({ pressed }) => [
+        styles.button,
+        { opacity: disabled ? 0.45 : 1 },
+        pressed && !disabled && {
+          borderColor: "#008852",
+          borderWidth: 2,
+          shadowColor: "#008852",
+          shadowOpacity: 0.35,
+          shadowRadius: 5,
+          transform: [{ scale: 0.98 }],
+        },
+      ]}
     >
       <Text style={styles.buttonText}>{title}</Text>
     </Pressable>
@@ -108,3 +120,53 @@ export function ErrorText({ message }: { message: string | null }) {
 export function Loading() {
   return <ActivityIndicator size="large" color={colors.primary} style={{ padding: 32 }} />;
 }
+
+export function EmptyState({
+  message = "Không có dữ liệu",
+  subtitle,
+}: {
+  message?: string;
+  subtitle?: string;
+}) {
+  return (
+    <View style={emptyStyles.container}>
+      <Image
+        source={require("../public/khong-co-gi-o-day.png")}
+        style={emptyStyles.image}
+        resizeMode="contain"
+      />
+      {message ? <Text style={emptyStyles.message}>{message}</Text> : null}
+      {subtitle ? <Text style={emptyStyles.subtitle}>{subtitle}</Text> : null}
+    </View>
+  );
+}
+
+const emptyStyles = StyleSheet.create({
+  container: {
+    width: "100%",
+    alignItems: "center",
+    justifyContent: "center",
+    paddingVertical: 24,
+    paddingHorizontal: 16,
+    gap: 6,
+  },
+  image: {
+    width: 240,
+    height: 135,
+    marginBottom: 4,
+  },
+  message: {
+    fontSize: 14,
+    fontWeight: "700",
+    color: "#334155",
+    fontFamily: "Inter-Bold",
+    textAlign: "center",
+  },
+  subtitle: {
+    fontSize: 12,
+    color: "#94a3b8",
+    fontFamily: "Inter-Regular",
+    textAlign: "center",
+    maxWidth: 280,
+  },
+});

@@ -8,7 +8,7 @@ import { getRoleDisplayName } from "../../../src/utils/permissionUtils";
 import { roster } from "../../src/api/services";
 import { useSession, messageOf } from "../../src/auth/SessionProvider";
 import { canUseModule, hasPermission } from "../../src/auth/access";
-import { Button, Card, ErrorText, Field, Loading, Page, styles } from "../../src/ui";
+import { Button, Card, EmptyState, ErrorText, Field, Loading, Page, styles } from "../../src/ui";
 export default function Employees() {
   const { user, selectedBranch } = useSession();
   const allowed = canUseModule(user, "hr") && (hasPermission(user, "hr:read") || hasPermission(user, "user:read"));
@@ -97,7 +97,14 @@ export default function Employees() {
           </View>
         }
         ListEmptyComponent={
-          loading ? <Loading /> : !error ? <Text style={styles.muted}>Không có nhân sự phù hợp.</Text> : null
+          loading ? (
+            <Loading />
+          ) : !error ? (
+            <EmptyState
+              message="Không có nhân sự phù hợp"
+              subtitle={search ? "Không tìm thấy nhân viên phù hợp với từ khóa." : undefined}
+            />
+          ) : null
         }
         renderItem={({ item }) => (
           <Card>

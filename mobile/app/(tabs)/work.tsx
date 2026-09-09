@@ -6,7 +6,7 @@ import type { HRTask, Project } from "../../../src/types/hr";
 import { kanban } from "../../src/api/services";
 import { useSession, messageOf } from "../../src/auth/SessionProvider";
 import { canUseModule, hasPermission } from "../../src/auth/access";
-import { Button, Card, ErrorText, Field, Loading, Page, styles } from "../../src/ui";
+import { Button, Card, EmptyState, ErrorText, Field, Loading, Page, styles } from "../../src/ui";
 import { ChoiceField } from "../../src/features/leave/ChoiceField";
 import { shareLeaveFile } from "../../src/features/leave/files";
 import { TaskForm } from "../../src/features/work/TaskForm";
@@ -159,7 +159,11 @@ export default function Work() {
           </View>
         }
         ListEmptyComponent={
-          loading ? <Loading /> : !error ? <Text style={styles.muted}>Không có công việc phù hợp.</Text> : null
+          loading ? (
+            <Loading />
+          ) : !error ? (
+            <EmptyState message="Không có công việc phù hợp" subtitle="Không tìm thấy công việc theo điều kiện lọc." />
+          ) : null
         }
         renderItem={({ item }) => (
           <Card>

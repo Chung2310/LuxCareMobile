@@ -6,7 +6,7 @@ import type { RecruitmentApplicant, RecruitmentStage } from "../../../src/types/
 import { emptyPagination } from "../../../src/types/pagination";
 import { recruitment } from "../../src/api/services";
 import { messageOf, useSession } from "../../src/auth/SessionProvider";
-import { Button, Card, ErrorText, Field, Loading, Page, styles } from "../../src/ui";
+import { Button, Card, EmptyState, ErrorText, Field, Loading, Page, styles } from "../../src/ui";
 import { ChoiceField } from "../../src/features/leave/ChoiceField";
 import { recruitmentAccess } from "../../src/features/recruitment/access";
 import { applicantFilters, OUTCOMES } from "../../src/features/recruitment/applicantModel";
@@ -210,7 +210,9 @@ export default function Applicants() {
             )}
           </Card>
         ))}
-        {!loading && !error && !rows.length && <Text style={styles.muted}>Không có ứng viên phù hợp.</Text>}
+        {!loading && !error && !rows.length && (
+          <EmptyState message="Không có ứng viên phù hợp" />
+        )}
         <Text style={styles.muted}>
           Trang {page}/{Math.max(1, pagination.totalPages)} · {pagination.total} ứng viên
         </Text>

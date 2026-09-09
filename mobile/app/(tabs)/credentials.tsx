@@ -12,7 +12,7 @@ import type { CredentialList } from "../../../src/services/hrCredentialService";
 import type { HRCredentialStatus, HRCredentialType } from "../../../shared/hr-credential";
 import { credentials } from "../../src/api/services";
 import { useSession, messageOf } from "../../src/auth/SessionProvider";
-import { Button, Card, ErrorText, Field, Loading, Page, styles } from "../../src/ui";
+import { Button, Card, EmptyState, ErrorText, Field, Loading, Page, styles } from "../../src/ui";
 import { ChoiceField } from "../../src/features/leave/ChoiceField";
 import { ContractFiles } from "../../src/features/contracts/ContractFiles";
 import { contractDate } from "../../src/features/contracts/model";
@@ -168,7 +168,7 @@ export default function Credentials() {
               {data.summary.expiring} sắp hết hạn · {data.summary.expired} hết hạn. Thống kê không giới hạn theo từ
               khóa/loại/trạng thái đang lọc.
             </Text>
-            {!data.credentials.length && <Text style={styles.text}>Không có chứng chỉ phù hợp.</Text>}
+            {!data.credentials.length && <EmptyState message="Không có chứng chỉ phù hợp" />}
             {data.credentials.map((item) => (
               <Card key={item._id}>
                 <Text style={styles.heading}>{item.name}</Text>

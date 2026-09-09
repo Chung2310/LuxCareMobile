@@ -1,51 +1,25 @@
 import { useCallback, useState } from "react";
-import { Alert, Image, ImageBackground, Platform, Pressable, ScrollView, StyleSheet, Text, View } from "react-native";
+import { Alert, Image, ImageBackground, Platform, Pressable, RefreshControl, ScrollView, StyleSheet, Text, View } from "react-native";
 import { router, useFocusEffect } from "expo-router";
 import { SafeAreaView } from "react-native-safe-area-context";
 import type { DashboardSummary, DashboardActionItems } from "../../../src/types/dashboard";
+import type { HRTask } from "../../../src/types/hr";
 import type { DashboardSummaryParams } from "../../../src/services/dashboardService";
-import { dashboard } from "../../src/api/services";
+import { dashboard, kanban } from "../../src/api/services";
 import { messageOf, useSession } from "../../src/auth/SessionProvider";
-import { Card, ErrorText, Field, Loading, colors, styles } from "../../src/ui";
-import { customDashboardRange } from "../../src/features/dashboard/range";
+import { Card, ErrorText, Loading, styles } from "../../src/ui";
 import { canUseModule } from "../../src/auth/access";
 
-function Button({
-  title,
-  onPress,
-  disabled = false,
-}: {
-  title: string;
-  onPress: () => void;
-  disabled?: boolean;
-}) {
-  return (
-    <Pressable
-      accessibilityRole="button"
-      accessibilityState={{ disabled }}
-      disabled={disabled}
-      onPress={onPress}
-      style={({ pressed }) => [
-        localStyles.roundedButton,
-        disabled && localStyles.roundedButtonDisabled,
-        pressed && { opacity: 0.8 },
-      ]}
-    >
-      <Text style={localStyles.roundedButtonText}>{title}</Text>
-    </Pressable>
-  );
-}
+
 export default function Home() {
   const { user, selectedBranch } = useSession();
   const [data, setData] = useState<DashboardSummary | null>(null);
-  const [params, setParams] = useState<DashboardSummaryParams>({ filter: "day" });
-  const [startDate, setStartDate] = useState("");
-  const [endDate, setEndDate] = useState("");
-  const [rangeError, setRangeError] = useState<string | null>(null);
+  const [params] = useState<DashboardSummaryParams>({ filter: "day" });
   const [actions, setActions] = useState<DashboardActionItems | null>(null);
-  const [actionsError, setActionsError] = useState<string | null>(null);
   const [actionsLoading, setActionsLoading] = useState(false);
   const [actionsRevision, setActionsRevision] = useState(0);
+  const [tasks, setTasks] = useState<HRTask[]>([]);
+  const [tasksLoading, setTasksLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [loading, setLoading] = useState(false);
   const [revision, setRevision] = useState(0);
@@ -77,7 +51,6 @@ export default function Home() {
     useCallback(() => {
       let active = true;
       setActions(null);
-      setActionsError(null);
       if (!allowed) return;
       setActionsLoading(true);
       void dashboard
@@ -85,16 +58,38 @@ export default function Home() {
         .then((value) => {
           if (active) setActions(value);
         })
-        .catch((error) => {
-          if (active) setActionsError(messageOf(error));
+        .catch(() => {
+          if (active) setActions(null);
         })
         .finally(() => {
           if (active) setActionsLoading(false);
         });
+      if (canUseModule(user, "hr")) {
+        setTasksLoading(true);
+        void kanban
+          .listTasks(selectedBranch?._id)
+          .then((items) => {
+            if (active) setTasks(items);
+          })
+          .catch(() => {
+            if (active) setTasks([]);
+          })
+          .finally(() => {
+            if (active) setTasksLoading(false);
+          });
+      }
       return () => {
         active = false;
       };
-    }, [allowed, user?.uid, selectedBranch?._id, actionsRevision]),
+    }, [allowed, user?.uid, selectedBranch?._id, actionsRevision, revision]),
+  );
+
+  const myTasks = tasks.filter(
+    (task) =>
+      (task.assigneeUid === user?.uid ||
+        task.subtasks?.some((sub) => sub.assigneeUid === user?.uid)) &&
+      task.status !== "Done" &&
+      task.status !== "Archived",
   );
   return (
     <View style={localStyles.container}>
@@ -111,6 +106,17 @@ export default function Home() {
           contentContainerStyle={localStyles.scrollContent}
           keyboardShouldPersistTaps="handled"
           showsVerticalScrollIndicator={false}
+          refreshControl={
+            <RefreshControl
+              refreshing={loading || actionsLoading}
+              onRefresh={() => {
+                setRevision((v) => v + 1);
+                setActionsRevision((v) => v + 1);
+              }}
+              colors={["#008852"]}
+              tintColor="#008852"
+            />
+          }
         >
           {/* Top Bar with Settings on the left, User and Bell on the right */}
           <View style={localStyles.topBar}>
@@ -118,7 +124,7 @@ export default function Home() {
               onPress={() => router.push("/(tabs)/profile")}
               style={({ pressed }) => [
                 localStyles.iconButton,
-                pressed && { opacity: 0.7 },
+                pressed && localStyles.iconButtonPressed,
               ]}
               hitSlop={8}
               accessibilityRole="button"
@@ -136,7 +142,7 @@ export default function Home() {
                 onPress={() => router.push("/(tabs)/profile")}
                 style={({ pressed }) => [
                   localStyles.iconButton,
-                  pressed && { opacity: 0.7 },
+                  pressed && localStyles.iconButtonPressed,
                 ]}
                 hitSlop={8}
                 accessibilityRole="button"
@@ -152,7 +158,7 @@ export default function Home() {
                 onPress={() => router.push("/(tabs)/notifications")}
                 style={({ pressed }) => [
                   localStyles.iconButton,
-                  pressed && { opacity: 0.7 },
+                  pressed && localStyles.iconButtonPressed,
                 ]}
                 hitSlop={8}
                 accessibilityRole="button"
@@ -200,7 +206,7 @@ export default function Home() {
           onPress={() => Alert.alert("Bảng tin", "Tính năng bảng tin đang được hoàn thiện.")}
           style={({ pressed }) => [
             localStyles.newsfeedCard,
-            pressed && { opacity: 0.8 },
+            pressed && localStyles.cardActiveBorder,
           ]}
           accessibilityRole="button"
           accessibilityLabel="Đi đến bảng tin"
@@ -220,37 +226,67 @@ export default function Home() {
           />
         </Pressable>
 
+        {/* Nút Chấm công nổi bật màu xanh lá #008852 có hiệu ứng khi click */}
+        <Pressable
+          onPress={() => router.push("/(tabs)/attendance")}
+          style={({ pressed }) => [
+            localStyles.checkInButton,
+            pressed && localStyles.checkInButtonPressed,
+          ]}
+          accessibilityRole="button"
+          accessibilityLabel="Chấm công, để bắt đầu công việc thôi nào !"
+        >
+          <View style={localStyles.checkInContent}>
+            <View style={localStyles.checkInIconContainer}>
+              <Image
+                source={require("../../assets/lucide-fingerprint.png")}
+                style={localStyles.checkInIcon}
+                resizeMode="contain"
+              />
+            </View>
+            <View style={localStyles.checkInTextContainer}>
+              <Text style={localStyles.checkInTitle}>Chấm công</Text>
+              <Text style={localStyles.checkInSubtitle}>
+                để bắt đầu công việc thôi nào !
+              </Text>
+            </View>
+          </View>
+          <Image
+            source={require("../../assets/lucide-chevron-right.png")}
+            style={localStyles.checkInChevron}
+            resizeMode="contain"
+          />
+        </Pressable>
+
         {!allowed ? (
           <Card>
             <Text style={styles.text}>Tài khoản của bạn chưa được cấp quyền xem tổng quan.</Text>
           </Card>
         ) : (
         <>
-          {/* 5 Thẻ thống kê KPI tổng quan ngay phía dưới bảng tin */}
+          {/* Lưới 6 thẻ KPI (3 thẻ/hàng), không nền icon, kích thước nhỏ gọn */}
           <View style={localStyles.metricsGrid}>
             {/* 1. Nhân sự đi làm */}
             <Pressable
               onPress={() => router.push("/(tabs)/attendance")}
               style={({ pressed }) => [
                 localStyles.metricCard,
-                pressed && { opacity: 0.85 },
+                pressed && localStyles.cardActiveBorder,
               ]}
               accessibilityRole="button"
               accessibilityLabel="Nhân sự đi làm"
             >
               <View style={localStyles.metricCardTop}>
-                <View style={[localStyles.metricBadge, { backgroundColor: "#ecfdf5" }]}>
-                  <Image
-                    source={require("../../assets/metric-users.png")}
-                    style={localStyles.metricIcon}
-                    resizeMode="contain"
-                  />
-                </View>
+                <Image
+                  source={require("../../assets/metric-users.png")}
+                  style={localStyles.metricIcon}
+                  resizeMode="contain"
+                />
                 <Text style={localStyles.metricLabel} numberOfLines={1}>
-                  NHÂN SỰ ĐI LÀM
+                  Nhân sự
                 </Text>
               </View>
-              <Text style={[localStyles.metricValue, { color: "#059669" }]}>
+              <Text style={[localStyles.metricValue, { color: "#059669" }]} numberOfLines={1}>
                 {data?.timekeeping
                   ? `${data.timekeeping.checkedInToday}/${data.timekeeping.totalEmployees}`
                   : "0/0"}
@@ -262,24 +298,22 @@ export default function Home() {
               onPress={() => router.push("/(tabs)/work")}
               style={({ pressed }) => [
                 localStyles.metricCard,
-                pressed && { opacity: 0.85 },
+                pressed && localStyles.cardActiveBorder,
               ]}
               accessibilityRole="button"
               accessibilityLabel="Task đang làm"
             >
               <View style={localStyles.metricCardTop}>
-                <View style={[localStyles.metricBadge, { backgroundColor: "#eff6ff" }]}>
-                  <Image
-                    source={require("../../assets/metric-activity.png")}
-                    style={localStyles.metricIcon}
-                    resizeMode="contain"
-                  />
-                </View>
+                <Image
+                  source={require("../../assets/metric-activity.png")}
+                  style={localStyles.metricIcon}
+                  resizeMode="contain"
+                />
                 <Text style={localStyles.metricLabel} numberOfLines={1}>
-                  TASK ĐANG LÀM
+                  Đang làm
                 </Text>
               </View>
-              <Text style={[localStyles.metricValue, { color: "#10b981" }]}>
+              <Text style={[localStyles.metricValue, { color: "#10b981" }]} numberOfLines={1}>
                 {data?.projects?.tasks?.doing ?? 0}
               </Text>
             </Pressable>
@@ -289,211 +323,209 @@ export default function Home() {
               onPress={() => router.push("/(tabs)/work")}
               style={({ pressed }) => [
                 localStyles.metricCard,
-                pressed && { opacity: 0.85 },
+                pressed && localStyles.cardActiveBorder,
               ]}
               accessibilityRole="button"
               accessibilityLabel="Task quá hạn"
             >
               <View style={localStyles.metricCardTop}>
-                <View style={[localStyles.metricBadge, { backgroundColor: "#fef2f2" }]}>
-                  <Image
-                    source={require("../../assets/metric-clock.png")}
-                    style={localStyles.metricIcon}
-                    resizeMode="contain"
-                  />
-                </View>
+                <Image
+                  source={require("../../assets/metric-clock.png")}
+                  style={localStyles.metricIcon}
+                  resizeMode="contain"
+                />
                 <Text style={localStyles.metricLabel} numberOfLines={1}>
-                  TASK QUÁ HẠN
+                  Quá hạn
                 </Text>
               </View>
-              <Text style={[localStyles.metricValue, { color: "#dc2626" }]}>
+              <Text style={[localStyles.metricValue, { color: "#dc2626" }]} numberOfLines={1}>
                 {data?.projects?.overdueTasks ?? 0}
               </Text>
             </Pressable>
 
-            {/* 4. Khóa đào tạo */}
+            {/* 4. Đơn phép */}
+            <Pressable
+              onPress={() => {
+                if (canUseModule(user, "hr")) {
+                  router.push("/(tabs)/leave");
+                } else {
+                  Alert.alert("Đơn phép", `Hiện có ${actions?.pendingApprovals?.length ?? 0} đơn chờ duyệt.`);
+                }
+              }}
+              style={({ pressed }) => [
+                localStyles.metricCard,
+                pressed && localStyles.cardActiveBorder,
+              ]}
+              accessibilityRole="button"
+              accessibilityLabel="Đơn phép"
+            >
+              <View style={localStyles.metricCardTop}>
+                <Image
+                  source={require("../../assets/metric-calendar.png")}
+                  style={localStyles.metricIcon}
+                  resizeMode="contain"
+                />
+                <Text style={localStyles.metricLabel} numberOfLines={1}>
+                  Đơn phép
+                </Text>
+              </View>
+              <Text
+                style={[
+                  localStyles.metricValue,
+                  { color: (actions?.pendingApprovals?.length ?? 0) > 0 ? "#ea580c" : "#059669" },
+                ]}
+                numberOfLines={1}
+              >
+                {actions?.pendingApprovals?.length ?? 0}
+              </Text>
+            </Pressable>
+
+            {/* 5. Khóa đào tạo */}
             <Pressable
               onPress={() => Alert.alert("Đào tạo", `Hiện có ${data?.training?.totalCourses ?? 0} khóa đào tạo.`)}
               style={({ pressed }) => [
                 localStyles.metricCard,
-                pressed && { opacity: 0.85 },
+                pressed && localStyles.cardActiveBorder,
               ]}
               accessibilityRole="button"
               accessibilityLabel="Khóa đào tạo"
             >
               <View style={localStyles.metricCardTop}>
-                <View style={[localStyles.metricBadge, { backgroundColor: "#fffbeb" }]}>
-                  <Image
-                    source={require("../../assets/metric-graduation.png")}
-                    style={localStyles.metricIcon}
-                    resizeMode="contain"
-                  />
-                </View>
+                <Image
+                  source={require("../../assets/metric-graduation.png")}
+                  style={localStyles.metricIcon}
+                  resizeMode="contain"
+                />
                 <Text style={localStyles.metricLabel} numberOfLines={1}>
-                  KHÓA ĐÀO TẠO
+                  Đào tạo
                 </Text>
               </View>
-              <Text style={[localStyles.metricValue, { color: "#ea580c" }]}>
+              <Text style={[localStyles.metricValue, { color: "#ea580c" }]} numberOfLines={1}>
                 {data?.training?.totalCourses ?? 0}
               </Text>
             </Pressable>
 
-            {/* 5. Thiết bị */}
+            {/* 6. Thiết bị */}
             <Pressable
-              onPress={() => Alert.alert("Thiết bị", `Hiện có ${data?.equipment?.total ?? 0} thiết bị trong hệ thống.`)}
+              onPress={() => router.push("/(tabs)/equipment")}
               style={({ pressed }) => [
                 localStyles.metricCard,
-                pressed && { opacity: 0.85 },
+                pressed && localStyles.cardActiveBorder,
               ]}
               accessibilityRole="button"
               accessibilityLabel="Thiết bị"
             >
               <View style={localStyles.metricCardTop}>
-                <View style={[localStyles.metricBadge, { backgroundColor: "#f5f3ff" }]}>
-                  <Image
-                    source={require("../../assets/metric-file-text.png")}
-                    style={localStyles.metricIcon}
-                    resizeMode="contain"
-                  />
-                </View>
+                <Image
+                  source={require("../../assets/metric-file-text.png")}
+                  style={localStyles.metricIcon}
+                  resizeMode="contain"
+                />
                 <Text style={localStyles.metricLabel} numberOfLines={1}>
-                  THIẾT BỊ
+                  Thiết bị
                 </Text>
               </View>
-              <Text style={[localStyles.metricValue, { color: "#059669" }]}>
+              <Text style={[localStyles.metricValue, { color: "#059669" }]} numberOfLines={1}>
                 {data?.equipment?.total ?? 0}
               </Text>
             </Pressable>
           </View>
 
-          <View style={localStyles.filterRow}>
-            {(["day", "week", "year"] as const).map((value, i) => (
-              <View key={value} style={{ flex: 1 }}>
-                <Button
-                  title={["Hôm nay", "Tuần", "Năm"][i]}
-                  disabled={params.filter === value}
-                  onPress={() => {
-                    setParams({ filter: value });
-                    setRangeError(null);
-                  }}
+          {/* Section: Công việc cần làm hôm nay */}
+          <View style={localStyles.taskSection}>
+            <View style={localStyles.taskSectionHeader}>
+              <Text style={localStyles.taskSectionTitle}>Công việc cần làm hôm nay</Text>
+              {myTasks.length > 0 && (
+                <Pressable
+                  onPress={() => router.push("/(tabs)/work")}
+                  hitSlop={8}
+                  style={({ pressed }) => [{ opacity: pressed ? 0.7 : 1 }]}
+                >
+                  <Text style={localStyles.taskSectionLink}>Xem tất cả ({myTasks.length})</Text>
+                </Pressable>
+              )}
+            </View>
+
+            {tasksLoading ? (
+              <Loading />
+            ) : myTasks.length === 0 ? (
+              <View style={localStyles.taskEmptyBannerContainer}>
+                <Image
+                  source={require("../../public/thong-bao-khong-co-viec-can-lam.png")}
+                  style={localStyles.taskEmptyBanner}
+                  resizeMode="contain"
                 />
               </View>
-            ))}
+            ) : (
+              <View style={localStyles.taskListContainer}>
+                {myTasks.slice(0, 5).map((task) => {
+                  const isOverdue = task.dueDate && new Date(task.dueDate).getTime() < Date.now();
+                  const statusLabel =
+                    task.status === "In Progress" || task.status === "doing"
+                      ? "Đang làm"
+                      : task.status === "Not Started" || task.status === "todo"
+                        ? "Chưa bắt đầu"
+                        : task.status === "Review/Testing"
+                          ? "Chờ kiểm tra"
+                          : task.status;
+
+                  return (
+                    <Pressable
+                      key={task.id}
+                      onPress={() => router.push("/(tabs)/work")}
+                      style={({ pressed }) => [
+                        localStyles.taskItemCard,
+                        pressed && localStyles.cardActiveBorder,
+                      ]}
+                      accessibilityRole="button"
+                      accessibilityLabel={task.title}
+                    >
+                      <View style={localStyles.taskItemLeft}>
+                        <View
+                          style={[
+                            localStyles.taskPriorityIndicator,
+                            {
+                              backgroundColor:
+                                task.priority === "High" || task.priority === "Cao"
+                                  ? "#ef4444"
+                                  : task.priority === "Medium" || task.priority === "Trung bình"
+                                    ? "#f59e0b"
+                                    : "#10b981",
+                            },
+                          ]}
+                        />
+                        <View style={localStyles.taskItemInfo}>
+                          <Text style={localStyles.taskItemTitle} numberOfLines={1}>
+                            {task.title}
+                          </Text>
+                          <View style={localStyles.taskItemMeta}>
+                            <Text
+                              style={[
+                                localStyles.taskItemDueDate,
+                                isOverdue && localStyles.taskItemOverdue,
+                              ]}
+                            >
+                              {task.dueDate
+                                ? `Hạn chót: ${new Date(task.dueDate).toLocaleDateString("vi-VN")}`
+                                : "Không có hạn"}
+                            </Text>
+                            <Text style={localStyles.taskItemDot}>·</Text>
+                            <Text style={localStyles.taskItemStatus}>{statusLabel}</Text>
+                          </View>
+                        </View>
+                      </View>
+                      <Image
+                        source={require("../../assets/lucide-chevron-right.png")}
+                        style={localStyles.taskItemChevron}
+                        resizeMode="contain"
+                      />
+                    </Pressable>
+                  );
+                })}
+              </View>
+            )}
           </View>
-          <Card>
-            <Text style={styles.heading}>Khoảng ngày tùy chọn</Text>
-            <Field label="Từ ngày (YYYY-MM-DD)" value={startDate} onChangeText={setStartDate} />
-            <Field label="Đến ngày (YYYY-MM-DD)" value={endDate} onChangeText={setEndDate} />
-            <ErrorText message={rangeError} />
-            <Button
-              title="Áp dụng khoảng ngày"
-              onPress={() => {
-                try {
-                  setParams(customDashboardRange(startDate.trim(), endDate.trim()));
-                  setRangeError(null);
-                } catch (error) {
-                  setRangeError(messageOf(error));
-                }
-              }}
-            />
-          </Card>
-          <Text style={styles.muted}>
-            Bộ lọc:{" "}
-            {params.filter === "custom"
-              ? `${params.startDate} – ${params.endDate}`
-              : params.filter === "day"
-                ? "Hôm nay"
-                : params.filter === "week"
-                  ? "7 ngày gần nhất"
-                  : "Năm nay"}
-            . Công việc và đào tạo là trạng thái hiện tại; chấm công theo hôm nay. Tài liệu mới tải lên áp dụng khoảng
-            ngày.
-          </Text>
-          <ErrorText message={error} />
           {loading && <Loading />}
-          {data && (
-            <>
-              <Card>
-                <Text style={styles.heading}>Công việc</Text>
-                <Text style={styles.title}>{data.projects.tasks.total}</Text>
-                <Text style={styles.text}>
-                  {data.projects.tasks.doing} đang làm · {data.projects.tasks.done} hoàn thành
-                </Text>
-                <Text style={styles.muted}>{data.projects.overdueTasks} quá hạn</Text>
-                <Text style={styles.text}>{data.projects.activeProjects} dự án đang hoạt động</Text>
-                {canUseModule(user, "hr") && (
-                  <Button title="Mở công việc" onPress={() => router.push("/(tabs)/work")} />
-                )}
-              </Card>
-              <Card>
-                <Text style={styles.heading}>Chấm công hôm nay</Text>
-                <Text style={styles.title}>
-                  {data.timekeeping.checkedInToday} / {data.timekeeping.totalEmployees}
-                </Text>
-                <Text style={styles.muted}>{data.timekeeping.lateToday} đi muộn</Text>
-              </Card>
-              <Card>
-                <Text style={styles.heading}>Tài nguyên & giao tiếp</Text>
-                <Text style={styles.text}>
-                  {data.resources.fileCount} tài liệu · {data.chat.unreadMessages} tin nhắn chưa đọc
-                </Text>
-                <Text style={styles.muted}>
-                  {data.resources.recentUploads} tài liệu mới trong khoảng ngày · {data.chat.roomCount} phòng trò chuyện
-                </Text>
-              </Card>
-              <Card>
-                <Text style={styles.heading}>Đào tạo</Text>
-                <Text style={styles.text}>
-                  {data.training.totalCourses} khóa học · {data.training.ongoingCourses} đang diễn ra
-                </Text>
-                <Text style={styles.muted}>
-                  {data.training.enrollments.completed}/{data.training.enrollments.total} lượt học hoàn thành
-                </Text>
-              </Card>
-            </>
-          )}
-          <Card>
-            <Text style={styles.heading}>Việc cần xử lý hôm nay</Text>
-            <Text style={styles.muted}>Danh sách ưu tiên từ hệ thống, độc lập với bộ lọc ngày ở trên.</Text>
-            <ErrorText message={actionsError} />
-            {actionsLoading && <Loading />}
-            {actions?.overdueTasks.map((item) => (
-              <View key={`task:${item.id}`} style={{ gap: 8 }}>
-                <Text style={styles.text}>Quá hạn: {item.title}</Text>
-                <Text style={styles.muted}>{new Date(item.dueDate).toLocaleString("vi-VN")}</Text>
-              </View>
-            ))}
-            {!!actions?.overdueTasks.length && canUseModule(user, "hr") && (
-              <Button title="Xem danh sách công việc" onPress={() => router.push("/(tabs)/work")} />
-            )}
-            {actions?.pendingApprovals.map((item) => (
-              <View key={`leave:${item.id}`} style={{ gap: 8 }}>
-                <Text style={styles.text}>Đơn chờ duyệt: {item.employeeName}</Text>
-                <Text style={styles.muted}>Từ {new Date(item.since).toLocaleDateString("vi-VN")}</Text>
-              </View>
-            ))}
-            {!!actions?.pendingApprovals.length && canUseModule(user, "hr") && (
-              <Button title="Mở đơn từ để xem và duyệt" onPress={() => router.push("/(tabs)/leave")} />
-            )}
-            {actions && !actions.overdueTasks.length && !actions.pendingApprovals.length && (
-              <Text style={styles.muted}>Không có mục cần xử lý trong danh sách ưu tiên.</Text>
-            )}
-            {actionsError && (
-              <Button
-                title="Tải lại việc cần xử lý"
-                disabled={actionsLoading}
-                onPress={() => setActionsRevision((value) => value + 1)}
-              />
-            )}
-          </Card>
-          <Button
-            title="Tải lại"
-            disabled={loading || actionsLoading}
-            onPress={() => {
-              setRevision((v) => v + 1);
-              setActionsRevision((value) => value + 1);
-            }}
-          />
         </>
       )}
         </ScrollView>
@@ -545,7 +577,7 @@ const localStyles = StyleSheet.create({
     paddingHorizontal: 16,
     borderRadius: 8, // Viền vuông bo góc tinh tế
     backgroundColor: "transparent", // Trong suốt hoàn toàn, không màu nền
-    borderWidth: 1,
+    borderWidth: 1.5,
     borderColor: "rgba(6, 95, 70, 0.25)", // Viền vuông tinh tế
     marginTop: -4,
   },
@@ -571,60 +603,124 @@ const localStyles = StyleSheet.create({
     height: 16,
     tintColor: "#065f46",
   },
+  checkInButton: {
+    backgroundColor: "#008852",
+    borderRadius: 16,
+    paddingVertical: 12,
+    paddingHorizontal: 16,
+    flexDirection: "row",
+    alignItems: "center",
+    justifyContent: "space-between",
+    shadowColor: "#008852",
+    shadowOffset: { width: 0, height: 3 },
+    shadowOpacity: 0.25,
+    shadowRadius: 6,
+    elevation: 3,
+    marginTop: 2,
+    marginBottom: 6,
+  },
+  checkInButtonPressed: {
+    backgroundColor: "#004d2e", // Đổi sang màu xanh lá đậm hơn khi click vào
+    transform: [{ scale: 0.98 }],
+  },
+  checkInContent: {
+    flexDirection: "row",
+    alignItems: "center",
+    gap: 12,
+    flex: 1,
+  },
+  checkInIconContainer: {
+    width: 32,
+    height: 32,
+    backgroundColor: "transparent",
+    alignItems: "center",
+    justifyContent: "center",
+  },
+  checkInIcon: {
+    width: 24,
+    height: 24,
+    tintColor: "#ffffff",
+  },
+  checkInTextContainer: {
+    flex: 1,
+  },
+  checkInTitle: {
+    color: "#ffffff",
+    fontSize: 16,
+    fontWeight: "800",
+    fontFamily: "Inter-Bold",
+    letterSpacing: 0.2,
+  },
+  checkInSubtitle: {
+    color: "rgba(255, 255, 255, 0.9)",
+    fontSize: 11,
+    fontWeight: "500",
+    fontFamily: "Inter-Medium",
+    marginTop: 1,
+  },
+  checkInChevron: {
+    width: 16,
+    height: 16,
+    tintColor: "rgba(255, 255, 255, 0.8)",
+  },
   metricsGrid: {
     flexDirection: "row",
     flexWrap: "wrap",
     justifyContent: "space-between",
-    rowGap: 12,
+    rowGap: 8,
     marginTop: 2,
     marginBottom: 4,
   },
   metricCard: {
-    width: "48%",
+    width: "31.6%",
     backgroundColor: "#ffffff",
-    borderRadius: 16,
-    paddingVertical: 14,
-    paddingHorizontal: 12,
-    borderWidth: 1,
+    borderRadius: 12,
+    paddingVertical: 9,
+    paddingHorizontal: 8,
+    borderWidth: 1.5,
     borderColor: "#e2e8f0",
     shadowColor: "#059669",
-    shadowOffset: { width: 0, height: 2 },
-    shadowOpacity: 0.06,
-    shadowRadius: 6,
-    elevation: 2,
-    minHeight: 92,
+    shadowOffset: { width: 0, height: 1 },
+    shadowOpacity: 0.05,
+    shadowRadius: 4,
+    elevation: 1,
+    minHeight: 66,
     justifyContent: "space-between",
   },
+  cardActiveBorder: {
+    borderColor: "#008852",
+    borderWidth: 1.5,
+    shadowColor: "#008852",
+    shadowOffset: { width: 0, height: 2 },
+    shadowOpacity: 0.35,
+    shadowRadius: 6,
+    elevation: 4,
+    transform: [{ scale: 0.96 }],
+  },
+
   metricCardTop: {
     flexDirection: "row",
     alignItems: "center",
-    gap: 8,
-  },
-  metricBadge: {
-    width: 32,
-    height: 32,
-    borderRadius: 9,
-    alignItems: "center",
-    justifyContent: "center",
+    gap: 5,
   },
   metricIcon: {
-    width: 18,
-    height: 18,
+    width: 15,
+    height: 15,
   },
   metricLabel: {
     flex: 1,
-    fontSize: 9,
-    fontWeight: "800",
-    color: "#334155",
-    fontFamily: "Inter-Bold",
-    letterSpacing: 0.2,
+    fontSize: 10,
+    fontWeight: "600",
+    color: "#475569",
+    fontFamily: "Inter-SemiBold",
   },
   metricValue: {
-    fontSize: 24,
+    fontSize: 16,
     fontWeight: "800",
-    marginTop: 8,
     fontFamily: "Inter-Bold",
-    letterSpacing: -0.5,
+    marginTop: 4,
+    letterSpacing: -0.3,
+    textAlign: "center",
   },
   iconButton: {
     width: 40,
@@ -633,8 +729,14 @@ const localStyles = StyleSheet.create({
     backgroundColor: "rgba(255, 255, 255, 0.18)", // Siêu mờ nhạt, trong suốt nhìn rõ trọn vẹn background
     alignItems: "center",
     justifyContent: "center",
-    borderWidth: 1,
+    borderWidth: 1.5,
     borderColor: "rgba(255, 255, 255, 0.35)", // Viền mờ nhẹ nhàng tinh tế
+  },
+  iconButtonPressed: {
+    borderColor: "#008852",
+    borderWidth: 1.5,
+    backgroundColor: "rgba(0, 136, 82, 0.15)",
+    transform: [{ scale: 0.94 }],
   },
   topBarIcon: {
     width: 22,
@@ -706,35 +808,108 @@ const localStyles = StyleSheet.create({
     paddingVertical: 2,
     borderRadius: 10,
   },
-  filterRow: {
-    flexDirection: "row",
-    gap: 10,
-    alignItems: "center",
+  taskSection: {
+    marginTop: 6,
+    gap: 8,
+    marginBottom: 8,
   },
-  roundedButton: {
-    backgroundColor: "#059669",
-    borderRadius: 24, // Bo tròn toàn bộ
-    paddingVertical: 13,
-    paddingHorizontal: 20,
+  taskSectionHeader: {
+    flexDirection: "row",
+    justifyContent: "space-between",
+    alignItems: "center",
+    paddingHorizontal: 2,
+  },
+  taskSectionTitle: {
+    fontSize: 15,
+    fontWeight: "800",
+    color: "#0f172a",
+    fontFamily: "Inter-Bold",
+  },
+  taskSectionLink: {
+    fontSize: 12,
+    fontWeight: "600",
+    color: "#008852",
+    fontFamily: "Inter-SemiBold",
+  },
+  taskEmptyBannerContainer: {
+    width: "100%",
     alignItems: "center",
     justifyContent: "center",
-    minHeight: 46,
+    marginTop: 4,
+  },
+  taskEmptyBanner: {
+    width: 280,
+    height: 140,
+  },
+  taskListContainer: {
+    gap: 8,
+  },
+  taskItemCard: {
+    backgroundColor: "#ffffff",
+    borderRadius: 14,
+    borderWidth: 1.5,
+    borderColor: "#e2e8f0",
+    paddingVertical: 12,
+    paddingHorizontal: 14,
+    flexDirection: "row",
+    alignItems: "center",
+    justifyContent: "space-between",
     shadowColor: "#059669",
-    shadowOffset: { width: 0, height: 2 },
-    shadowOpacity: 0.15,
+    shadowOffset: { width: 0, height: 1 },
+    shadowOpacity: 0.05,
     shadowRadius: 4,
-    elevation: 2,
+    elevation: 1,
   },
-  roundedButtonDisabled: {
-    opacity: 0.5,
-    shadowOpacity: 0,
-    elevation: 0,
+  taskItemLeft: {
+    flexDirection: "row",
+    alignItems: "center",
+    gap: 12,
+    flex: 1,
   },
-  roundedButtonText: {
-    color: "#ffffff",
-    fontWeight: "700",
+  taskPriorityIndicator: {
+    width: 4,
+    height: 32,
+    borderRadius: 2,
+  },
+  taskItemInfo: {
+    flex: 1,
+    gap: 3,
+  },
+  taskItemTitle: {
     fontSize: 13,
+    fontWeight: "700",
+    color: "#1e293b",
     fontFamily: "Inter-Bold",
-    letterSpacing: 0.2,
+  },
+  taskItemMeta: {
+    flexDirection: "row",
+    alignItems: "center",
+    gap: 6,
+  },
+  taskItemDueDate: {
+    fontSize: 11,
+    fontWeight: "500",
+    color: "#64748b",
+    fontFamily: "Inter-Medium",
+  },
+  taskItemOverdue: {
+    color: "#dc2626",
+    fontWeight: "700",
+    fontFamily: "Inter-Bold",
+  },
+  taskItemDot: {
+    fontSize: 11,
+    color: "#94a3b8",
+  },
+  taskItemStatus: {
+    fontSize: 11,
+    fontWeight: "600",
+    color: "#059669",
+    fontFamily: "Inter-SemiBold",
+  },
+  taskItemChevron: {
+    width: 14,
+    height: 14,
+    tintColor: "#94a3b8",
   },
 });

@@ -6,7 +6,7 @@ import { currentKpiPeriod, validateKpiPeriod } from "../../../src/services/month
 import { hrCalendar } from "../../src/api/services";
 import { messageOf, useSession } from "../../src/auth/SessionProvider";
 import { canUseModule } from "../../src/auth/access";
-import { Button, Card, ErrorText, Field, Loading, Page, styles } from "../../src/ui";
+import { Button, Card, EmptyState, ErrorText, Field, Loading, Page, styles } from "../../src/ui";
 import { ChoiceField } from "../../src/features/leave/ChoiceField";
 import { calendarEvents, EVENT_TYPES } from "../../src/features/calendar/events";
 export default function CalendarEvents() {
@@ -86,7 +86,13 @@ export default function CalendarEvents() {
       />
       {loading && <Loading />}
       <ErrorText message={error} />
-      {!loading && !error && (
+      {!loading && !error && rows.length === 0 && (
+        <EmptyState
+          message="Không có sự kiện nào"
+          subtitle={search ? "Không tìm thấy sự kiện theo từ khóa." : `Không có sự kiện trong tháng ${period}.`}
+        />
+      )}
+      {!loading && !error && rows.length > 0 && (
         <Text style={styles.muted}>
           {rows.length} mục trong tháng {period}
         </Text>

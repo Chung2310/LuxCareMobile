@@ -5,7 +5,7 @@ import type { PayrollRun } from "../../../src/types/payrollRun";
 import { payroll } from "../../src/api/services";
 import { useSession, messageOf } from "../../src/auth/SessionProvider";
 import { hasPermission } from "../../src/auth/access";
-import { Button, Card, ErrorText, Field, Loading, Page, styles } from "../../src/ui";
+import { Button, Card, EmptyState, ErrorText, Field, Loading, Page, styles } from "../../src/ui";
 import {
   canReadPayrollRuns,
   effectiveRunLines,
@@ -127,7 +127,7 @@ export default function PayrollRuns() {
           employees={run?.effectiveLines || []}
         />
       )}
-      {missing && <Text style={styles.text}>Chưa có bảng lương cho kỳ {period}.</Text>}
+      {missing && <EmptyState message={`Chưa có bảng lương cho kỳ ${period}`} />}
       {missing && !loading && (
         <CreatePayrollRun
           key={`create:${period}:${revision}`}
@@ -212,7 +212,7 @@ export default function PayrollRuns() {
               onChanged={() => setRevision((value) => value + 1)}
             />
           )}
-          {!rows.length && <Text style={styles.text}>Không có dòng lương phù hợp.</Text>}
+          {!rows.length && <EmptyState message="Không có dòng lương phù hợp" />}
           {rows.map((line) => (
             <Card key={line.employeeId}>
               <Text style={styles.heading}>{line.employeeName || line.employeeId}</Text>

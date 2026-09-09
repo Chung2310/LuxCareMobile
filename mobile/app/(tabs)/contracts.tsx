@@ -9,7 +9,7 @@ import type { ContractList } from "../../../src/services/hrContractService";
 import { getContractFiles, getSignedImages } from "../../../src/services/hrContractFiles";
 import { contracts } from "../../src/api/services";
 import { useSession, messageOf } from "../../src/auth/SessionProvider";
-import { Button, Card, ErrorText, Field, Loading, Page, styles } from "../../src/ui";
+import { Button, Card, EmptyState, ErrorText, Field, Loading, Page, styles } from "../../src/ui";
 import {
   canManageContracts,
   canReadContracts,
@@ -149,7 +149,9 @@ export default function Contracts() {
         <Button title="Tải lại" disabled={loading} onPress={() => setRevision((value) => value + 1)} />
         {loading && <Loading />}
         <ErrorText message={error} />
-        {!loading && !error && !rows.length && <Text style={styles.muted}>Không có hợp đồng phù hợp.</Text>}
+        {!loading && !error && !rows.length && (
+          <EmptyState message="Không có hợp đồng phù hợp" />
+        )}
         {rows.map((item) => (
           <Card key={item._id}>
             <Text style={styles.heading}>{item.employeeName}</Text>

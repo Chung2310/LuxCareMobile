@@ -5,7 +5,7 @@ import { currentKpiPeriod, validateKpiPeriod, type MonthlyKpiReport } from "../.
 import { monthlyKpi } from "../../src/api/services";
 import { canUseModule, hasPermission } from "../../src/auth/access";
 import { messageOf, useSession } from "../../src/auth/SessionProvider";
-import { Button, Card, ErrorText, Field, Loading, Page, styles } from "../../src/ui";
+import { Button, Card, EmptyState, ErrorText, Field, Loading, Page, styles } from "../../src/ui";
 export default function Kpi() {
   const { user, selectedBranch } = useSession();
   const allowed = canUseModule(user, "hr") && hasPermission(user, "work:read");
@@ -96,7 +96,10 @@ export default function Kpi() {
         loading ? (
           <Loading />
         ) : !error ? (
-          <Text style={styles.muted}>Không có nhân viên phù hợp trong phạm vi báo cáo.</Text>
+          <EmptyState
+            message="Không có nhân viên phù hợp"
+            subtitle="Không tìm thấy nhân viên trong phạm vi báo cáo."
+          />
         ) : null
       }
       renderItem={({ item }) => (

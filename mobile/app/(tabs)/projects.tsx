@@ -10,7 +10,7 @@ import { ProjectForm } from "../../src/features/work/ProjectForm";
 import { AttachmentsForm } from "../../src/features/work/AttachmentsForm";
 import { PROJECT_PRIORITIES, PROJECT_STATUSES } from "../../src/features/work/project";
 import { ChoiceField } from "../../src/features/leave/ChoiceField";
-import { Button, Card, ErrorText, Field, Loading, Page, styles } from "../../src/ui";
+import { Button, Card, EmptyState, ErrorText, Field, Loading, Page, styles } from "../../src/ui";
 export default function Projects() {
   const { user, selectedBranch } = useSession();
   const allowed = canUseModule(user, "hr");
@@ -111,7 +111,14 @@ export default function Projects() {
           </View>
         }
         ListEmptyComponent={
-          loading ? <Loading /> : !error ? <Text style={styles.muted}>Không có dự án phù hợp.</Text> : null
+          loading ? (
+            <Loading />
+          ) : !error ? (
+            <EmptyState
+              message="Không có dự án phù hợp"
+              subtitle={search ? "Không tìm thấy dự án nào theo từ khóa." : undefined}
+            />
+          ) : null
         }
         renderItem={({ item }) => (
           <Card>
