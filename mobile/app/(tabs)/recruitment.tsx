@@ -17,6 +17,7 @@ import { emptyPagination } from "../../../src/types/pagination";
 import { recruitment } from "../../src/api/services";
 import { messageOf, useSession } from "../../src/auth/SessionProvider";
 import { RecruitmentSubnav } from "../../src/features/recruitment/RecruitmentSubnav";
+import { RecruitmentGate } from "../../src/features/recruitment/RecruitmentGate";
 import { JOB_STATUSES, recruitmentAccess } from "../../src/features/recruitment/access";
 import { JobForm } from "../../src/features/recruitment/JobForm";
 import { AttachmentPanel } from "../../src/features/recruitment/AttachmentPanel";
@@ -231,33 +232,11 @@ export default function Recruitment() {
   }, [jobs, pagination.total]);
 
   if (!access.read) {
-    return (
-      <Page title="Tuyển dụng">
-        <View style={uiStyles.emptyBox}>
-          <Text style={uiStyles.emptyIcon}>🔒</Text>
-          <Text style={uiStyles.emptyTitle}>Không có quyền truy cập</Text>
-          <Text style={uiStyles.emptyText}>
-            Tài khoản của bạn cần thuộc doanh nghiệp và có quyền đọc phân hệ HR / Tuyển dụng.
-          </Text>
-        </View>
-      </Page>
-    );
+    return <RecruitmentGate title="Tuyển dụng" user={user} access={access} scopeReady={scopeReady} />;
   }
 
   if (!scopeReady) {
-    return (
-      <Page title="Tuyển dụng">
-        <View style={uiStyles.emptyBox}>
-          <Text style={uiStyles.emptyIcon}>🏢</Text>
-          <Text style={uiStyles.emptyTitle}>Chưa chọn chi nhánh</Text>
-          <Text style={uiStyles.emptyText}>
-            {user?.role === "admin"
-              ? "Vui lòng chọn chi nhánh làm việc trong mục Tài khoản để quản lý tin tuyển dụng."
-              : "Hồ sơ của bạn chưa được liên kết với chi nhánh làm việc."}
-          </Text>
-        </View>
-      </Page>
-    );
+    return <RecruitmentGate title="Tuyển dụng" user={user} access={access} scopeReady={scopeReady} />;
   }
 
   const disabled = busy || loading;

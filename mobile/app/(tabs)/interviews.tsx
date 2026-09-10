@@ -1,4 +1,5 @@
 import { RecruitmentSubnav } from "../../src/features/recruitment/RecruitmentSubnav";
+import { RecruitmentGate } from "../../src/features/recruitment/RecruitmentGate";
 import { useCallback, useEffect, useRef, useState } from "react";
 import { Modal, Text } from "react-native";
 import { SafeAreaView } from "react-native-safe-area-context";
@@ -71,13 +72,7 @@ export default function Interviews() {
     }, [access.read, scopeReady, selectedBranch?._id, page, status, mine, user?.uid, applicantId, revision, deleted]),
   );
   if (!access.read || !scopeReady)
-    return (
-      <Page title="Phỏng vấn">
-        <Text style={styles.text}>
-          Cần quyền đọc tuyển dụng và chi nhánh hợp lệ. Admin chọn chi nhánh trong Tài khoản.
-        </Text>
-      </Page>
-    );
+    return <RecruitmentGate title="Phỏng vấn" user={user} access={access} scopeReady={scopeReady} />;
   const time = (value: string) => new Date(value).toLocaleString("vi-VN", { timeZone: "Asia/Ho_Chi_Minh" });
   return (
     <>

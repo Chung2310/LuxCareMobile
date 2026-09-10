@@ -7,6 +7,7 @@ import { emptyPagination } from "../../../src/types/pagination";
 import { recruitment } from "../../src/api/services";
 import { messageOf, useSession } from "../../src/auth/SessionProvider";
 import { RecruitmentSubnav } from "../../src/features/recruitment/RecruitmentSubnav";
+import { RecruitmentGate } from "../../src/features/recruitment/RecruitmentGate";
 import { Button, Card, EmptyState, ErrorText, Field, Loading, Page, styles } from "../../src/ui";
 import { ChoiceField } from "../../src/features/leave/ChoiceField";
 import { recruitmentAccess } from "../../src/features/recruitment/access";
@@ -96,13 +97,7 @@ export default function Applicants() {
     setRevision((value) => value + 1);
   };
   if (!access.read || !scopeReady)
-    return (
-      <Page title="Ứng viên">
-        <Text style={styles.text}>
-          Cần quyền đọc tuyển dụng và chi nhánh hợp lệ. Admin chọn chi nhánh trong Tài khoản.
-        </Text>
-      </Page>
-    );
+    return <RecruitmentGate title="Ứng viên" user={user} access={access} scopeReady={scopeReady} />;
   return (
     <>
       <Page title="Ứng viên">
