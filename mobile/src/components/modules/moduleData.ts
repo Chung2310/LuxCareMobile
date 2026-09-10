@@ -211,16 +211,6 @@ export const LUXCARE_MODULES: ServiceModule[] = [
         status: "active",
       },
       {
-        id: "hr-pipeline",
-        title: "Quy trình\ntuyển dụng",
-        icon: "git-branch",
-        color: "#f59e0b",
-        bgColor: "#fffbeb",
-        route: "/(tabs)/recruitment-pipeline",
-        moduleId: "hr",
-        status: "active",
-      },
-      {
         id: "hr-contracts",
         title: "Hợp đồng\nlao động",
         icon: "newspaper",
