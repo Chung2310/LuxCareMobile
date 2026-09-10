@@ -114,16 +114,6 @@ export const LUXCARE_MODULES: ServiceModule[] = [
         status: "active",
       },
       {
-        id: "pop-calendar",
-        title: "Lịch nghỉ\n& Làm bù",
-        icon: "calendar",
-        color: "#0891b2",
-        bgColor: "#ecfeff",
-        route: "/(tabs)/work-calendar",
-        moduleId: "popular",
-        status: "active",
-      },
-      {
         id: "pop-blog",
         title: "Bảng tin\ndoanh nghiệp",
         icon: "newspaper",
