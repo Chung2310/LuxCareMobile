@@ -150,7 +150,7 @@ export function DateTimePickerModal({
   };
 
   // Calendar cells
-  const calendarCells = [];
+  const calendarCells: { day: number; isCurrentMonth: boolean }[] = [];
   for (let i = startDayOfWeek - 1; i >= 0; i--) {
     calendarCells.push({ day: prevMonthDays - i, isCurrentMonth: false });
   }
@@ -162,6 +162,15 @@ export function DateTimePickerModal({
   while (calendarCells.length < totalCells) {
     calendarCells.push({ day: nextD++, isCurrentMonth: false });
   }
+
+  // Chia calendarCells thành từng hàng tuần đúng 7 cột (T2 -> CN)
+  const calendarWeeks = useMemo(() => {
+    const weeks: { day: number; isCurrentMonth: boolean }[][] = [];
+    for (let i = 0; i < calendarCells.length; i += 7) {
+      weeks.push(calendarCells.slice(i, i + 7));
+    }
+    return weeks;
+  }, [calendarCells]);
 
   const today = new Date();
   const isViewingCurrentMonth =
@@ -273,42 +282,51 @@ export function DateTimePickerModal({
               ))}
             </View>
 
-            {/* Days Grid */}
+            {/* Days Grid - hiển thị theo từng tuần cố định 7 ngày */}
             <View style={styles.daysGrid}>
-              {calendarCells.map((cell, idx) => {
-                if (!cell.isCurrentMonth) {
-                  return (
-                    <View key={`cell-${idx}`} style={styles.dayCell}>
-                      <Text style={styles.otherMonthText}>{cell.day}</Text>
-                    </View>
-                  );
-                }
+              {calendarWeeks.map((week, wIdx) => (
+                <View key={`week-${wIdx}`} style={styles.weekRow}>
+                  {week.map((cell, dayColIdx) => {
+                    const isSunday = dayColIdx === 6;
+                    const isSaturday = dayColIdx === 5;
 
-                const isSelected = selectedDay === cell.day;
-                const isToday = isViewingCurrentMonth && today.getDate() === cell.day;
+                    if (!cell.isCurrentMonth) {
+                      return (
+                        <View key={`cell-${dayColIdx}`} style={styles.dayCell}>
+                          <Text style={styles.otherMonthText}>{cell.day}</Text>
+                        </View>
+                      );
+                    }
 
-                return (
-                  <Pressable
-                    key={`cell-${idx}`}
-                    style={[
-                      styles.dayCell,
-                      isSelected && styles.dayCellSelected,
-                      isToday && !isSelected && styles.dayCellToday,
-                    ]}
-                    onPress={() => setSelectedDay(cell.day)}
-                  >
-                    <Text
-                      style={[
-                        styles.dayText,
-                        isSelected && styles.dayTextSelected,
-                        isToday && !isSelected && styles.dayTextToday,
-                      ]}
-                    >
-                      {cell.day}
-                    </Text>
-                  </Pressable>
-                );
-              })}
+                    const isSelected = selectedDay === cell.day;
+                    const isToday = isViewingCurrentMonth && today.getDate() === cell.day;
+
+                    return (
+                      <Pressable
+                        key={`cell-${dayColIdx}`}
+                        style={[
+                          styles.dayCell,
+                          isSelected && styles.dayCellSelected,
+                          isToday && !isSelected && styles.dayCellToday,
+                        ]}
+                        onPress={() => setSelectedDay(cell.day)}
+                      >
+                        <Text
+                          style={[
+                            styles.dayText,
+                            isSunday && !isSelected && { color: "#e11d48", fontWeight: "700" },
+                            isSaturday && !isSelected && { color: "#0284c7" },
+                            isSelected && styles.dayTextSelected,
+                            isToday && !isSelected && styles.dayTextToday,
+                          ]}
+                        >
+                          {cell.day}
+                        </Text>
+                      </Pressable>
+                    );
+                  })}
+                </View>
+              ))}
             </View>
 
             {/* Time Picker Section */}
@@ -547,13 +565,15 @@ const styles = StyleSheet.create({
     color: "#64748b",
   },
   daysGrid: {
+    gap: 4,
+  },
+  weekRow: {
     flexDirection: "row",
-    flexWrap: "wrap",
-    rowGap: 2,
+    alignItems: "center",
   },
   dayCell: {
-    width: `${100 / 7}%`,
-    aspectRatio: 1.15,
+    flex: 1,
+    height: 36,
     alignItems: "center",
     justifyContent: "center",
     borderRadius: 10,

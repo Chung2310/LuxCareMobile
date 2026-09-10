@@ -1,5 +1,6 @@
 import React from "react";
 import {
+  Image,
   Modal,
   ScrollView,
   StyleSheet,
@@ -9,6 +10,7 @@ import {
 } from "react-native";
 import { Ionicons } from "@expo/vector-icons";
 import type { InventorySupply } from "./types";
+import { formatDateVN } from "../../features/credentials/DatePickerModal";
 
 interface SupplyDetailModalProps {
   item: InventorySupply | null;
@@ -92,14 +94,14 @@ export const SupplyDetailModal: React.FC<SupplyDetailModalProps> = ({
               <View style={styles.infoRow}>
                 <Text style={styles.infoLabel}>Hạn sử dụng:</Text>
                 <Text style={[styles.infoValue, { color: "#e11d48", fontWeight: "700" }]}>
-                  {item.expiryDate || "Không yêu cầu"}
+                  {formatDateVN(item.expiryDate) || "Không yêu cầu"}
                 </Text>
               </View>
 
               {item.manufactureDate && (
                 <View style={styles.infoRow}>
                   <Text style={styles.infoLabel}>Ngày sản xuất:</Text>
-                  <Text style={styles.infoValue}>{item.manufactureDate}</Text>
+                  <Text style={styles.infoValue}>{formatDateVN(item.manufactureDate)}</Text>
                 </View>
               )}
             </View>
@@ -139,14 +141,14 @@ export const SupplyDetailModal: React.FC<SupplyDetailModalProps> = ({
                 {item.inspectionDate && (
                   <View style={styles.infoRow}>
                     <Text style={styles.infoLabel}>Ngày kiểm định:</Text>
-                    <Text style={styles.infoValue}>{item.inspectionDate}</Text>
+                    <Text style={styles.infoValue}>{formatDateVN(item.inspectionDate)}</Text>
                   </View>
                 )}
 
                 {item.nextInspectionDate && (
                   <View style={styles.infoRow}>
                     <Text style={styles.infoLabel}>Hạn kiểm định tiếp theo:</Text>
-                    <Text style={styles.infoValue}>{item.nextInspectionDate}</Text>
+                    <Text style={styles.infoValue}>{formatDateVN(item.nextInspectionDate)}</Text>
                   </View>
                 )}
               </View>
@@ -157,6 +159,47 @@ export const SupplyDetailModal: React.FC<SupplyDetailModalProps> = ({
               <View style={styles.sectionCard}>
                 <Text style={styles.sectionTitle}>Ghi chú bảo quản</Text>
                 <Text style={styles.notesText}>{item.notes}</Text>
+              </View>
+            )}
+
+            {/* Tài liệu & Hình ảnh CO/CQ đính kèm */}
+            {item.documents && item.documents.length > 0 && (
+              <View style={styles.sectionCard}>
+                <Text style={styles.sectionTitle}>
+                  Tài liệu & Hình ảnh CO/CQ ({item.documents.length})
+                </Text>
+                <View style={styles.docsList}>
+                  {item.documents.map((doc, idx) => {
+                    const isImg =
+                      doc.fileType?.includes("image") ||
+                      /\.(jpe?g|png|webp|gif|bmp|heic)$/i.test(doc.name || "") ||
+                      /\.(jpe?g|png|webp|gif|bmp|heic)$/i.test(doc.fileUrl || "");
+                    return (
+                      <View key={`${doc.fileUrl}-${idx}`} style={styles.docRow}>
+                        {isImg ? (
+                          <Image source={{ uri: doc.fileUrl }} style={styles.docThumbImage} />
+                        ) : (
+                          <View style={styles.docIconBox}>
+                            <Ionicons
+                              name={doc.fileType?.includes("pdf") ? "document-text" : "document"}
+                              size={16}
+                              color="#0284c7"
+                            />
+                          </View>
+                        )}
+                        <View style={styles.docInfo}>
+                          <Text style={styles.docName} numberOfLines={1}>
+                            {doc.name}
+                          </Text>
+                          <Text style={styles.docSize}>
+                            {isImg ? "Hình ảnh" : doc.fileType?.includes("pdf") ? "Tài liệu PDF" : "Tệp văn bản"}
+                            {doc.fileSize ? ` • ${Math.round(doc.fileSize / 1024)} KB` : ""}
+                          </Text>
+                        </View>
+                      </View>
+                    );
+                  })}
+                </View>
               </View>
             )}
 
@@ -327,7 +370,48 @@ const styles = StyleSheet.create({
   notesText: {
     fontSize: 13,
     color: "#475569",
-    lineHeight: 19,
+    lineHeight: 18,
+  },
+  docsList: {
+    gap: 8,
+    marginTop: 8,
+  },
+  docRow: {
+    flexDirection: "row",
+    alignItems: "center",
+    backgroundColor: "#f8fafc",
+    borderWidth: 1,
+    borderColor: "#e2e8f0",
+    borderRadius: 10,
+    padding: 8,
+    gap: 8,
+  },
+  docThumbImage: {
+    width: 32,
+    height: 32,
+    borderRadius: 6,
+    backgroundColor: "#e2e8f0",
+  },
+  docIconBox: {
+    width: 32,
+    height: 32,
+    borderRadius: 6,
+    backgroundColor: "#f0f9ff",
+    alignItems: "center",
+    justifyContent: "center",
+  },
+  docInfo: {
+    flex: 1,
+  },
+  docName: {
+    fontSize: 12,
+    fontWeight: "600",
+    color: "#0f172a",
+  },
+  docSize: {
+    fontSize: 10,
+    color: "#64748b",
+    marginTop: 1,
   },
   footer: {
     flexDirection: "row",

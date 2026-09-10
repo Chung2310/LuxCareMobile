@@ -27,12 +27,50 @@ export interface TransactionListParams {
   search?: string;
 }
 
+export interface BatchStockLineItem {
+  supplyId: string;
+  quantity: number;
+  batchNumber?: string;
+  expiryDate?: string;
+  unitPrice?: number;
+  notes?: string;
+}
+
+export interface BatchStockPayload {
+  type: "in" | "out";
+  batchCode?: string;
+  supplier?: string;
+  warehouseLocation?: string;
+  recipientDepartment?: string;
+  reason: string;
+  items: BatchStockLineItem[];
+}
+
+/**
+ * Helper sinh mã thao tác (Idempotency-Key) cho các giao dịch kho / vật tư.
+ * Tuân thủ quy cách regex của server: /^[a-zA-Z0-9:_-]{8,128}$/
+ */
+export function generateIdempotencyKey(prefix = "op"): string {
+  if (typeof crypto !== "undefined" && typeof crypto.randomUUID === "function") {
+    try {
+      const uuid = crypto.randomUUID();
+      return `${prefix}-${uuid}`.slice(0, 128);
+    } catch {
+      // Fallback nếu môi trường native không hỗ trợ crypto.randomUUID
+    }
+  }
+  const timestamp = Date.now().toString(36);
+  const rand1 = Math.random().toString(36).substring(2, 10);
+  const rand2 = Math.random().toString(36).substring(2, 10);
+  return `${prefix}-${timestamp}-${rand1}-${rand2}`.slice(0, 128);
+}
+
 export const supplyApi = {
   // 1. Danh sách vật tư & dược phẩm
   async getSupplies(params?: SupplyListParams): Promise<{ data: InventorySupply[]; total: number }> {
     const query = new URLSearchParams();
     if (params?.page) query.set("page", String(params.page));
-    if (params?.limit) query.set("limit", String(params.limit));
+    query.set("limit", String(params?.limit || 200));
     if (params?.search) query.set("search", params.search);
     if (params?.category && params.category !== "all") query.set("category", params.category);
     if (params?.status) query.set("status", params.status);
@@ -132,7 +170,7 @@ export const supplyApi = {
   },
 
   // 4. Tạo mới vật tư
-  async createSupply(data: Partial<InventorySupply>): Promise<any> {
+  async createSupply(data: Partial<InventorySupply>, operationKey?: string): Promise<any> {
     const payload: any = {
       name: data.name?.trim(),
       code: data.code?.trim().toUpperCase(),
@@ -159,9 +197,13 @@ export const supplyApi = {
     if (data.documents && data.documents.length > 0) payload.documents = data.documents;
     if (data.notes) payload.notes = data.notes;
 
+    const key = operationKey || generateIdempotencyKey("create-supply");
     const res = await api.transport.fetch("/api/v1/supplies", {
       method: "POST",
-      headers: { "Content-Type": "application/json" },
+      headers: {
+        "Content-Type": "application/json",
+        "Idempotency-Key": key,
+      },
       body: JSON.stringify(payload),
     });
     const json = await res.json();
@@ -281,10 +323,15 @@ export const supplyApi = {
   async stockIn(
     id: string,
     data: { quantity: number; batchNumber?: string; expiryDate?: string; reason?: string },
+    operationKey?: string,
   ): Promise<any> {
+    const key = operationKey || generateIdempotencyKey("stock-in");
     const res = await api.transport.fetch(`/api/v1/supplies/${id}/stock-in`, {
       method: "POST",
-      headers: { "Content-Type": "application/json" },
+      headers: {
+        "Content-Type": "application/json",
+        "Idempotency-Key": key,
+      },
       body: JSON.stringify(data),
     });
     const json = await res.json();
@@ -296,10 +343,15 @@ export const supplyApi = {
   async stockOut(
     id: string,
     data: { quantity: number; recipientDepartment: string; reason?: string },
+    operationKey?: string,
   ): Promise<any> {
+    const key = operationKey || generateIdempotencyKey("stock-out");
     const res = await api.transport.fetch(`/api/v1/supplies/${id}/stock-out`, {
       method: "POST",
-      headers: { "Content-Type": "application/json" },
+      headers: {
+        "Content-Type": "application/json",
+        "Idempotency-Key": key,
+      },
       body: JSON.stringify(data),
     });
     const json = await res.json();
@@ -307,11 +359,32 @@ export const supplyApi = {
     return json;
   },
 
+  // 9. Lập phiếu Nhập / Xuất kho theo lô đa mặt hàng (Batch Stock Voucher)
+  async batchStock(payload: BatchStockPayload, operationKey?: string): Promise<any> {
+    const defaultKey =
+      payload.batchCode && /^[a-zA-Z0-9:_-]{3,100}$/.test(payload.batchCode)
+        ? `batch-${payload.batchCode}`
+        : generateIdempotencyKey("batch");
+    const key = operationKey || defaultKey;
+
+    const res = await api.transport.fetch("/api/v1/supplies/transactions/batch", {
+      method: "POST",
+      headers: {
+        "Content-Type": "application/json",
+        "Idempotency-Key": key,
+      },
+      body: JSON.stringify(payload),
+    });
+    const json = await res.json();
+    if (!res.ok) throw new Error(json.message || "Lập phiếu nhập/xuất kho thất bại.");
+    return json;
+  },
+
   // 6. Lịch sử giao dịch nhập / xuất kho
   async getTransactions(params?: TransactionListParams): Promise<{ data: InventoryTransaction[]; total: number }> {
     const query = new URLSearchParams();
     if (params?.page) query.set("page", String(params.page));
-    if (params?.limit) query.set("limit", String(params.limit));
+    query.set("limit", String(params?.limit || 100));
     if (params?.type) query.set("type", params.type);
     if (params?.status) query.set("status", params.status);
     if (params?.search) query.set("search", params.search);
@@ -340,6 +413,7 @@ export const supplyApi = {
       performerName: raw.performerName || "Người vận hành",
       reason: raw.reason || (raw.type === "in" ? "Nhập kho" : "Xuất cấp"),
       createdAt: raw.createdAt ? new Date(raw.createdAt).toLocaleString("vi-VN") : "Hôm nay",
+      rawCreatedAt: raw.createdAt || "",
       status: raw.status === "completed" ? "completed" : "pending",
     }));
 
@@ -548,5 +622,25 @@ export const supplyApi = {
     });
     const json = await res.json();
     if (!res.ok) throw new Error(json.message || "Không thể xóa kho lưu trữ.");
+  },
+
+  // 13. Danh sách khoa / phòng ban thực tế từ cơ sở dữ liệu
+  async getDepartments(params?: { search?: string }): Promise<Array<{ id: string; name: string; code?: string }>> {
+    const query = new URLSearchParams();
+    query.set("activeOnly", "true");
+    if (params?.search) query.set("search", params.search);
+
+    const queryString = query.toString();
+    const endpoint = `/api/v1/departments${queryString ? `?${queryString}` : ""}`;
+    const res = await api.transport.fetch(endpoint);
+    const json = await res.json();
+    if (!res.ok) throw new Error(json.message || "Không thể tải danh sách khoa/phòng ban.");
+
+    const rawList = Array.isArray(json.data) ? json.data : [];
+    return rawList.map((raw: any) => ({
+      id: raw._id || raw.id,
+      name: raw.name || "Phòng ban",
+      code: raw.code || "",
+    }));
   },
 };

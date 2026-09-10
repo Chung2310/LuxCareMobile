@@ -4,11 +4,11 @@ import {
   Modal,
   StyleSheet,
   Text,
-  TextInput,
   TouchableOpacity,
   View,
 } from "react-native";
 import { Ionicons } from "@expo/vector-icons";
+import { SearchInput } from "../common";
 
 export interface SelectOption {
   id: string;
@@ -17,6 +17,12 @@ export interface SelectOption {
   badge?: string;
   badgeColor?: string;
   icon?: string;
+}
+
+export interface SelectTab {
+  id: string;
+  label: string;
+  count?: number;
 }
 
 interface InventorySelectModalProps {
@@ -29,6 +35,10 @@ interface InventorySelectModalProps {
   onClose: () => void;
   onAddNew?: () => void;
   addNewLabel?: string;
+  bannerNode?: React.ReactNode;
+  tabs?: SelectTab[];
+  activeTab?: string;
+  onTabChange?: (tabId: string) => void;
 }
 
 export const InventorySelectModal: React.FC<InventorySelectModalProps> = ({
@@ -41,6 +51,10 @@ export const InventorySelectModal: React.FC<InventorySelectModalProps> = ({
   onClose,
   onAddNew,
   addNewLabel,
+  bannerNode,
+  tabs,
+  activeTab,
+  onTabChange,
 }) => {
   const [search, setSearch] = useState("");
 
@@ -86,22 +100,37 @@ export const InventorySelectModal: React.FC<InventorySelectModalProps> = ({
             </View>
           </View>
 
+          {/* Banner Context (Ví dụ: Tên NCC hiện tại) */}
+          {bannerNode && <View style={styles.bannerContainer}>{bannerNode}</View>}
+
+          {/* Filter Tabs (Ví dụ: Sản phẩm của NCC vs Tất cả) */}
+          {tabs && tabs.length > 0 && (
+            <View style={styles.tabsRow}>
+              {tabs.map((tab) => {
+                const isActive = activeTab === tab.id;
+                return (
+                  <TouchableOpacity
+                    key={tab.id}
+                    style={[styles.tabChip, isActive && styles.tabChipActive]}
+                    onPress={() => onTabChange?.(tab.id)}
+                    activeOpacity={0.7}
+                  >
+                    <Text style={[styles.tabChipText, isActive && styles.tabChipTextActive]}>
+                      {tab.label} {tab.count !== undefined ? `(${tab.count})` : ""}
+                    </Text>
+                  </TouchableOpacity>
+                );
+              })}
+            </View>
+          )}
+
           {/* Search Bar */}
-          <View style={styles.searchContainer}>
-            <Ionicons name="search-outline" size={18} color="#94a3b8" style={{ marginRight: 8 }} />
-            <TextInput
-              style={styles.searchInput}
-              placeholder={placeholderSearch}
-              placeholderTextColor="#94a3b8"
+          <View style={styles.searchSection}>
+            <SearchInput
               value={search}
               onChangeText={setSearch}
-              clearButtonMode="while-editing"
+              placeholder={placeholderSearch}
             />
-            {search.length > 0 && (
-              <TouchableOpacity onPress={() => setSearch("")}>
-                <Ionicons name="close-circle" size={18} color="#94a3b8" />
-              </TouchableOpacity>
-            )}
           </View>
 
           {/* Options List */}
@@ -142,6 +171,7 @@ export const InventorySelectModal: React.FC<InventorySelectModalProps> = ({
                         <Text
                           style={[styles.itemLabel, isSelected && styles.itemLabelSelected]}
                           numberOfLines={1}
+                          ellipsizeMode="tail"
                         >
                           {item.label}
                         </Text>
@@ -157,6 +187,8 @@ export const InventorySelectModal: React.FC<InventorySelectModalProps> = ({
                                 styles.itemBadgeText,
                                 item.badgeColor ? { color: item.badgeColor } : null,
                               ]}
+                              numberOfLines={1}
+                              ellipsizeMode="tail"
                             >
                               {item.badge}
                             </Text>
@@ -165,7 +197,11 @@ export const InventorySelectModal: React.FC<InventorySelectModalProps> = ({
                       </View>
 
                       {item.subLabel ? (
-                        <Text style={styles.itemSubLabel} numberOfLines={1}>
+                        <Text
+                          style={styles.itemSubLabel}
+                          numberOfLines={1}
+                          ellipsizeMode="tail"
+                        >
                           {item.subLabel}
                         </Text>
                       ) : null}
@@ -173,7 +209,9 @@ export const InventorySelectModal: React.FC<InventorySelectModalProps> = ({
                   </View>
 
                   {isSelected && (
-                    <Ionicons name="checkmark-circle" size={22} color="#059669" />
+                    <View style={styles.checkIconBox}>
+                      <Ionicons name="checkmark-circle" size={22} color="#059669" />
+                    </View>
                   )}
                 </TouchableOpacity>
               );
@@ -257,21 +295,42 @@ const styles = StyleSheet.create({
     alignItems: "center",
     justifyContent: "center",
   },
-  searchContainer: {
+  bannerContainer: {
+    paddingHorizontal: 16,
+    paddingTop: 10,
+  },
+  tabsRow: {
     flexDirection: "row",
     alignItems: "center",
-    backgroundColor: "#f1f5f9",
-    marginHorizontal: 16,
-    marginTop: 12,
-    marginBottom: 8,
-    borderRadius: 14,
-    paddingHorizontal: 12,
-    height: 42,
+    paddingHorizontal: 16,
+    paddingTop: 10,
+    gap: 8,
   },
-  searchInput: {
-    flex: 1,
-    fontSize: 14,
-    color: "#0f172a",
+  tabChip: {
+    paddingHorizontal: 12,
+    paddingVertical: 6,
+    borderRadius: 16,
+    backgroundColor: "#f1f5f9",
+    borderWidth: 1,
+    borderColor: "#e2e8f0",
+  },
+  tabChipActive: {
+    backgroundColor: "#ecfdf5",
+    borderColor: "#a7f3d0",
+  },
+  tabChipText: {
+    fontSize: 12,
+    fontWeight: "600",
+    color: "#64748b",
+  },
+  tabChipTextActive: {
+    color: "#059669",
+    fontWeight: "700",
+  },
+  searchSection: {
+    paddingHorizontal: 16,
+    paddingTop: 10,
+    paddingBottom: 6,
   },
   listContent: {
     paddingHorizontal: 16,
@@ -298,7 +357,8 @@ const styles = StyleSheet.create({
     flexDirection: "row",
     alignItems: "center",
     flex: 1,
-    marginRight: 10,
+    marginRight: 8,
+    minWidth: 0,
   },
   iconCircle: {
     width: 38,
@@ -306,20 +366,25 @@ const styles = StyleSheet.create({
     borderRadius: 12,
     alignItems: "center",
     justifyContent: "center",
-    marginRight: 12,
+    marginRight: 10,
+    flexShrink: 0,
   },
   itemInfo: {
     flex: 1,
+    minWidth: 0,
+    justifyContent: "center",
   },
   labelRow: {
     flexDirection: "row",
     alignItems: "center",
     gap: 6,
+    minWidth: 0,
   },
   itemLabel: {
     fontSize: 14,
     fontWeight: "700",
     color: "#1e293b",
+    flexShrink: 1,
   },
   itemLabelSelected: {
     color: "#059669",
@@ -329,6 +394,8 @@ const styles = StyleSheet.create({
     paddingHorizontal: 6,
     paddingVertical: 2,
     borderRadius: 6,
+    flexShrink: 0,
+    maxWidth: 90,
   },
   itemBadgeText: {
     fontSize: 10,
@@ -339,6 +406,12 @@ const styles = StyleSheet.create({
     fontSize: 12,
     color: "#64748b",
     marginTop: 2,
+  },
+  checkIconBox: {
+    marginLeft: 6,
+    flexShrink: 0,
+    alignItems: "center",
+    justifyContent: "center",
   },
   emptyBox: {
     paddingVertical: 40,

@@ -6,6 +6,7 @@ import {
   KeyboardAvoidingView,
   Modal,
   Platform,
+  Pressable,
   ScrollView,
   StyleSheet,
   Switch,
@@ -28,6 +29,8 @@ import { CategoryFormModal } from "./CategoryFormModal";
 import { WarehouseFormModal } from "./WarehouseFormModal";
 import { SupplierFormModal } from "./SupplierFormModal";
 import { supplyApi } from "../../api/supplyApi";
+import { DatePickerModal, formatDateVN } from "../../features/credentials/DatePickerModal";
+import { AppButton } from "../common";
 
 interface SupplyFormModalProps {
   visible: boolean;
@@ -59,12 +62,12 @@ export const SupplyFormModal: React.FC<SupplyFormModalProps> = ({
   // 1. Định danh & Phân loại
   const [name, setName] = useState("");
   const [code, setCode] = useState("");
-  const [category, setCategory] = useState("Vật tư tiêu hao");
+  const [category, setCategory] = useState(categories[0]?.name || "");
   const [unit, setUnit] = useState("Hộp");
   const [unitPrice, setUnitPrice] = useState("");
 
   // 2. Nguồn cung & Vị trí kho
-  const [warehouseLocation, setWarehouseLocation] = useState("");
+  const [warehouseLocation, setWarehouseLocation] = useState(warehouses[0]?.name || "");
   const [warehouseId, setWarehouseId] = useState<string | undefined>();
   const [supplierName, setSupplierName] = useState("");
   const [supplierId, setSupplierId] = useState<string | undefined>();
@@ -83,6 +86,9 @@ export const SupplyFormModal: React.FC<SupplyFormModalProps> = ({
   const [inspectionDate, setInspectionDate] = useState("");
   const [nextInspectionDate, setNextInspectionDate] = useState("");
   const [inspectionCertificateNumber, setInspectionCertificateNumber] = useState("");
+  const [activeDatePicker, setActiveDatePicker] = useState<
+    "manufactureDate" | "expiryDate" | "inspectionDate" | "nextInspectionDate" | null
+  >(null);
 
   // 6. Nhiều hình ảnh & Tài liệu đính kèm
   const [imageUrl, setImageUrl] = useState("");
@@ -92,6 +98,7 @@ export const SupplyFormModal: React.FC<SupplyFormModalProps> = ({
   >([]);
   const [uploadingMedia, setUploadingMedia] = useState(false);
   const [uploadProgressText, setUploadProgressText] = useState("");
+  const [docPickerOpen, setDocPickerOpen] = useState(false);
   const [notes, setNotes] = useState("");
 
   const [submitting, setSubmitting] = useState(false);
@@ -136,11 +143,11 @@ export const SupplyFormModal: React.FC<SupplyFormModalProps> = ({
     } else {
       setName("");
       setCode(`VT-${Date.now().toString().slice(-4)}`);
-      setCategory(categories[0]?.name || "Vật tư tiêu hao");
+      setCategory(categories[0]?.name || "");
       setUnit("Hộp");
       setUnitPrice("");
 
-      setWarehouseLocation(warehouses[0]?.name || "KHO CHÍNH");
+      setWarehouseLocation(warehouses[0]?.name || "");
       setWarehouseId(warehouses[0]?.id);
       setSupplierName(suppliers[0]?.name || "");
       setSupplierId(suppliers[0]?.id);
@@ -222,18 +229,118 @@ export const SupplyFormModal: React.FC<SupplyFormModalProps> = ({
     }
   };
 
-  // CHỌN TÀI LIỆU (PDF, Word, Excel, CO/CQ, File kiểm định)
-  const handlePickDocuments = async () => {
+  // Kiểm tra tệp có phải hình ảnh hay không
+  const isImageFile = (file?: { name?: string; fileType?: string; fileUrl?: string }) => {
+    if (!file) return false;
+    return (
+      file.fileType?.includes("image") ||
+      /\.(jpe?g|png|webp|gif|bmp|heic)$/i.test(file.name || "") ||
+      /\.(jpe?g|png|webp|gif|bmp|heic)$/i.test(file.fileUrl || "")
+    );
+  };
+
+  // 1. Chụp ảnh tài liệu trực tiếp qua Camera
+  const handleCaptureDocPhoto = async () => {
+    try {
+      const permission = await ImagePicker.requestCameraPermissionsAsync();
+      if (!permission.granted) {
+        Alert.alert(
+          "Cần quyền máy ảnh",
+          "Vui lòng cho phép ứng dụng truy cập máy ảnh để chụp giấy tờ, tem nhãn CO/CQ.",
+        );
+        return;
+      }
+
+      const result = await ImagePicker.launchCameraAsync({
+        quality: 0.85,
+      });
+
+      if (result.canceled || !result.assets || result.assets.length === 0) {
+        return;
+      }
+
+      setDocPickerOpen(false);
+      setUploadingMedia(true);
+      setUploadProgressText("Đang tải lên ảnh chụp tài liệu...");
+
+      const asset = result.assets[0];
+      const fileName = asset.fileName || `doc_scan_${Date.now()}.jpg`;
+      const uploaded = await supplyApi.uploadFiles([
+        {
+          uri: asset.uri,
+          name: fileName,
+          type: asset.mimeType || "image/jpeg",
+        },
+      ]);
+
+      if (uploaded.length > 0) {
+        setDocuments((prev) => [...prev, ...uploaded]);
+        Alert.alert("Thành công", "Đã đính kèm ảnh chụp tài liệu CO/CQ.");
+      }
+    } catch (err: any) {
+      Alert.alert("Lỗi chụp ảnh", err.message || "Không thể chụp ảnh tài liệu.");
+    } finally {
+      setUploadingMedia(false);
+      setUploadProgressText("");
+    }
+  };
+
+  // 2. Chọn ảnh tài liệu từ Thư viện ảnh
+  const handlePickDocPhotos = async () => {
+    try {
+      const permission = await ImagePicker.requestMediaLibraryPermissionsAsync();
+      if (!permission.granted) {
+        Alert.alert(
+          "Cần quyền thư viện ảnh",
+          "Vui lòng cho phép ứng dụng truy cập thư viện ảnh để đính kèm giấy chứng nhận.",
+        );
+        return;
+      }
+
+      const result = await ImagePicker.launchImageLibraryAsync({
+        mediaTypes: ["images"],
+        allowsMultipleSelection: true,
+        selectionLimit: 10,
+        quality: 0.85,
+      });
+
+      if (result.canceled || !result.assets || result.assets.length === 0) {
+        return;
+      }
+
+      setDocPickerOpen(false);
+      setUploadingMedia(true);
+      setUploadProgressText(`Đang tải lên ${result.assets.length} ảnh tài liệu...`);
+
+      const filesToUpload = result.assets.map((asset, index) => {
+        const uriParts = asset.uri.split("/");
+        const fileName = asset.fileName || uriParts[uriParts.length - 1] || `doc_photo_${Date.now()}_${index}.jpg`;
+        return {
+          uri: asset.uri,
+          name: fileName,
+          type: asset.mimeType || "image/jpeg",
+        };
+      });
+
+      const uploaded = await supplyApi.uploadFiles(filesToUpload);
+
+      if (uploaded.length > 0) {
+        setDocuments((prev) => [...prev, ...uploaded]);
+        Alert.alert("Thành công", `Đã đính kèm ${uploaded.length} ảnh tài liệu.`);
+      }
+    } catch (err: any) {
+      Alert.alert("Lỗi tải ảnh", err.message || "Không thể tải lên ảnh tài liệu.");
+    } finally {
+      setUploadingMedia(false);
+      setUploadProgressText("");
+    }
+  };
+
+  // 3. Chọn tệp tài liệu (PDF, Word, Excel, hoặc tệp bất kỳ)
+  const handlePickDocFiles = async () => {
     try {
       const result = await DocumentPicker.getDocumentAsync({
-        type: [
-          "application/pdf",
-          "application/msword",
-          "application/vnd.openxmlformats-officedocument.wordprocessingml.document",
-          "application/vnd.ms-excel",
-          "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet",
-          "image/*",
-        ],
+        type: "*/*", // Cho phép chọn tất cả các định dạng tệp và ảnh
         multiple: true,
         copyToCacheDirectory: true,
       });
@@ -242,6 +349,7 @@ export const SupplyFormModal: React.FC<SupplyFormModalProps> = ({
         return;
       }
 
+      setDocPickerOpen(false);
       setUploadingMedia(true);
       setUploadProgressText(`Đang tải lên ${result.assets.length} tệp tài liệu...`);
 
@@ -430,7 +538,7 @@ export const SupplyFormModal: React.FC<SupplyFormModalProps> = ({
 
               {/* Mã vật tư & Đơn vị tính */}
               <View style={styles.rowFields}>
-                <View style={[styles.fieldGroup, { flex: 1.2 }]}>
+                <View style={[styles.fieldGroup, { flex: 1 }]}>
                   <Text style={styles.label}>
                     Mã vật tư <Text style={styles.required}>*</Text>
                   </Text>
@@ -634,7 +742,7 @@ export const SupplyFormModal: React.FC<SupplyFormModalProps> = ({
 
               {/* Số lô & Ngày sản xuất */}
               <View style={styles.rowFields}>
-                <View style={[styles.fieldGroup, { flex: 1.2 }]}>
+                <View style={[styles.fieldGroup, { flex: 1 }]}>
                   <Text style={styles.label}>Số lô sản xuất (Batch/Lot)</Text>
                   <TextInput
                     style={[styles.input, { fontFamily: "monospace" }]}
@@ -647,27 +755,56 @@ export const SupplyFormModal: React.FC<SupplyFormModalProps> = ({
 
                 <View style={[styles.fieldGroup, { flex: 1 }]}>
                   <Text style={styles.label}>Ngày sản xuất (NSX)</Text>
-                  <TextInput
-                    style={styles.input}
-                    placeholder="YYYY-MM-DD"
-                    placeholderTextColor="#94a3b8"
-                    value={manufactureDate}
-                    onChangeText={setManufactureDate}
-                  />
+                  <TouchableOpacity
+                    style={styles.datePickerTrigger}
+                    onPress={() => setActiveDatePicker("manufactureDate")}
+                    activeOpacity={0.7}
+                  >
+                    <Text
+                      style={[
+                        styles.datePickerText,
+                        !manufactureDate && styles.datePickerPlaceholder,
+                      ]}
+                    >
+                      {formatDateVN(manufactureDate) || "dd/MM/yyyy"}
+                    </Text>
+                    <Ionicons name="calendar-outline" size={16} color="#64748b" />
+                  </TouchableOpacity>
                 </View>
               </View>
 
               {/* Hạn sử dụng (HSD) */}
               <View style={styles.fieldGroup}>
                 <Text style={styles.label}>Hạn sử dụng (HSD)</Text>
-                <TextInput
-                  style={[styles.input, !requiresExpiry && styles.readOnlyInput]}
-                  placeholder="YYYY-MM-DD"
-                  placeholderTextColor="#94a3b8"
-                  value={expiryDate}
-                  onChangeText={setExpiryDate}
-                  editable={requiresExpiry}
-                />
+                <TouchableOpacity
+                  style={[
+                    styles.datePickerTrigger,
+                    !requiresExpiry && styles.readOnlyInput,
+                  ]}
+                  onPress={() => {
+                    if (requiresExpiry) {
+                      setActiveDatePicker("expiryDate");
+                    }
+                  }}
+                  disabled={!requiresExpiry}
+                  activeOpacity={0.7}
+                >
+                  <Text
+                    style={[
+                      styles.datePickerText,
+                      (!expiryDate || !requiresExpiry) && styles.datePickerPlaceholder,
+                    ]}
+                  >
+                    {requiresExpiry
+                      ? formatDateVN(expiryDate) || "dd/MM/yyyy"
+                      : "Không áp dụng hạn dùng"}
+                  </Text>
+                  <Ionicons
+                    name="calendar-outline"
+                    size={16}
+                    color={requiresExpiry ? "#64748b" : "#cbd5e1"}
+                  />
+                </TouchableOpacity>
               </View>
 
               {/* Switch Quản lý hạn dùng */}
@@ -711,24 +848,40 @@ export const SupplyFormModal: React.FC<SupplyFormModalProps> = ({
               <View style={styles.rowFields}>
                 <View style={[styles.fieldGroup, { flex: 1 }]}>
                   <Text style={styles.label}>Ngày kiểm định</Text>
-                  <TextInput
-                    style={styles.input}
-                    placeholder="YYYY-MM-DD"
-                    placeholderTextColor="#94a3b8"
-                    value={inspectionDate}
-                    onChangeText={setInspectionDate}
-                  />
+                  <TouchableOpacity
+                    style={styles.datePickerTrigger}
+                    onPress={() => setActiveDatePicker("inspectionDate")}
+                    activeOpacity={0.7}
+                  >
+                    <Text
+                      style={[
+                        styles.datePickerText,
+                        !inspectionDate && styles.datePickerPlaceholder,
+                      ]}
+                    >
+                      {formatDateVN(inspectionDate) || "dd/MM/yyyy"}
+                    </Text>
+                    <Ionicons name="calendar-outline" size={16} color="#64748b" />
+                  </TouchableOpacity>
                 </View>
 
                 <View style={[styles.fieldGroup, { flex: 1 }]}>
                   <Text style={styles.label}>Hạn kiểm định tiếp theo</Text>
-                  <TextInput
-                    style={styles.input}
-                    placeholder="YYYY-MM-DD"
-                    placeholderTextColor="#94a3b8"
-                    value={nextInspectionDate}
-                    onChangeText={setNextInspectionDate}
-                  />
+                  <TouchableOpacity
+                    style={styles.datePickerTrigger}
+                    onPress={() => setActiveDatePicker("nextInspectionDate")}
+                    activeOpacity={0.7}
+                  >
+                    <Text
+                      style={[
+                        styles.datePickerText,
+                        !nextInspectionDate && styles.datePickerPlaceholder,
+                      ]}
+                    >
+                      {formatDateVN(nextInspectionDate) || "dd/MM/yyyy"}
+                    </Text>
+                    <Ionicons name="calendar-outline" size={16} color="#64748b" />
+                  </TouchableOpacity>
                 </View>
               </View>
 
@@ -765,20 +918,7 @@ export const SupplyFormModal: React.FC<SupplyFormModalProps> = ({
 
               {/* 6.1: BỘ SƯU TẬP HÌNH ẢNH */}
               <View style={styles.fieldGroup}>
-                <View style={styles.mediaTitleRow}>
-                  <Text style={[styles.label, styles.mediaLabel]} numberOfLines={1}>
-                    Ảnh sản phẩm ({images.length})
-                  </Text>
-                  <TouchableOpacity
-                    style={styles.mediaAddBtn}
-                    onPress={handlePickImagesFromLibrary}
-                    disabled={uploadingMedia}
-                    activeOpacity={0.7}
-                  >
-                    <Ionicons name="image-outline" size={13} color="#059669" />
-                    <Text style={styles.mediaAddBtnText}>+ Thư viện</Text>
-                  </TouchableOpacity>
-                </View>
+                <Text style={styles.label}>Ảnh sản phẩm ({images.length})</Text>
 
                 {images.length > 0 ? (
                   <View style={styles.imagesGrid}>
@@ -810,6 +950,15 @@ export const SupplyFormModal: React.FC<SupplyFormModalProps> = ({
                         </View>
                       );
                     })}
+                    <TouchableOpacity
+                      style={styles.addImageCard}
+                      onPress={handlePickImagesFromLibrary}
+                      disabled={uploadingMedia}
+                      activeOpacity={0.7}
+                    >
+                      <Ionicons name="add" size={24} color="#059669" />
+                      <Text style={styles.addImageCardText}>Thêm ảnh</Text>
+                    </TouchableOpacity>
                   </View>
                 ) : (
                   <TouchableOpacity
@@ -827,72 +976,88 @@ export const SupplyFormModal: React.FC<SupplyFormModalProps> = ({
                 )}
               </View>
 
-              {/* 6.2: TÀI LIỆU ĐÍNH KÈM CO/CQ, HDSD */}
+              {/* 6.2: TÀI LIỆU ĐÍNH KÈM CO/CQ, HDSD & HÌNH ẢNH */}
               <View style={[styles.fieldGroup, { marginTop: 8 }]}>
-                <View style={styles.mediaTitleRow}>
-                  <Text style={[styles.label, styles.mediaLabel]} numberOfLines={1}>
-                    Tài liệu CO/CQ & HDSD ({documents.length})
-                  </Text>
-                  <TouchableOpacity
-                    style={[styles.mediaAddBtn, { borderColor: "#bae6fd", backgroundColor: "#f0f9ff" }]}
-                    onPress={handlePickDocuments}
-                    disabled={uploadingMedia}
-                    activeOpacity={0.7}
-                  >
-                    <Ionicons name="attach-outline" size={14} color="#0284c7" />
-                    <Text style={[styles.mediaAddBtnText, { color: "#0284c7" }]}>+ Đính kèm</Text>
-                  </TouchableOpacity>
-                </View>
+                <Text style={styles.label}>
+                  Tài liệu & Hình ảnh CO/CQ ({documents.length})
+                </Text>
 
                 {documents.length > 0 ? (
                   <View style={styles.docsList}>
-                    {documents.map((doc, idx) => (
-                      <View key={`${doc.fileUrl}-${idx}`} style={styles.docRow}>
-                        <View style={styles.docIconBox}>
-                          <Ionicons
-                            name={
-                              doc.fileType?.includes("pdf")
-                                ? "document-text"
-                                : doc.fileType?.includes("image")
-                                ? "image"
-                                : "document"
-                            }
-                            size={18}
-                            color="#0284c7"
-                          />
-                        </View>
-                        <View style={styles.docInfo}>
-                          <Text style={styles.docName} numberOfLines={1}>
-                            {doc.name}
-                          </Text>
-                          {doc.fileSize ? (
-                            <Text style={styles.docSize}>
-                              {Math.round(doc.fileSize / 1024)} KB
+                    {documents.map((doc, idx) => {
+                      const isImg = isImageFile(doc);
+                      return (
+                        <View key={`${doc.fileUrl}-${idx}`} style={styles.docRow}>
+                          {isImg ? (
+                            <Image source={{ uri: doc.fileUrl }} style={styles.docThumbImage} />
+                          ) : (
+                            <View style={styles.docIconBox}>
+                              <Ionicons
+                                name={
+                                  doc.fileType?.includes("pdf")
+                                    ? "document-text"
+                                    : "document"
+                                }
+                                size={18}
+                                color="#0284c7"
+                              />
+                            </View>
+                          )}
+                          <View style={styles.docInfo}>
+                            <Text style={styles.docName} numberOfLines={1}>
+                              {doc.name}
                             </Text>
-                          ) : null}
+                            <Text style={styles.docSize}>
+                              {isImg ? "Hình ảnh" : doc.fileType?.includes("pdf") ? "Tài liệu PDF" : "Tệp văn bản"}
+                              {doc.fileSize ? ` • ${Math.round(doc.fileSize / 1024)} KB` : ""}
+                            </Text>
+                          </View>
+                          <TouchableOpacity
+                            style={styles.docDeleteBtn}
+                            onPress={() => handleRemoveDocument(idx)}
+                            hitSlop={8}
+                          >
+                            <Ionicons name="trash-outline" size={16} color="#ef4444" />
+                          </TouchableOpacity>
                         </View>
-                        <TouchableOpacity
-                          style={styles.docDeleteBtn}
-                          onPress={() => handleRemoveDocument(idx)}
-                          hitSlop={8}
-                        >
-                          <Ionicons name="trash-outline" size={16} color="#ef4444" />
-                        </TouchableOpacity>
-                      </View>
-                    ))}
+                      );
+                    })}
+                    <TouchableOpacity
+                      style={styles.addDocBtn}
+                      onPress={() => setDocPickerOpen(true)}
+                      disabled={uploadingMedia}
+                      activeOpacity={0.7}
+                    >
+                      <Ionicons name="add-circle-outline" size={16} color="#0284c7" />
+                      <Text style={styles.addDocBtnText}>+ Thêm tài liệu / ảnh khác</Text>
+                    </TouchableOpacity>
                   </View>
                 ) : (
                   <TouchableOpacity
                     style={styles.emptyMediaBox}
-                    onPress={handlePickDocuments}
+                    onPress={() => setDocPickerOpen(true)}
                     disabled={uploadingMedia}
                     activeOpacity={0.7}
                   >
-                    <Ionicons name="document-attach-outline" size={26} color="#94a3b8" />
-                    <Text style={styles.emptyMediaTitle}>Chưa có tài liệu đính kèm</Text>
+                    <Ionicons name="document-attach-outline" size={26} color="#0284c7" />
+                    <Text style={styles.emptyMediaTitle}>Chưa có tài liệu hoặc hình ảnh</Text>
                     <Text style={styles.emptyMediaDesc}>
-                      Chạm để đính kèm tệp CO/CQ, PDF, Word hoặc bảng thông số
+                      Chạm để đính kèm cả ảnh chụp, tệp CO/CQ, PDF, Word hoặc bảng thông số
                     </Text>
+                    <View style={styles.emptyActionPills}>
+                      <View style={styles.emptyActionPill}>
+                        <Ionicons name="camera-outline" size={13} color="#0284c7" />
+                        <Text style={styles.emptyActionPillText}>Chụp ảnh</Text>
+                      </View>
+                      <View style={styles.emptyActionPill}>
+                        <Ionicons name="image-outline" size={13} color="#0284c7" />
+                        <Text style={styles.emptyActionPillText}>Thư viện ảnh</Text>
+                      </View>
+                      <View style={styles.emptyActionPill}>
+                        <Ionicons name="document-text-outline" size={13} color="#0284c7" />
+                        <Text style={styles.emptyActionPillText}>Tệp tin / PDF</Text>
+                      </View>
+                    </View>
                   </TouchableOpacity>
                 )}
               </View>
@@ -917,20 +1082,23 @@ export const SupplyFormModal: React.FC<SupplyFormModalProps> = ({
 
           {/* Footer Actions */}
           <View style={styles.footer}>
-            <TouchableOpacity style={styles.cancelBtn} onPress={onClose} disabled={submitting}>
-              <Text style={styles.cancelBtnText}>Hủy bỏ</Text>
-            </TouchableOpacity>
+            <AppButton
+              variant="secondary"
+              title="Hủy bỏ"
+              onPress={onClose}
+              disabled={submitting}
+              style={{ flex: 1 }}
+            />
 
-            <TouchableOpacity
-              style={[styles.submitBtn, submitting && { opacity: 0.6 }]}
+            <AppButton
+              variant="primary"
+              icon={item ? "checkmark-circle-outline" : "add"}
+              title={submitting ? "Đang lưu..." : item ? "Lưu thay đổi" : "Thêm vật tư"}
               onPress={handleSubmit}
+              loading={submitting}
               disabled={submitting || uploadingMedia}
-            >
-              <Ionicons name={item ? "checkmark-circle-outline" : "add"} size={18} color="#ffffff" />
-              <Text style={styles.submitBtnText}>
-                {submitting ? "Đang lưu..." : item ? "Lưu thay đổi" : "Thêm vật tư"}
-              </Text>
-            </TouchableOpacity>
+              style={{ flex: 2 }}
+            />
           </View>
         </View>
       </KeyboardAvoidingView>
@@ -1021,6 +1189,114 @@ export const SupplyFormModal: React.FC<SupplyFormModalProps> = ({
           }}
         />
       )}
+
+      {/* DatePickerModal chọn ngày theo quy chuẩn Việt Nam dd/MM/yyyy */}
+      <DatePickerModal
+        visible={activeDatePicker !== null}
+        onClose={() => setActiveDatePicker(null)}
+        title={
+          activeDatePicker === "manufactureDate"
+            ? "Chọn Ngày sản xuất (NSX)"
+            : activeDatePicker === "expiryDate"
+            ? "Chọn Hạn sử dụng (HSD)"
+            : activeDatePicker === "inspectionDate"
+            ? "Chọn Ngày kiểm định"
+            : activeDatePicker === "nextInspectionDate"
+            ? "Chọn Hạn kiểm định tiếp theo"
+            : "Chọn ngày"
+        }
+        value={
+          activeDatePicker === "manufactureDate"
+            ? manufactureDate
+            : activeDatePicker === "expiryDate"
+            ? expiryDate
+            : activeDatePicker === "inspectionDate"
+            ? inspectionDate
+            : activeDatePicker === "nextInspectionDate"
+            ? nextInspectionDate
+            : ""
+        }
+        allowClear={true}
+        clearLabel="Xóa ngày"
+        showYearShortcuts={activeDatePicker !== "manufactureDate"}
+        onChange={(val) => {
+          if (activeDatePicker === "manufactureDate") setManufactureDate(val);
+          else if (activeDatePicker === "expiryDate") setExpiryDate(val);
+          else if (activeDatePicker === "inspectionDate") setInspectionDate(val);
+          else if (activeDatePicker === "nextInspectionDate") setNextInspectionDate(val);
+          setActiveDatePicker(null);
+        }}
+      />
+
+      {/* Modal chọn nguồn đính kèm: Camera, Thư viện ảnh, Tệp tin */}
+      <Modal
+        visible={docPickerOpen}
+        transparent={true}
+        animationType="fade"
+        onRequestClose={() => setDocPickerOpen(false)}
+      >
+        <View style={styles.pickerBackdrop}>
+          <Pressable style={styles.pickerBackdropDismiss} onPress={() => setDocPickerOpen(false)} />
+          <View style={styles.pickerSheet}>
+            <View style={styles.pickerHeader}>
+              <View>
+                <Text style={styles.pickerTitle}>Đính kèm tài liệu & hình ảnh</Text>
+                <Text style={styles.pickerSubtitle}>Hỗ trợ cả ảnh chụp, ảnh thư viện và các loại tệp</Text>
+              </View>
+              <TouchableOpacity onPress={() => setDocPickerOpen(false)} hitSlop={8} style={styles.pickerCloseBtn}>
+                <Ionicons name="close" size={20} color="#64748b" />
+              </TouchableOpacity>
+            </View>
+
+            <View style={styles.pickerOptionsList}>
+              <TouchableOpacity
+                style={styles.pickerOptionCard}
+                onPress={handleCaptureDocPhoto}
+                activeOpacity={0.7}
+              >
+                <View style={[styles.pickerOptionIconCircle, { backgroundColor: "#ecfdf5" }]}>
+                  <Ionicons name="camera" size={22} color="#059669" />
+                </View>
+                <View style={styles.pickerOptionTextContainer}>
+                  <Text style={styles.pickerOptionTitle}>Chụp ảnh trực tiếp</Text>
+                  <Text style={styles.pickerOptionDesc}>Dùng camera chụp giấy tờ chứng chỉ, tem nhãn CO/CQ</Text>
+                </View>
+                <Ionicons name="chevron-forward" size={18} color="#94a3b8" />
+              </TouchableOpacity>
+
+              <TouchableOpacity
+                style={styles.pickerOptionCard}
+                onPress={handlePickDocPhotos}
+                activeOpacity={0.7}
+              >
+                <View style={[styles.pickerOptionIconCircle, { backgroundColor: "#f0fdf4" }]}>
+                  <Ionicons name="images" size={22} color="#16a34a" />
+                </View>
+                <View style={styles.pickerOptionTextContainer}>
+                  <Text style={styles.pickerOptionTitle}>Chọn ảnh từ thư viện</Text>
+                  <Text style={styles.pickerOptionDesc}>Chọn 1 hoặc nhiều ảnh chụp chứng từ sẵn có từ máy</Text>
+                </View>
+                <Ionicons name="chevron-forward" size={18} color="#94a3b8" />
+              </TouchableOpacity>
+
+              <TouchableOpacity
+                style={styles.pickerOptionCard}
+                onPress={handlePickDocFiles}
+                activeOpacity={0.7}
+              >
+                <View style={[styles.pickerOptionIconCircle, { backgroundColor: "#f0f9ff" }]}>
+                  <Ionicons name="document-text" size={22} color="#0284c7" />
+                </View>
+                <View style={styles.pickerOptionTextContainer}>
+                  <Text style={styles.pickerOptionTitle}>Chọn tệp tài liệu (*/*)</Text>
+                  <Text style={styles.pickerOptionDesc}>Đính kèm file PDF, Word, Excel hoặc tệp tài liệu bất kỳ</Text>
+                </View>
+                <Ionicons name="chevron-forward" size={18} color="#94a3b8" />
+              </TouchableOpacity>
+            </View>
+          </View>
+        </View>
+      </Modal>
     </Modal>
   );
 };
@@ -1148,10 +1424,30 @@ const styles = StyleSheet.create({
     borderColor: "#cbd5e1",
     borderRadius: 12,
     paddingHorizontal: 12,
-    paddingVertical: 9,
+    paddingVertical: 0,
+    height: 44,
     fontSize: 13,
     color: "#0f172a",
     fontWeight: "500",
+  },
+  datePickerTrigger: {
+    backgroundColor: "#ffffff",
+    borderWidth: 1,
+    borderColor: "#cbd5e1",
+    borderRadius: 12,
+    paddingHorizontal: 12,
+    height: 44,
+    flexDirection: "row",
+    alignItems: "center",
+    justifyContent: "space-between",
+  },
+  datePickerText: {
+    fontSize: 13,
+    color: "#0f172a",
+    fontWeight: "500",
+  },
+  datePickerPlaceholder: {
+    color: "#94a3b8",
   },
   readOnlyInput: {
     backgroundColor: "#f1f5f9",
@@ -1210,7 +1506,7 @@ const styles = StyleSheet.create({
     borderColor: "#cbd5e1",
     borderRadius: 12,
     paddingHorizontal: 12,
-    paddingVertical: 9,
+    height: 44,
     flexDirection: "row",
     alignItems: "center",
     justifyContent: "space-between",
@@ -1409,8 +1705,44 @@ const styles = StyleSheet.create({
     fontWeight: "600",
     color: "#ffffff",
   },
+  addImageCard: {
+    width: 76,
+    height: 76,
+    borderRadius: 10,
+    borderWidth: 1.5,
+    borderColor: "#a7f3d0",
+    borderStyle: "dashed",
+    backgroundColor: "#f0fdf4",
+    alignItems: "center",
+    justifyContent: "center",
+    gap: 2,
+  },
+  addImageCardText: {
+    fontSize: 10,
+    fontWeight: "700",
+    color: "#059669",
+  },
   docsList: {
     gap: 6,
+  },
+  addDocBtn: {
+    flexDirection: "row",
+    alignItems: "center",
+    justifyContent: "center",
+    gap: 6,
+    paddingVertical: 9,
+    paddingHorizontal: 12,
+    borderRadius: 10,
+    borderWidth: 1.5,
+    borderColor: "#bae6fd",
+    borderStyle: "dashed",
+    backgroundColor: "#f0f9ff",
+    marginTop: 4,
+  },
+  addDocBtnText: {
+    fontSize: 12,
+    fontWeight: "700",
+    color: "#0284c7",
   },
   docRow: {
     flexDirection: "row",
@@ -1422,13 +1754,113 @@ const styles = StyleSheet.create({
     padding: 8,
     gap: 8,
   },
+  docThumbImage: {
+    width: 32,
+    height: 32,
+    borderRadius: 6,
+    backgroundColor: "#e2e8f0",
+  },
   docIconBox: {
-    width: 30,
-    height: 30,
+    width: 32,
+    height: 32,
     borderRadius: 6,
     backgroundColor: "#f0f9ff",
     alignItems: "center",
     justifyContent: "center",
+  },
+  emptyActionPills: {
+    flexDirection: "row",
+    gap: 8,
+    marginTop: 10,
+    flexWrap: "wrap",
+    justifyContent: "center",
+  },
+  emptyActionPill: {
+    flexDirection: "row",
+    alignItems: "center",
+    gap: 5,
+    backgroundColor: "#f0f9ff",
+    borderWidth: 1,
+    borderColor: "#bae6fd",
+    paddingHorizontal: 10,
+    paddingVertical: 5,
+    borderRadius: 14,
+  },
+  emptyActionPillText: {
+    fontSize: 11,
+    fontWeight: "700",
+    color: "#0284c7",
+  },
+  pickerBackdrop: {
+    flex: 1,
+    backgroundColor: "rgba(15, 23, 42, 0.5)",
+    justifyContent: "flex-end",
+  },
+  pickerBackdropDismiss: {
+    ...StyleSheet.absoluteFill,
+  },
+  pickerSheet: {
+    backgroundColor: "#ffffff",
+    borderTopLeftRadius: 20,
+    borderTopRightRadius: 20,
+    paddingHorizontal: 20,
+    paddingTop: 18,
+    paddingBottom: 28,
+  },
+  pickerHeader: {
+    flexDirection: "row",
+    alignItems: "flex-start",
+    justifyContent: "space-between",
+    marginBottom: 16,
+    paddingBottom: 12,
+    borderBottomWidth: 1,
+    borderBottomColor: "#f1f5f9",
+  },
+  pickerTitle: {
+    fontSize: 16,
+    fontWeight: "800",
+    color: "#0f172a",
+  },
+  pickerSubtitle: {
+    fontSize: 12,
+    color: "#64748b",
+    marginTop: 2,
+  },
+  pickerCloseBtn: {
+    padding: 4,
+  },
+  pickerOptionsList: {
+    gap: 10,
+  },
+  pickerOptionCard: {
+    flexDirection: "row",
+    alignItems: "center",
+    padding: 12,
+    backgroundColor: "#f8fafc",
+    borderRadius: 14,
+    borderWidth: 1,
+    borderColor: "#e2e8f0",
+    gap: 12,
+  },
+  pickerOptionIconCircle: {
+    width: 42,
+    height: 42,
+    borderRadius: 12,
+    alignItems: "center",
+    justifyContent: "center",
+  },
+  pickerOptionTextContainer: {
+    flex: 1,
+  },
+  pickerOptionTitle: {
+    fontSize: 14,
+    fontWeight: "700",
+    color: "#0f172a",
+  },
+  pickerOptionDesc: {
+    fontSize: 11.5,
+    color: "#64748b",
+    marginTop: 2,
   },
   docInfo: {
     flex: 1,
