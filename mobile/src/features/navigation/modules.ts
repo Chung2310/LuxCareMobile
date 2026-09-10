@@ -117,6 +117,18 @@ export function availableModules(user: UserProfile | null) {
       visible: !!user,
     },
     {
+      title: "Quản lý người dùng",
+      description: "Thành viên, tài khoản & phân quyền hệ thống",
+      href: "/(tabs)/users" as const,
+      visible:
+        !!user &&
+        (user.role === "admin" ||
+          user.role === "superadmin" ||
+          user.role === "branch_owner" ||
+          user.role === "manager" ||
+          hasPermission(user, "user:read")),
+    },
+    {
       title: "Sơ đồ tổ chức",
       description: "Cơ cấu phân cấp phòng ban và nhân sự",
       href: "/(tabs)/org-chart" as const,

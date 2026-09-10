@@ -61,7 +61,6 @@ export const LUXCARE_MODULES: ServiceModule[] = [
         bgColor: "#ecfdf5",
         route: "/(tabs)/inventory",
         moduleId: "popular",
-        badge: "Mới",
         status: "active",
       },
       {
@@ -72,7 +71,6 @@ export const LUXCARE_MODULES: ServiceModule[] = [
         bgColor: "#f0f9ff",
         route: "/(tabs)/equipment",
         moduleId: "popular",
-        badge: "Mới",
         status: "coming_soon",
       },
       {
@@ -83,7 +81,6 @@ export const LUXCARE_MODULES: ServiceModule[] = [
         bgColor: "#f0fdfa",
         route: "/(tabs)/chat",
         moduleId: "popular",
-        badge: "Mới",
         status: "coming_soon",
       },
       {
@@ -104,7 +101,16 @@ export const LUXCARE_MODULES: ServiceModule[] = [
         bgColor: "#ecfdf5",
         route: "/(tabs)/customers",
         moduleId: "popular",
-        badge: "Mới",
+        status: "active",
+      },
+      {
+        id: "pop-users",
+        title: "Quản lý\nngười dùng",
+        icon: "people-circle",
+        color: "#6366f1",
+        bgColor: "#eef2ff",
+        route: "/(tabs)/users",
+        moduleId: "popular",
         status: "active",
       },
       {
@@ -269,7 +275,6 @@ export const LUXCARE_MODULES: ServiceModule[] = [
         bgColor: "#ecfdf5",
         route: "/(tabs)/inventory",
         moduleId: "operations",
-        badge: "Web ERP",
         status: "active",
       },
       {
@@ -310,7 +315,6 @@ export const LUXCARE_MODULES: ServiceModule[] = [
         bgColor: "#f0f9ff",
         route: "/(tabs)/equipment",
         moduleId: "operations",
-        badge: "Web ERP",
         status: "coming_soon",
       },
       {
@@ -341,7 +345,6 @@ export const LUXCARE_MODULES: ServiceModule[] = [
         bgColor: "#ecfdf5",
         route: "/(tabs)/customers",
         moduleId: "operations",
-        badge: "CRM",
         status: "active",
       },
       {
@@ -352,7 +355,6 @@ export const LUXCARE_MODULES: ServiceModule[] = [
         bgColor: "#ecfdf5",
         route: "/(tabs)/customers",
         moduleId: "operations",
-        badge: "Mới",
         status: "active",
       },
       {
@@ -447,7 +449,6 @@ export const LUXCARE_MODULES: ServiceModule[] = [
         bgColor: "#ecfdf5",
         route: "/(tabs)/chat",
         moduleId: "communication",
-        badge: "Socket",
         status: "coming_soon",
       },
       {
@@ -468,7 +469,6 @@ export const LUXCARE_MODULES: ServiceModule[] = [
         bgColor: "#fff7ed",
         route: "/(tabs)/blog",
         moduleId: "communication",
-        badge: "Web",
         status: "coming_soon",
       },
       {
@@ -489,19 +489,17 @@ export const LUXCARE_MODULES: ServiceModule[] = [
         bgColor: "#f5f3ff",
         route: "/(tabs)/knowledge",
         moduleId: "communication",
-        badge: "SOPs",
         status: "coming_soon",
       },
       {
         id: "sys-users",
         title: "Quản lý\nngười dùng",
         icon: "people-circle",
-        color: "#0284c7",
-        bgColor: "#f0f9ff",
+        color: "#6366f1",
+        bgColor: "#eef2ff",
         route: "/(tabs)/users",
         moduleId: "communication",
-        badge: "Admin",
-        status: "coming_soon",
+        status: "active",
       },
       {
         id: "sys-roles",
@@ -511,7 +509,6 @@ export const LUXCARE_MODULES: ServiceModule[] = [
         bgColor: "#ecfdf5",
         route: "/(tabs)/roles",
         moduleId: "communication",
-        badge: "Admin",
         status: "coming_soon",
       },
       {
