@@ -105,6 +105,18 @@ export function availableModules(user: UserProfile | null) {
       visible: !!user,
     },
     {
+      title: "Khách hàng & Tiếp nhận",
+      description: "Tiếp nhận Leads, tư vấn & chăm sóc khách hàng",
+      href: "/(tabs)/customers" as const,
+      visible: !!user,
+    },
+    {
+      title: "Vật tư & Dược phẩm",
+      description: "Quản lý tồn kho, nhập xuất và cấp phát",
+      href: "/(tabs)/inventory" as const,
+      visible: !!user,
+    },
+    {
       title: "Sơ đồ tổ chức",
       description: "Cơ cấu phân cấp phòng ban và nhân sự",
       href: "/(tabs)/org-chart" as const,
