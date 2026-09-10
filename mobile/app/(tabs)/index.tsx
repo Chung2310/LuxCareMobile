@@ -164,12 +164,12 @@ export default function Home() {
         route: "/(tabs)/inventory",
       },
       {
-        id: "equipment",
-        title: "Thiết bị\ny tế",
-        icon: "medkit",
-        color: "#0284c7", // Xanh sky y tế
-        bgColor: "#f0f9ff",
-        route: "/(tabs)/equipment",
+        id: "customers",
+        title: "Khách hàng\n& Leads",
+        icon: "people",
+        color: "#059669", // Xanh emerald LuxCare
+        bgColor: "#ecfdf5",
+        route: "/(tabs)/customers",
       },
       {
         id: "chat",

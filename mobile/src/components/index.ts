@@ -11,3 +11,6 @@ export * from "./modules/EditPinnedModal";
 
 // Inventory Components
 export * from "./inventory";
+
+// Customer Components
+export * from "./customers";
