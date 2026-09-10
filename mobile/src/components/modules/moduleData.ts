@@ -161,16 +161,6 @@ export const LUXCARE_MODULES: ServiceModule[] = [
         status: "active",
       },
       {
-        id: "att-shifts",
-        title: "Quản lý\n& Phân ca",
-        icon: "swap-horizontal",
-        color: "#0d9488",
-        bgColor: "#f0fdfa",
-        route: "/(tabs)/shifts",
-        moduleId: "hr",
-        status: "active",
-      },
-      {
         id: "att-mgmt",
         title: "Quản lý\n& Duyệt công",
         icon: "calendar-clear",
