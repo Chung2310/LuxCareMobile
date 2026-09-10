@@ -105,5 +105,23 @@ export function availableModules(user: UserProfile | null) {
       href: "/(tabs)/org-chart" as const,
       visible: !!user,
     },
+    {
+      title: "Thiết bị y tế",
+      description: "Quản lý danh mục, mượn trả & bảo trì thiết bị",
+      href: "/(tabs)/equipment" as const,
+      visible: !!user,
+    },
+    {
+      title: "Bản tin & Blog nội bộ",
+      description: "Bản tin công ty, chia sẻ kiến thức & thảo luận",
+      href: "/(tabs)/blog" as const,
+      visible: !!user,
+    },
+    {
+      title: "Trò chuyện nội bộ",
+      description: "Trao đổi tin nhắn, nhóm phòng ban & chia sẻ",
+      href: "/(tabs)/chat" as const,
+      visible: !!user,
+    },
   ].filter((item) => item.visible);
 }

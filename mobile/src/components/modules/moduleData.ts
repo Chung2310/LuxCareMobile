@@ -71,7 +71,7 @@ export const LUXCARE_MODULES: ServiceModule[] = [
         bgColor: "#f0f9ff",
         route: "/(tabs)/equipment",
         moduleId: "popular",
-        status: "coming_soon",
+        status: "active",
       },
       {
         id: "pop-chat",
@@ -81,7 +81,7 @@ export const LUXCARE_MODULES: ServiceModule[] = [
         bgColor: "#f0fdfa",
         route: "/(tabs)/chat",
         moduleId: "popular",
-        status: "coming_soon",
+        status: "active",
       },
       {
         id: "pop-directory",
@@ -141,7 +141,7 @@ export const LUXCARE_MODULES: ServiceModule[] = [
         bgColor: "#fff7ed",
         route: "/(tabs)/blog",
         moduleId: "popular",
-        status: "coming_soon",
+        status: "active",
       },
     ],
   },
@@ -315,7 +315,7 @@ export const LUXCARE_MODULES: ServiceModule[] = [
         bgColor: "#f0f9ff",
         route: "/(tabs)/equipment",
         moduleId: "operations",
-        status: "coming_soon",
+        status: "active",
       },
       {
         id: "op-maintenance",
@@ -449,7 +449,7 @@ export const LUXCARE_MODULES: ServiceModule[] = [
         bgColor: "#ecfdf5",
         route: "/(tabs)/chat",
         moduleId: "communication",
-        status: "coming_soon",
+        status: "active",
       },
       {
         id: "comm-groups",
@@ -457,9 +457,9 @@ export const LUXCARE_MODULES: ServiceModule[] = [
         icon: "chatbubbles",
         color: "#0284c7",
         bgColor: "#f0f9ff",
-        route: "/(tabs)/chat-groups",
+        route: "/(tabs)/chat",
         moduleId: "communication",
-        status: "coming_soon",
+        status: "active",
       },
       {
         id: "comm-blog",
@@ -469,7 +469,7 @@ export const LUXCARE_MODULES: ServiceModule[] = [
         bgColor: "#fff7ed",
         route: "/(tabs)/blog",
         moduleId: "communication",
-        status: "coming_soon",
+        status: "active",
       },
       {
         id: "comm-broadcast",

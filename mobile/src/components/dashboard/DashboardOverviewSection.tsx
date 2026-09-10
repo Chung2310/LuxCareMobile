@@ -445,7 +445,7 @@ export const DashboardOverviewSection: React.FC<DashboardOverviewSectionProps> =
         {/* Tài nguyên */}
         <TouchableOpacity
           style={styles.capsuleItem}
-          onPress={() => onNavigate("/(tabs)/modules", "Tài nguyên")}
+          onPress={() => onNavigate("/(tabs)/resources", "Tài nguyên số")}
           activeOpacity={0.8}
         >
           <View style={[styles.capsuleIcon, { backgroundColor: "#ecfeff" }]}>
@@ -481,6 +481,26 @@ export const DashboardOverviewSection: React.FC<DashboardOverviewSectionProps> =
               Thiết bị y tế
             </Text>
             <Text style={styles.capsuleSub}>Đang chạy</Text>
+          </View>
+        </TouchableOpacity>
+
+        {/* Bản tin & Blog */}
+        <TouchableOpacity
+          style={styles.capsuleItem}
+          onPress={() => onNavigate("/(tabs)/blog", "Bản tin & Blog")}
+          activeOpacity={0.8}
+        >
+          <View style={[styles.capsuleIcon, { backgroundColor: "#fff7ed" }]}>
+            <Ionicons name="newspaper" size={15} color="#ea580c" />
+          </View>
+          <View style={styles.capsuleContent}>
+            <Text style={[styles.capsuleNum, { color: "#ea580c" }]}>
+              Bản tin
+            </Text>
+            <Text style={styles.capsuleLabel} numberOfLines={1}>
+              Blog nội bộ
+            </Text>
+            <Text style={styles.capsuleSub}>Truyền thông</Text>
           </View>
         </TouchableOpacity>
       </View>
