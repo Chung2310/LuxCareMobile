@@ -1,6 +1,8 @@
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import {
+  ActivityIndicator,
   Alert,
+  Linking,
   Modal,
   Pressable,
   RefreshControl,
@@ -13,7 +15,10 @@ import {
 import { SafeAreaView } from "react-native-safe-area-context";
 import { router, useFocusEffect } from "expo-router";
 import { Ionicons } from "@expo/vector-icons";
+import * as Location from "expo-location";
 import { CheckInForm } from "../../src/features/attendance/CheckInForm";
+import { currentAttendancePosition, submitAttendance } from "../../src/features/attendance/checkin";
+import { ATTENDANCE_FACE_CHECK_ENABLED } from "../../../src/config/attendanceFaceCheck";
 import { attendance, workCalendar } from "../../src/api/services";
 import type { AttendanceLog, TodayAttendance, WorkShift } from "../../../src/services/attendanceService";
 import type { WorkCalendarDay } from "../../../src/services/companyWorkCalendarService";
@@ -75,10 +80,97 @@ function calculateWorkHours(checkIn?: string | Date, checkOut?: string | Date): 
 
 export default function Attendance() {
   const [action, setAction] = useState<"check-in" | "check-out" | null>(null);
+  const [submittingAction, setSubmittingAction] = useState<"check-in" | "check-out" | null>(null);
+  const [submittingStep, setSubmittingStep] = useState<string | null>(null);
   const actionLock = useRef(false);
   const { user, selectedBranch } = useSession();
   const allowed = canUseModule(user, "hr");
   const manage = hasPermission(user, "timekeeping:manage");
+
+  // In-place direct check-in / check-out handler
+  const handleAttendance = async (type: "check-in" | "check-out") => {
+    if (submittingAction) return;
+
+    try {
+      setSubmittingAction(type);
+      setSubmittingStep("Đang kiểm tra quyền vị trí...");
+
+      // 1. Check & request foreground location permission immediately on this screen
+      const perm = await Location.getForegroundPermissionsAsync();
+      if (!perm.granted) {
+        setSubmittingStep("Đang yêu cầu quyền vị trí...");
+        const requestRes = await Location.requestForegroundPermissionsAsync();
+        if (!requestRes.granted) {
+          setSubmittingAction(null);
+          setSubmittingStep(null);
+          Alert.alert(
+            "Cần quyền vị trí",
+            "LuxCare cần quyền truy cập vị trí thiết bị để xác thực bạn đang có mặt tại cơ sở/chi nhánh khi chấm công.",
+            [
+              { text: "Để sau", style: "cancel" },
+              { text: "Mở Cài đặt", onPress: () => void Linking.openSettings() },
+            ],
+          );
+          return;
+        }
+      }
+
+      // 2. Check if device location services (GPS) are turned on
+      const servicesEnabled = await Location.hasServicesEnabledAsync();
+      if (!servicesEnabled) {
+        setSubmittingAction(null);
+        setSubmittingStep(null);
+        Alert.alert(
+          "Dịch vụ định vị đang tắt",
+          "Vui lòng bật dịch vụ định vị (GPS) trên điện thoại của bạn để thực hiện chấm công.",
+        );
+        return;
+      }
+
+      // 3. If face verification is configured, fallback to face check camera modal
+      if (ATTENDANCE_FACE_CHECK_ENABLED) {
+        setSubmittingAction(null);
+        setSubmittingStep(null);
+        setAction(type);
+        return;
+      }
+
+      // 4. In-place GPS location retrieval
+      setSubmittingStep("Đang định vị toạ độ GPS...");
+      const position = await currentAttendancePosition();
+
+      // 5. Submit attendance directly
+      setSubmittingStep("Đang gửi dữ liệu chấm công...");
+      await submitAttendance(type, position.coords.latitude, position.coords.longitude);
+
+      setSubmittingStep("Chấm công thành công!");
+      const timeNow = new Date().toLocaleTimeString("vi-VN", {
+        hour: "2-digit",
+        minute: "2-digit",
+        timeZone: "Asia/Ho_Chi_Minh",
+      });
+
+      Alert.alert(
+        "Chấm công thành công",
+        type === "check-in"
+          ? `Đã ghi nhận Chấm công vào ca lúc ${timeNow}. Chúc bạn một ngày làm việc hiệu quả!`
+          : `Đã ghi nhận Chấm công ra ca lúc ${timeNow}. Hẹn gặp lại bạn vào ngày tiếp theo!`,
+      );
+
+      // Auto reload today data & history
+      await loadData(true);
+      setRevision((v) => v + 1);
+    } catch (err: any) {
+      const msg = messageOf(err);
+      Alert.alert(
+        "Không thể chấm công",
+        msg || "Có lỗi xảy ra khi xác thực vị trí hoặc kết nối đến máy chủ. Vui lòng kiểm tra GPS và thử lại.",
+      );
+    } finally {
+      setSubmittingAction(null);
+      setSubmittingStep(null);
+    }
+  };
 
   // Real-time digital clock
   const [currentTime, setCurrentTime] = useState(() => new Date());
@@ -372,26 +464,43 @@ export default function Attendance() {
               style={[
                 styles.actionCard,
                 styles.checkInCard,
-                (loading || hasCheckIn) && styles.actionCardDisabled,
+                (loading || submittingAction !== null || hasCheckIn) && styles.actionCardDisabled,
               ]}
-              disabled={loading || !today || hasCheckIn}
-              onPress={() => setAction("check-in")}
+              disabled={loading || submittingAction !== null || !today || hasCheckIn}
+              onPress={() => void handleAttendance("check-in")}
               activeOpacity={0.8}
             >
-              <View style={[styles.actionIconCircle, { backgroundColor: hasCheckIn ? "#f1f5f9" : "#ecfdf5" }]}>
-                <Ionicons
-                  name={hasCheckIn ? "checkmark-circle" : "finger-print"}
-                  size={28}
-                  color={hasCheckIn ? "#059669" : "#047857"}
-                />
+              <View
+                style={[
+                  styles.actionIconCircle,
+                  { backgroundColor: hasCheckIn ? "#f1f5f9" : "#ecfdf5" },
+                ]}
+              >
+                {submittingAction === "check-in" ? (
+                  <ActivityIndicator size="small" color="#059669" />
+                ) : (
+                  <Ionicons
+                    name={hasCheckIn ? "checkmark-circle" : "finger-print"}
+                    size={28}
+                    color={hasCheckIn ? "#059669" : "#047857"}
+                  />
+                )}
               </View>
               <Text style={styles.actionCardTitle}>VÀO CA</Text>
               <Text style={styles.actionCardTime}>
-                {hasCheckIn ? formatTimeOnly(today?.log?.checkIn?.time) : "Chưa chấm vào"}
+                {submittingAction === "check-in"
+                  ? "Đang xử lý..."
+                  : hasCheckIn
+                    ? formatTimeOnly(today?.log?.checkIn?.time)
+                    : "Chưa chấm vào"}
               </Text>
               <View style={[styles.actionCardBadge, hasCheckIn && styles.actionCardBadgeDone]}>
                 <Text style={[styles.actionCardBadgeText, hasCheckIn && { color: "#059669" }]}>
-                  {hasCheckIn ? "Đã ghi nhận" : "Chấm công vào"}
+                  {submittingAction === "check-in"
+                    ? "Đang gửi..."
+                    : hasCheckIn
+                      ? "Đã ghi nhận"
+                      : "Chấm công vào"}
                 </Text>
               </View>
             </TouchableOpacity>
@@ -401,30 +510,77 @@ export default function Attendance() {
               style={[
                 styles.actionCard,
                 styles.checkOutCard,
-                (loading || !hasCheckIn || hasCheckOut) && styles.actionCardDisabled,
+                (loading || submittingAction !== null || !hasCheckIn || hasCheckOut) && styles.actionCardDisabled,
               ]}
-              disabled={loading || !hasCheckIn || hasCheckOut}
-              onPress={() => setAction("check-out")}
+              disabled={loading || submittingAction !== null || !hasCheckIn || hasCheckOut}
+              onPress={() => void handleAttendance("check-out")}
               activeOpacity={0.8}
             >
-              <View style={[styles.actionIconCircle, { backgroundColor: hasCheckOut ? "#f1f5f9" : "#eff6ff" }]}>
-                <Ionicons
-                  name={hasCheckOut ? "checkmark-circle" : "log-out-outline"}
-                  size={28}
-                  color={hasCheckOut ? "#2563eb" : "#1d4ed8"}
-                />
+              <View
+                style={[
+                  styles.actionIconCircle,
+                  { backgroundColor: hasCheckOut ? "#f1f5f9" : "#eff6ff" },
+                ]}
+              >
+                {submittingAction === "check-out" ? (
+                  <ActivityIndicator size="small" color="#2563eb" />
+                ) : (
+                  <Ionicons
+                    name={hasCheckOut ? "checkmark-circle" : "log-out-outline"}
+                    size={28}
+                    color={hasCheckOut ? "#2563eb" : "#1d4ed8"}
+                  />
+                )}
               </View>
               <Text style={styles.actionCardTitle}>RA CA</Text>
               <Text style={styles.actionCardTime}>
-                {hasCheckOut ? formatTimeOnly(today?.log?.checkOut?.time) : "Chưa chấm ra"}
+                {submittingAction === "check-out"
+                  ? "Đang xử lý..."
+                  : hasCheckOut
+                    ? formatTimeOnly(today?.log?.checkOut?.time)
+                    : "Chưa chấm ra"}
               </Text>
               <View style={[styles.actionCardBadge, hasCheckOut && styles.actionCardBadgeDone]}>
                 <Text style={[styles.actionCardBadgeText, hasCheckOut && { color: "#2563eb" }]}>
-                  {hasCheckOut ? "Đã hoàn thành" : "Chấm công ra"}
+                  {submittingAction === "check-out"
+                    ? "Đang gửi..."
+                    : hasCheckOut
+                      ? "Đã hoàn thành"
+                      : "Chấm công ra"}
                 </Text>
               </View>
             </TouchableOpacity>
           </View>
+
+          {/* Submitting Progress Status Card */}
+          {submittingAction && (
+            <View
+              style={[
+                styles.submittingStatusCard,
+                submittingAction === "check-out" && styles.submittingStatusCardBlue,
+              ]}
+            >
+              <ActivityIndicator
+                size="small"
+                color={submittingAction === "check-in" ? "#059669" : "#2563eb"}
+              />
+              <View style={{ flex: 1, gap: 2 }}>
+                <Text style={styles.submittingStatusTitle}>
+                  {submittingAction === "check-in"
+                    ? "Đang xử lý Chấm công vào ca"
+                    : "Đang xử lý Chấm công ra ca"}
+                </Text>
+                <Text
+                  style={[
+                    styles.submittingStatusStep,
+                    submittingAction === "check-out" && { color: "#2563eb" },
+                  ]}
+                >
+                  {submittingStep}
+                </Text>
+              </View>
+            </View>
+          )}
 
           {/* Month Stepper & Switcher */}
           <View style={styles.monthPickerCard}>
@@ -715,32 +871,34 @@ export default function Attendance() {
         </ScrollView>
       </SafeAreaView>
 
-      {/* Modal Check-In Camera Form */}
-      <Modal
-        visible={action !== null}
-        animationType="slide"
-        onRequestClose={() => {
-          if (!actionLock.current) {
-            setAction(null);
-            setRevision((v) => v + 1);
-          }
-        }}
-      >
-        <SafeAreaView style={styles.modalSafeArea} edges={["top", "bottom"]}>
-          {action && (
-            <CheckInForm
-              action={action}
-              onClose={() => {
-                setAction(null);
-                setRevision((v) => v + 1);
-              }}
-              setLocked={(val) => {
-                actionLock.current = val;
-              }}
-            />
-          )}
-        </SafeAreaView>
-      </Modal>
+      {/* Modal Check-In Camera Form (Only fallback if face check is explicitly enabled) */}
+      {ATTENDANCE_FACE_CHECK_ENABLED && (
+        <Modal
+          visible={action !== null}
+          animationType="slide"
+          onRequestClose={() => {
+            if (!actionLock.current) {
+              setAction(null);
+              setRevision((v) => v + 1);
+            }
+          }}
+        >
+          <SafeAreaView style={styles.modalSafeArea} edges={["top", "bottom"]}>
+            {action && (
+              <CheckInForm
+                action={action}
+                onClose={() => {
+                  setAction(null);
+                  setRevision((v) => v + 1);
+                }}
+                setLocked={(val) => {
+                  actionLock.current = val;
+                }}
+              />
+            )}
+          </SafeAreaView>
+        </Modal>
+      )}
     </>
   );
 }
@@ -965,6 +1123,37 @@ const styles = StyleSheet.create({
     fontSize: 11,
     fontWeight: "700",
     color: "#475569",
+  },
+  submittingStatusCard: {
+    flexDirection: "row",
+    alignItems: "center",
+    gap: 12,
+    backgroundColor: "#ecfdf5",
+    borderWidth: 1,
+    borderColor: "#a7f3d0",
+    borderRadius: 14,
+    paddingHorizontal: 14,
+    paddingVertical: 10,
+    shadowColor: "#059669",
+    shadowOffset: { width: 0, height: 2 },
+    shadowOpacity: 0.06,
+    shadowRadius: 4,
+    elevation: 2,
+  },
+  submittingStatusCardBlue: {
+    backgroundColor: "#eff6ff",
+    borderColor: "#bfdbfe",
+    shadowColor: "#2563eb",
+  },
+  submittingStatusTitle: {
+    fontSize: 13,
+    fontWeight: "700",
+    color: "#0f172a",
+  },
+  submittingStatusStep: {
+    fontSize: 12,
+    fontWeight: "600",
+    color: "#059669",
   },
 
   // Month Stepper
