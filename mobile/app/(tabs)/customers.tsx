@@ -24,7 +24,7 @@ import {
   SOURCE_LABELS,
   STATUS_MAP,
 } from "../../src/components/customers";
-import { SearchInput, AppButton } from "../../src/components/common";
+import { SearchInput, AppButton, PageLoadingView } from "../../src/components/common";
 import {
   customerLeadApi,
   type CreateCustomerLeadInput,
@@ -79,7 +79,7 @@ export default function CustomersScreen() {
   const [sourceFilter, setSourceFilter] = useState("all");
 
   // Trạng thái tải
-  const [loading, setLoading] = useState(false);
+  const [loading, setLoading] = useState(true);
   const [refreshing, setRefreshing] = useState(false);
 
   // Modals
@@ -425,10 +425,11 @@ export default function CustomersScreen() {
         }
         ListEmptyComponent={
           loading ? (
-            <View style={styles.loadingContainer}>
-              <ActivityIndicator size="large" color="#059669" />
-              <Text style={styles.loadingText}>Đang tải dữ liệu khách hàng...</Text>
-            </View>
+            <PageLoadingView
+              title="Đang tải danh sách khách hàng & Leads..."
+              subtitle="Hệ thống đang kết nối và nạp dữ liệu từ máy chủ"
+              color="#059669"
+            />
           ) : (
             <View style={styles.emptyContainer}>
               <View style={styles.emptyIconCircle}>

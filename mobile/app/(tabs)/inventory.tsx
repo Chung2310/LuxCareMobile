@@ -35,7 +35,7 @@ import {
   type InventoryTransaction,
   type InventoryWarehouse,
 } from "../../src/components/inventory";
-import { SearchInput } from "../../src/components/common";
+import { SearchInput, PageLoadingView } from "../../src/components/common";
 import { supplyApi, type BatchStockPayload } from "../../src/api/supplyApi";
 
 
@@ -62,7 +62,7 @@ export default function InventoryScreen() {
   const [departments, setDepartments] = useState<Array<{ id: string; name: string; code?: string }>>([]);
 
   // Loading states
-  const [loadingSupplies, setLoadingSupplies] = useState(false);
+  const [loadingSupplies, setLoadingSupplies] = useState(true);
   const [loadingTransactions, setLoadingTransactions] = useState(false);
   const [loadingSuppliers, setLoadingSuppliers] = useState(false);
   const [loadingWarehouses, setLoadingWarehouses] = useState(false);
@@ -569,10 +569,11 @@ export default function InventoryScreen() {
             }
             ListEmptyComponent={
               loadingSupplies ? (
-                <View style={styles.emptyContainer}>
-                  <ActivityIndicator size="large" color="#059669" />
-                  <Text style={styles.loadingText}>Đang tải dữ liệu từ máy chủ...</Text>
-                </View>
+                <PageLoadingView
+                  title="Đang tải danh mục vật tư & tồn kho..."
+                  subtitle="Hệ thống đang kết nối và nạp danh sách dược phẩm/thiết bị"
+                  color="#059669"
+                />
               ) : (
                 <View style={styles.emptyContainer}>
                   <Ionicons name="cube-outline" size={54} color="#cbd5e1" />

@@ -15,12 +15,19 @@ import {
 import { router, useFocusEffect } from "expo-router";
 import { SafeAreaView } from "react-native-safe-area-context";
 import { Ionicons } from "@expo/vector-icons";
-import type { DashboardSummary, DashboardActionItems } from "../../../src/types/dashboard";
+import type {
+  DashboardSummary,
+  DashboardActionItems,
+  DashboardDateFilter,
+} from "../../../src/types/dashboard";
 import type { DashboardSummaryParams } from "../../../src/services/dashboardService";
 import { dashboard } from "../../src/api/services";
 import { messageOf, useSession } from "../../src/auth/SessionProvider";
 import { colors } from "../../src/ui";
 import { canUseModule } from "../../src/auth/access";
+import { useAppLoading } from "../../src/context/LoadingContext";
+import { DashboardOverviewSection } from "../../src/components/dashboard";
+import { getAllServicesFlat, LUXCARE_MODULES } from "../../src/components";
 
 const { width: SCREEN_WIDTH } = Dimensions.get("window");
 
@@ -37,6 +44,7 @@ interface LuxCareFeature {
 
 export default function Home() {
   const { user, selectedBranch } = useSession();
+  const { navigateWithLoading } = useAppLoading();
   const [data, setData] = useState<DashboardSummary | null>(null);
   const [params, setParams] = useState<DashboardSummaryParams>({ filter: "day" });
   const [actions, setActions] = useState<DashboardActionItems | null>(null);
@@ -84,38 +92,34 @@ export default function Home() {
   }, []);
   // =====================================================
 
-  const allowed = user?.permissions?.some((p) => p === "*" || p === "dashboard:read") ?? false;
+  const allowed =
+    user?.role === "superadmin" ||
+    user?.role === "admin" ||
+    user?.role === "branch_owner" ||
+    user?.role === "manager" ||
+    (user?.permissions?.some((p) => p === "*" || p === "dashboard:read") ?? false);
+
+  const [loadingDashboard, setLoadingDashboard] = useState(false);
+
+  const loadDashboardData = useCallback(async () => {
+    if (!allowed) return;
+    setLoadingDashboard(true);
+    try {
+      const [summaryRes, actionsRes] = await Promise.all([
+        dashboard.getSummary(params).catch(() => null),
+        dashboard.getActionItems().catch(() => null),
+      ]);
+      if (summaryRes) setData(summaryRes);
+      if (actionsRes) setActions(actionsRes);
+    } finally {
+      setLoadingDashboard(false);
+    }
+  }, [allowed, params]);
 
   useFocusEffect(
     useCallback(() => {
-      let active = true;
-      if (!allowed) return;
-      void dashboard
-        .getSummary(params)
-        .then((value) => {
-          if (active) setData(value);
-        })
-        .catch(() => {});
-      return () => {
-        active = false;
-      };
-    }, [params, allowed, user?.uid]),
-  );
-
-  useFocusEffect(
-    useCallback(() => {
-      let active = true;
-      if (!allowed) return;
-      void dashboard
-        .getActionItems()
-        .then((value) => {
-          if (active) setActions(value);
-        })
-        .catch(() => {});
-      return () => {
-        active = false;
-      };
-    }, [allowed, user?.uid, selectedBranch?._id]),
+      void loadDashboardData();
+    }, [loadDashboardData]),
   );
 
   // 8 Chức năng cốt lõi (2 hàng x 4 cột) - Phong cách Super App tinh gọn, đầy đủ các mảng thiết yếu
@@ -191,12 +195,22 @@ export default function Home() {
     [actions],
   );
 
-  // Lọc theo tìm kiếm
+  // Danh sách toàn bộ các tính năng để tìm kiếm toàn diện
+  const allServicesFlat = useMemo(() => getAllServicesFlat(LUXCARE_MODULES), []);
+
+  const isSearching = searchQuery.trim().length > 0;
+
+  // Lọc theo tìm kiếm: Nếu không tìm kiếm -> hiển thị 8 dịch vụ chính; Nếu đang tìm kiếm -> quét toàn bộ chức năng
   const visibleServices = useMemo(() => {
-    if (!searchQuery.trim()) return luxcareServices;
+    if (!isSearching) return luxcareServices;
     const q = searchQuery.toLowerCase().trim();
-    return luxcareServices.filter((item) => item.title.toLowerCase().includes(q));
-  }, [luxcareServices, searchQuery]);
+    return allServicesFlat.filter((item) =>
+      `${item.title} ${item.subtitle || ""}`
+        .toLowerCase()
+        .replace(/\n/g, " ")
+        .includes(q)
+    );
+  }, [allServicesFlat, isSearching, luxcareServices, searchQuery]);
 
   // 4 Icon LuxCare Đề Xuất
   const luxcareRecommendations = [
@@ -247,18 +261,25 @@ export default function Home() {
         {/* ============================================================ */}
         <View style={uiStyles.luxcareHeaderContainer}>
           <SafeAreaView edges={["top"]} style={uiStyles.luxcareSafeArea}>
-            {/* Top Bar: Blog Button + Notification Bell + User Avatar */}
+            {/* Top Bar: Search Bar + Notification Bell + User Avatar */}
             <View style={uiStyles.searchHeaderRow}>
-              {/* Nút Truy cập Blog – thay thế thanh tìm kiếm */}
-              <Pressable
-                style={({ pressed }) => [uiStyles.blogBtn, pressed && { opacity: 0.82 }]}
-                onPress={() => router.push("/(tabs)/blog")}
-                accessibilityLabel="Truy cập blog"
-              >
-                <Ionicons name="megaphone" size={18} color="#059669" />
-                <Text style={uiStyles.blogBtnText}>Truy cập blog</Text>
-                <Ionicons name="chevron-forward" size={14} color="#059669" />
-              </Pressable>
+              {/* Thanh tìm kiếm dịch vụ & tính năng */}
+              <View style={uiStyles.homeSearchBar}>
+                <Ionicons name="search" size={17} color="#059669" style={{ marginRight: 6 }} />
+                <TextInput
+                  style={uiStyles.homeSearchInput}
+                  placeholder="Tìm dịch vụ, tính năng..."
+                  placeholderTextColor="#94a3b8"
+                  value={searchQuery}
+                  onChangeText={setSearchQuery}
+                  returnKeyType="search"
+                />
+                {searchQuery.length > 0 && (
+                  <Pressable onPress={() => setSearchQuery("")} hitSlop={8}>
+                    <Ionicons name="close-circle" size={16} color="#94a3b8" />
+                  </Pressable>
+                )}
+              </View>
 
               <View style={uiStyles.headerRightIcons}>
                 <Pressable
@@ -322,7 +343,14 @@ export default function Home() {
             <View style={uiStyles.topQuickRow}>
               <Pressable
                 style={({ pressed }) => [uiStyles.topQuickItem, pressed && { opacity: 0.8 }]}
-                onPress={() => router.push("/(tabs)/attendance")}
+                onPress={() =>
+                  navigateWithLoading("/(tabs)/attendance", {
+                    title: "Chấm công hôm nay",
+                    icon: "finger-print-outline",
+                    color: "#059669",
+                    bgColor: "#ecfdf5",
+                  })
+                }
               >
                 <View style={[uiStyles.topQuickIconBox, { borderColor: "rgba(5, 150, 105, 0.18)" }]}>
                   <Ionicons name="finger-print-outline" size={26} color="#059669" />
@@ -332,7 +360,14 @@ export default function Home() {
 
               <Pressable
                 style={({ pressed }) => [uiStyles.topQuickItem, pressed && { opacity: 0.8 }]}
-                onPress={() => router.push("/(tabs)/leave?create=1")}
+                onPress={() =>
+                  navigateWithLoading("/(tabs)/leave?create=1", {
+                    title: "Đơn từ & Nghỉ phép",
+                    icon: "document-text-outline",
+                    color: "#7c3aed",
+                    bgColor: "#f5f3ff",
+                  })
+                }
               >
                 <View style={[uiStyles.topQuickIconBox, { borderColor: "rgba(124, 58, 237, 0.18)" }]}>
                   <Ionicons name="document-text-outline" size={25} color="#7c3aed" />
@@ -342,7 +377,14 @@ export default function Home() {
 
               <Pressable
                 style={({ pressed }) => [uiStyles.topQuickItem, pressed && { opacity: 0.8 }]}
-                onPress={() => router.push("/(tabs)/work")}
+                onPress={() =>
+                  navigateWithLoading("/(tabs)/work", {
+                    title: "Công việc cần làm",
+                    icon: "checkbox-outline",
+                    color: "#2563eb",
+                    bgColor: "#eff6ff",
+                  })
+                }
               >
                 <View style={[uiStyles.topQuickIconBox, { borderColor: "rgba(37, 99, 235, 0.18)" }]}>
                   <Ionicons name="checkbox-outline" size={25} color="#2563eb" />
@@ -352,7 +394,14 @@ export default function Home() {
 
               <Pressable
                 style={({ pressed }) => [uiStyles.topQuickItem, pressed && { opacity: 0.8 }]}
-                onPress={() => router.push("/(tabs)/payslips")}
+                onPress={() =>
+                  navigateWithLoading("/(tabs)/payslips", {
+                    title: "Phiếu lương cá nhân",
+                    icon: "wallet-outline",
+                    color: "#d97706",
+                    bgColor: "#fffbeb",
+                  })
+                }
               >
                 <View style={[uiStyles.topQuickIconBox, { borderColor: "rgba(245, 158, 11, 0.18)" }]}>
                   <Ionicons name="wallet-outline" size={25} color="#d97706" />
@@ -377,10 +426,10 @@ export default function Home() {
                 />
               </Pressable>
 
-              {/* Cột 1: Công tháng này */}
+              {/* Cột 1: Công hôm nay */}
               <View style={uiStyles.cardCol}>
                 <View style={uiStyles.colHeader}>
-                  <Text style={uiStyles.colTitle}>Công tháng</Text>
+                  <Text style={uiStyles.colTitle}>Đi làm</Text>
                   <View style={uiStyles.miniBrandBadge}>
                     <Text style={uiStyles.miniBrandText}>LC</Text>
                   </View>
@@ -390,7 +439,9 @@ export default function Home() {
                   onPress={() => router.push("/(tabs)/attendance")}
                 >
                   <Text style={uiStyles.colValueBig}>
-                    {showValues ? `${data?.timekeeping.checkedInToday || 22} công` : "••••••"}
+                    {showValues
+                      ? `${data?.timekeeping?.checkedInToday || 0} người`
+                      : "••••••"}
                   </Text>
                   <Ionicons name="chevron-forward" size={13} color="#64748b" />
                 </Pressable>
@@ -398,18 +449,25 @@ export default function Home() {
 
               <View style={uiStyles.vDivider} />
 
-              {/* Cột 2: Phép năm */}
+              {/* Cột 2: Đơn chờ duyệt */}
               <View style={uiStyles.cardCol}>
                 <View style={uiStyles.colHeader}>
-                  <Text style={uiStyles.colTitle}>Phép năm</Text>
-                  <Ionicons name="calendar" size={12} color="#059669" style={{ marginLeft: 3 }} />
+                  <Text style={uiStyles.colTitle}>Chờ duyệt</Text>
+                  <Ionicons
+                    name="document-text"
+                    size={12}
+                    color="#059669"
+                    style={{ marginLeft: 3 }}
+                  />
                 </View>
                 <Pressable
                   style={uiStyles.colValueRow}
                   onPress={() => router.push("/(tabs)/leave")}
                 >
                   <Text style={[uiStyles.colValueBig, { color: "#059669" }]}>
-                    {showValues ? "Còn 12 ngày" : "••••••"}
+                    {showValues
+                      ? `${actions?.pendingApprovals?.length || 0} đơn`
+                      : "••••••"}
                   </Text>
                   <Ionicons name="chevron-forward" size={13} color="#059669" />
                 </Pressable>
@@ -417,18 +475,35 @@ export default function Home() {
 
               <View style={uiStyles.vDivider} />
 
-              {/* Cột 3: Việc cần làm */}
+              {/* Cột 3: Việc gấp quá hạn */}
               <View style={uiStyles.cardCol}>
                 <View style={uiStyles.colHeader}>
                   <Text style={uiStyles.colTitle}>Việc gấp</Text>
-                  <Ionicons name="flame" size={12} color="#ea580c" style={{ marginLeft: 3 }} />
+                  <Ionicons
+                    name="flame"
+                    size={12}
+                    color="#ea580c"
+                    style={{ marginLeft: 3 }}
+                  />
                 </View>
                 <Pressable
                   style={uiStyles.colValueRow}
                   onPress={() => router.push("/(tabs)/work")}
                 >
-                  <Text style={[uiStyles.colValueBig, { color: pendingCount > 0 ? "#dc2626" : "#071629" }]}>
-                    {showValues ? `${pendingCount} việc` : "••••••"}
+                  <Text
+                    style={[
+                      uiStyles.colValueBig,
+                      {
+                        color:
+                          (actions?.overdueTasks?.length || 0) > 0
+                            ? "#dc2626"
+                            : "#071629",
+                      },
+                    ]}
+                  >
+                    {showValues
+                      ? `${actions?.overdueTasks?.length || 0} việc`
+                      : "••••••"}
                   </Text>
                   <Ionicons name="chevron-forward" size={13} color="#64748b" />
                 </Pressable>
@@ -452,89 +527,126 @@ export default function Home() {
         </View>
 
         {/* ============================================================ */}
-        {/* KHỐI 3: MA TRẬN 12 ICON DỊCH VỤ (TỰ DO TRÊN NỀN TRẮNG NHƯ MOMO) */}
+        {/* KHỐI 3: MA TRẬN ICON DỊCH VỤ / KẾT QUẢ TÌM KIẾM */}
         {/* ============================================================ */}
         <View style={uiStyles.servicesContainer}>
-          <View style={uiStyles.servicesGrid}>
-            {visibleServices.map((item) => (
-              <Pressable
-                key={item.id}
-                style={({ pressed }) => [uiStyles.gridItem, pressed && { opacity: 0.7 }]}
-                onPress={() => {
-                  if (item.requiresModule && !canUseModule(user, item.requiresModule)) {
-                    Alert.alert("Thông báo", "Bạn chưa được cấp quyền sử dụng phân hệ này.");
-                    return;
+          {isSearching && (
+            <View style={uiStyles.searchResultHeader}>
+              <Text style={uiStyles.searchResultTitle}>
+                Kết quả tìm kiếm ({visibleServices.length})
+              </Text>
+              <Pressable onPress={() => setSearchQuery("")} hitSlop={8}>
+                <Text style={uiStyles.searchResultClearText}>Đóng</Text>
+              </Pressable>
+            </View>
+          )}
+
+          {isSearching && visibleServices.length === 0 ? (
+            <View style={uiStyles.searchEmptyContainer}>
+              <Ionicons name="search-outline" size={38} color="#94a3b8" />
+              <Text style={uiStyles.searchEmptyTitle}>Không tìm thấy chức năng phù hợp</Text>
+              <Text style={uiStyles.searchEmptySubtitle}>
+                Không có kết quả nào cho "{searchQuery}". Bạn có thể thử tìm: chấm công, đơn nghỉ phép, việc làm, lương, vật tư...
+              </Text>
+              <Pressable style={uiStyles.searchEmptyClearBtn} onPress={() => setSearchQuery("")}>
+                <Text style={uiStyles.searchEmptyClearText}>Xóa bộ lọc</Text>
+              </Pressable>
+            </View>
+          ) : (
+            <View style={uiStyles.servicesGrid}>
+              {visibleServices.map((item) => (
+                <Pressable
+                  key={item.id}
+                  style={({ pressed }) => [uiStyles.gridItem, pressed && { opacity: 0.7 }]}
+                  onPress={() => {
+                    if ((item as any).requiresModule && !canUseModule(user, (item as any).requiresModule)) {
+                      Alert.alert("Thông báo", "Bạn chưa được cấp quyền sử dụng phân hệ này.");
+                      return;
+                    }
+                    if ((item as any).status === "coming_soon") {
+                      Alert.alert(
+                        item.title.replace(/\n/g, " "),
+                        "Phân hệ này đang được hoàn thiện và đồng bộ từ phiên bản LuxCare Web. Sẽ sớm sẵn sàng trong bản cập nhật kế tiếp!",
+                        [{ text: "Đã hiểu", style: "default" }]
+                      );
+                      return;
+                    }
+                    navigateWithLoading(item.route, {
+                      title: item.title.replace(/\n/g, " "),
+                      icon: item.icon,
+                      color: item.color,
+                      bgColor: item.bgColor,
+                    });
+                  }}
+                >
+                  <View style={uiStyles.iconWrapper}>
+                    <Ionicons name={item.icon} size={28} color={item.color} />
+                    {item.badge && (
+                      <View style={uiStyles.serviceBadge}>
+                        <Text style={uiStyles.serviceBadgeText}>{item.badge}</Text>
+                      </View>
+                    )}
+                  </View>
+                  <Text style={uiStyles.itemLabel}>{item.title}</Text>
+                </Pressable>
+              ))}
+            </View>
+          )}
+        </View>
+
+        {/* ============================================================ */}
+        {/* KHỐI 4: "LUXCARE ĐỀ XUẤT" (CHỈ HIỂN THỊ KHI KHÔNG TÌM KIẾM) */}
+        {/* ============================================================ */}
+        {!isSearching && (
+          <View style={uiStyles.recommendSection}>
+            <Text style={uiStyles.sectionTitle}>LuxCare đề xuất</Text>
+
+            <View style={uiStyles.recommendGrid}>
+              {luxcareRecommendations.map((item) => (
+                <Pressable
+                  key={item.id}
+                  style={({ pressed }) => [uiStyles.recommendItem, pressed && { opacity: 0.7 }]}
+                  onPress={() =>
+                    navigateWithLoading(item.route, {
+                      title: item.title.replace(/\n/g, " "),
+                      icon: item.icon as any,
+                      color: item.color,
+                      bgColor: (item as any).bgColor,
+                    })
                   }
-                  router.push(item.route as any);
-                }}
-              >
-                <View style={uiStyles.iconWrapper}>
-                  <Ionicons name={item.icon} size={28} color={item.color} />
-                  {item.badge && (
-                    <View style={uiStyles.serviceBadge}>
-                      <Text style={uiStyles.serviceBadgeText}>{item.badge}</Text>
-                    </View>
-                  )}
-                </View>
-                <Text style={uiStyles.itemLabel}>{item.title}</Text>
-              </Pressable>
-            ))}
-          </View>
-        </View>
-
-        {/* ============================================================ */}
-        {/* KHỐI 4: "LUXCARE ĐỀ XUẤT" (HEADING ĐẬM, ICON NẰM TỰ DO) */}
-        {/* ============================================================ */}
-        <View style={uiStyles.recommendSection}>
-          <Text style={uiStyles.sectionTitle}>LuxCare đề xuất</Text>
-
-          <View style={uiStyles.recommendGrid}>
-            {luxcareRecommendations.map((item) => (
-              <Pressable
-                key={item.id}
-                style={({ pressed }) => [uiStyles.recommendItem, pressed && { opacity: 0.7 }]}
-                onPress={() => router.push(item.route as any)}
-              >
-                <View style={uiStyles.recommendIconBox}>
-                  <Ionicons name={item.icon as any} size={28} color={item.color} />
-                  {item.badge && (
-                    <View style={uiStyles.serviceBadge}>
-                      <Text style={uiStyles.serviceBadgeText}>{item.badge}</Text>
-                    </View>
-                  )}
-                </View>
-                <Text style={uiStyles.recommendLabel}>{item.title}</Text>
-              </Pressable>
-            ))}
-          </View>
-        </View>
-
-        {/* ============================================================ */}
-        {/* KHỐI 5: THẺ TIẾN ĐỘ CHUYÊN CẦN THÁNG (CHUẨN THEME LUXCARE) */}
-        {/* ============================================================ */}
-        <View style={uiStyles.trackerCardWrapper}>
-          <View style={uiStyles.trackerCard}>
-            <View style={uiStyles.trackerHeader}>
-              <View style={uiStyles.trackerTitleRow}>
-                <View style={uiStyles.trackerIcon}>
-                  <Ionicons name="calendar-outline" size={17} color="#059669" />
-                </View>
-                <Text style={uiStyles.trackerTitle}>Chuyên cần & Công tháng 9</Text>
-                <Ionicons name="chevron-forward" size={14} color="#64748b" />
-              </View>
-              <Ionicons name="ellipsis-horizontal" size={17} color="#94a3b8" />
-            </View>
-
-            <View style={uiStyles.progressBarBg}>
-              <View style={[uiStyles.progressBarFill, { width: "82%" }]} />
-            </View>
-
-            <View style={uiStyles.trackerFooterRow}>
-              <Text style={uiStyles.trackerFooterLeft}>Đã đạt 18/22 ngày công chuẩn</Text>
-              <Text style={uiStyles.trackerFooterRight}>82% chỉ tiêu</Text>
+                >
+                  <View style={uiStyles.recommendIconBox}>
+                    <Ionicons name={item.icon as any} size={28} color={item.color} />
+                    {item.badge && (
+                      <View style={uiStyles.serviceBadge}>
+                        <Text style={uiStyles.serviceBadgeText}>{item.badge}</Text>
+                      </View>
+                    )}
+                  </View>
+                  <Text style={uiStyles.recommendLabel}>{item.title}</Text>
+                </Pressable>
+              ))}
             </View>
           </View>
-        </View>
+        )}
+
+        {/* ============================================================ */}
+        {/* KHỐI 5: DASHBOARD TỔNG QUAN DOANH NGHIỆP THỜI GIAN THỰC */}
+        {/* ============================================================ */}
+        {!isSearching && allowed && (
+          <DashboardOverviewSection
+            summary={data}
+            actionItems={actions}
+            loading={loadingDashboard}
+            filter={params.filter}
+            onFilterChange={(newFilter) => setParams({ filter: newFilter })}
+            onRefresh={() => void loadDashboardData()}
+            canViewExecutive={allowed}
+            onNavigate={(route, title) =>
+              navigateWithLoading(route, { title })
+            }
+          />
+        )}
 
         <View style={{ height: 40 }} />
       </ScrollView>
@@ -650,15 +762,14 @@ const uiStyles = StyleSheet.create({
     gap: 10,
     marginBottom: 16,
   },
-  // Nút Truy cập Blog – thay thế search bar
-  blogBtn: {
+  // Thanh tìm kiếm dịch vụ & tính năng
+  homeSearchBar: {
     flex: 1,
     flexDirection: "row",
     alignItems: "center",
-    gap: 7,
     backgroundColor: "#ffffff",
     borderRadius: 22,
-    paddingHorizontal: 14,
+    paddingHorizontal: 12,
     height: 40,
     shadowColor: "#059669",
     shadowOffset: { width: 0, height: 2 },
@@ -668,11 +779,12 @@ const uiStyles = StyleSheet.create({
     borderWidth: 1,
     borderColor: "rgba(5, 150, 105, 0.18)",
   },
-  blogBtnText: {
+  homeSearchInput: {
     flex: 1,
+    height: 38,
     fontSize: 13,
-    fontWeight: "700",
-    color: "#059669",
+    color: "#0f172a",
+    paddingVertical: 0,
   },
   headerRightIcons: {
     flexDirection: "row",
@@ -859,6 +971,58 @@ const uiStyles = StyleSheet.create({
     marginTop: 14,
     paddingVertical: 16,
     paddingHorizontal: 10,
+  },
+  searchResultHeader: {
+    flexDirection: "row",
+    alignItems: "center",
+    justifyContent: "space-between",
+    paddingHorizontal: 8,
+    marginBottom: 14,
+  },
+  searchResultTitle: {
+    fontSize: 13,
+    fontWeight: "700",
+    color: "#065f46",
+  },
+  searchResultClearText: {
+    fontSize: 12,
+    fontWeight: "600",
+    color: "#059669",
+    textDecorationLine: "underline",
+  },
+  searchEmptyContainer: {
+    alignItems: "center",
+    justifyContent: "center",
+    paddingVertical: 32,
+    paddingHorizontal: 16,
+  },
+  searchEmptyTitle: {
+    fontSize: 15,
+    fontWeight: "700",
+    color: "#1e293b",
+    marginTop: 12,
+    marginBottom: 4,
+  },
+  searchEmptySubtitle: {
+    fontSize: 12.5,
+    color: "#64748b",
+    textAlign: "center",
+    lineHeight: 18,
+    marginBottom: 16,
+    maxWidth: 280,
+  },
+  searchEmptyClearBtn: {
+    backgroundColor: "#ecfdf5",
+    paddingHorizontal: 16,
+    paddingVertical: 8,
+    borderRadius: 20,
+    borderWidth: 1,
+    borderColor: "#a7f3d0",
+  },
+  searchEmptyClearText: {
+    fontSize: 13,
+    fontWeight: "600",
+    color: "#059669",
   },
   servicesGrid: {
     flexDirection: "row",
