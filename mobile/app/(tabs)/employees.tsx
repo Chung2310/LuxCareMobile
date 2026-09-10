@@ -22,6 +22,8 @@ import type { UserProfile } from "../../../src/types/common";
 import type { EmployeeProfileInput } from "../../../src/services/rosterService";
 import type { DepartmentRecord } from "../../../src/services/departmentService";
 import type { BranchRecord } from "../../../src/services/branchService";
+import { UserCreateModal } from "../../src/components/users";
+import { userManagementApi, type CreateUserInput } from "../../src/api/userManagementApi";
 import { getRoleDisplayName } from "../../../src/utils/permissionUtils";
 import { branches, departments, roster } from "../../src/api/services";
 import { messageOf, useSession } from "../../src/auth/SessionProvider";
@@ -83,6 +85,7 @@ export default function Employees() {
   const [refreshing, setRefreshing] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [revision, setRevision] = useState(0);
+  const [createModalVisible, setCreateModalVisible] = useState(false);
 
   // Selected employee for detail view & edit
   const [selected, setSelected] = useState<UserProfile | null>(null);
@@ -92,6 +95,17 @@ export default function Employees() {
   const [busy, setBusy] = useState(false);
   const lock = useRef(false);
   const [formError, setFormError] = useState<string | null>(null);
+
+  const handleCreateUser = async (data: CreateUserInput) => {
+    try {
+      await userManagementApi.createUser(data);
+      Alert.alert("Thành công", "Đã thêm nhân sự mới vào hệ thống.");
+      setCreateModalVisible(false);
+      setRevision((v) => v + 1);
+    } catch (err: any) {
+      Alert.alert("Lỗi", err?.message || "Không thể tạo tài khoản nhân sự.");
+    }
+  };
 
   const loadData = useCallback(
     async (isRefresh = false) => {
@@ -285,6 +299,17 @@ export default function Employees() {
                 </View>
 
                 <View style={styles.headerRight}>
+                  {canManageUsers && (
+                    <TouchableOpacity
+                      style={styles.addEmployeeBtn}
+                      onPress={() => setCreateModalVisible(true)}
+                      activeOpacity={0.8}
+                    >
+                      <Ionicons name="person-add" size={14} color="#ffffff" />
+                      <Text style={styles.addEmployeeText}>Thêm</Text>
+                    </TouchableOpacity>
+                  )}
+
                   <TouchableOpacity
                     style={styles.refreshBtn}
                     onPress={() => setRevision((v) => v + 1)}
@@ -1062,6 +1087,18 @@ export default function Employees() {
           )}
         </SafeAreaView>
       </Modal>
+
+      {/* Create New Employee Modal */}
+      <UserCreateModal
+        visible={createModalVisible}
+        onClose={() => setCreateModalVisible(false)}
+        onSubmit={handleCreateUser}
+        branches={branchList}
+        departments={deptList.map((d) => ({ id: (d as any).id || d._id, name: d.name, code: d.code }))}
+        defaultBranchId={selectedBranch?._id || user?.branchId}
+        companyCode={user?.companyCode}
+        companyName={user?.companyName}
+      />
     </>
   );
 }
@@ -1119,6 +1156,25 @@ const styles = StyleSheet.create({
     flexDirection: "row",
     alignItems: "center",
     gap: 8,
+  },
+  addEmployeeBtn: {
+    flexDirection: "row",
+    alignItems: "center",
+    backgroundColor: "#059669",
+    paddingHorizontal: 11,
+    paddingVertical: 8,
+    borderRadius: 12,
+    gap: 5,
+    shadowColor: "#059669",
+    shadowOffset: { width: 0, height: 1 },
+    shadowOpacity: 0.2,
+    shadowRadius: 2,
+    elevation: 2,
+  },
+  addEmployeeText: {
+    fontSize: 12,
+    fontWeight: "800",
+    color: "#ffffff",
   },
   refreshBtn: {
     width: 36,

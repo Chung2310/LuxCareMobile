@@ -1,6 +1,7 @@
 import React, { useCallback, useMemo, useState } from "react";
 import {
   ActivityIndicator,
+  Alert,
   Image,
   Linking,
   Modal,
@@ -14,8 +15,13 @@ import {
 import { SafeAreaView } from "react-native-safe-area-context";
 import { router, useFocusEffect } from "expo-router";
 import type { UserProfile } from "../../../src/types/common";
-import { roster } from "../../src/api/services";
+import type { BranchRecord } from "../../../src/services/branchService";
+import type { DepartmentRecord } from "../../../src/services/departmentService";
+import { UserCreateModal } from "../../src/components/users";
+import { userManagementApi, type CreateUserInput } from "../../src/api/userManagementApi";
+import { branches as branchService, departments as departmentService, roster } from "../../src/api/services";
 import { messageOf, useSession } from "../../src/auth/SessionProvider";
+import { hasPermission } from "../../src/auth/access";
 
 /* ==========================================================================
    1. FUNCTIONAL CATEGORIES (Theo chuẩn LuxCare Web)
@@ -657,16 +663,38 @@ export default function OrgChart() {
   const [selected, setSelected] = useState<UserProfile | null>(null);
   const [viewMode, setViewMode] = useState<"tree" | "list">("tree");
   const [zoomScale, setZoomScale] = useState<number>(1.0);
+  const [createModalVisible, setCreateModalVisible] = useState(false);
+  const [deptList, setDeptList] = useState<DepartmentRecord[]>([]);
+  const [branchList, setBranchList] = useState<BranchRecord[]>([]);
+  const canManage = ["admin", "superadmin", "branch_owner", "manager"].includes(user?.role || "") || hasPermission(user, "user:manage");
+
+  const handleCreateUser = async (data: CreateUserInput) => {
+    try {
+      await userManagementApi.createUser(data);
+      Alert.alert("Thành công", "Đã thêm nhân sự mới vào hệ thống.");
+      setCreateModalVisible(false);
+      setRevision((v) => v + 1);
+    } catch (err: any) {
+      Alert.alert("Lỗi", err?.message || "Không thể tạo tài khoản nhân sự.");
+    }
+  };
 
   useFocusEffect(
     useCallback(() => {
       let active = true;
       setLoading(true);
       setError(null);
-      roster
-        .list(user?.companyCode ?? "", branchId)
-        .then((emps) => {
-          if (active) setEmpList(emps);
+      Promise.all([
+        roster.list(user?.companyCode ?? "", branchId),
+        departmentService.list().catch(() => []),
+        branchService.list().catch(() => []),
+      ])
+        .then(([emps, depts, brs]) => {
+          if (active) {
+            setEmpList(emps);
+            setDeptList(depts);
+            setBranchList(brs);
+          }
         })
         .catch((e) => {
           if (active) setError(messageOf(e));
@@ -773,6 +801,12 @@ export default function OrgChart() {
           </Text>
         </Pressable>
       </View>
+
+      {canManage && (
+        <Pressable style={s.addBtn} onPress={() => setCreateModalVisible(true)}>
+          <Text style={s.addBtnText}>+ Thêm</Text>
+        </Pressable>
+      )}
 
       <Pressable style={s.iconBtn} onPress={() => setRevision((v) => v + 1)}>
         <Text style={{ fontSize: 17 }}>↺</Text>
@@ -908,6 +942,18 @@ export default function OrgChart() {
         managerName={managerName}
         onClose={() => setSelected(null)}
       />
+
+      {/* Create New Employee Modal */}
+      <UserCreateModal
+        visible={createModalVisible}
+        onClose={() => setCreateModalVisible(false)}
+        onSubmit={handleCreateUser}
+        branches={branchList}
+        departments={deptList.map((d) => ({ id: (d as any).id || d._id, name: d.name, code: d.code }))}
+        defaultBranchId={selectedBranch?._id || user?.branchId}
+        companyCode={user?.companyCode}
+        companyName={user?.companyName}
+      />
     </SafeAreaView>
   );
 }
@@ -937,6 +983,19 @@ const s = StyleSheet.create({
   },
   title: { fontSize: 17, fontWeight: "800", color: "#0f172a", letterSpacing: -0.3 },
   subtitle: { fontSize: 11, color: "#64748b", marginTop: 1 },
+  addBtn: {
+    backgroundColor: "#059669",
+    paddingHorizontal: 10,
+    paddingVertical: 6,
+    borderRadius: 8,
+    alignItems: "center",
+    justifyContent: "center",
+  },
+  addBtnText: {
+    color: "#ffffff",
+    fontSize: 12,
+    fontWeight: "700",
+  },
 
   viewToggleContainer: {
     flexDirection: "row",
