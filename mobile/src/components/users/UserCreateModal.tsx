@@ -14,6 +14,7 @@ import {
 import { SafeAreaView } from "react-native-safe-area-context";
 import { Ionicons } from "@expo/vector-icons";
 import { AppButton } from "../common/AppButton";
+import { DatePickerField } from "../common/DatePickerField";
 import { DropdownSelectField } from "../common/DropdownSelectField";
 import { ROLE_MAP } from "./UserCard";
 import { userManagementApi, type CreateUserInput, type UserRole } from "../../api/userManagementApi";
@@ -395,16 +396,14 @@ export const UserCreateModal: React.FC<UserCreateModalProps> = ({
             </View>
 
             {/* Ngày sinh */}
-            <View style={styles.fieldGroup}>
-              <Text style={styles.fieldLabel}>Ngày sinh (YYYY-MM-DD)</Text>
-              <TextInput
-                style={styles.input}
-                placeholder="VD: 1995-08-20"
-                placeholderTextColor="#94a3b8"
-                value={birthDate}
-                onChangeText={setBirthDate}
-              />
-            </View>
+            <DatePickerField
+              label="Ngày sinh"
+              value={birthDate}
+              onChange={setBirthDate}
+              title="Chọn ngày sinh"
+              placeholder="Chọn ngày sinh..."
+              allowClear
+            />
 
             {/* Mức lương tháng */}
             <View style={styles.fieldGroup}>

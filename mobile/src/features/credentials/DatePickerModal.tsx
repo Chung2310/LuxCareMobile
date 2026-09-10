@@ -2,6 +2,7 @@ import React, { useState, useMemo } from "react";
 import {
   Modal,
   Pressable,
+  ScrollView,
   StyleSheet,
   Text,
   View,
@@ -80,6 +81,8 @@ export function DatePickerModal({
   const [viewMonth, setViewMonth] = useState(initial.month);
   const [selectedDate, setSelectedDate] = useState(value);
 
+  const [pickerMode, setPickerMode] = useState<"calendar" | "year" | "month">("calendar");
+
   // Sync when opening
   React.useEffect(() => {
     if (visible) {
@@ -87,8 +90,18 @@ export function DatePickerModal({
       setViewYear(p.year);
       setViewMonth(p.month);
       setSelectedDate(value);
+      setPickerMode("calendar");
     }
   }, [visible, value]);
+
+  const yearsList = useMemo(() => {
+    const list: number[] = [];
+    const currentY = new Date().getFullYear();
+    for (let y = currentY + 5; y >= 1940; y--) {
+      list.push(y);
+    }
+    return list;
+  }, []);
 
   const daysInMonth = useMemo(() => {
     return new Date(viewYear, viewMonth + 1, 0).getDate();
@@ -218,14 +231,32 @@ export function DatePickerModal({
             </Pressable>
 
             <View style={styles.navMonthYear}>
-              <Text style={styles.navMonthText}>{MONTH_NAMES[viewMonth]}</Text>
+              <Pressable
+                onPress={() => setPickerMode((m) => (m === "month" ? "calendar" : "month"))}
+                style={[styles.navSelectBtn, pickerMode === "month" && styles.navSelectBtnActive]}
+                hitSlop={6}
+              >
+                <Text style={styles.navMonthText}>{MONTH_NAMES[viewMonth]} ▾</Text>
+              </Pressable>
               <View style={styles.yearButtonsRow}>
+                <Pressable onPress={() => setViewYear((y) => y - 10)} hitSlop={6} style={styles.yearChangeBtn}>
+                  <Text style={styles.yearChangeText}>-10</Text>
+                </Pressable>
                 <Pressable onPress={() => setViewYear((y) => y - 1)} hitSlop={6} style={styles.yearChangeBtn}>
                   <Text style={styles.yearChangeText}>-1</Text>
                 </Pressable>
-                <Text style={styles.navYearText}>{viewYear}</Text>
+                <Pressable
+                  onPress={() => setPickerMode((m) => (m === "year" ? "calendar" : "year"))}
+                  style={[styles.navYearBtn, pickerMode === "year" && styles.navSelectBtnActive]}
+                  hitSlop={6}
+                >
+                  <Text style={styles.navYearText}>{viewYear} ▾</Text>
+                </Pressable>
                 <Pressable onPress={() => setViewYear((y) => y + 1)} hitSlop={6} style={styles.yearChangeBtn}>
                   <Text style={styles.yearChangeText}>+1</Text>
+                </Pressable>
+                <Pressable onPress={() => setViewYear((y) => y + 10)} hitSlop={6} style={styles.yearChangeBtn}>
+                  <Text style={styles.yearChangeText}>+10</Text>
                 </Pressable>
               </View>
             </View>
@@ -235,70 +266,123 @@ export function DatePickerModal({
             </Pressable>
           </View>
 
-          {/* Weekday headers */}
-          <View style={styles.weekDaysRow}>
-            {WEEK_DAYS.map((w, idx) => (
-              <View key={w} style={styles.weekDayCell}>
-                <Text
-                  style={[
-                    styles.weekDayText,
-                    idx === 6 && { color: "#e11d48" }, // Sunday
-                    idx === 5 && { color: "#0284c7" }, // Saturday
-                  ]}
-                >
-                  {w}
-                </Text>
-              </View>
-            ))}
-          </View>
-
-          {/* Days Grid - hiển thị theo từng tuần cố định 7 ngày */}
-          <View style={styles.daysGrid}>
-            {calendarWeeks.map((week, wIdx) => (
-              <View key={`week-${wIdx}`} style={styles.weekRow}>
-                {week.map((cell, dayColIdx) => {
-                  const isSunday = dayColIdx === 6;
-                  const isSaturday = dayColIdx === 5;
-
-                  if (!cell.isCurrentMonth) {
+          {/* Body: Year picker grid, Month picker grid, or Days calendar */}
+          {pickerMode === "year" ? (
+            <View style={styles.selectorContainer}>
+              <Text style={styles.selectorHeaderHint}>Chọn năm sinh / năm làm việc:</Text>
+              <ScrollView style={{ maxHeight: 220 }} showsVerticalScrollIndicator={true}>
+                <View style={styles.selectorGrid}>
+                  {yearsList.map((y) => {
+                    const isSelected = y === viewYear;
                     return (
-                      <View key={`cell-${dayColIdx}`} style={styles.dayCell}>
-                        <Text style={styles.otherMonthText}>{cell.day}</Text>
-                      </View>
+                      <Pressable
+                        key={y}
+                        style={[styles.selectorChip, isSelected && styles.selectorChipActive]}
+                        onPress={() => {
+                          setViewYear(y);
+                          setPickerMode("calendar");
+                        }}
+                      >
+                        <Text style={[styles.selectorChipText, isSelected && styles.selectorChipTextActive]}>
+                          {y}
+                        </Text>
+                      </Pressable>
                     );
-                  }
-
-                  const cellDateStr = `${viewYear}-${pad(viewMonth + 1)}-${pad(cell.day)}`;
-                  const isSelected = selectedDate === cellDateStr;
-                  const isToday = todayStr === cellDateStr;
-
+                  })}
+                </View>
+              </ScrollView>
+            </View>
+          ) : pickerMode === "month" ? (
+            <View style={styles.selectorContainer}>
+              <Text style={styles.selectorHeaderHint}>Chọn tháng:</Text>
+              <View style={styles.selectorGrid}>
+                {MONTH_NAMES.map((mName, mIdx) => {
+                  const isSelected = mIdx === viewMonth;
                   return (
                     <Pressable
-                      key={`cell-${dayColIdx}`}
-                      style={[
-                        styles.dayCell,
-                        isSelected && styles.dayCellSelected,
-                        isToday && !isSelected && styles.dayCellToday,
-                      ]}
-                      onPress={() => handleSelectDay(cell.day)}
+                      key={mName}
+                      style={[styles.selectorChip, styles.selectorChipMonth, isSelected && styles.selectorChipActive]}
+                      onPress={() => {
+                        setViewMonth(mIdx);
+                        setPickerMode("calendar");
+                      }}
                     >
-                      <Text
-                        style={[
-                          styles.dayText,
-                          isSunday && !isSelected && { color: "#e11d48", fontWeight: "700" },
-                          isSaturday && !isSelected && { color: "#0284c7" },
-                          isSelected && styles.dayTextSelected,
-                          isToday && !isSelected && styles.dayTextToday,
-                        ]}
-                      >
-                        {cell.day}
+                      <Text style={[styles.selectorChipText, isSelected && styles.selectorChipTextActive]}>
+                        {mName}
                       </Text>
                     </Pressable>
                   );
                 })}
               </View>
-            ))}
-          </View>
+            </View>
+          ) : (
+            <>
+              {/* Weekday headers */}
+              <View style={styles.weekDaysRow}>
+                {WEEK_DAYS.map((w, idx) => (
+                  <View key={w} style={styles.weekDayCell}>
+                    <Text
+                      style={[
+                        styles.weekDayText,
+                        idx === 6 && { color: "#e11d48" }, // Sunday
+                        idx === 5 && { color: "#0284c7" }, // Saturday
+                      ]}
+                    >
+                      {w}
+                    </Text>
+                  </View>
+                ))}
+              </View>
+
+              {/* Days Grid - hiển thị theo từng tuần cố định 7 ngày */}
+              <View style={styles.daysGrid}>
+                {calendarWeeks.map((week, wIdx) => (
+                  <View key={`week-${wIdx}`} style={styles.weekRow}>
+                    {week.map((cell, dayColIdx) => {
+                      const isSunday = dayColIdx === 6;
+                      const isSaturday = dayColIdx === 5;
+
+                      if (!cell.isCurrentMonth) {
+                        return (
+                          <View key={`cell-${dayColIdx}`} style={styles.dayCell}>
+                            <Text style={styles.otherMonthText}>{cell.day}</Text>
+                          </View>
+                        );
+                      }
+
+                      const cellDateStr = `${viewYear}-${pad(viewMonth + 1)}-${pad(cell.day)}`;
+                      const isSelected = selectedDate === cellDateStr;
+                      const isToday = todayStr === cellDateStr;
+
+                      return (
+                        <Pressable
+                          key={`cell-${dayColIdx}`}
+                          style={[
+                            styles.dayCell,
+                            isSelected && styles.dayCellSelected,
+                            isToday && !isSelected && styles.dayCellToday,
+                          ]}
+                          onPress={() => handleSelectDay(cell.day)}
+                        >
+                          <Text
+                            style={[
+                              styles.dayText,
+                              isSunday && !isSelected && { color: "#e11d48", fontWeight: "700" },
+                              isSaturday && !isSelected && { color: "#0284c7" },
+                              isSelected && styles.dayTextSelected,
+                              isToday && !isSelected && styles.dayTextToday,
+                            ]}
+                          >
+                            {cell.day}
+                          </Text>
+                        </Pressable>
+                      );
+                    })}
+                  </View>
+                ))}
+              </View>
+            </>
+          )}
 
           {/* Quick Shortcuts */}
           <View style={styles.shortcutsRow}>
@@ -422,6 +506,65 @@ const styles = StyleSheet.create({
     fontSize: 15,
     fontWeight: "800",
     color: "#0f172a",
+  },
+  navSelectBtn: {
+    paddingHorizontal: 8,
+    paddingVertical: 2,
+    borderRadius: 8,
+  },
+  navSelectBtnActive: {
+    backgroundColor: "#ecfdf5",
+    borderWidth: 1,
+    borderColor: "#a7f3d0",
+  },
+  navYearBtn: {
+    paddingHorizontal: 6,
+    paddingVertical: 2,
+    borderRadius: 6,
+    backgroundColor: "#ecfdf5",
+  },
+  selectorContainer: {
+    paddingVertical: 4,
+  },
+  selectorHeaderHint: {
+    fontSize: 12,
+    fontWeight: "600",
+    color: "#64748b",
+    marginBottom: 8,
+  },
+  selectorGrid: {
+    flexDirection: "row",
+    flexWrap: "wrap",
+    gap: 8,
+    justifyContent: "space-between",
+    paddingVertical: 2,
+  },
+  selectorChip: {
+    width: "22%",
+    paddingVertical: 10,
+    alignItems: "center",
+    justifyContent: "center",
+    borderRadius: 10,
+    backgroundColor: "#f8fafc",
+    borderWidth: 1,
+    borderColor: "#e2e8f0",
+  },
+  selectorChipMonth: {
+    width: "31%",
+    paddingVertical: 12,
+  },
+  selectorChipActive: {
+    backgroundColor: "#059669",
+    borderColor: "#059669",
+  },
+  selectorChipText: {
+    fontSize: 13,
+    fontWeight: "600",
+    color: "#334155",
+  },
+  selectorChipTextActive: {
+    color: "#ffffff",
+    fontWeight: "800",
   },
   yearButtonsRow: {
     flexDirection: "row",
