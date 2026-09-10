@@ -1,6 +1,7 @@
 import React, { useCallback, useMemo, useState } from "react";
 import {
   ActivityIndicator,
+  Alert,
   Image,
   Linking,
   Modal,
@@ -14,8 +15,15 @@ import {
 import { SafeAreaView } from "react-native-safe-area-context";
 import { router, useFocusEffect } from "expo-router";
 import type { UserProfile } from "../../../src/types/common";
-import { roster } from "../../src/api/services";
+import type { BranchRecord } from "../../../src/services/branchService";
+import type { DepartmentRecord } from "../../../src/services/departmentService";
+import { UserCreateModal } from "../../src/components/users";
+import { DatePickerField } from "../../src/components/common/DatePickerField";
+import { DropdownSelectField } from "../../src/components/common/DropdownSelectField";
+import { userManagementApi, type CreateUserInput } from "../../src/api/userManagementApi";
+import { branches as branchService, departments as departmentService, roster } from "../../src/api/services";
 import { messageOf, useSession } from "../../src/auth/SessionProvider";
+import { hasPermission } from "../../src/auth/access";
 
 /* ==========================================================================
    1. FUNCTIONAL CATEGORIES (Theo chuẩn LuxCare Web)
@@ -238,6 +246,19 @@ function buildTree(emps: UserProfile[]): TreeNode[] {
   return roots.map((r) => build(r.uid, 0));
 }
 
+function isDescendant(ancestorUid: string, candidateUid: string, emps: UserProfile[]): boolean {
+  if (ancestorUid === candidateUid) return true;
+  let curr = emps.find((e) => e.uid === candidateUid);
+  const visited = new Set<string>();
+  while (curr?.parentId) {
+    if (curr.parentId === ancestorUid) return true;
+    if (visited.has(curr.parentId)) break;
+    visited.add(curr.parentId);
+    curr = emps.find((e) => e.uid === curr?.parentId);
+  }
+  return false;
+}
+
 function flattenSearchMatches(nodes: TreeNode[], sq: string): Set<string> {
   const matched = new Set<string>();
   function walk(n: TreeNode) {
@@ -310,14 +331,314 @@ function IRow({ icon, label, value }: { icon: string; label: string; value: stri
   );
 }
 
+function OrgEditModal({
+  visible,
+  emp,
+  empList,
+  departments,
+  onClose,
+  onSave,
+}: {
+  visible: boolean;
+  emp: UserProfile | null;
+  empList: UserProfile[];
+  departments: DepartmentRecord[];
+  onClose: () => void;
+  onSave: (uid: string, data: Partial<UserProfile>) => Promise<void>;
+}) {
+  if (!emp) return null;
+
+  const [displayName, setDisplayName] = useState(emp.displayName || "");
+  const [jobTitle, setJobTitle] = useState(emp.jobTitle || "");
+  const [department, setDepartment] = useState(emp.department || "");
+  const [parentId, setParentId] = useState(emp.parentId || "");
+  const [phone, setPhone] = useState(emp.phone || "");
+  const [birthDate, setBirthDate] = useState(emp.birthDate || "");
+  const [monthlySalary, setMonthlySalary] = useState(emp.monthlySalary ? String(emp.monthlySalary) : "");
+  const [jobDescriptionLink, setJobDescriptionLink] = useState(emp.jobDescriptionLink || "");
+  const [isLeader, setIsLeader] = useState(!!emp.isLeader);
+
+  const [showDeptPicker, setShowDeptPicker] = useState(false);
+  const [showManagerPicker, setShowManagerPicker] = useState(false);
+  const [managerSearch, setManagerSearch] = useState("");
+  const [loading, setLoading] = useState(false);
+
+  React.useEffect(() => {
+    if (emp) {
+      setDisplayName(emp.displayName || "");
+      setJobTitle(emp.jobTitle || "");
+      setDepartment(emp.department || "");
+      setParentId(emp.parentId || "");
+      setPhone(emp.phone || "");
+      setBirthDate(emp.birthDate || "");
+      setMonthlySalary(emp.monthlySalary ? String(emp.monthlySalary) : "");
+      setJobDescriptionLink(emp.jobDescriptionLink || "");
+      setIsLeader(!!emp.isLeader);
+    }
+  }, [emp]);
+
+  const candidateManagers = useMemo(() => {
+    return empList.filter((e) => e.uid !== emp.uid && !isDescendant(emp.uid, e.uid, empList));
+  }, [empList, emp]);
+
+  const filteredManagers = useMemo(() => {
+    if (!managerSearch.trim()) return candidateManagers;
+    const q = managerSearch.trim().toLowerCase();
+    return candidateManagers.filter(
+      (m) =>
+        m.displayName?.toLowerCase().includes(q) ||
+        m.jobTitle?.toLowerCase().includes(q) ||
+        m.department?.toLowerCase().includes(q)
+    );
+  }, [candidateManagers, managerSearch]);
+
+  const selectedManager = empList.find((m) => m.uid === parentId);
+  const selectedManagerName = selectedManager
+    ? `${selectedManager.displayName}${selectedManager.jobTitle ? ` (${selectedManager.jobTitle})` : ""}`
+    : "-- Cấp cao nhất / Không có quản lý --";
+
+  const salaryNum = monthlySalary.replace(/[^0-9]/g, "");
+  const salaryPreview = salaryNum ? Number(salaryNum).toLocaleString("vi-VN") + " đ" : "";
+
+  const handleSave = async () => {
+    const trimmedName = displayName.trim();
+    if (!trimmedName || trimmedName.length < 2) {
+      Alert.alert("Thiếu thông tin", "Vui lòng nhập họ và tên (tối thiểu 2 ký tự).");
+      return;
+    }
+
+    if (parentId && isDescendant(emp.uid, parentId, empList)) {
+      Alert.alert("Không hợp lệ", "Quản lý trực tiếp không thể là cấp dưới của nhân sự này.");
+      return;
+    }
+
+    setLoading(true);
+    try {
+      await onSave(emp.uid, {
+        displayName: trimmedName,
+        jobTitle: jobTitle.trim() || undefined,
+        department: department || undefined,
+        division: jobTitle.trim() || undefined,
+        parentId: parentId || undefined,
+        phone: phone.trim() || undefined,
+        birthDate: birthDate.trim() || undefined,
+        monthlySalary: salaryNum ? parseInt(salaryNum, 10) : undefined,
+        jobDescriptionLink: jobDescriptionLink.trim() || undefined,
+        isLeader,
+      });
+      onClose();
+    } catch (e: any) {
+      Alert.alert("Lỗi", e?.message || "Không thể lưu thông tin.");
+    } finally {
+      setLoading(false);
+    }
+  };
+
+  return (
+    <Modal visible={visible} animationType="slide" transparent onRequestClose={onClose}>
+      <SafeAreaView style={s.editModalOverlay} edges={["top", "bottom"]}>
+        <View style={s.editContainer}>
+          {/* Header */}
+          <View style={s.editHeader}>
+            <View>
+              <Text style={s.editHeaderTitle}>Chỉnh sửa nhân sự</Text>
+              <Text style={s.editHeaderSub}>{emp.displayName}</Text>
+            </View>
+            <Pressable onPress={onClose} hitSlop={8} style={s.editCloseBtn} disabled={loading}>
+              <Text style={{ fontSize: 16, color: "#64748b", fontWeight: "700" }}>✕</Text>
+            </Pressable>
+          </View>
+
+          <ScrollView style={s.editScroll} contentContainerStyle={s.editScrollContent} keyboardShouldPersistTaps="handled">
+            {/* Họ và tên */}
+            <View style={s.formGroup}>
+              <Text style={s.formLabel}>Họ và tên <Text style={{ color: "#ef4444" }}>*</Text></Text>
+              <TextInput style={s.formInput} value={displayName} onChangeText={setDisplayName} placeholder="VD: Nguyễn Văn A" placeholderTextColor="#94a3b8" />
+            </View>
+
+            {/* Chức danh */}
+            <View style={s.formGroup}>
+              <Text style={s.formLabel}>Chức danh / Vị trí chuyên môn</Text>
+              <TextInput style={s.formInput} value={jobTitle} onChangeText={setJobTitle} placeholder="VD: Trưởng khoa Nội" placeholderTextColor="#94a3b8" />
+            </View>
+
+            {/* Phòng ban */}
+            <DropdownSelectField
+              label="Khoa / Phòng ban"
+              value={department || "Chưa chọn phòng ban"}
+              placeholder="Chọn khoa / phòng ban..."
+              icon="layers-outline"
+              iconColor="#7c3aed"
+              iconBgColor="#f5f3ff"
+              onPress={() => setShowDeptPicker(true)}
+            />
+
+            {/* Quản lý trực tiếp */}
+            <DropdownSelectField
+              label="Quản lý trực tiếp (Cấp trên)"
+              value={selectedManagerName}
+              placeholder="Chọn quản lý trực tiếp..."
+              icon="people-outline"
+              iconColor="#0284c7"
+              iconBgColor="#e0f2fe"
+              onPress={() => setShowManagerPicker(true)}
+            />
+
+            {/* Trưởng nhóm Leader */}
+            <View style={s.formLeaderRow}>
+              <View style={{ flex: 1 }}>
+                <Text style={s.formLeaderLabel}>👑 Chỉ định Trưởng nhóm / Leader</Text>
+                <Text style={s.formLeaderSub}>Hiển thị huy hiệu Leader nổi bật trên sơ đồ tổ chức</Text>
+              </View>
+              <Pressable
+                style={[s.leaderToggle, isLeader && s.leaderToggleActive]}
+                onPress={() => setIsLeader(!isLeader)}
+              >
+                <Text style={[s.leaderToggleText, isLeader && s.leaderToggleTextActive]}>
+                  {isLeader ? "BẬT" : "TẮT"}
+                </Text>
+              </Pressable>
+            </View>
+
+            {/* Số điện thoại */}
+            <View style={s.formGroup}>
+              <Text style={s.formLabel}>Số điện thoại</Text>
+              <TextInput style={s.formInput} value={phone} onChangeText={setPhone} keyboardType="phone-pad" placeholder="VD: 0912345678" placeholderTextColor="#94a3b8" />
+            </View>
+
+            {/* Ngày sinh */}
+            <DatePickerField
+              label="Ngày sinh"
+              value={birthDate}
+              onChange={setBirthDate}
+              title="Chọn ngày sinh"
+              placeholder="Chọn ngày sinh..."
+              allowClear
+            />
+
+            {/* Mức lương tháng */}
+            <View style={s.formGroup}>
+              <Text style={s.formLabel}>Mức lương cơ bản hàng tháng (VNĐ)</Text>
+              <TextInput style={s.formInput} value={monthlySalary} onChangeText={setMonthlySalary} keyboardType="numeric" placeholder="VD: 15000000" placeholderTextColor="#94a3b8" />
+              {salaryPreview ? <Text style={s.salaryPreviewText}>= {salaryPreview} / tháng</Text> : null}
+            </View>
+
+            {/* Link JD */}
+            <View style={s.formGroup}>
+              <Text style={s.formLabel}>Đường dẫn mô tả công việc (JD Link)</Text>
+              <TextInput style={s.formInput} value={jobDescriptionLink} onChangeText={setJobDescriptionLink} autoCapitalize="none" keyboardType="url" placeholder="https://drive.google.com/..." placeholderTextColor="#94a3b8" />
+            </View>
+          </ScrollView>
+
+          {/* Footer */}
+          <View style={s.editFooter}>
+            <Pressable style={s.editCancelBtn} onPress={onClose} disabled={loading}>
+              <Text style={s.editCancelBtnTxt}>Hủy</Text>
+            </Pressable>
+            <Pressable style={[s.editSaveBtn, loading && { opacity: 0.6 }]} onPress={handleSave} disabled={loading}>
+              {loading ? (
+                <ActivityIndicator color="#ffffff" size="small" />
+              ) : (
+                <Text style={s.editSaveBtnTxt}>Lưu thay đổi</Text>
+              )}
+            </Pressable>
+          </View>
+        </View>
+
+        {/* Dept picker modal */}
+        <Modal visible={showDeptPicker} transparent animationType="fade" onRequestClose={() => setShowDeptPicker(false)}>
+          <Pressable style={s.pickerBackdrop} onPress={() => setShowDeptPicker(false)}>
+            <Pressable style={s.pickerCard} onPress={() => {}}>
+              <Text style={s.pickerTitle}>Chọn phòng ban</Text>
+              <ScrollView style={{ maxHeight: 280 }}>
+                {departments.map((d, i) => (
+                  <Pressable
+                    key={d._id || `${d.name}-${i}`}
+                    style={[s.pickerItem, department === d.name && s.pickerItemActive]}
+                    onPress={() => {
+                      setDepartment(d.name);
+                      setShowDeptPicker(false);
+                    }}
+                  >
+                    <Text style={[s.pickerItemText, department === d.name && s.pickerItemTextActive]}>
+                      {d.name}
+                    </Text>
+                  </Pressable>
+                ))}
+              </ScrollView>
+            </Pressable>
+          </Pressable>
+        </Modal>
+
+        {/* Manager picker modal */}
+        <Modal visible={showManagerPicker} transparent animationType="fade" onRequestClose={() => setShowManagerPicker(false)}>
+          <Pressable style={s.pickerBackdrop} onPress={() => setShowManagerPicker(false)}>
+            <Pressable style={[s.pickerCard, { maxHeight: "80%" }]} onPress={() => {}}>
+              <Text style={s.pickerTitle}>Chọn quản lý trực tiếp</Text>
+              <View style={s.searchBox}>
+                <Text style={{ marginRight: 6 }}>🔍</Text>
+                <TextInput
+                  style={s.searchInput}
+                  placeholder="Tìm theo tên hoặc chức vụ..."
+                  placeholderTextColor="#94a3b8"
+                  value={managerSearch}
+                  onChangeText={setManagerSearch}
+                />
+              </View>
+              <ScrollView style={{ maxHeight: 280 }} keyboardShouldPersistTaps="handled">
+                <Pressable
+                  style={[s.pickerItem, parentId === "" && s.pickerItemActive]}
+                  onPress={() => {
+                    setParentId("");
+                    setShowManagerPicker(false);
+                  }}
+                >
+                  <Text style={[s.pickerItemText, parentId === "" && s.pickerItemTextActive]}>
+                    -- Cấp cao nhất / Không có quản lý --
+                  </Text>
+                </Pressable>
+                {filteredManagers.map((m) => (
+                  <Pressable
+                    key={m.uid}
+                    style={[s.pickerItem, parentId === m.uid && s.pickerItemActive]}
+                    onPress={() => {
+                      setParentId(m.uid);
+                      setShowManagerPicker(false);
+                    }}
+                  >
+                    <View>
+                      <Text style={[s.pickerItemText, parentId === m.uid && s.pickerItemTextActive]}>
+                        {m.displayName}
+                      </Text>
+                      {(m.jobTitle || m.department) ? (
+                        <Text style={s.pickerSubText}>{[m.jobTitle, m.department].filter(Boolean).join(" • ")}</Text>
+                      ) : null}
+                    </View>
+                  </Pressable>
+                ))}
+              </ScrollView>
+            </Pressable>
+          </Pressable>
+        </Modal>
+      </SafeAreaView>
+    </Modal>
+  );
+}
+
 function ProfileModal({
   emp,
   managerName,
   onClose,
+  canManage,
+  onEdit,
+  onStartMove,
 }: {
   emp: UserProfile | null;
   managerName?: string;
   onClose: () => void;
+  canManage?: boolean;
+  onEdit?: (emp: UserProfile) => void;
+  onStartMove?: (emp: UserProfile) => void;
 }) {
   if (!emp) return null;
   const b = roleBadge(emp.role);
@@ -362,27 +683,61 @@ function ProfileModal({
             />
             {!!emp.email && <IRow icon="✉️" label="Email" value={emp.email} />}
             {!!emp.phone && <IRow icon="📱" label="Điện thoại" value={emp.phone} />}
+            {!!emp.birthDate && <IRow icon="🎂" label="Ngày sinh" value={emp.birthDate} />}
+            {emp.monthlySalary != null && emp.monthlySalary > 0 && (
+              <IRow icon="💰" label="Lương tháng" value={`${emp.monthlySalary.toLocaleString("vi-VN")} đ`} />
+            )}
+            {!!emp.jobDescriptionLink && (
+              <View style={s.iRow}>
+                <Text style={s.iIco}>📄</Text>
+                <Text style={s.iLbl}>Mô tả công việc</Text>
+                <Pressable onPress={() => Linking.openURL(emp.jobDescriptionLink!)}>
+                  <Text style={[s.iVal, { color: "#0284c7", textDecorationLine: "underline" }]}>Xem link JD</Text>
+                </Pressable>
+              </View>
+            )}
             {!!emp.division && <IRow icon="📁" label="Khối" value={emp.division} />}
           </View>
 
           <View style={s.actionRow}>
-            {!!emp.phone && (
-              <Pressable
-                style={s.actionBtn}
-                onPress={() => void Linking.openURL(`tel:${emp.phone}`)}
-              >
-                <Text style={s.actionIco}>📞</Text>
-                <Text style={s.actionLbl}>Gọi điện</Text>
-              </Pressable>
-            )}
-            {!!emp.email && (
-              <Pressable
-                style={s.actionBtn}
-                onPress={() => void Linking.openURL(`mailto:${emp.email}`)}
-              >
-                <Text style={s.actionIco}>✉️</Text>
-                <Text style={s.actionLbl}>Gửi email</Text>
-              </Pressable>
+            <Pressable
+              style={s.actionBtn}
+              onPress={() => {
+                onClose();
+                router.push({
+                  pathname: "/(tabs)/chat",
+                  params: { peerId: emp.uid, name: emp.displayName || emp.email },
+                } as any);
+              }}
+            >
+              <Text style={s.actionIco}>💬</Text>
+              <Text style={s.actionLbl}>Nhắn tin</Text>
+            </Pressable>
+
+            {canManage && (
+              <>
+                <Pressable
+                  style={[s.actionBtn, { backgroundColor: "#f0fdf4", borderColor: "#86efac" }]}
+                  onPress={() => {
+                    onClose();
+                    onEdit?.(emp);
+                  }}
+                >
+                  <Text style={s.actionIco}>✏️</Text>
+                  <Text style={[s.actionLbl, { color: "#059669" }]}>Sửa thông tin</Text>
+                </Pressable>
+
+                <Pressable
+                  style={[s.actionBtn, { backgroundColor: "#eff6ff", borderColor: "#93c5fd" }]}
+                  onPress={() => {
+                    onClose();
+                    onStartMove?.(emp);
+                  }}
+                >
+                  <Text style={s.actionIco}>🔄</Text>
+                  <Text style={[s.actionLbl, { color: "#1d4ed8" }]}>Đổi quản lý</Text>
+                </Pressable>
+              </>
             )}
           </View>
         </Pressable>
@@ -403,12 +758,22 @@ function TreeBranchView({
   collapsed,
   toggleCollapse,
   highlighted,
+  movingEmp,
+  onStartMove,
+  onTargetSelect,
+  canManage,
+  allEmps,
 }: {
   node: TreeNode;
   onSelect: (e: UserProfile) => void;
   collapsed: Set<string>;
   toggleCollapse: (uid: string) => void;
   highlighted: Set<string> | null;
+  movingEmp?: UserProfile | null;
+  onStartMove?: (e: UserProfile) => void;
+  onTargetSelect?: (target: UserProfile) => void;
+  canManage?: boolean;
+  allEmps: UserProfile[];
 }) {
   const { emp, children } = node;
   const isCollapsed = collapsed.has(emp.uid);
@@ -419,18 +784,54 @@ function TreeBranchView({
   const roleIcon = getRoleIcon(emp.jobTitle || emp.role);
   const directReports = children.length;
 
+  const isMoving = movingEmp?.uid === emp.uid;
+  const isDesc = movingEmp ? isDescendant(movingEmp.uid, emp.uid, allEmps) : false;
+  const isValidTarget = Boolean(movingEmp && !isMoving && !isDesc);
+  const isInvalidTarget = Boolean(movingEmp && !isMoving && isDesc);
+
   return (
     <View style={s.branchCol}>
       {/* Smart Employee Card */}
       <Pressable
-        onPress={() => onSelect(emp)}
+        onPress={() => {
+          if (movingEmp) {
+            if (isValidTarget && onTargetSelect) {
+              onTargetSelect(emp);
+            } else if (isInvalidTarget) {
+              Alert.alert("Không thể gán", "Không thể gán nhân sự này vào cấp dưới của chính họ.");
+            }
+          } else {
+            onSelect(emp);
+          }
+        }}
+        onLongPress={() => {
+          if (canManage && onStartMove && !movingEmp) {
+            onStartMove(emp);
+          }
+        }}
+        delayLongPress={300}
         style={[
           s.card,
           { borderTopColor: cat.color },
           isHighlighted && s.cardHighlighted,
           dimmed && s.cardDimmed,
+          isMoving && s.cardMoving,
+          isValidTarget && s.cardDropTarget,
+          isInvalidTarget && s.cardDisabledTarget,
         ]}
       >
+        {/* Moving / Target Banner Badge */}
+        {isMoving && (
+          <View style={s.cardMovingBadge}>
+            <Text style={s.cardMovingBadgeText}>🔄 Đang chuyển vị trí</Text>
+          </View>
+        )}
+        {isValidTarget && (
+          <View style={s.cardDropBadge}>
+            <Text style={s.cardDropBadgeText}>📥 Gán làm quản lý</Text>
+          </View>
+        )}
+
         {/* Top Header Row: Category Badge / Leader & Online Dot */}
         <View style={s.cardTopRow}>
           {emp.isLeader ? (
@@ -442,12 +843,17 @@ function TreeBranchView({
               <Text style={[s.catBadgeText, { color: cat.text }]}>{cat.badge}</Text>
             </View>
           )}
-          <View
-            style={[
-              s.onlineDot,
-              { backgroundColor: emp.status === "online" ? "#10b981" : "#cbd5e1" },
-            ]}
-          />
+          <View style={{ flexDirection: "row", alignItems: "center", gap: 4 }}>
+            {canManage && !movingEmp && (
+              <Text style={{ fontSize: 10, color: "#94a3b8" }}>⋮⋮</Text>
+            )}
+            <View
+              style={[
+                s.onlineDot,
+                { backgroundColor: emp.status === "online" ? "#10b981" : "#cbd5e1" },
+              ]}
+            />
+          </View>
         </View>
 
         {/* Department Title (Main highlight) */}
@@ -547,6 +953,11 @@ function TreeBranchView({
                     collapsed={collapsed}
                     toggleCollapse={toggleCollapse}
                     highlighted={highlighted}
+                    movingEmp={movingEmp}
+                    onStartMove={onStartMove}
+                    onTargetSelect={onTargetSelect}
+                    canManage={canManage}
+                    allEmps={allEmps}
                   />
                 </View>
               );
@@ -565,10 +976,18 @@ function OrgListView({
   emps,
   onSelect,
   highlighted,
+  movingEmp,
+  onStartMove,
+  onTargetSelect,
+  canManage,
 }: {
   emps: UserProfile[];
   onSelect: (e: UserProfile) => void;
   highlighted: Set<string> | null;
+  movingEmp?: UserProfile | null;
+  onStartMove?: (e: UserProfile) => void;
+  onTargetSelect?: (target: UserProfile) => void;
+  canManage?: boolean;
 }) {
   const managerMap = useMemo(() => {
     const map = new Map<string, string>();
@@ -587,15 +1006,39 @@ function OrgListView({
         const dimmed = highlighted !== null && !isHighlighted;
         const mgrName = emp.parentId ? managerMap.get(emp.parentId) : undefined;
 
+        const isMoving = movingEmp?.uid === emp.uid;
+        const isDesc = movingEmp ? isDescendant(movingEmp.uid, emp.uid, emps) : false;
+        const isValidTarget = Boolean(movingEmp && !isMoving && !isDesc);
+        const isInvalidTarget = Boolean(movingEmp && !isMoving && isDesc);
+
         return (
           <Pressable
             key={emp.uid}
-            onPress={() => onSelect(emp)}
+            onPress={() => {
+              if (movingEmp) {
+                if (isValidTarget && onTargetSelect) {
+                  onTargetSelect(emp);
+                } else if (isInvalidTarget) {
+                  Alert.alert("Không thể gán", "Không thể gán nhân sự này vào cấp dưới của chính họ.");
+                }
+              } else {
+                onSelect(emp);
+              }
+            }}
+            onLongPress={() => {
+              if (canManage && onStartMove && !movingEmp) {
+                onStartMove(emp);
+              }
+            }}
+            delayLongPress={300}
             style={[
               s.listCard,
               { borderLeftColor: cat.color },
               isHighlighted && s.cardHighlighted,
               dimmed && s.cardDimmed,
+              isMoving && s.cardMoving,
+              isValidTarget && s.cardDropTarget,
+              isInvalidTarget && s.cardDisabledTarget,
             ]}
           >
             <Avatar
@@ -613,6 +1056,16 @@ function OrgListView({
                     <Text style={s.leaderText}>👑</Text>
                   </View>
                 )}
+                {isMoving && (
+                  <View style={[s.leaderBadge, { backgroundColor: "#6366f1" }]}>
+                    <Text style={s.leaderText}>🔄 ĐANG CHUYỂN</Text>
+                  </View>
+                )}
+                {isValidTarget && (
+                  <View style={[s.leaderBadge, { backgroundColor: "#10b981" }]}>
+                    <Text style={s.leaderText}>📥 GÁN LÀM QUẢN LÝ</Text>
+                  </View>
+                )}
               </View>
               <Text style={s.listEmpRole}>
                 {roleIcon} {emp.jobTitle || roleBadge(emp.role).label}
@@ -626,15 +1079,18 @@ function OrgListView({
               <View style={[s.catBadge, { backgroundColor: cat.bg }]}>
                 <Text style={[s.catBadgeText, { color: cat.text }]}>{cat.badge}</Text>
               </View>
-              {!!emp.phone && (
-                <Pressable
-                  hitSlop={8}
-                  style={s.listCallBtn}
-                  onPress={() => void Linking.openURL(`tel:${emp.phone}`)}
-                >
-                  <Text style={{ fontSize: 13 }}>📞</Text>
-                </Pressable>
-              )}
+              <Pressable
+                hitSlop={8}
+                style={s.listCallBtn}
+                onPress={() => {
+                  router.push({
+                    pathname: "/(tabs)/chat",
+                    params: { peerId: emp.uid, name: emp.displayName || emp.email },
+                  } as any);
+                }}
+              >
+                <Text style={{ fontSize: 13 }}>💬</Text>
+              </Pressable>
             </View>
           </Pressable>
         );
@@ -657,18 +1113,71 @@ export default function OrgChart() {
   const [search, setSearch] = useState("");
   const [collapsed, setCollapsed] = useState<Set<string>>(new Set());
   const [selected, setSelected] = useState<UserProfile | null>(null);
+  const [editingEmp, setEditingEmp] = useState<UserProfile | null>(null);
+  const [movingEmp, setMovingEmp] = useState<UserProfile | null>(null);
   const [viewMode, setViewMode] = useState<"tree" | "list">("tree");
   const [zoomScale, setZoomScale] = useState<number>(1.0);
+  const [createModalVisible, setCreateModalVisible] = useState(false);
+  const [deptList, setDeptList] = useState<DepartmentRecord[]>([]);
+  const [branchList, setBranchList] = useState<BranchRecord[]>([]);
+  const canManage =
+    ["admin", "superadmin", "branch_owner", "manager"].includes(user?.role || "") ||
+    hasPermission(user, "user:manage");
+
+  // Multi-touch pinch-to-zoom tracking
+  const pinchStartDistRef = React.useRef<number | null>(null);
+  const pinchStartScaleRef = React.useRef<number>(1.0);
+
+  const handleTouchStart = (e: any) => {
+    if (e.nativeEvent.touches && e.nativeEvent.touches.length === 2) {
+      const [t1, t2] = e.nativeEvent.touches;
+      const dist = Math.hypot(t1.pageX - t2.pageX, t1.pageY - t2.pageY);
+      pinchStartDistRef.current = dist;
+      pinchStartScaleRef.current = zoomScale;
+    }
+  };
+
+  const handleTouchMove = (e: any) => {
+    if (e.nativeEvent.touches && e.nativeEvent.touches.length === 2 && pinchStartDistRef.current) {
+      const [t1, t2] = e.nativeEvent.touches;
+      const currentDist = Math.hypot(t1.pageX - t2.pageX, t1.pageY - t2.pageY);
+      const ratio = currentDist / pinchStartDistRef.current;
+      const newScale = Math.min(2.0, Math.max(0.35, Number((pinchStartScaleRef.current * ratio).toFixed(2))));
+      setZoomScale(newScale);
+    }
+  };
+
+  const handleTouchEnd = () => {
+    pinchStartDistRef.current = null;
+  };
+
+  const handleCreateUser = async (data: CreateUserInput) => {
+    try {
+      await userManagementApi.createUser(data);
+      Alert.alert("Thành công", "Đã thêm nhân sự mới vào hệ thống.");
+      setCreateModalVisible(false);
+      setRevision((v) => v + 1);
+    } catch (err: any) {
+      Alert.alert("Lỗi", err?.message || "Không thể tạo tài khoản nhân sự.");
+    }
+  };
 
   useFocusEffect(
     useCallback(() => {
       let active = true;
       setLoading(true);
       setError(null);
-      roster
-        .list(user?.companyCode ?? "", branchId)
-        .then((emps) => {
-          if (active) setEmpList(emps);
+      Promise.all([
+        roster.list(user?.companyCode ?? "", branchId),
+        departmentService.list().catch(() => []),
+        branchService.list().catch(() => []),
+      ])
+        .then(([emps, depts, brs]) => {
+          if (active) {
+            setEmpList(emps);
+            setDeptList(depts);
+            setBranchList(brs);
+          }
         })
         .catch((e) => {
           if (active) setError(messageOf(e));
@@ -721,16 +1230,86 @@ export default function OrgChart() {
   }
 
   function zoomIn() {
-    setZoomScale((z) => Math.min(1.3, Number((z + 0.15).toFixed(2))));
+    setZoomScale((z) => Math.min(2.0, Number((z + 0.15).toFixed(2))));
   }
 
   function zoomOut() {
-    setZoomScale((z) => Math.max(0.6, Number((z - 0.15).toFixed(2))));
+    setZoomScale((z) => Math.max(0.35, Number((z - 0.15).toFixed(2))));
   }
 
   function zoomReset() {
     setZoomScale(1.0);
   }
+
+  function zoomFit() {
+    setZoomScale(0.55);
+  }
+
+  const handleConfirmMove = (target: UserProfile | null) => {
+    if (!movingEmp) return;
+    const empToMove = movingEmp;
+    if (target && isDescendant(empToMove.uid, target.uid, empList)) {
+      Alert.alert(
+        "Không thể gán",
+        "Không thể gán nhân sự này làm cấp dưới của người nằm trong nhánh dưới của chính họ."
+      );
+      return;
+    }
+
+    const targetName = target ? target.displayName : "Cấp cao nhất (Không có quản lý)";
+    Alert.alert(
+      "Xác nhận thay đổi quản lý",
+      `Bạn có chắc chắn muốn chuyển quản lý trực tiếp của "${empToMove.displayName}" thành "${targetName}"?`,
+      [
+        { text: "Hủy", style: "cancel" },
+        {
+          text: "Đồng ý",
+          style: "default",
+          onPress: async () => {
+            const newParentId = target ? target.uid : "";
+            try {
+              setLoading(true);
+              await Promise.all([
+                roster.update(empToMove.uid, { parentId: newParentId } as any).catch(() => null),
+                userManagementApi.updateUser(empToMove.uid, { parentId: newParentId }),
+              ]);
+              setEmpList((prev) =>
+                prev.map((e) => (e.uid === empToMove.uid ? { ...e, parentId: newParentId } : e))
+              );
+              setRevision((v) => v + 1);
+              Alert.alert("Thành công", `Đã cập nhật quản lý trực tiếp cho ${empToMove.displayName}.`);
+            } catch (err: any) {
+              Alert.alert("Lỗi", err?.message || "Không thể cập nhật quản lý trực tiếp.");
+            } finally {
+              setLoading(false);
+              setMovingEmp(null);
+            }
+          },
+        },
+      ]
+    );
+  };
+
+  const handleSaveEdit = async (uid: string, draft: Partial<UserProfile>) => {
+    try {
+      await Promise.all([
+        roster.update(uid, draft as any).catch(() => null),
+        userManagementApi.updateUser(uid, draft as any),
+      ]);
+      setEmpList((prev) =>
+        prev.map((e) => (e.uid === uid ? { ...e, ...draft } : e))
+      );
+      setRevision((v) => v + 1);
+      if (selected?.uid === uid) {
+        setSelected((prev) => (prev ? { ...prev, ...draft } : null));
+      }
+      Alert.alert("Thành công", "Đã cập nhật thông tin nhân sự.");
+      setEditingEmp(null);
+    } catch (err: any) {
+      Alert.alert("Lỗi", err?.message || "Không thể lưu thông tin nhân sự.");
+      throw err;
+    }
+  };
 
   const Header = () => (
     <View style={s.header}>
@@ -776,6 +1355,12 @@ export default function OrgChart() {
         </Pressable>
       </View>
 
+      {canManage && (
+        <Pressable style={s.addBtn} onPress={() => setCreateModalVisible(true)}>
+          <Text style={s.addBtnText}>+ Thêm</Text>
+        </Pressable>
+      )}
+
       <Pressable style={s.iconBtn} onPress={() => setRevision((v) => v + 1)}>
         <Text style={{ fontSize: 17 }}>↺</Text>
       </Pressable>
@@ -811,6 +1396,30 @@ export default function OrgChart() {
   return (
     <SafeAreaView edges={["top"]} style={s.root}>
       <Header />
+
+      {/* Drag & Drop Sticky Banner */}
+      {movingEmp && (
+        <View style={s.dragBanner}>
+          <View style={s.dragBannerRow}>
+            <View style={{ flex: 1 }}>
+              <Text style={s.dragBannerTitle} numberOfLines={1}>
+                🔄 Đổi quản lý cho: {movingEmp.displayName}
+              </Text>
+              <Text style={s.dragBannerSub}>
+                Nhấn thẻ nhân viên để gán làm quản lý mới, hoặc gán làm Cấp cao nhất
+              </Text>
+            </View>
+            <View style={s.dragBannerActions}>
+              <Pressable style={s.dragRootBtn} onPress={() => handleConfirmMove(null)}>
+                <Text style={s.dragRootBtnText}>👑 Cấp cao nhất</Text>
+              </Pressable>
+              <Pressable style={s.dragCancelBtn} onPress={() => setMovingEmp(null)}>
+                <Text style={s.dragCancelBtnText}>✕ Hủy</Text>
+              </Pressable>
+            </View>
+          </View>
+        </View>
+      )}
 
       {/* Control Toolbar: Search + Quick Expand/Collapse + Zoom */}
       <View style={s.toolbar}>
@@ -851,6 +1460,9 @@ export default function OrgChart() {
               <Pressable style={s.zoomBtn} onPress={zoomIn}>
                 <Text style={s.zoomBtnTxt}>+</Text>
               </Pressable>
+              <Pressable style={s.floatingFitBtn} onPress={zoomFit}>
+                <Text style={s.floatingFitBtnTxt}>Fit</Text>
+              </Pressable>
             </View>
           </View>
         )}
@@ -858,50 +1470,81 @@ export default function OrgChart() {
 
       {/* Main Content Area */}
       {viewMode === "list" ? (
-        <OrgListView emps={empList} onSelect={setSelected} highlighted={highlighted} />
+        <OrgListView
+          emps={empList}
+          onSelect={setSelected}
+          highlighted={highlighted}
+          movingEmp={movingEmp}
+          onStartMove={(e) => setMovingEmp(e)}
+          onTargetSelect={(target) => handleConfirmMove(target)}
+          canManage={canManage}
+        />
       ) : (
-        /* 2D Scrollable Interactive Tree Canvas */
-        <ScrollView
-          style={{ flex: 1 }}
-          contentContainerStyle={s.verticalScroll}
-          showsVerticalScrollIndicator={true}
-        >
+        /* 2D Scrollable Interactive Tree Canvas with Pinch Zoom */
+        <View style={{ flex: 1 }} onTouchStart={handleTouchStart} onTouchMove={handleTouchMove} onTouchEnd={handleTouchEnd}>
           <ScrollView
-            horizontal
-            showsHorizontalScrollIndicator={true}
-            contentContainerStyle={s.horizontalScroll}
+            style={{ flex: 1 }}
+            contentContainerStyle={s.verticalScroll}
+            showsVerticalScrollIndicator={true}
           >
-            {tree.length === 0 ? (
-              <View style={s.emptyBox}>
-                <Text style={{ fontSize: 36, marginBottom: 8 }}>👥</Text>
-                <Text style={s.emptyTitle}>Chưa có dữ liệu cơ cấu nhân sự</Text>
-                <Text style={s.emptySub}>Vui lòng kiểm tra phân quyền hoặc danh sách nhân viên</Text>
-              </View>
-            ) : (
-              <View
-                style={[
-                  s.treeCanvas,
-                  {
-                    transform: [{ scale: zoomScale }],
-                  },
-                ]}
-              >
-                <View style={s.rootRow}>
-                  {tree.map((rootNode) => (
-                    <TreeBranchView
-                      key={rootNode.emp.uid}
-                      node={rootNode}
-                      onSelect={setSelected}
-                      collapsed={collapsed}
-                      toggleCollapse={toggle}
-                      highlighted={highlighted}
-                    />
-                  ))}
+            <ScrollView
+              horizontal
+              showsHorizontalScrollIndicator={true}
+              contentContainerStyle={s.horizontalScroll}
+            >
+              {tree.length === 0 ? (
+                <View style={s.emptyBox}>
+                  <Text style={{ fontSize: 36, marginBottom: 8 }}>👥</Text>
+                  <Text style={s.emptyTitle}>Chưa có dữ liệu cơ cấu nhân sự</Text>
+                  <Text style={s.emptySub}>Vui lòng kiểm tra phân quyền hoặc danh sách nhân viên</Text>
                 </View>
-              </View>
-            )}
+              ) : (
+                <View
+                  style={[
+                    s.treeCanvas,
+                    {
+                      transform: [{ scale: zoomScale }],
+                    },
+                  ]}
+                >
+                  <View style={s.rootRow}>
+                    {tree.map((rootNode) => (
+                      <TreeBranchView
+                        key={rootNode.emp.uid}
+                        node={rootNode}
+                        onSelect={setSelected}
+                        collapsed={collapsed}
+                        toggleCollapse={toggle}
+                        highlighted={highlighted}
+                        movingEmp={movingEmp}
+                        onStartMove={(e) => setMovingEmp(e)}
+                        onTargetSelect={(target) => handleConfirmMove(target)}
+                        canManage={canManage}
+                        allEmps={empList}
+                      />
+                    ))}
+                  </View>
+                </View>
+              )}
+            </ScrollView>
           </ScrollView>
-        </ScrollView>
+
+          {/* Floating Zoom Action Controls (FAB) */}
+          <View style={s.floatingZoomBar}>
+            <Pressable style={s.floatingZoomBtn} onPress={zoomIn}>
+              <Text style={s.floatingZoomBtnTxt}>+</Text>
+            </Pressable>
+            <Pressable style={s.floatingZoomLabelBtn} onPress={zoomReset}>
+              <Text style={s.floatingZoomLabelTxt}>{Math.round(zoomScale * 100)}%</Text>
+            </Pressable>
+            <Pressable style={s.floatingZoomBtn} onPress={zoomOut}>
+              <Text style={s.floatingZoomBtnTxt}>−</Text>
+            </Pressable>
+            <Pressable style={s.floatingFitBtn} onPress={zoomFit}>
+              <Text style={s.floatingFitBtnTxt}>Fit</Text>
+            </Pressable>
+          </View>
+        </View>
       )}
 
       {/* Employee Profile Details Modal */}
@@ -909,6 +1552,34 @@ export default function OrgChart() {
         emp={selected}
         managerName={managerName}
         onClose={() => setSelected(null)}
+        canManage={canManage}
+        onEdit={(e) => setEditingEmp(e)}
+        onStartMove={(e) => setMovingEmp(e)}
+      />
+
+      {/* Employee Information Edit Modal */}
+      {editingEmp && (
+        <OrgEditModal
+          visible={!!editingEmp}
+          emp={editingEmp}
+          empList={empList}
+          departments={deptList}
+          onClose={() => setEditingEmp(null)}
+          onSave={handleSaveEdit}
+        />
+      )}
+
+      {/* Create New Employee Modal */}
+      <UserCreateModal
+        visible={createModalVisible}
+        onClose={() => setCreateModalVisible(false)}
+        onSubmit={handleCreateUser}
+        branches={branchList}
+        departments={deptList.map((d) => ({ id: (d as any).id || d._id, name: d.name, code: d.code }))}
+        defaultBranchId={selectedBranch?._id || user?.branchId}
+        companyCode={user?.companyCode}
+        companyName={user?.companyName}
+        managers={empList}
       />
     </SafeAreaView>
   );
@@ -939,6 +1610,19 @@ const s = StyleSheet.create({
   },
   title: { fontSize: 17, fontWeight: "800", color: "#0f172a", letterSpacing: -0.3 },
   subtitle: { fontSize: 11, color: "#64748b", marginTop: 1 },
+  addBtn: {
+    backgroundColor: "#059669",
+    paddingHorizontal: 10,
+    paddingVertical: 6,
+    borderRadius: 8,
+    alignItems: "center",
+    justifyContent: "center",
+  },
+  addBtnText: {
+    color: "#ffffff",
+    fontSize: 12,
+    fontWeight: "700",
+  },
 
   viewToggleContainer: {
     flexDirection: "row",
@@ -1019,6 +1703,118 @@ const s = StyleSheet.create({
     paddingVertical: 3,
   },
   zoomLabelTxt: { fontSize: 10, fontWeight: "700", color: "#475569" },
+
+  /* Floating Zoom Controls */
+  floatingZoomBar: {
+    position: "absolute",
+    right: 16,
+    bottom: 24,
+    backgroundColor: "#ffffff",
+    borderRadius: 12,
+    borderWidth: 1,
+    borderColor: "#cbd5e1",
+    flexDirection: "column",
+    alignItems: "center",
+    shadowColor: "#0f172a",
+    shadowOffset: { width: 0, height: 4 },
+    shadowOpacity: 0.15,
+    shadowRadius: 8,
+    elevation: 6,
+    overflow: "hidden",
+  },
+  floatingZoomBtn: {
+    width: 38,
+    height: 36,
+    alignItems: "center",
+    justifyContent: "center",
+    backgroundColor: "#ffffff",
+  },
+  floatingZoomBtnTxt: {
+    fontSize: 18,
+    fontWeight: "800",
+    color: "#334155",
+  },
+  floatingZoomLabelBtn: {
+    width: 38,
+    height: 28,
+    alignItems: "center",
+    justifyContent: "center",
+    backgroundColor: "#f1f5f9",
+    borderTopWidth: 1,
+    borderBottomWidth: 1,
+    borderColor: "#e2e8f0",
+  },
+  floatingZoomLabelTxt: {
+    fontSize: 9,
+    fontWeight: "700",
+    color: "#475569",
+  },
+  floatingFitBtn: {
+    width: 38,
+    height: 28,
+    alignItems: "center",
+    justifyContent: "center",
+    backgroundColor: "#eef2ff",
+    borderTopWidth: 1,
+    borderColor: "#c7d2fe",
+  },
+  floatingFitBtnTxt: {
+    fontSize: 10,
+    fontWeight: "800",
+    color: "#4f46e5",
+  },
+
+  /* Drag & Drop / Reassign Mode Banner */
+  dragBanner: {
+    backgroundColor: "#eff6ff",
+    borderBottomWidth: 2,
+    borderBottomColor: "#3b82f6",
+    paddingHorizontal: 12,
+    paddingVertical: 8,
+  },
+  dragBannerRow: {
+    flexDirection: "row",
+    alignItems: "center",
+    justifyContent: "space-between",
+    gap: 8,
+  },
+  dragBannerTitle: {
+    fontSize: 12,
+    fontWeight: "800",
+    color: "#1d4ed8",
+  },
+  dragBannerSub: {
+    fontSize: 10,
+    color: "#3b82f6",
+    marginTop: 2,
+  },
+  dragBannerActions: {
+    flexDirection: "row",
+    alignItems: "center",
+    gap: 6,
+  },
+  dragRootBtn: {
+    backgroundColor: "#f59e0b",
+    paddingHorizontal: 8,
+    paddingVertical: 5,
+    borderRadius: 6,
+  },
+  dragRootBtnText: {
+    color: "#ffffff",
+    fontSize: 10,
+    fontWeight: "800",
+  },
+  dragCancelBtn: {
+    backgroundColor: "#64748b",
+    paddingHorizontal: 8,
+    paddingVertical: 5,
+    borderRadius: 6,
+  },
+  dragCancelBtnText: {
+    color: "#ffffff",
+    fontSize: 10,
+    fontWeight: "700",
+  },
 
   /* 2D Tree Canvas */
   verticalScroll: { flexGrow: 1 },
@@ -1103,6 +1899,57 @@ const s = StyleSheet.create({
   },
   cardDimmed: {
     opacity: 0.25,
+  },
+  cardMoving: {
+    borderColor: "#6366f1",
+    borderWidth: 2,
+    backgroundColor: "#f5f3ff",
+    shadowColor: "#6366f1",
+    shadowOpacity: 0.35,
+    shadowRadius: 10,
+    elevation: 5,
+  },
+  cardMovingBadge: {
+    position: "absolute",
+    top: -12,
+    left: 8,
+    backgroundColor: "#6366f1",
+    paddingHorizontal: 6,
+    paddingVertical: 2,
+    borderRadius: 6,
+    zIndex: 10,
+  },
+  cardMovingBadgeText: {
+    color: "#ffffff",
+    fontSize: 9,
+    fontWeight: "800",
+  },
+  cardDropTarget: {
+    borderColor: "#10b981",
+    borderWidth: 2,
+    backgroundColor: "#ecfdf5",
+    shadowColor: "#10b981",
+    shadowOpacity: 0.3,
+    shadowRadius: 8,
+    elevation: 4,
+  },
+  cardDropBadge: {
+    position: "absolute",
+    top: -12,
+    right: 8,
+    backgroundColor: "#10b981",
+    paddingHorizontal: 6,
+    paddingVertical: 2,
+    borderRadius: 6,
+    zIndex: 10,
+  },
+  cardDropBadgeText: {
+    color: "#ffffff",
+    fontSize: 9,
+    fontWeight: "800",
+  },
+  cardDisabledTarget: {
+    opacity: 0.3,
   },
   cardTopRow: {
     flexDirection: "row",
@@ -1303,6 +2150,197 @@ const s = StyleSheet.create({
   },
   actionIco: { fontSize: 20 },
   actionLbl: { fontSize: 12, fontWeight: "700", color: "#475569" },
+
+  /* Org Edit Modal Styles */
+  editModalOverlay: {
+    flex: 1,
+    backgroundColor: "rgba(15,23,42,0.5)",
+    justifyContent: "flex-end",
+  },
+  editContainer: {
+    backgroundColor: "#ffffff",
+    borderTopLeftRadius: 20,
+    borderTopRightRadius: 20,
+    maxHeight: "92%",
+    flex: 1,
+    display: "flex",
+  },
+  editHeader: {
+    flexDirection: "row",
+    alignItems: "center",
+    justifyContent: "space-between",
+    paddingHorizontal: 18,
+    paddingVertical: 14,
+    borderBottomWidth: 1,
+    borderBottomColor: "#f1f5f9",
+  },
+  editHeaderTitle: {
+    fontSize: 17,
+    fontWeight: "800",
+    color: "#0f172a",
+  },
+  editHeaderSub: {
+    fontSize: 12,
+    color: "#64748b",
+    marginTop: 2,
+  },
+  editCloseBtn: {
+    width: 32,
+    height: 32,
+    borderRadius: 16,
+    backgroundColor: "#f1f5f9",
+    alignItems: "center",
+    justifyContent: "center",
+  },
+  editScroll: {
+    flex: 1,
+  },
+  editScrollContent: {
+    paddingHorizontal: 18,
+    paddingVertical: 14,
+    gap: 12,
+  },
+  formGroup: {
+    gap: 4,
+  },
+  formLabel: {
+    fontSize: 12,
+    fontWeight: "700",
+    color: "#334155",
+  },
+  formInput: {
+    backgroundColor: "#f8fafc",
+    borderWidth: 1,
+    borderColor: "#e2e8f0",
+    borderRadius: 10,
+    paddingHorizontal: 12,
+    paddingVertical: 9,
+    fontSize: 13,
+    color: "#0f172a",
+  },
+  formLeaderRow: {
+    flexDirection: "row",
+    alignItems: "center",
+    justifyContent: "space-between",
+    backgroundColor: "#fffbeb",
+    borderWidth: 1,
+    borderColor: "#fde68a",
+    borderRadius: 10,
+    padding: 12,
+    gap: 8,
+  },
+  formLeaderLabel: {
+    fontSize: 12,
+    fontWeight: "800",
+    color: "#92400e",
+  },
+  formLeaderSub: {
+    fontSize: 10,
+    color: "#b45309",
+    marginTop: 2,
+  },
+  leaderToggle: {
+    backgroundColor: "#cbd5e1",
+    paddingHorizontal: 12,
+    paddingVertical: 6,
+    borderRadius: 8,
+  },
+  leaderToggleActive: {
+    backgroundColor: "#f59e0b",
+  },
+  leaderToggleText: {
+    fontSize: 11,
+    fontWeight: "800",
+    color: "#475569",
+  },
+  leaderToggleTextActive: {
+    color: "#ffffff",
+  },
+  salaryPreviewText: {
+    fontSize: 11,
+    fontWeight: "700",
+    color: "#059669",
+    marginTop: 2,
+  },
+  editFooter: {
+    flexDirection: "row",
+    gap: 10,
+    paddingHorizontal: 18,
+    paddingVertical: 12,
+    borderTopWidth: 1,
+    borderTopColor: "#f1f5f9",
+    backgroundColor: "#ffffff",
+  },
+  editCancelBtn: {
+    flex: 1,
+    paddingVertical: 11,
+    borderRadius: 10,
+    borderWidth: 1,
+    borderColor: "#e2e8f0",
+    alignItems: "center",
+    justifyContent: "center",
+    backgroundColor: "#f8fafc",
+  },
+  editCancelBtnTxt: {
+    fontSize: 13,
+    fontWeight: "700",
+    color: "#64748b",
+  },
+  editSaveBtn: {
+    flex: 2,
+    paddingVertical: 11,
+    borderRadius: 10,
+    backgroundColor: "#4f46e5",
+    alignItems: "center",
+    justifyContent: "center",
+  },
+  editSaveBtnTxt: {
+    fontSize: 13,
+    fontWeight: "700",
+    color: "#ffffff",
+  },
+
+  /* Inner Dropdown / Pickers */
+  pickerBackdrop: {
+    flex: 1,
+    backgroundColor: "rgba(15,23,42,0.45)",
+    justifyContent: "center",
+    padding: 20,
+  },
+  pickerCard: {
+    backgroundColor: "#ffffff",
+    borderRadius: 16,
+    padding: 16,
+    maxHeight: 380,
+  },
+  pickerTitle: {
+    fontSize: 15,
+    fontWeight: "800",
+    color: "#0f172a",
+    marginBottom: 12,
+  },
+  pickerItem: {
+    paddingVertical: 10,
+    paddingHorizontal: 12,
+    borderRadius: 8,
+  },
+  pickerItemActive: {
+    backgroundColor: "#eff6ff",
+  },
+  pickerItemText: {
+    fontSize: 13,
+    color: "#334155",
+    fontWeight: "600",
+  },
+  pickerItemTextActive: {
+    color: "#2563eb",
+    fontWeight: "800",
+  },
+  pickerSubText: {
+    fontSize: 11,
+    color: "#64748b",
+    marginTop: 1,
+  },
 
   /* Center / Empty states */
   centerBox: {

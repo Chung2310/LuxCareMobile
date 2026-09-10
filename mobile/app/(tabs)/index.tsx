@@ -23,12 +23,12 @@ import type {
 import type { DashboardSummaryParams } from "../../../src/services/dashboardService";
 import { dashboard } from "../../src/api/services";
 import { messageOf, useSession } from "../../src/auth/SessionProvider";
-import { colors } from "../../src/ui";
 import { canUseModule } from "../../src/auth/access";
 import { useAppLoading } from "../../src/context/LoadingContext";
 import { DashboardOverviewSection } from "../../src/components/dashboard";
-import { getAllServicesFlat, LUXCARE_MODULES } from "../../src/components";
+import { getAllServicesFlat, isServiceAccessible, LUXCARE_MODULES } from "../../src/components";
 import { isBlogEditorUser } from "../../../src/utils/permissionUtils";
+import { BranchSelector } from "../../src/features/branches/BranchSelector";
 
 const { width: SCREEN_WIDTH } = Dimensions.get("window");
 
@@ -46,6 +46,7 @@ interface LuxCareFeature {
 export default function Home() {
   const { user, selectedBranch } = useSession();
   const { navigateWithLoading } = useAppLoading();
+  const isOwner = ["admin", "superadmin", "branch_owner"].includes(user?.role || "");
   const isEditor = isBlogEditorUser(user);
 
   if (isEditor) {
@@ -197,16 +198,16 @@ export default function Home() {
         bgColor: "#eef2ff",
         route: "/(tabs)/modules",
       },
-    ],
-    [actions],
+    ].filter((item) => item.id === "modules" || isServiceAccessible(item as any, user)) as LuxCareFeature[],
+    [actions, user],
   );
 
-  // Danh sách toàn bộ các tính năng để tìm kiếm toàn diện
-  const allServicesFlat = useMemo(() => getAllServicesFlat(LUXCARE_MODULES), []);
+  // Danh sách toàn bộ các tính năng để tìm kiếm toàn diện (đã lọc quyền)
+  const allServicesFlat = useMemo(() => getAllServicesFlat(LUXCARE_MODULES, user), [user]);
 
   const isSearching = searchQuery.trim().length > 0;
 
-  // Lọc theo tìm kiếm: Nếu không tìm kiếm -> hiển thị 8 dịch vụ chính; Nếu đang tìm kiếm -> quét toàn bộ chức năng
+  // Lọc theo tìm kiếm: Nếu không tìm kiếm -> hiển thị các dịch vụ chính được phép; Nếu đang tìm kiếm -> quét toàn bộ chức năng được phép
   const visibleServices = useMemo(() => {
     if (!isSearching) return luxcareServices;
     const q = searchQuery.toLowerCase().trim();
@@ -218,39 +219,43 @@ export default function Home() {
     );
   }, [allServicesFlat, isSearching, luxcareServices, searchQuery]);
 
-  // 4 Icon LuxCare Đề Xuất
-  const luxcareRecommendations = [
-    {
-      id: "overdue",
-      title: "Việc gấp\nquá hạn",
-      icon: "alert-circle",
-      color: "#dc2626",
-      route: "/(tabs)/work",
-      badge: actions?.overdueTasks.length ? `${actions.overdueTasks.length}` : undefined,
-    },
-    {
-      id: "leave-pending",
-      title: "Đơn chờ\nxét duyệt",
-      icon: "file-tray-full",
-      color: "#0d9488",
-      route: "/(tabs)/leave",
-      badge: actions?.pendingApprovals.length ? `${actions.pendingApprovals.length}` : undefined,
-    },
-    {
-      id: "projects",
-      title: "Dự án\nđang chạy",
-      icon: "git-network",
-      color: "#0284c7",
-      route: "/(tabs)/projects",
-    },
-    {
-      id: "payslip",
-      title: "Bảng lương",
-      icon: "newspaper",
-      color: "#059669",
-      route: "/(tabs)/payslips",
-    },
-  ];
+  // 4 Icon LuxCare Đề Xuất (đã lọc theo quyền)
+  const luxcareRecommendations = useMemo(
+    () =>
+      [
+        {
+          id: "overdue",
+          title: "Việc gấp\nquá hạn",
+          icon: "alert-circle",
+          color: "#dc2626",
+          route: "/(tabs)/work",
+          badge: actions?.overdueTasks.length ? `${actions.overdueTasks.length}` : undefined,
+        },
+        {
+          id: "leave-pending",
+          title: "Đơn chờ\nxét duyệt",
+          icon: "file-tray-full",
+          color: "#0d9488",
+          route: "/(tabs)/leave",
+          badge: actions?.pendingApprovals.length ? `${actions.pendingApprovals.length}` : undefined,
+        },
+        {
+          id: "projects",
+          title: "Dự án\nđang chạy",
+          icon: "git-network",
+          color: "#0284c7",
+          route: "/(tabs)/projects",
+        },
+        {
+          id: "payslip",
+          title: "Bảng lương",
+          icon: "newspaper",
+          color: "#059669",
+          route: "/(tabs)/payslips",
+        },
+      ].filter((item) => isServiceAccessible(item as any, user)),
+    [actions, user],
+  );
 
   const pendingCount = (actions?.overdueTasks.length || 0) + (actions?.pendingApprovals.length || 0);
 
@@ -343,6 +348,33 @@ export default function Home() {
                 <Text style={uiStyles.greetingSubText}>{typedText}</Text>
                 <Animated.Text style={[uiStyles.greetingCursor, { opacity: cursorOpacity }]}>|</Animated.Text>
               </View>
+
+              {/* Branch Selector for Business Owners */}
+              {isOwner && (
+                <View style={{ marginTop: 8 }}>
+                  <BranchSelector
+                    renderCustomTrigger={(open) => (
+                      <Pressable
+                        style={uiStyles.homeBranchSelector}
+                        onPress={open}
+                        accessibilityRole="button"
+                        accessibilityLabel="Chọn chi nhánh xem dữ liệu"
+                      >
+                        <View style={uiStyles.homeBranchLeft}>
+                          <Ionicons name="business" size={13} color="#047857" />
+                          <Text style={uiStyles.homeBranchLabel}>Chi nhánh:</Text>
+                          <Text style={uiStyles.homeBranchName} numberOfLines={1}>
+                            {selectedBranch?.name || "Toàn hệ thống (Tất cả chi nhánh)"}
+                          </Text>
+                        </View>
+                        <View style={uiStyles.homeBranchChevron}>
+                          <Ionicons name="chevron-down" size={12} color="#047857" />
+                        </View>
+                      </Pressable>
+                    )}
+                  />
+                </View>
+              )}
             </ImageBackground>
 
             {/* Hàng 4 nút Thao tác nhanh (Chấm công, Nộp đơn, Việc tôi, Phiếu lương) */}
@@ -755,6 +787,48 @@ const uiStyles = StyleSheet.create({
     borderRadius: 20,
     borderWidth: 1,
     borderColor: "rgba(5, 150, 105, 0.2)",
+  },
+  homeBranchSelector: {
+    flexDirection: "row",
+    alignItems: "center",
+    justifyContent: "space-between",
+    backgroundColor: "rgba(255, 255, 255, 0.94)",
+    paddingHorizontal: 12,
+    paddingVertical: 8,
+    borderRadius: 12,
+    borderWidth: 1,
+    borderColor: "rgba(5, 150, 105, 0.25)",
+    shadowColor: "#059669",
+    shadowOffset: { width: 0, height: 2 },
+    shadowOpacity: 0.08,
+    shadowRadius: 4,
+    elevation: 2,
+  },
+  homeBranchLeft: {
+    flexDirection: "row",
+    alignItems: "center",
+    gap: 6,
+    flex: 1,
+  },
+  homeBranchLabel: {
+    fontSize: 11,
+    fontWeight: "600",
+    color: "#047857",
+  },
+  homeBranchName: {
+    fontSize: 12,
+    fontWeight: "800",
+    color: "#065f46",
+    flex: 1,
+  },
+  homeBranchChevron: {
+    width: 20,
+    height: 20,
+    borderRadius: 10,
+    backgroundColor: "rgba(5, 150, 105, 0.12)",
+    alignItems: "center",
+    justifyContent: "center",
+    marginLeft: 6,
   },
   greetingDateText: {
     fontSize: 11,
