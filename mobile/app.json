@@ -58,7 +58,8 @@
           "cameraPermission": "LuxCare cần quyền truy cập máy ảnh để chụp ảnh đại diện."
         }
       ],
-      "expo-font"
+      "expo-font",
+      "expo-video"
     ]
   }
 }

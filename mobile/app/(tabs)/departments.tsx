@@ -38,6 +38,7 @@ function getCodePalette(code: string) {
   const index = Math.abs(hash) % CODE_PALETTES.length;
   return CODE_PALETTES[index];
 }
+
 export default function Departments() {
   const { user } = useSession();
   const canManage = ["admin", "superadmin"].includes(user?.role || "");

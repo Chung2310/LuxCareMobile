@@ -19,6 +19,7 @@ import {
 import { router, useFocusEffect } from "expo-router";
 import { SafeAreaView } from "react-native-safe-area-context";
 import { Ionicons, MaterialCommunityIcons } from "@expo/vector-icons";
+import Svg, { Circle, Path } from "react-native-svg";
 import * as ImagePicker from "expo-image-picker";
 import * as DocumentPicker from "expo-document-picker";
 import * as FileSystem from "expo-file-system";
@@ -27,6 +28,8 @@ import * as Linking from "expo-linking";
 import { DatePickerModal } from "../../src/features/credentials/DatePickerModal";
 import { EmptyState } from "../../src/ui";
 import { equipment, departments } from "../../src/api/services";
+import { useSession } from "../../src/auth/SessionProvider";
+import { hasPermission } from "../../../src/utils/permissionUtils";
 import type {
   EquipmentRecord,
   EquipmentSummary,
@@ -1877,8 +1880,660 @@ function DeleteConfirmModal({
   );
 }
 
+// ── Donut Chart Component ───────────────────────────────────────────────────
+interface ChartSlice {
+  label: string;
+  count: number;
+  color: string;
+  filter?: string;
+}
+
+function DonutChart({
+  items,
+  total,
+  size = 180,
+  strokeWidth = 26,
+}: {
+  items: ChartSlice[];
+  total: number;
+  size?: number;
+  strokeWidth?: number;
+}) {
+  const radius = (size - strokeWidth) / 2;
+  const center = size / 2;
+  const validItems = items.filter((i) => i.count > 0);
+  const sum = validItems.reduce((acc, i) => acc + i.count, 0) || total;
+
+  if (sum === 0) {
+    return (
+      <View style={{ width: size, height: size, alignItems: "center", justifyContent: "center" }}>
+        <Svg width={size} height={size}>
+          <Circle
+            cx={center}
+            cy={center}
+            r={radius}
+            stroke="#f1f5f9"
+            strokeWidth={strokeWidth}
+            fill="none"
+          />
+          <Circle
+            cx={center}
+            cy={center}
+            r={radius - strokeWidth / 2}
+            fill="#ffffff"
+          />
+        </Svg>
+        <View style={[StyleSheet.absoluteFill, { alignItems: "center", justifyContent: "center" }]}>
+          <Text style={{ fontSize: 11, color: "#64748b", fontFamily: "Inter-Medium" }}>Tổng số</Text>
+          <Text style={{ fontSize: 24, fontWeight: "800", color: "#0f172a", fontFamily: "Inter-Bold" }}>0</Text>
+          <Text style={{ fontSize: 11, color: "#64748b", fontFamily: "Inter-Regular" }}>thiết bị</Text>
+        </View>
+      </View>
+    );
+  }
+
+  if (validItems.length === 1) {
+    return (
+      <View style={{ width: size, height: size, alignItems: "center", justifyContent: "center" }}>
+        <Svg width={size} height={size}>
+          <Circle
+            cx={center}
+            cy={center}
+            r={radius}
+            stroke={validItems[0].color}
+            strokeWidth={strokeWidth}
+            fill="none"
+          />
+          <Circle
+            cx={center}
+            cy={center}
+            r={radius - strokeWidth / 2}
+            fill="#ffffff"
+          />
+        </Svg>
+        <View style={[StyleSheet.absoluteFill, { alignItems: "center", justifyContent: "center" }]}>
+          <Text style={{ fontSize: 11, color: "#64748b", fontFamily: "Inter-Medium" }}>Tổng số</Text>
+          <Text style={{ fontSize: 24, fontWeight: "800", color: "#0f172a", fontFamily: "Inter-Bold" }}>{total}</Text>
+          <Text style={{ fontSize: 11, color: "#64748b", fontFamily: "Inter-Regular" }}>thiết bị</Text>
+        </View>
+      </View>
+    );
+  }
+
+  let accumulatedAngle = 0;
+  const slices = validItems.map((item) => {
+    const percentage = item.count / sum;
+    const angle = percentage * 360;
+    const startAngle = accumulatedAngle;
+    accumulatedAngle += angle;
+    return {
+      ...item,
+      percentage,
+      startAngle,
+      endAngle: accumulatedAngle,
+    };
+  });
+
+  const polarToCartesian = (cx: number, cy: number, r: number, angleDeg: number) => {
+    const rad = ((angleDeg - 90) * Math.PI) / 180.0;
+    return {
+      x: cx + r * Math.cos(rad),
+      y: cy + r * Math.sin(rad),
+    };
+  };
+
+  const describeArc = (startAngle: number, endAngle: number) => {
+    const sweep = endAngle - startAngle;
+    const safeEnd = sweep >= 360 ? startAngle + 359.99 : endAngle;
+    const start = polarToCartesian(center, center, radius, safeEnd);
+    const end = polarToCartesian(center, center, radius, startAngle);
+    const largeArcFlag = sweep > 180 ? 1 : 0;
+    return `M ${start.x} ${start.y} A ${radius} ${radius} 0 ${largeArcFlag} 0 ${end.x} ${end.y}`;
+  };
+
+  return (
+    <View style={{ width: size, height: size, alignItems: "center", justifyContent: "center" }}>
+      <Svg width={size} height={size}>
+        {slices.map((slice, idx) => (
+          <Path
+            key={idx}
+            d={describeArc(slice.startAngle, slice.endAngle)}
+            stroke={slice.color}
+            strokeWidth={strokeWidth}
+            fill="none"
+          />
+        ))}
+        {/* White circle in the center */}
+        <Circle
+          cx={center}
+          cy={center}
+          r={radius - strokeWidth / 2}
+          fill="#ffffff"
+        />
+      </Svg>
+      <View style={[StyleSheet.absoluteFill, { alignItems: "center", justifyContent: "center" }]}>
+        <Text style={{ fontSize: 11, color: "#64748b", fontFamily: "Inter-Medium" }}>Tổng số</Text>
+        <Text style={{ fontSize: 24, fontWeight: "800", color: "#0f172a", fontFamily: "Inter-Bold" }}>{total}</Text>
+        <Text style={{ fontSize: 11, color: "#64748b", fontFamily: "Inter-Regular" }}>thiết bị</Text>
+      </View>
+    </View>
+  );
+}
+
+// ── Equipment Borrow & Return Modal ──────────────────────────────────────────
+function EquipmentBorrowReturnModal({
+  visible,
+  initialTab = "borrow",
+  equipmentList,
+  onClose,
+  onSaved,
+  showAlert,
+}: {
+  visible: boolean;
+  initialTab?: "borrow" | "return";
+  equipmentList: EquipmentRecord[];
+  onClose: () => void;
+  onSaved: (updatedItem?: EquipmentRecord, newReq?: EquipmentRequestRecord) => void;
+  showAlert: (title: string, message: string, type?: "error" | "warning" | "success" | "info") => void;
+}) {
+  const { user } = useSession();
+  const [activeTab, setActiveTab] = useState<"borrow" | "return">(initialTab);
+  const [searchQuery, setSearchQuery] = useState("");
+  const [selectedDevice, setSelectedDevice] = useState<EquipmentRecord | null>(null);
+  const [reason, setReason] = useState("");
+  const [returnDate, setReturnDate] = useState("");
+  const [returnNotes, setReturnNotes] = useState("");
+  const [submitting, setSubmitting] = useState(false);
+  const [showDevicePicker, setShowDevicePicker] = useState(false);
+  const [showDatePicker, setShowDatePicker] = useState(false);
+
+  useEffect(() => {
+    setActiveTab(initialTab);
+    setSelectedDevice(null);
+    setSearchQuery("");
+    setReason("");
+    setReturnDate("");
+    setReturnNotes("");
+    setShowDevicePicker(false);
+    setShowDatePicker(false);
+  }, [visible, initialTab]);
+
+  // Filter available devices for "borrow"
+  const availableDevices = equipmentList.filter((item) => {
+    const s = (item.status || "").toLowerCase();
+    const isAvail = !s.includes("using") && !s.includes("dùng") && !s.includes("booked") && !s.includes("mượn") && !s.includes("đơn") && !s.includes("maint") && !s.includes("trì") && !s.includes("retire") && !s.includes("lý");
+    if (!isAvail) return false;
+    if (!searchQuery.trim()) return true;
+    const q = searchQuery.trim().toLowerCase();
+    return (
+      item.name.toLowerCase().includes(q) ||
+      (item.code || "").toLowerCase().includes(q) ||
+      (item.department || "").toLowerCase().includes(q)
+    );
+  });
+
+  // Filter borrowed / in-use devices for "return"
+  const borrowedDevices = equipmentList.filter((item) => {
+    const s = (item.status || "").toLowerCase();
+    const isBorrowed = s.includes("using") || s.includes("dùng") || s.includes("booked") || s.includes("mượn") || s.includes("đơn") || s.includes("maint") || s.includes("trì");
+    if (!isBorrowed) return false;
+    if (!searchQuery.trim()) return true;
+    const q = searchQuery.trim().toLowerCase();
+    return (
+      item.name.toLowerCase().includes(q) ||
+      (item.code || "").toLowerCase().includes(q) ||
+      (item.department || "").toLowerCase().includes(q)
+    );
+  });
+
+  const activeDeviceList = activeTab === "borrow" ? availableDevices : borrowedDevices;
+
+  const handleSubmit = async () => {
+    if (!selectedDevice) {
+      showAlert("Thiếu thông tin", `Vui lòng chọn thiết bị cần ${activeTab === "borrow" ? "mượn" : "trả"}.`, "warning");
+      return;
+    }
+
+    if (activeTab === "borrow" && !reason.trim()) {
+      showAlert("Thiếu thông tin", "Vui lòng nhập lý do mượn thiết bị.", "warning");
+      return;
+    }
+
+    const deviceId = selectedDevice._id || selectedDevice.id;
+    if (!deviceId) {
+      showAlert("Lỗi", "Không tìm thấy ID thiết bị.", "error");
+      return;
+    }
+
+    setSubmitting(true);
+    try {
+      if (activeTab === "borrow") {
+        const updatedNotes = `${selectedDevice.notes || ""}\n[Mượn thiết bị: ${reason.trim()}${returnDate ? ` | Hạn trả: ${returnDate}` : ""}]`.trim();
+        const updatedRes = await equipment.update(deviceId, {
+          ...selectedDevice,
+          status: "booked",
+          assignedToName: user?.displayName || user?.email || "Nhân viên",
+          notes: updatedNotes,
+        });
+        const newReq: EquipmentRequestRecord = {
+          id: "req-" + Date.now(),
+          equipmentId: deviceId,
+          equipmentName: selectedDevice.name,
+          equipmentCode: selectedDevice.code || "100015",
+          type: "borrow",
+          requesterName: user?.displayName || user?.email || "Igen Test",
+          requesterDepartment: selectedDevice.department || "DDD",
+          status: "pending",
+          createdAt: "Vừa xong",
+          reason: reason.trim(),
+        };
+        showAlert("Thành công", `Đã gửi yêu cầu mượn thiết bị "${selectedDevice.name}" thành công! Phiếu đang chờ duyệt.`, "success");
+        onSaved({ ...selectedDevice, ...updatedRes, status: "booked", assignedToName: user?.displayName || "Nhân viên", notes: updatedNotes }, newReq);
+      } else {
+        const updatedNotes = `${selectedDevice.notes || ""}\n[Trả thiết bị: ${returnNotes.trim() || "Hoàn trả đầy đủ"}]`.trim();
+        const updatedRes = await equipment.update(deviceId, {
+          ...selectedDevice,
+          status: "ready",
+          assignedToName: "",
+          notes: updatedNotes,
+        });
+        const newReq: EquipmentRequestRecord = {
+          id: "req-" + Date.now(),
+          equipmentId: deviceId,
+          equipmentName: selectedDevice.name,
+          equipmentCode: selectedDevice.code || "100015",
+          type: "return",
+          requesterName: user?.displayName || user?.email || "Igen Test",
+          requesterDepartment: selectedDevice.department || "DDD",
+          status: "pending",
+          createdAt: "Vừa xong",
+          reason: returnNotes.trim(),
+        };
+        showAlert("Thành công", `Đã gửi yêu cầu trả thiết bị "${selectedDevice.name}" thành công! Phiếu đang chờ duyệt.`, "success");
+        onSaved({ ...selectedDevice, ...updatedRes, status: "ready", assignedToName: "", notes: updatedNotes }, newReq);
+      }
+      onClose();
+    } catch (e: any) {
+      showAlert("Thất bại", e.message || "Không thể gửi yêu cầu.", "error");
+    } finally {
+      setSubmitting(false);
+    }
+  };
+
+  return (
+    <Modal visible={visible} transparent animationType="fade" onRequestClose={onClose}>
+      <Pressable style={borrowModalStyles.overlay} onPress={onClose}>
+        <Pressable style={borrowModalStyles.dialog} onPress={(e) => e.stopPropagation()}>
+          {/* Header */}
+          <View style={borrowModalStyles.header}>
+            <View style={borrowModalStyles.headerIconWrap}>
+              <Ionicons name="swap-horizontal" size={22} color="#059669" />
+            </View>
+            <View style={{ flex: 1 }}>
+              <Text style={borrowModalStyles.title}>Tạo phiếu mượn / trả thiết bị</Text>
+              <Text style={borrowModalStyles.subtitle}>Gửi yêu cầu mượn hoặc hoàn trả thiết bị trong hệ thống</Text>
+            </View>
+            <Pressable onPress={onClose} style={borrowModalStyles.closeBtn} hitSlop={8}>
+              <Ionicons name="close" size={20} color="#64748b" />
+            </Pressable>
+          </View>
+
+          {/* Segmented Tab Switcher */}
+          <View style={borrowModalStyles.tabSwitcher}>
+            <Pressable
+              style={[borrowModalStyles.tabBtn, activeTab === "borrow" && borrowModalStyles.tabBtnActive]}
+              onPress={() => {
+                setActiveTab("borrow");
+                setSelectedDevice(null);
+              }}
+            >
+              <Ionicons name="hand-left-outline" size={17} color={activeTab === "borrow" ? "#059669" : "#64748b"} />
+              <Text style={[borrowModalStyles.tabBtnText, activeTab === "borrow" && borrowModalStyles.tabBtnTextActive]}>
+                Mượn thiết bị
+              </Text>
+            </Pressable>
+
+            <Pressable
+              style={[borrowModalStyles.tabBtn, activeTab === "return" && borrowModalStyles.tabBtnActive]}
+              onPress={() => {
+                setActiveTab("return");
+                setSelectedDevice(null);
+              }}
+            >
+              <Ionicons name="refresh-outline" size={17} color={activeTab === "return" ? "#059669" : "#64748b"} />
+              <Text style={[borrowModalStyles.tabBtnText, activeTab === "return" && borrowModalStyles.tabBtnTextActive]}>
+                Trả thiết bị
+              </Text>
+            </Pressable>
+          </View>
+
+          <ScrollView style={{ maxHeight: 420 }} showsVerticalScrollIndicator={false}>
+            {/* 1. Search Bar */}
+            <Text style={borrowModalStyles.fieldLabel}>Tìm kiếm thiết bị nhanh</Text>
+            <View style={borrowModalStyles.searchWrap}>
+              <Ionicons name="search-outline" size={16} color="#94a3b8" />
+              <TextInput
+                value={searchQuery}
+                onChangeText={setSearchQuery}
+                placeholder={activeTab === "borrow" ? "Lọc theo tên, mã thiết bị sẵn sàng..." : "Lọc theo tên, mã thiết bị đang dùng..."}
+                placeholderTextColor="#94a3b8"
+                style={borrowModalStyles.searchInput}
+              />
+              {searchQuery ? (
+                <Pressable onPress={() => setSearchQuery("")} hitSlop={6}>
+                  <Ionicons name="close-circle" size={16} color="#94a3b8" />
+                </Pressable>
+              ) : null}
+            </View>
+
+            {/* 2. Select Device Dropdown */}
+            <Text style={borrowModalStyles.fieldLabel}>
+              Chọn thiết bị <Text style={{ color: "#dc2626" }}>*</Text>
+            </Text>
+            <Pressable
+              style={borrowModalStyles.selectBtn}
+              onPress={() => setShowDevicePicker(true)}
+            >
+              <Text style={[borrowModalStyles.selectBtnText, selectedDevice && { color: "#0f172a", fontWeight: "700" }]}>
+                {selectedDevice
+                  ? `${selectedDevice.name} (${selectedDevice.code || "N/A"})`
+                  : activeTab === "borrow"
+                  ? `-- Chọn thiết bị cần mượn (${availableDevices.length} khả dụng) --`
+                  : `-- Chọn thiết bị cần trả (${borrowedDevices.length} thiết bị) --`}
+              </Text>
+              <Ionicons name="chevron-down" size={18} color="#64748b" />
+            </Pressable>
+
+            {/* Form Fields for Borrow */}
+            {activeTab === "borrow" ? (
+              <>
+                <Text style={borrowModalStyles.fieldLabel}>
+                  Lý do mượn <Text style={{ color: "#dc2626" }}>*</Text>
+                </Text>
+                <TextInput
+                  value={reason}
+                  onChangeText={setReason}
+                  multiline
+                  numberOfLines={3}
+                  placeholder="Nhập lý do sử dụng, ca điều trị, phòng thực hiện hoặc mục đích mượn thiết bị..."
+                  placeholderTextColor="#94a3b8"
+                  style={borrowModalStyles.textAreaInput}
+                />
+
+                <Text style={borrowModalStyles.fieldLabel}>Ngày dự kiến trả (không bắt buộc)</Text>
+                <Pressable style={borrowModalStyles.dateInputBtn} onPress={() => setShowDatePicker(true)}>
+                  <TextInput
+                    value={returnDate}
+                    onChangeText={setReturnDate}
+                    placeholder="dd/mm/yyyy"
+                    placeholderTextColor="#94a3b8"
+                    style={{ flex: 1, fontSize: 13, color: "#0f172a", padding: 0 }}
+                    editable={false}
+                    pointerEvents="none"
+                  />
+                  <Ionicons name="calendar-outline" size={18} color="#64748b" />
+                </Pressable>
+              </>
+            ) : (
+              <>
+                <Text style={borrowModalStyles.fieldLabel}>Ghi chú khi trả / Tình trạng bàn giao</Text>
+                <TextInput
+                  value={returnNotes}
+                  onChangeText={setReturnNotes}
+                  multiline
+                  numberOfLines={3}
+                  placeholder="Ghi chú tình trạng thiết bị khi hoàn trả, phụ kiện đi kèm (nếu có)..."
+                  placeholderTextColor="#94a3b8"
+                  style={borrowModalStyles.textAreaInput}
+                />
+              </>
+            )}
+
+            <Text style={borrowModalStyles.footerNote}>
+              Bạn có thể theo dõi hoặc Hủy yêu cầu tại tab Yêu cầu mượn/trả.
+            </Text>
+          </ScrollView>
+
+          {/* Footer Actions */}
+          <View style={borrowModalStyles.footerActions}>
+            <Pressable style={borrowModalStyles.cancelBtn} onPress={onClose} disabled={submitting}>
+              <Text style={borrowModalStyles.cancelBtnText}>Đóng</Text>
+            </Pressable>
+            <Pressable
+              style={[borrowModalStyles.submitBtn, submitting && { opacity: 0.6 }]}
+              onPress={handleSubmit}
+              disabled={submitting}
+            >
+              {submitting ? (
+                <ActivityIndicator size="small" color="#ffffff" />
+              ) : (
+                <Text style={borrowModalStyles.submitBtnText}>
+                  {activeTab === "borrow" ? "Gửi yêu cầu mượn" : "Gửi yêu cầu trả"}
+                </Text>
+              )}
+            </Pressable>
+          </View>
+
+          {/* Select Device Modal Sheet */}
+          <Modal visible={showDevicePicker} transparent animationType="fade" onRequestClose={() => setShowDevicePicker(false)}>
+            <Pressable style={borrowModalStyles.pickerOverlay} onPress={() => setShowDevicePicker(false)}>
+              <View style={borrowModalStyles.pickerSheet} onStartShouldSetResponder={() => true}>
+                <View style={borrowModalStyles.pickerHeader}>
+                  <Text style={borrowModalStyles.pickerTitle}>
+                    {activeTab === "borrow" ? "Chọn thiết bị cần mượn" : "Chọn thiết bị cần trả"}
+                  </Text>
+                  <Pressable onPress={() => setShowDevicePicker(false)} hitSlop={8}>
+                    <Ionicons name="close" size={20} color="#64748b" />
+                  </Pressable>
+                </View>
+
+                <ScrollView style={{ maxHeight: 340 }} showsVerticalScrollIndicator={false}>
+                  {activeDeviceList.length === 0 ? (
+                    <Text style={{ textAlign: "center", padding: 20, color: "#94a3b8", fontSize: 13 }}>
+                      {activeTab === "borrow" ? "Không có thiết bị sẵn sàng để mượn." : "Không có thiết bị đang mượn để trả."}
+                    </Text>
+                  ) : (
+                    activeDeviceList.map((dev) => {
+                      const isSelected = selectedDevice?._id === dev._id || selectedDevice?.id === dev.id;
+                      return (
+                        <Pressable
+                          key={dev._id || dev.id || dev.code}
+                          style={[borrowModalStyles.pickerItem, isSelected && borrowModalStyles.pickerItemActive]}
+                          onPress={() => {
+                            setSelectedDevice(dev);
+                            setShowDevicePicker(false);
+                          }}
+                        >
+                          <View style={{ flex: 1 }}>
+                            <Text style={[borrowModalStyles.pickerItemName, isSelected && { color: "#008852" }]}>
+                              {dev.name}
+                            </Text>
+                            <Text style={borrowModalStyles.pickerItemMeta}>
+                              Mã: {dev.code || "N/A"} {dev.department ? `· Khoa: ${dev.department}` : ""}
+                            </Text>
+                          </View>
+                          {isSelected && <Ionicons name="checkmark-circle" size={20} color="#008852" />}
+                        </Pressable>
+                      );
+                    })
+                  )}
+                </ScrollView>
+              </View>
+            </Pressable>
+          </Modal>
+
+          {/* Date Picker Modal for Return Date */}
+          <DatePickerModal
+            visible={showDatePicker}
+            title="Chọn ngày dự kiến trả"
+            value={returnDate}
+            onChange={(dateStr: string) => {
+              setReturnDate(dateStr);
+              setShowDatePicker(false);
+            }}
+            onClose={() => setShowDatePicker(false)}
+          />
+        </Pressable>
+      </Pressable>
+    </Modal>
+  );
+}
+
+const borrowModalStyles = StyleSheet.create({
+  overlay: {
+    flex: 1,
+    backgroundColor: "rgba(0, 0, 0, 0.55)",
+    justifyContent: "center",
+    alignItems: "center",
+    paddingHorizontal: 16,
+  },
+  dialog: {
+    backgroundColor: "#ffffff",
+    borderRadius: 20,
+    width: "100%",
+    maxWidth: 500,
+    padding: 18,
+    gap: 12,
+    shadowColor: "#000",
+    shadowOffset: { width: 0, height: 10 },
+    shadowOpacity: 0.22,
+    shadowRadius: 18,
+    elevation: 12,
+  },
+  header: {
+    flexDirection: "row",
+    alignItems: "center",
+    gap: 10,
+    paddingBottom: 10,
+    borderBottomWidth: 1,
+    borderBottomColor: "#f1f5f9",
+  },
+  headerIconWrap: {
+    width: 38,
+    height: 38,
+    borderRadius: 19,
+    backgroundColor: "#dcfce7",
+    alignItems: "center",
+    justifyContent: "center",
+  },
+  title: { fontSize: 16, fontWeight: "800", color: "#0f172a", fontFamily: "Inter-Bold" },
+  subtitle: { fontSize: 11, color: "#64748b", fontFamily: "Inter-Regular", marginTop: 2 },
+  closeBtn: { padding: 4, borderRadius: 16, backgroundColor: "#f1f5f9" },
+  tabSwitcher: {
+    flexDirection: "row",
+    backgroundColor: "#f1f5f9",
+    borderRadius: 12,
+    padding: 3,
+    gap: 4,
+  },
+  tabBtn: {
+    flex: 1,
+    flexDirection: "row",
+    alignItems: "center",
+    justifyContent: "center",
+    gap: 6,
+    paddingVertical: 9,
+    borderRadius: 9,
+  },
+  tabBtnActive: {
+    backgroundColor: "#ffffff",
+    shadowColor: "#000",
+    shadowOffset: { width: 0, height: 1 },
+    shadowOpacity: 0.08,
+    shadowRadius: 2,
+    elevation: 2,
+  },
+  tabBtnText: { fontSize: 13, fontWeight: "600", color: "#64748b", fontFamily: "Inter-SemiBold" },
+  tabBtnTextActive: { color: "#059669", fontWeight: "700", fontFamily: "Inter-Bold" },
+  fieldLabel: { fontSize: 12, fontWeight: "700", color: "#334155", fontFamily: "Inter-Bold", marginTop: 10, marginBottom: 4 },
+  searchWrap: {
+    flexDirection: "row",
+    alignItems: "center",
+    backgroundColor: "#f8fafc",
+    borderWidth: 1,
+    borderColor: "#e2e8f0",
+    borderRadius: 10,
+    paddingHorizontal: 10,
+    paddingVertical: 6,
+    gap: 6,
+  },
+  searchInput: { flex: 1, fontSize: 12.5, color: "#0f172a", fontFamily: "Inter-Medium" },
+  selectBtn: {
+    flexDirection: "row",
+    alignItems: "center",
+    justifyContent: "space-between",
+    backgroundColor: "#f8fafc",
+    borderWidth: 1,
+    borderColor: "#e2e8f0",
+    borderRadius: 10,
+    paddingHorizontal: 12,
+    paddingVertical: 10,
+  },
+  selectBtnText: { fontSize: 12.5, color: "#64748b", fontFamily: "Inter-Medium", flex: 1 },
+  textAreaInput: {
+    backgroundColor: "#f8fafc",
+    borderWidth: 1,
+    borderColor: "#e2e8f0",
+    borderRadius: 10,
+    paddingHorizontal: 12,
+    paddingVertical: 10,
+    fontSize: 12.5,
+    color: "#0f172a",
+    fontFamily: "Inter-Medium",
+    textAlignVertical: "top",
+    minHeight: 80,
+  },
+  dateInputBtn: {
+    flexDirection: "row",
+    alignItems: "center",
+    justifyContent: "space-between",
+    backgroundColor: "#f8fafc",
+    borderWidth: 1,
+    borderColor: "#e2e8f0",
+    borderRadius: 10,
+    paddingHorizontal: 12,
+    paddingVertical: 10,
+  },
+  footerNote: { fontSize: 11, color: "#94a3b8", fontFamily: "Inter-Regular", marginTop: 14, textAlign: "left" },
+  footerActions: {
+    flexDirection: "row",
+    justifyContent: "flex-end",
+    alignItems: "center",
+    gap: 10,
+    paddingTop: 10,
+    borderTopWidth: 1,
+    borderTopColor: "#f1f5f9",
+  },
+  cancelBtn: { backgroundColor: "#f1f5f9", paddingHorizontal: 18, paddingVertical: 10, borderRadius: 10 },
+  cancelBtnText: { fontSize: 13, fontWeight: "700", color: "#334155", fontFamily: "Inter-Bold" },
+  submitBtn: { backgroundColor: "#10b981", paddingHorizontal: 20, paddingVertical: 10, borderRadius: 10 },
+  submitBtnText: { fontSize: 13, fontWeight: "700", color: "#ffffff", fontFamily: "Inter-Bold" },
+  pickerOverlay: { flex: 1, backgroundColor: "rgba(0, 0, 0, 0.4)", justifyContent: "center", alignItems: "center", paddingHorizontal: 20 },
+  pickerSheet: { backgroundColor: "#ffffff", borderRadius: 16, width: "100%", maxWidth: 460, padding: 14, gap: 10 },
+  pickerHeader: { flexDirection: "row", justifyContent: "space-between", alignItems: "center", paddingBottom: 8, borderBottomWidth: 1, borderBottomColor: "#f1f5f9" },
+  pickerTitle: { fontSize: 14, fontWeight: "800", color: "#0f172a", fontFamily: "Inter-Bold" },
+  pickerItem: { flexDirection: "row", alignItems: "center", justifyContent: "space-between", paddingVertical: 10, paddingHorizontal: 10, borderRadius: 8, borderBottomWidth: 1, borderBottomColor: "#f8fafc" },
+  pickerItemActive: { backgroundColor: "#f0fdf4" },
+  pickerItemName: { fontSize: 13, fontWeight: "700", color: "#0f172a", fontFamily: "Inter-Bold" },
+  pickerItemMeta: { fontSize: 11, color: "#64748b", fontFamily: "Inter-Regular", marginTop: 2 },
+});
+
+export interface EquipmentRequestRecord {
+  id: string;
+  equipmentId?: string;
+  equipmentName: string;
+  equipmentCode: string;
+  type: "borrow" | "return";
+  requesterName: string;
+  requesterDepartment: string;
+  status: "pending" | "approved" | "rejected" | "cancelled";
+  createdAt: string;
+  reason?: string;
+}
+
 // ── Main Screen ───────────────────────────────────────────────────────────────
 export default function EquipmentScreen() {
+  const { user } = useSession();
   const [items, setItems] = useState<EquipmentRecord[]>([]);
   const [serverTotal, setServerTotal] = useState<number | null>(null);
   const [globalItems, setGlobalItems] = useState<EquipmentRecord[]>([]);
@@ -1887,6 +2542,49 @@ export default function EquipmentScreen() {
   const [compliance, setCompliance] = useState<EquipmentComplianceSummary | null>(null);
   const [loading, setLoading] = useState(true);
   const [refreshing, setRefreshing] = useState(false);
+
+  // Danh sách phiếu mượn / trả thiết bị (Duyệt & Hủy)
+  const [requests, setRequests] = useState<EquipmentRequestRecord[]>([
+    {
+      id: "req-100015",
+      equipmentName: "Máy nước nóng lạnh Kangaroo",
+      equipmentCode: "100015",
+      type: "borrow",
+      requesterName: "Igen Test",
+      requesterDepartment: "DDD",
+      status: "pending",
+      createdAt: "Vừa xong",
+      reason: "Mượn sử dụng ca làm việc",
+    },
+    {
+      id: "req-100016",
+      equipmentName: "Máy siêu âm 4D Chison",
+      equipmentCode: "SA-204",
+      type: "return",
+      requesterName: "Nguyễn Văn Nam",
+      requesterDepartment: "Khoa Chẩn đoán hình ảnh",
+      status: "pending",
+      createdAt: "15 phút trước",
+      reason: "Hoàn trả thiết bị sau ca làm việc",
+    },
+  ]);
+
+  // Phân quyền tài khoản thực tế dựa trên Role & Permissions hệ thống
+  const canApprove =
+    hasPermission(user, "equipment:approve") ||
+    hasPermission(user, "equipment:manage") ||
+    user?.role === "superadmin" ||
+    user?.role === "branch_owner" ||
+    (user as any)?.role === "admin" ||
+    (user as any)?.role === "manager";
+
+  const canManageEquipment =
+    hasPermission(user, "equipment:manage") ||
+    user?.role === "superadmin" ||
+    user?.role === "branch_owner" ||
+    (user as any)?.role === "admin" ||
+    (user as any)?.role === "manager";
+
   const [error, setError] = useState<string | null>(null);
   const [search, setSearch] = useState("");
   const [selectedFilter, setSelectedFilter] = useState<string>("all");
@@ -1896,6 +2594,19 @@ export default function EquipmentScreen() {
   const [viewDetailItem, setViewDetailItem] = useState<EquipmentRecord | null>(null);
   const [deleteItem, setDeleteItem] = useState<EquipmentRecord | null>(null);
   const [deleting, setDeleting] = useState(false);
+
+  const [borrowReturnModalVisible, setBorrowReturnModalVisible] = useState(false);
+  const [borrowReturnTab, setBorrowReturnTab] = useState<"borrow" | "return">("borrow");
+
+  const openBorrowModal = () => {
+    setBorrowReturnTab("borrow");
+    setBorrowReturnModalVisible(true);
+  };
+
+  const openReturnModal = () => {
+    setBorrowReturnTab("return");
+    setBorrowReturnModalVisible(true);
+  };
 
   // Screen Rounded Alert Modal
   const [alertState, setAlertState] = useState<{
@@ -1932,6 +2643,101 @@ export default function EquipmentScreen() {
     }
   };
 
+  // ── Xử lý Duyệt / Từ chối / Hủy phiếu ────────────────────────────────────
+  const handleApproveRequest = (req: EquipmentRequestRecord) => {
+    setRequests((prev) =>
+      prev.map((r) => (r.id === req.id ? { ...r, status: "approved" } : r))
+    );
+
+    const isBorrow = req.type === "borrow";
+    const targetStatus = isBorrow ? "booked" : "ready";
+    const targetAssignee = isBorrow ? req.requesterName : "";
+
+    const updatedDevPayload: Partial<EquipmentRecord> = {
+      status: targetStatus,
+      assignedToName: targetAssignee,
+    };
+
+    setItems((prev) =>
+      prev.map((i) => {
+        if (i.code === req.equipmentCode || i.name === req.equipmentName || i._id === req.equipmentId || i.id === req.equipmentId) {
+          const updated = { ...i, ...updatedDevPayload };
+          const key = i._id || i.id || i.code;
+          if (key) localOverridesRef.current[key] = updated;
+          return updated;
+        }
+        return i;
+      })
+    );
+
+    setGlobalItems((prev) =>
+      prev.map((i) => {
+        if (i.code === req.equipmentCode || i.name === req.equipmentName || i._id === req.equipmentId || i.id === req.equipmentId) {
+          return { ...i, ...updatedDevPayload };
+        }
+        return i;
+      })
+    );
+
+    showAlert(
+      "Đã duyệt phiếu",
+      `Đã duyệt phiếu ${isBorrow ? "mượn" : "trả"} thiết bị "${req.equipmentName}" (${req.equipmentCode}) thành công!`,
+      "success"
+    );
+  };
+
+  const handleRejectRequest = (req: EquipmentRequestRecord) => {
+    setRequests((prev) =>
+      prev.map((r) => (r.id === req.id ? { ...r, status: "rejected" } : r))
+    );
+    showAlert(
+      "Đã từ chối phiếu",
+      `Đã từ chối phiếu ${req.type === "borrow" ? "mượn" : "trả"} thiết bị "${req.equipmentName}".`,
+      "warning"
+    );
+  };
+
+  const handleCancelRequest = (req: EquipmentRequestRecord) => {
+    setRequests((prev) =>
+      prev.map((r) => (r.id === req.id ? { ...r, status: "cancelled" } : r))
+    );
+    showAlert(
+      "Đã hủy phiếu",
+      `Đã tự hủy phiếu ${req.type === "borrow" ? "mượn" : "trả"} thiết bị "${req.equipmentName}".`,
+      "info"
+    );
+  };
+
+  // Local overrides store to preserve device borrow/return/edit updates across API re-fetches
+  const localOverridesRef = useRef<Record<string, Partial<EquipmentRecord>>>({});
+
+  const handleItemSaved = (updatedDev?: EquipmentRecord, newReq?: EquipmentRequestRecord) => {
+    if (newReq) {
+      setRequests((prev) => [newReq, ...prev]);
+    }
+    if (updatedDev) {
+      const key = updatedDev._id || updatedDev.id || updatedDev.code;
+      if (key) {
+        localOverridesRef.current[key] = updatedDev;
+      }
+      setItems((prev) =>
+        prev.map((i) =>
+          (i._id && i._id === updatedDev._id) || (i.id && i.id === updatedDev.id) || (i.code && i.code === updatedDev.code)
+            ? { ...i, ...updatedDev }
+            : i
+        )
+      );
+      setGlobalItems((prev) =>
+        prev.map((i) =>
+          (i._id && i._id === updatedDev._id) || (i.id && i.id === updatedDev.id) || (i.code && i.code === updatedDev.code)
+            ? { ...i, ...updatedDev }
+            : i
+        )
+      );
+    }
+    setRevision((v) => v + 1);
+  };
+
   const loadData = useCallback(async () => {
     setError(null);
     const isSearching = !!search.trim();
@@ -1954,7 +2760,13 @@ export default function EquipmentScreen() {
       if (compRes.status === "fulfilled" && compRes.value) setCompliance(compRes.value);
 
       if (listRes.status === "fulfilled") {
-        const fetchedItems = listRes.value.items || [];
+        let fetchedItems: EquipmentRecord[] = listRes.value.items || [];
+        // Apply local overrides (borrow/return/edit updates)
+        fetchedItems = fetchedItems.map((item) => {
+          const key = item._id || item.id || item.code;
+          return key && localOverridesRef.current[key] ? { ...item, ...localOverridesRef.current[key] } : item;
+        });
+
         setItems(fetchedItems);
         if (typeof listRes.value.total === "number") setServerTotal(listRes.value.total);
 
@@ -1970,7 +2782,11 @@ export default function EquipmentScreen() {
 
       // Nhận kết quả danh sách toàn cục khi đang tìm kiếm
       if (fullRes && fullRes.status === "fulfilled") {
-        const fullItems = fullRes.value.items || [];
+        let fullItems: EquipmentRecord[] = fullRes.value.items || [];
+        fullItems = fullItems.map((item) => {
+          const key = item._id || item.id || item.code;
+          return key && localOverridesRef.current[key] ? { ...item, ...localOverridesRef.current[key] } : item;
+        });
         setGlobalItems(fullItems);
         setGlobalTotal(typeof fullRes.value.total === "number" ? fullRes.value.total : fullItems.length);
       }
@@ -1991,26 +2807,22 @@ export default function EquipmentScreen() {
   );
 
   // Dữ liệu cho 6 thẻ thống kê trên cùng và 3 thẻ tuân thủ:
-  // Luôn lấy từ globalItems / globalTotal / summary gốc, KHÔNG bị thay đổi theo từ khóa tìm kiếm
+  // Luôn tính toán động trực tiếp từ baseItemsForStats để cập nhật ngay lập tức khi mượn/trả
   const baseItemsForStats = globalItems.length > 0 ? globalItems : items;
-  const totalCount = summary?.total ?? globalTotal ?? (globalItems.length > 0 ? globalItems.length : (serverTotal ?? items.length));
+  const totalCount = baseItemsForStats.length > 0 ? baseItemsForStats.length : (summary?.total ?? globalTotal ?? (serverTotal ?? items.length));
 
   const countByStatus = (...keywords: string[]) => {
-    if (summary?.byStatus && Array.isArray(summary.byStatus)) {
-      const found = summary.byStatus.find((s) => keywords.some((k) => s.status.toLowerCase().includes(k.toLowerCase())));
-      if (found) return found.count;
-    }
     return baseItemsForStats.filter((item) => {
       const s = (item.status || "").toLowerCase();
       return keywords.some((k) => s.includes(k.toLowerCase()));
     }).length;
   };
 
-  const bookedCount = summary?.booked ?? countByStatus("đơn", "booked", "order", "request");
-  const readyCount = summary?.ready ?? countByStatus("sẵn", "ready", "avail");
-  const usingCount = summary?.using ?? countByStatus("dùng", "using", "in_use", "in-use");
-  const maintenanceCount = summary?.maintenance ?? countByStatus("trì", "maint", "repair");
-  const disposedCount = summary?.disposed ?? countByStatus("lý", "dispos", "scrap", "retire");
+  const bookedCount = countByStatus("đơn", "booked", "order", "request", "mượn");
+  const readyCount = countByStatus("sẵn", "ready", "avail", "available");
+  const usingCount = countByStatus("dùng", "using", "in_use", "in-use");
+  const maintenanceCount = countByStatus("trì", "maint", "repair");
+  const disposedCount = countByStatus("lý", "dispos", "scrap", "retire");
 
   const displayedItems = items.filter((item) => {
     if (selectedFilter === "all") return true;
@@ -2046,14 +2858,86 @@ export default function EquipmentScreen() {
     });
   }
 
+  const [showAllCategories, setShowAllCategories] = useState(true);
+
+  const chartItems: ChartSlice[] = [
+    { label: "Có sẵn", count: readyCount, color: "#10b981", filter: "ready" },
+    { label: "Đang dùng", count: usingCount, color: "#0284c7", filter: "using" },
+    { label: "Đơn mượn", count: bookedCount, color: "#8b5cf6", filter: "booked" },
+    { label: "Bảo trì", count: maintenanceCount, color: "#f59e0b", filter: "maintenance" },
+    { label: "Thanh lý", count: disposedCount, color: "#ef4444", filter: "disposed" },
+  ];
+
+  const statusCards = [
+    {
+      label: "TỔNG SỐ",
+      value: totalCount,
+      filter: "all",
+      icon: "layers-outline" as const,
+      color: "#2563eb",
+      bgColor: "#eff6ff",
+    },
+    {
+      label: "CÓ SẴN",
+      value: readyCount,
+      filter: "ready",
+      icon: "checkmark-circle-outline" as const,
+      color: "#10b981",
+      bgColor: "#ecfdf5",
+    },
+    {
+      label: "ĐANG DÙNG",
+      value: usingCount,
+      filter: "using",
+      icon: "pulse-outline" as const,
+      color: "#0284c7",
+      bgColor: "#f0f9ff",
+    },
+    {
+      label: "ĐƠN MƯỢN",
+      value: bookedCount,
+      filter: "booked",
+      icon: "receipt-outline" as const,
+      color: "#8b5cf6",
+      bgColor: "#f5f3ff",
+    },
+    {
+      label: "BẢO TRÌ",
+      value: maintenanceCount,
+      filter: "maintenance",
+      icon: "construct-outline" as const,
+      color: "#f59e0b",
+      bgColor: "#fffbeb",
+    },
+    {
+      label: "THANH LÝ",
+      value: disposedCount,
+      filter: "disposed",
+      icon: "trash-outline" as const,
+      color: "#ef4444",
+      bgColor: "#fef2f2",
+    },
+  ];
+
   return (
     <SafeAreaView edges={["top"]} style={styles.container}>
+      {/* App Bar / Header */}
       <View style={styles.header}>
         <Pressable onPress={() => router.back()} style={({ pressed }) => [styles.backButton, pressed && { opacity: 0.6 }]} hitSlop={8}>
-          <Image source={require("../../assets/lucide-chevron-right.png")} style={styles.backIcon} resizeMode="contain" />
+          <Ionicons name="arrow-back" size={20} color="#0f172a" />
         </Pressable>
         <Text style={styles.headerTitle}>Quản lý thiết bị</Text>
-        <View style={styles.headerRightSpacer} />
+        <View style={styles.headerIconsRight}>
+          <Pressable style={styles.headerIconBtn} onPress={() => {}} hitSlop={6}>
+            <Ionicons name="star-outline" size={19} color="#475569" />
+          </Pressable>
+          <Pressable style={styles.headerIconBtn} onPress={() => {}} hitSlop={6}>
+            <Ionicons name="headset-outline" size={19} color="#475569" />
+          </Pressable>
+          <Pressable style={styles.headerIconBtn} onPress={() => router.push("/")} hitSlop={6}>
+            <Ionicons name="home-outline" size={19} color="#475569" />
+          </Pressable>
+        </View>
       </View>
 
       <ScrollView
@@ -2073,117 +2957,306 @@ export default function EquipmentScreen() {
           </View>
         ) : null}
 
-        {/* Card trắng bọc 6 thẻ con */}
-        <View style={styles.statsWrapperCard}>
-          <View style={styles.statusGrid}>
-            {[
-              {
-                label: "THIẾT BỊ",
-                value: totalCount,
-                filter: "all",
-                family: "mci",
-                icon: "needle",
-                color: "#2563eb",
-              },
-              {
-                label: "ĐƠN MƯỢN",
-                value: bookedCount,
-                filter: "booked",
-                family: "ionicons",
-                icon: "receipt",
-                color: "#7c3aed",
-              },
-              {
-                label: "CÓ SẴN",
-                value: readyCount,
-                filter: "ready",
-                family: "ionicons",
-                icon: "checkmark-circle",
-                color: "#059669",
-              },
-              {
-                label: "ĐANG DÙNG",
-                value: usingCount,
-                filter: "using",
-                family: "mci",
-                icon: "stethoscope",
-                color: "#0284c7",
-              },
-              {
-                label: "BẢO TRÌ",
-                value: maintenanceCount,
-                filter: "maintenance",
-                family: "ionicons",
-                icon: "construct",
-                color: "#d97706",
-              },
-              {
-                label: "THANH LÝ",
-                value: disposedCount,
-                filter: "disposed",
-                family: "ionicons",
-                icon: "trash",
-                color: "#dc2626",
-              },
-            ].map((c) => {
-              const IconComp = c.family === "mci" ? MaterialCommunityIcons : Ionicons;
-              const isSelected = selectedFilter === c.filter;
+        {/* Top 3 Quick Actions (Thêm / Mượn / Trả) */}
+        <View style={styles.topActionsCard}>
+          <Pressable style={styles.actionCol} onPress={openAdd}>
+            <View style={[styles.actionIconBox, { backgroundColor: "#ecfeff", borderColor: "#a5f3fc" }]}>
+              <Ionicons name="add-circle-outline" size={24} color="#0891b2" />
+            </View>
+            <Text style={styles.actionColLabel}>Thêm thiết bị</Text>
+          </Pressable>
+
+          <Pressable style={styles.actionCol} onPress={openBorrowModal}>
+            <View style={[styles.actionIconBox, { backgroundColor: "#f0fdf4", borderColor: "#bbf7d0" }]}>
+              <Ionicons name="hand-left-outline" size={22} color="#16a34a" />
+            </View>
+            <Text style={styles.actionColLabel}>Mượn thiết bị</Text>
+          </Pressable>
+
+          <Pressable style={styles.actionCol} onPress={openReturnModal}>
+            <View style={[styles.actionIconBox, { backgroundColor: "#eff6ff", borderColor: "#bfdbfe" }]}>
+              <Ionicons name="refresh-outline" size={22} color="#2563eb" />
+            </View>
+            <Text style={styles.actionColLabel}>Trả thiết bị</Text>
+          </Pressable>
+        </View>
+
+        {/* Section Header: Tình hình thiết bị */}
+        <View style={styles.sectionHeaderRow}>
+          <View style={styles.sectionHeaderLeft}>
+            <Text style={styles.sectionHeaderMainTitle}>Tình hình thiết bị</Text>
+            <Ionicons name="eye-outline" size={18} color="#db2777" />
+          </View>
+          <View style={styles.pillToggle}>
+            <Ionicons name="pie-chart-outline" size={14} color="#db2777" />
+            <Text style={styles.pillToggleText}>Phân bổ</Text>
+          </View>
+        </View>
+
+        {/* Overview Card with Donut Chart & 6 Stat Cards */}
+        <View style={styles.overviewCard}>
+          {/* Period/Scope selector */}
+          <View style={styles.periodRow}>
+            <Ionicons name="chevron-back" size={16} color="#94a3b8" />
+            <View style={styles.periodBadge}>
+              <Ionicons name="calendar-outline" size={15} color="#0f172a" />
+              <Text style={styles.periodText}>Toàn hệ thống cơ sở</Text>
+            </View>
+            <Ionicons name="chevron-forward" size={16} color="#94a3b8" />
+          </View>
+
+          {/* Ratio banner */}
+          <View style={styles.ratioBanner}>
+            <Ionicons name="bar-chart-outline" size={16} color="#0284c7" />
+            <Text style={styles.ratioBannerText}>
+              {totalCount > 0 ? ((readyCount / totalCount) * 100).toFixed(0) : 0}% thiết bị sẵn sàng so với toàn cơ sở
+            </Text>
+            <Ionicons name="chevron-forward" size={14} color="#94a3b8" />
+          </View>
+
+          {/* Donut Chart with White Center Circle for Total and Legend */}
+          <View style={styles.donutSection}>
+            <DonutChart items={chartItems} total={totalCount} size={175} strokeWidth={24} />
+
+            {/* Legend / Callout items beside Donut */}
+            <View style={styles.donutLegend}>
+              {chartItems.map((item) => {
+                const pct = totalCount > 0 ? ((item.count / totalCount) * 100).toFixed(0) : 0;
+                const isSelected = selectedFilter === item.filter;
+                return (
+                  <Pressable
+                    key={item.label}
+                    style={[styles.donutLegendItem, isSelected && styles.donutLegendItemActive]}
+                    onPress={() => setSelectedFilter(isSelected ? "all" : (item.filter || "all"))}
+                  >
+                    <View style={[styles.legendColorDot, { backgroundColor: item.color }]} />
+                    <Text style={styles.legendPctText}>{pct}%</Text>
+                    <Text style={styles.legendLabelText} numberOfLines={1}>
+                      {item.label} ({item.count})
+                    </Text>
+                  </Pressable>
+                );
+              })}
+            </View>
+          </View>
+
+          {/* Expander toggle button */}
+          <Pressable
+            style={styles.expandToggleBtn}
+            onPress={() => setShowAllCategories((prev) => !prev)}
+          >
+            <Text style={styles.expandToggleText}>Chi tiết từng danh mục (6)</Text>
+            <Ionicons name={showAllCategories ? "chevron-up" : "chevron-down"} size={16} color="#db2777" />
+          </Pressable>
+
+          {/* The 6 Stat Cards */}
+          {showAllCategories && (
+            <View style={styles.statusGrid}>
+              {statusCards.map((c) => {
+                const isSelected = selectedFilter === c.filter;
+                return (
+                  <Pressable
+                    key={c.filter}
+                    onPress={() => setSelectedFilter(isSelected ? "all" : c.filter)}
+                    style={[styles.statusCard, isSelected && styles.cardActive]}
+                  >
+                    <View style={styles.statusIconValRow}>
+                      <View style={[styles.statusCardIconCircle, { backgroundColor: c.bgColor }]}>
+                        <Ionicons name={c.icon} size={16} color={c.color} />
+                      </View>
+                      <Text style={[styles.statusValue, { color: c.color }]}>{c.value}</Text>
+                    </View>
+                    <Text style={styles.statusLabel} numberOfLines={1}>
+                      {c.label}
+                    </Text>
+                  </Pressable>
+                );
+              })}
+            </View>
+          )}
+        </View>
+
+        {/* Section: Trạng thái kiểm định (Cards nền trắng bo góc, icon minh họa) */}
+        <Text style={styles.statusSectionTitle}>Trạng thái kiểm định</Text>
+
+        <View style={styles.complianceGrid}>
+          {/* Quá hạn */}
+          <View style={styles.complianceCardWhite}>
+            <View style={styles.complianceCardHeader}>
+              <Text style={[styles.complianceCardTitle, { color: "#be123c" }]} numberOfLines={1}>Quá hạn</Text>
+              <View style={[styles.complianceIconWrap, { backgroundColor: "#fee2e2" }]}>
+                <Ionicons name="time-outline" size={16} color="#dc2626" />
+              </View>
+            </View>
+            <Text style={[styles.complianceValue, { color: "#be123c" }]}>{computedOverdue}</Text>
+            <Text style={[styles.complianceSubtitle, { color: "#e11d48" }]} numberOfLines={1}>Cần kiểm định gấp</Text>
+          </View>
+
+          {/* Sắp tới hạn */}
+          <View style={styles.complianceCardWhite}>
+            <View style={styles.complianceCardHeader}>
+              <Text style={[styles.complianceCardTitle, { color: "#b45309" }]} numberOfLines={1}>Sắp tới hạn</Text>
+              <View style={[styles.complianceIconWrap, { backgroundColor: "#fef3c7" }]}>
+                <Ionicons name="calendar-outline" size={16} color="#d97706" />
+              </View>
+            </View>
+            <Text style={[styles.complianceValue, { color: "#b45309" }]}>{computedUpcoming}</Text>
+            <Text style={[styles.complianceSubtitle, { color: "#b45309" }]} numberOfLines={1}>Trong 30 ngày</Text>
+          </View>
+
+          {/* Đạt chuẩn */}
+          <View style={styles.complianceCardWhite}>
+            <View style={styles.complianceCardHeader}>
+              <Text style={[styles.complianceCardTitle, { color: "#047857" }]} numberOfLines={1}>Đạt chuẩn</Text>
+              <View style={[styles.complianceIconWrap, { backgroundColor: "#dcfce7" }]}>
+                <Ionicons name="shield-checkmark-outline" size={16} color="#059669" />
+              </View>
+            </View>
+            <Text style={[styles.complianceValue, { color: "#047857" }]}>{computedValid}</Text>
+            <Text style={[styles.complianceSubtitle, { color: "#059669" }]} numberOfLines={1}>Hoạt động an toàn</Text>
+          </View>
+        </View>
+
+        {/* SECTION: Danh sách phiếu mượn & trả (Duyệt, Từ chối & Hủy) */}
+        <View style={requestStyles.sectionWrap}>
+          <View style={requestStyles.sectionHeaderRow}>
+            <View style={requestStyles.sectionHeaderLeft}>
+              <Ionicons name="clipboard-outline" size={18} color="#008852" />
+              <Text style={requestStyles.sectionHeaderTitle}>Danh sách phiếu mượn / trả</Text>
+            </View>
+            <View style={requestStyles.pendingCountBadge}>
+              <Text style={requestStyles.pendingCountText}>
+                {requests.filter((r) => r.status === "pending").length} chờ duyệt
+              </Text>
+            </View>
+          </View>
+
+          <View style={requestStyles.requestCardsList}>
+            {requests.map((req) => {
+              const isPending = req.status === "pending";
+              const isApproved = req.status === "approved";
+              const isRejected = req.status === "rejected";
+              const isCancelled = req.status === "cancelled";
+              const isMyRequest = user?.displayName ? req.requesterName.includes(user.displayName) : true;
+
               return (
-                <Pressable
-                  key={c.filter}
-                  onPress={() => setSelectedFilter(isSelected ? "all" : c.filter)}
-                  style={[styles.statusCard, isSelected && styles.cardActive]}
-                >
-                  <View style={styles.statusIconValRow}>
-                    <IconComp name={c.icon as any} size={15} color={c.color} />
-                    <Text style={[styles.statusValue, { color: c.color }]}>{c.value}</Text>
+                <View key={req.id} style={requestStyles.card}>
+                  {/* Row 1: Header (Title, Type Badge, Status Badge) */}
+                  <View style={requestStyles.cardHeaderRow}>
+                    <View style={requestStyles.titleWrap}>
+                      <Text style={requestStyles.cardEquipName} numberOfLines={2}>
+                        {req.equipmentName}{" "}
+                        <Text style={requestStyles.cardEquipCode}>({req.equipmentCode})</Text>
+                      </Text>
+                    </View>
+
+                    <View style={requestStyles.badgeGroup}>
+                      <View
+                        style={[
+                          requestStyles.typeBadge,
+                          req.type === "borrow"
+                            ? { backgroundColor: "#e0f2fe" }
+                            : { backgroundColor: "#fef3c7" },
+                        ]}
+                      >
+                        <Text
+                          style={[
+                            requestStyles.typeBadgeText,
+                            req.type === "borrow" ? { color: "#0284c7" } : { color: "#d97706" },
+                          ]}
+                        >
+                          {req.type === "borrow" ? "Mượn" : "Trả"}
+                        </Text>
+                      </View>
+
+                      <View
+                        style={[
+                          requestStyles.statusBadge,
+                          isPending && { backgroundColor: "#e6f4ea" },
+                          isApproved && { backgroundColor: "#dcfce7" },
+                          isRejected && { backgroundColor: "#fee2e2" },
+                          isCancelled && { backgroundColor: "#f1f5f9" },
+                        ]}
+                      >
+                        <Text
+                          style={[
+                            requestStyles.statusBadgeText,
+                            isPending && { color: "#008852" },
+                            isApproved && { color: "#15803d" },
+                            isRejected && { color: "#dc2626" },
+                            isCancelled && { color: "#64748b" },
+                          ]}
+                        >
+                          {isPending ? "Chờ duyệt" : isApproved ? "Đã duyệt" : isRejected ? "Từ chối" : "Đã hủy"}
+                        </Text>
+                      </View>
+                    </View>
                   </View>
-                  <Text style={styles.statusLabel} numberOfLines={1}>
-                    {c.label}
-                  </Text>
-                </Pressable>
+
+                  {/* Row 2: Subtitle (Người tạo) */}
+                  <View style={requestStyles.cardSubRow}>
+                    <Ionicons name="person-outline" size={13} color="#64748b" />
+                    <Text style={requestStyles.cardSubLine}>
+                      Người tạo: <Text style={requestStyles.cardRequesterName}>{req.requesterName}</Text> ({req.requesterDepartment})
+                    </Text>
+                  </View>
+
+                  {/* Row 3: Action Buttons at the bottom */}
+                  {isPending ? (
+                    <View style={requestStyles.cardBottomActions}>
+                      {canApprove ? (
+                        <>
+                          <Pressable
+                            style={requestStyles.approveBtn}
+                            onPress={() => handleApproveRequest(req)}
+                          >
+                            <Ionicons name="checkmark-sharp" size={14} color="#ffffff" />
+                            <Text style={requestStyles.approveBtnText}>Duyệt</Text>
+                          </Pressable>
+
+                          <Pressable
+                            style={requestStyles.rejectBtn}
+                            onPress={() => handleRejectRequest(req)}
+                          >
+                            <Ionicons name="close-circle-outline" size={14} color="#dc2626" />
+                            <Text style={requestStyles.rejectBtnText}>Từ chối</Text>
+                          </Pressable>
+                        </>
+                      ) : null}
+
+                      {isMyRequest ? (
+                        <Pressable
+                          style={requestStyles.cancelBtn}
+                          onPress={() => handleCancelRequest(req)}
+                        >
+                          <Ionicons name="ban-outline" size={14} color="#64748b" />
+                          <Text style={requestStyles.cancelBtnText}>Hủy</Text>
+                        </Pressable>
+                      ) : null}
+                    </View>
+                  ) : (
+                    <View style={requestStyles.cardBottomStatus}>
+                      <Text
+                        style={[
+                          requestStyles.statusDoneText,
+                          isApproved && { color: "#15803d" },
+                          isRejected && { color: "#dc2626" },
+                          isCancelled && { color: "#64748b" },
+                        ]}
+                      >
+                        {isApproved ? "✓ Đã phê duyệt" : isRejected ? "✕ Đã từ chối" : "─ Đã hủy phiếu"}
+                      </Text>
+                    </View>
+                  )}
+                </View>
               );
             })}
           </View>
         </View>
 
-        <Text style={styles.statusSectionTitle}>Trạng thái</Text>
-
-        <View style={styles.complianceGrid}>
-          <View style={[styles.complianceCard, styles.complianceCardRed]}>
-            <View style={styles.complianceCardHeader}>
-              <Text style={[styles.complianceCardTitle, styles.complianceTextRed]} numberOfLines={1}>Quá hạn</Text>
-              <View style={[styles.complianceIconWrap, styles.complianceIconWrapRed]}>
-                <Image source={require("../../assets/compliance-clock-badge.png")} style={styles.complianceIcon} resizeMode="contain" />
-              </View>
-            </View>
-            <Text style={[styles.complianceValue, styles.complianceTextRed]}>{computedOverdue}</Text>
-            <Text style={[styles.complianceSubtitle, styles.complianceSubRed]} numberOfLines={1}>Cần kiểm định gấp</Text>
-          </View>
-          <View style={[styles.complianceCard, styles.complianceCardAmber]}>
-            <View style={styles.complianceCardHeader}>
-              <Text style={[styles.complianceCardTitle, styles.complianceTextAmber]} numberOfLines={1}>Sắp tới hạn</Text>
-              <View style={[styles.complianceIconWrap, styles.complianceIconWrapAmber]}>
-                <Image source={require("../../assets/compliance-calendar-badge.png")} style={styles.complianceIcon} resizeMode="contain" />
-              </View>
-            </View>
-            <Text style={[styles.complianceValue, styles.complianceTextAmber]}>{computedUpcoming}</Text>
-            <Text style={[styles.complianceSubtitle, styles.complianceSubAmber]} numberOfLines={1}>Trong 30 ngày</Text>
-          </View>
-          <View style={[styles.complianceCard, styles.complianceCardGreen]}>
-            <View style={styles.complianceCardHeader}>
-              <Text style={[styles.complianceCardTitle, styles.complianceTextGreen]} numberOfLines={1}>Đạt chuẩn</Text>
-              <View style={[styles.complianceIconWrap, styles.complianceIconWrapGreen]}>
-                <Image source={require("../../assets/compliance-shield-badge.png")} style={styles.complianceIcon} resizeMode="contain" />
-              </View>
-            </View>
-            <Text style={[styles.complianceValue, styles.complianceTextGreen]}>{computedValid}</Text>
-            <Text style={[styles.complianceSubtitle, styles.complianceSubGreen]} numberOfLines={1}>Hoạt động an toàn</Text>
-          </View>
-        </View>
-
+        {/* Search Bar */}
         <View style={styles.searchBar}>
-          <Ionicons name="search" size={15} color="#94a3b8" style={{ marginRight: 8 }} />
+          <Ionicons name="search" size={16} color="#94a3b8" style={{ marginRight: 8 }} />
           <TextInput
             value={search}
             onChangeText={setSearch}
@@ -2195,11 +3268,12 @@ export default function EquipmentScreen() {
           />
           {search ? (
             <Pressable onPress={() => { setSearch(""); void loadData(); }} hitSlop={8}>
-              <Ionicons name="close-circle" size={16} color="#94a3b8" />
+              <Ionicons name="close-circle" size={18} color="#94a3b8" />
             </Pressable>
           ) : null}
         </View>
 
+        {/* List Section */}
         <View style={styles.listSection}>
           <View style={styles.listHeader}>
             <Text style={styles.listTitle}>Danh sách thiết bị ({displayedItems.length})</Text>
@@ -2249,7 +3323,7 @@ export default function EquipmentScreen() {
         </View>
       </ScrollView>
 
-      <EquipmentModal visible={modalVisible} onClose={() => setModalVisible(false)} onSaved={() => setRevision((v) => v + 1)} editItem={editItem} />
+      <EquipmentModal visible={modalVisible} onClose={() => setModalVisible(false)} onSaved={handleItemSaved} editItem={editItem} />
       <EquipmentDetailModal
         visible={!!viewDetailItem}
         item={viewDetailItem}
@@ -2270,52 +3344,321 @@ export default function EquipmentScreen() {
         type={alertState.type}
         onClose={() => setAlertState((prev) => ({ ...prev, visible: false }))}
       />
+      <EquipmentBorrowReturnModal
+        visible={borrowReturnModalVisible}
+        initialTab={borrowReturnTab}
+        equipmentList={items}
+        onClose={() => setBorrowReturnModalVisible(false)}
+        onSaved={handleItemSaved}
+        showAlert={showAlert}
+      />
     </SafeAreaView>
   );
 }
 
 const styles = StyleSheet.create({
   container: { flex: 1, backgroundColor: "#f8fafc" },
-  header: { flexDirection: "row", alignItems: "center", justifyContent: "space-between", paddingHorizontal: 16, paddingVertical: 12, backgroundColor: "#ffffff", borderBottomWidth: 1, borderBottomColor: "#f1f5f9" },
-  backButton: { width: 36, height: 36, borderRadius: 18, backgroundColor: "#f1f5f9", alignItems: "center", justifyContent: "center", transform: [{ rotate: "180deg" }] },
-  backIcon: { width: 16, height: 16, tintColor: "#334155" },
-  headerTitle: { fontSize: 16, fontWeight: "700", color: "#0f172a", fontFamily: "Inter-Bold" },
-  headerRightSpacer: { width: 36 },
+  header: {
+    flexDirection: "row",
+    alignItems: "center",
+    justifyContent: "space-between",
+    paddingHorizontal: 16,
+    paddingVertical: 12,
+    backgroundColor: "#ffffff",
+    borderBottomWidth: 1,
+    borderBottomColor: "#f1f5f9",
+  },
+  backButton: {
+    width: 36,
+    height: 36,
+    borderRadius: 18,
+    backgroundColor: "#f1f5f9",
+    alignItems: "center",
+    justifyContent: "center",
+  },
+  headerTitle: { fontSize: 17, fontWeight: "800", color: "#0f172a", fontFamily: "Inter-Bold" },
+  headerIconsRight: { flexDirection: "row", alignItems: "center", gap: 8 },
+  headerIconBtn: {
+    width: 34,
+    height: 34,
+    borderRadius: 17,
+    backgroundColor: "#f8fafc",
+    alignItems: "center",
+    justifyContent: "center",
+  },
   scrollView: { flex: 1 },
-  scrollContent: { padding: 16, gap: 8, paddingBottom: 40 },
-  errorBanner: { backgroundColor: "#fff1f2", borderRadius: 12, borderWidth: 1, borderColor: "#fecdd3", padding: 12, flexDirection: "row", alignItems: "center", justifyContent: "space-between", gap: 8 },
+  scrollContent: { padding: 16, gap: 12, paddingBottom: 40 },
+  errorBanner: {
+    backgroundColor: "#fff1f2",
+    borderRadius: 12,
+    borderWidth: 1,
+    borderColor: "#fecdd3",
+    padding: 12,
+    flexDirection: "row",
+    alignItems: "center",
+    justifyContent: "space-between",
+    gap: 8,
+  },
   errorBannerText: { fontSize: 12, color: "#be123c", fontFamily: "Inter-Medium", flex: 1 },
   errorRetryBtn: { backgroundColor: "#be123c", paddingHorizontal: 10, paddingVertical: 5, borderRadius: 8 },
   errorRetryText: { fontSize: 11, fontWeight: "700", color: "#ffffff", fontFamily: "Inter-Bold" },
-  statsWrapperCard: {
+
+  // Top 4 quick actions
+  topActionsCard: {
+    flexDirection: "row",
+    justifyContent: "space-between",
     backgroundColor: "#ffffff",
-    borderRadius: 14,
-    padding: 8,
+    borderRadius: 16,
+    paddingVertical: 14,
+    paddingHorizontal: 8,
     borderWidth: 1,
     borderColor: "#e2e8f0",
     shadowColor: "#000",
-    shadowOffset: { width: 0, height: 1 },
+    shadowOffset: { width: 0, height: 2 },
     shadowOpacity: 0.04,
-    shadowRadius: 3,
-    elevation: 1,
+    shadowRadius: 4,
+    elevation: 2,
   },
+  actionCol: {
+    flex: 1,
+    alignItems: "center",
+    justifyContent: "center",
+  },
+  actionIconBox: {
+    width: 50,
+    height: 50,
+    borderRadius: 15,
+    borderWidth: 1,
+    alignItems: "center",
+    justifyContent: "center",
+    marginBottom: 6,
+  },
+  actionBadgeWrap: { position: "relative" },
+  actionRedBadge: {
+    position: "absolute",
+    top: -6,
+    right: -10,
+    backgroundColor: "#ef4444",
+    borderRadius: 9,
+    paddingHorizontal: 5,
+    paddingVertical: 1,
+    borderWidth: 1.5,
+    borderColor: "#ffffff",
+  },
+  actionRedBadgeText: { color: "#ffffff", fontSize: 9.5, fontWeight: "800", fontFamily: "Inter-Bold" },
+  actionColLabel: { fontSize: 11.5, fontWeight: "700", color: "#334155", fontFamily: "Inter-Bold", textAlign: "center" },
+
+  // Section Header
+  sectionHeaderRow: {
+    flexDirection: "row",
+    justifyContent: "space-between",
+    alignItems: "center",
+    marginTop: 4,
+  },
+  sectionHeaderLeft: {
+    flexDirection: "row",
+    alignItems: "center",
+    gap: 6,
+  },
+  sectionHeaderMainTitle: {
+    fontSize: 16,
+    fontWeight: "800",
+    color: "#0f172a",
+    fontFamily: "Inter-Bold",
+  },
+  pillToggle: {
+    flexDirection: "row",
+    alignItems: "center",
+    gap: 5,
+    backgroundColor: "#fdf2f8",
+    paddingHorizontal: 10,
+    paddingVertical: 4,
+    borderRadius: 20,
+    borderWidth: 1,
+    borderColor: "#fbcfe8",
+  },
+  pillToggleText: {
+    fontSize: 12,
+    fontWeight: "700",
+    color: "#db2777",
+    fontFamily: "Inter-Bold",
+  },
+
+  // Overview / Donut Card
+  overviewCard: {
+    backgroundColor: "#ffffff",
+    borderRadius: 18,
+    padding: 14,
+    borderWidth: 1,
+    borderColor: "#e2e8f0",
+    shadowColor: "#000",
+    shadowOffset: { width: 0, height: 2 },
+    shadowOpacity: 0.05,
+    shadowRadius: 5,
+    elevation: 2,
+    gap: 12,
+  },
+  periodRow: {
+    flexDirection: "row",
+    justifyContent: "space-between",
+    alignItems: "center",
+    paddingHorizontal: 4,
+  },
+  periodBadge: {
+    flexDirection: "row",
+    alignItems: "center",
+    gap: 6,
+  },
+  periodText: {
+    fontSize: 14,
+    fontWeight: "700",
+    color: "#0f172a",
+    fontFamily: "Inter-Bold",
+  },
+  highlightRow: {
+    flexDirection: "row",
+    gap: 10,
+  },
+  highlightCard: {
+    flex: 1,
+    backgroundColor: "#ffffff",
+    borderRadius: 12,
+    borderWidth: 1.5,
+    borderColor: "#e2e8f0",
+    paddingVertical: 8,
+    paddingHorizontal: 12,
+  },
+  highlightCardPink: {
+    borderColor: "#f472b6",
+  },
+  highlightCardActive: {
+    backgroundColor: "#f8fafc",
+    borderColor: "#008852",
+  },
+  highlightCardHeader: {
+    flexDirection: "row",
+    alignItems: "center",
+    gap: 6,
+    marginBottom: 4,
+  },
+  highlightIconWrap: {
+    width: 22,
+    height: 22,
+    borderRadius: 11,
+    alignItems: "center",
+    justifyContent: "center",
+  },
+  highlightLabel: {
+    fontSize: 12,
+    fontWeight: "700",
+    color: "#475569",
+    fontFamily: "Inter-Bold",
+    flex: 1,
+  },
+  highlightValue: {
+    fontSize: 20,
+    fontWeight: "800",
+    color: "#0f172a",
+    fontFamily: "Inter-Bold",
+  },
+  ratioBanner: {
+    flexDirection: "row",
+    alignItems: "center",
+    gap: 8,
+    backgroundColor: "#f8fafc",
+    borderRadius: 10,
+    paddingVertical: 8,
+    paddingHorizontal: 10,
+    borderWidth: 1,
+    borderColor: "#f1f5f9",
+  },
+  ratioBannerText: {
+    flex: 1,
+    fontSize: 11.5,
+    fontWeight: "600",
+    color: "#334155",
+    fontFamily: "Inter-SemiBold",
+  },
+  donutSection: {
+    flexDirection: "row",
+    alignItems: "center",
+    justifyContent: "center",
+    gap: 12,
+    paddingVertical: 4,
+  },
+  donutLegend: {
+    flex: 1,
+    gap: 6,
+  },
+  donutLegendItem: {
+    flexDirection: "row",
+    alignItems: "center",
+    gap: 6,
+    paddingVertical: 3,
+    paddingHorizontal: 6,
+    borderRadius: 6,
+  },
+  donutLegendItemActive: {
+    backgroundColor: "#f1f5f9",
+  },
+  legendColorDot: {
+    width: 9,
+    height: 9,
+    borderRadius: 4.5,
+  },
+  legendPctText: {
+    fontSize: 11.5,
+    fontWeight: "800",
+    color: "#0f172a",
+    fontFamily: "Inter-Bold",
+    width: 32,
+  },
+  legendLabelText: {
+    fontSize: 11.5,
+    color: "#475569",
+    fontFamily: "Inter-Medium",
+    flex: 1,
+  },
+  expandToggleBtn: {
+    flexDirection: "row",
+    alignItems: "center",
+    justifyContent: "center",
+    gap: 4,
+    paddingTop: 6,
+    borderTopWidth: 1,
+    borderTopColor: "#f1f5f9",
+  },
+  expandToggleText: {
+    fontSize: 12.5,
+    fontWeight: "700",
+    color: "#db2777",
+    fontFamily: "Inter-Bold",
+  },
+
+  // 6 Stat Cards inside overview
   statusGrid: {
     flexDirection: "row",
     flexWrap: "wrap",
     justifyContent: "space-between",
-    rowGap: 6,
+    rowGap: 8,
+    marginTop: 4,
   },
   statusCard: {
-    width: "32%",
+    width: "31.6%",
     backgroundColor: "#ffffff",
     borderWidth: 1,
-    borderColor: "#f1f5f9",
-    borderRadius: 8,
-    paddingVertical: 6,
-    paddingHorizontal: 3,
+    borderColor: "#e2e8f0",
+    borderRadius: 12,
+    paddingVertical: 9,
+    paddingHorizontal: 6,
     alignItems: "center",
     justifyContent: "center",
-    minHeight: 46,
+    minHeight: 64,
+    shadowColor: "#000",
+    shadowOffset: { width: 0, height: 1 },
+    shadowOpacity: 0.03,
+    shadowRadius: 2,
+    elevation: 1,
   },
   cardActive: {
     borderColor: "#008852",
@@ -2325,83 +3668,130 @@ const styles = StyleSheet.create({
     flexDirection: "row",
     alignItems: "center",
     justifyContent: "center",
-    gap: 4,
+    gap: 5,
+  },
+  statusCardIconCircle: {
+    width: 22,
+    height: 22,
+    borderRadius: 11,
+    alignItems: "center",
+    justifyContent: "center",
   },
   statusValue: {
-    fontSize: 15,
+    fontSize: 17,
     fontWeight: "800",
     fontFamily: "Inter-Bold",
   },
   statusLabel: {
-    fontSize: 9.5,
+    fontSize: 11.5,
+    fontWeight: "700",
+    fontFamily: "Inter-Bold",
+    color: "#475569",
+    textAlign: "center",
+    marginTop: 4,
+  },
+
+  // Compliance / Status Section
+  statusSectionTitle: {
+    fontSize: 15,
+    fontWeight: "800",
+    color: "#0f172a",
+    fontFamily: "Inter-Bold",
+    marginTop: 6,
+    marginBottom: 2,
+  },
+  complianceGrid: {
+    flexDirection: "row",
+    justifyContent: "space-between",
+  },
+  complianceCardWhite: {
+    width: "31.6%",
+    backgroundColor: "#ffffff",
+    borderRadius: 14,
+    borderWidth: 1,
+    borderColor: "#e2e8f0",
+    paddingVertical: 10,
+    paddingHorizontal: 8,
+    justifyContent: "space-between",
+    minHeight: 78,
+    shadowColor: "#000",
+    shadowOffset: { width: 0, height: 1 },
+    shadowOpacity: 0.04,
+    shadowRadius: 3,
+    elevation: 1,
+  },
+  complianceCardHeader: {
+    flexDirection: "row",
+    justifyContent: "space-between",
+    alignItems: "center",
+  },
+  complianceCardTitle: {
+    fontSize: 12.5,
+    fontWeight: "700",
+    fontFamily: "Inter-Bold",
+    flex: 1,
+  },
+  complianceIconWrap: {
+    width: 24,
+    height: 24,
+    borderRadius: 12,
+    alignItems: "center",
+    justifyContent: "center",
+  },
+  complianceValue: {
+    fontSize: 20,
     fontWeight: "800",
     fontFamily: "Inter-Bold",
-    color: "#0f172a",
-    letterSpacing: 0.1,
-    textAlign: "center",
     marginTop: 2,
+    marginBottom: 2,
+    textAlign: "center",
   },
-  statusSectionTitle: { fontSize: 13.5, fontWeight: "700", color: "#0f172a", fontFamily: "Inter-Bold", marginTop: 6, marginBottom: 2 },
-  cardGray: { backgroundColor: "#ffffff", borderColor: "#e2e8f0" },
-  cardGreen: { backgroundColor: "#f0fdf4", borderColor: "#bbf7d0" },
-  cardAmber: { backgroundColor: "#fffbeb", borderColor: "#fed7aa" },
-  textGray: { color: "#64748b" },
-  textGreen: { color: "#047857" },
-  textAmber: { color: "#b45309" },
-  textDark: { color: "#0f172a" },
-  complianceGrid: { flexDirection: "row", justifyContent: "space-between", marginTop: 1 },
-  complianceCard: {
-    width: "31.6%",
-    borderRadius: 10,
-    borderWidth: 1,
-    paddingVertical: 5,
-    paddingHorizontal: 6,
-    justifyContent: "space-between",
-    minHeight: 52,
+  complianceSubtitle: {
+    fontSize: 10,
+    fontWeight: "600",
+    fontFamily: "Inter-SemiBold",
+    textAlign: "center",
   },
-  complianceCardHeader: { flexDirection: "row", justifyContent: "space-between", alignItems: "center" },
-  complianceCardTitle: { fontSize: 9.5, fontWeight: "700", fontFamily: "Inter-Bold", flex: 1 },
-  complianceIconWrap: { width: 15, height: 15, borderRadius: 7.5, alignItems: "center", justifyContent: "center" },
-  complianceIconWrapRed: { backgroundColor: "#ffe4e6" },
-  complianceIconWrapAmber: { backgroundColor: "#fef3c7" },
-  complianceIconWrapGreen: { backgroundColor: "#dcfce7" },
-  complianceIcon: { width: 9, height: 9 },
-  complianceValue: { fontSize: 16, fontWeight: "800", fontFamily: "Inter-Bold", marginTop: 1, marginBottom: 1, textAlign: "center" },
-  complianceSubtitle: { fontSize: 8, fontWeight: "600", fontFamily: "Inter-SemiBold", textAlign: "center" },
-  complianceCardRed: { backgroundColor: "#fff1f2", borderColor: "#fecdd3" },
-  complianceCardAmber: { backgroundColor: "#fffbeb", borderColor: "#fed7aa" },
-  complianceCardGreen: { backgroundColor: "#f0fdf4", borderColor: "#bbf7d0" },
-  complianceTextRed: { color: "#be123c" },
-  complianceSubRed: { color: "#e11d48" },
-  complianceTextAmber: { color: "#b45309" },
-  complianceSubAmber: { color: "#b45309" },
-  complianceTextGreen: { color: "#047857" },
-  complianceSubGreen: { color: "#059669" },
+
+  // Search Bar
   searchBar: {
     backgroundColor: "#ffffff",
     borderRadius: 24,
     borderWidth: 1,
     borderColor: "#e2e8f0",
     paddingHorizontal: 14,
-    paddingVertical: 7,
-    marginTop: 8,
+    paddingVertical: 8,
+    marginTop: 4,
     flexDirection: "row",
     alignItems: "center",
-    width: "88%",
-    alignSelf: "center",
+    width: "100%",
     shadowColor: "#000",
     shadowOffset: { width: 0, height: 1 },
     shadowOpacity: 0.05,
     shadowRadius: 3,
     elevation: 1,
   },
-  searchInput: { flex: 1, fontSize: 12.5, fontFamily: "Inter-Medium", color: "#1e293b", paddingVertical: 2 },
-  listSection: { gap: 8, marginTop: 6 },
+  searchInput: { flex: 1, fontSize: 13, fontFamily: "Inter-Medium", color: "#1e293b", paddingVertical: 2 },
+
+  // List Section
+  listSection: { gap: 8, marginTop: 4 },
   listHeader: { flexDirection: "row", justifyContent: "space-between", alignItems: "center", paddingHorizontal: 2 },
   listHeaderRight: { flexDirection: "row", alignItems: "center" },
-  listTitle: { fontSize: 14, fontWeight: "700", color: "#1e293b", fontFamily: "Inter-Bold" },
+  listTitle: { fontSize: 14.5, fontWeight: "700", color: "#1e293b", fontFamily: "Inter-Bold" },
   resetFilterText: { fontSize: 12, fontWeight: "600", color: "#008852", fontFamily: "Inter-SemiBold" },
-  addBtn: { width: 32, height: 32, borderRadius: 16, backgroundColor: "#008852", alignItems: "center", justifyContent: "center", shadowColor: "#008852", shadowOffset: { width: 0, height: 2 }, shadowOpacity: 0.3, shadowRadius: 4, elevation: 3 },
+  addBtn: {
+    width: 32,
+    height: 32,
+    borderRadius: 16,
+    backgroundColor: "#008852",
+    alignItems: "center",
+    justifyContent: "center",
+    shadowColor: "#008852",
+    shadowOffset: { width: 0, height: 2 },
+    shadowOpacity: 0.3,
+    shadowRadius: 4,
+    elevation: 3,
+  },
   swipeHint: { fontSize: 11, color: "#94a3b8", fontFamily: "Inter-Regular", textAlign: "right", paddingRight: 4, marginTop: -2 },
   loadingContainer: { paddingVertical: 30, alignItems: "center", justifyContent: "center", gap: 8 },
   loadingText: { fontSize: 12, color: "#64748b", fontFamily: "Inter-Regular" },
@@ -2410,18 +3800,30 @@ const styles = StyleSheet.create({
   editBtn: { flex: 1, backgroundColor: "#2563eb", alignItems: "center", justifyContent: "center", gap: 3 },
   deleteBtn: { flex: 1, backgroundColor: "#dc2626", alignItems: "center", justifyContent: "center", gap: 3 },
   actionBtnText: { color: "#ffffff", fontSize: 11, fontWeight: "700" },
-  itemCard: { backgroundColor: "#ffffff", borderRadius: 14, borderWidth: 1, borderColor: "#e2e8f0", padding: 14, gap: 10, shadowColor: "#059669", shadowOffset: { width: 0, height: 1 }, shadowOpacity: 0.04, shadowRadius: 3, elevation: 1 },
+  itemCard: {
+    backgroundColor: "#ffffff",
+    borderRadius: 14,
+    borderWidth: 1,
+    borderColor: "#e2e8f0",
+    padding: 14,
+    gap: 10,
+    shadowColor: "#059669",
+    shadowOffset: { width: 0, height: 1 },
+    shadowOpacity: 0.04,
+    shadowRadius: 3,
+    elevation: 1,
+  },
   itemCardTop: { flexDirection: "row", justifyContent: "space-between", alignItems: "flex-start", gap: 8 },
   itemInfo: { flex: 1, gap: 2 },
-  itemName: { fontSize: 13.5, fontWeight: "700", color: "#0f172a", fontFamily: "Inter-Bold" },
-  itemCode: { fontSize: 11, color: "#64748b", fontFamily: "Inter-Regular" },
+  itemName: { fontSize: 14, fontWeight: "700", color: "#0f172a", fontFamily: "Inter-Bold" },
+  itemCode: { fontSize: 11.5, color: "#64748b", fontFamily: "Inter-Regular" },
   itemBadge: { paddingHorizontal: 8, paddingVertical: 3, borderRadius: 8 },
-  itemBadgeText: { fontSize: 10.5, fontWeight: "700", fontFamily: "Inter-Bold" },
+  itemBadgeText: { fontSize: 11, fontWeight: "700", fontFamily: "Inter-Bold" },
   itemFooter: { flexDirection: "row", justifyContent: "space-between", alignItems: "center", paddingTop: 8, borderTopWidth: 1, borderTopColor: "#f1f5f9" },
-  itemMeta: { fontSize: 11, color: "#64748b", fontFamily: "Inter-Medium" },
+  itemMeta: { fontSize: 11.5, color: "#64748b", fontFamily: "Inter-Medium" },
   normalDate: { color: "#334155", fontFamily: "Inter-SemiBold" },
   categoryBadge: { backgroundColor: "#f1f5f9", paddingHorizontal: 8, paddingVertical: 3, borderRadius: 8 },
-  categoryBadgeText: { fontSize: 10, color: "#475569", fontFamily: "Inter-Medium" },
+  categoryBadgeText: { fontSize: 10.5, color: "#475569", fontFamily: "Inter-Medium" },
 });
 
 const modal = StyleSheet.create({
@@ -3383,5 +4785,195 @@ const previewModalStyles = StyleSheet.create({
     fontStyle: "italic",
     textAlign: "center",
     marginTop: 8,
+  },
+});
+
+const requestStyles = StyleSheet.create({
+  sectionWrap: {
+    backgroundColor: "#ffffff",
+    borderRadius: 16,
+    padding: 14,
+    borderWidth: 1,
+    borderColor: "#e2e8f0",
+    gap: 10,
+    marginBottom: 12,
+    shadowColor: "#000",
+    shadowOffset: { width: 0, height: 1 },
+    shadowOpacity: 0.04,
+    shadowRadius: 3,
+    elevation: 1,
+  },
+  sectionHeaderRow: {
+    flexDirection: "row",
+    alignItems: "center",
+    justifyContent: "space-between",
+    paddingBottom: 8,
+    borderBottomWidth: 1,
+    borderBottomColor: "#f1f5f9",
+  },
+  sectionHeaderLeft: {
+    flexDirection: "row",
+    alignItems: "center",
+    gap: 6,
+  },
+  sectionHeaderTitle: {
+    fontSize: 15,
+    fontWeight: "800",
+    color: "#0f172a",
+    fontFamily: "Inter-Bold",
+  },
+  pendingCountBadge: {
+    backgroundColor: "#e6f4ea",
+    paddingHorizontal: 8,
+    paddingVertical: 3,
+    borderRadius: 12,
+  },
+  pendingCountText: {
+    fontSize: 11,
+    fontWeight: "700",
+    color: "#008852",
+    fontFamily: "Inter-Bold",
+  },
+  requestCardsList: {
+    gap: 8,
+  },
+  card: {
+    flexDirection: "column",
+    backgroundColor: "#ffffff",
+    borderRadius: 14,
+    padding: 12,
+    borderWidth: 1,
+    borderColor: "#e2e8f0",
+    gap: 8,
+    shadowColor: "#000",
+    shadowOffset: { width: 0, height: 1 },
+    shadowOpacity: 0.04,
+    shadowRadius: 3,
+    elevation: 1,
+  },
+  cardHeaderRow: {
+    flexDirection: "row",
+    alignItems: "flex-start",
+    justifyContent: "space-between",
+    gap: 8,
+  },
+  titleWrap: {
+    flex: 1,
+  },
+  cardEquipName: {
+    fontSize: 13.5,
+    fontWeight: "800",
+    color: "#0f172a",
+    fontFamily: "Inter-Bold",
+    lineHeight: 18,
+  },
+  cardEquipCode: {
+    fontSize: 12,
+    fontWeight: "400",
+    color: "#64748b",
+    fontFamily: "Inter-Regular",
+  },
+  badgeGroup: {
+    flexDirection: "row",
+    alignItems: "center",
+    gap: 6,
+  },
+  typeBadge: {
+    paddingHorizontal: 8,
+    paddingVertical: 3,
+    borderRadius: 8,
+  },
+  typeBadgeText: {
+    fontSize: 11,
+    fontWeight: "700",
+    fontFamily: "Inter-Bold",
+  },
+  statusBadge: {
+    paddingHorizontal: 8,
+    paddingVertical: 3,
+    borderRadius: 8,
+  },
+  statusBadgeText: {
+    fontSize: 11,
+    fontWeight: "700",
+    fontFamily: "Inter-Bold",
+  },
+  cardSubRow: {
+    flexDirection: "row",
+    alignItems: "center",
+    gap: 5,
+  },
+  cardSubLine: {
+    fontSize: 12,
+    color: "#64748b",
+    fontFamily: "Inter-Regular",
+  },
+  cardRequesterName: {
+    fontWeight: "700",
+    color: "#334155",
+    fontFamily: "Inter-Bold",
+  },
+  cardBottomActions: {
+    flexDirection: "row",
+    alignItems: "center",
+    gap: 8,
+    paddingTop: 8,
+    borderTopWidth: 1,
+    borderTopColor: "#f1f5f9",
+  },
+  cardBottomStatus: {
+    paddingTop: 4,
+  },
+  approveBtn: {
+    flexDirection: "row",
+    alignItems: "center",
+    gap: 4,
+    backgroundColor: "#008852",
+    paddingHorizontal: 14,
+    paddingVertical: 7,
+    borderRadius: 18,
+    elevation: 2,
+  },
+  approveBtnText: {
+    color: "#ffffff",
+    fontSize: 12.5,
+    fontWeight: "800",
+    fontFamily: "Inter-Bold",
+  },
+  rejectBtn: {
+    flexDirection: "row",
+    alignItems: "center",
+    gap: 4,
+    backgroundColor: "#fef2f2",
+    borderWidth: 1,
+    borderColor: "#fecaca",
+    paddingHorizontal: 12,
+    paddingVertical: 6,
+    borderRadius: 18,
+  },
+  rejectBtnText: {
+    color: "#dc2626",
+    fontSize: 12.5,
+    fontWeight: "700",
+    fontFamily: "Inter-Bold",
+  },
+  cancelBtn: {
+    flexDirection: "row",
+    alignItems: "center",
+    gap: 4,
+    backgroundColor: "#f1f5f9",
+    paddingHorizontal: 10,
+    paddingVertical: 6,
+    borderRadius: 14,
+  },
+  cancelBtnText: {
+    color: "#64748b",
+    fontSize: 12,
+    fontFamily: "Inter-Medium",
+  },
+  statusDoneText: {
+    fontSize: 12,
+    fontWeight: "700",
+    fontFamily: "Inter-Bold",
   },
 });

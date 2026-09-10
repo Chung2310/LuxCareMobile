@@ -57,6 +57,16 @@ export default function TabLayout() {
         }}
       />
       <Tabs.Screen
+        name="resources"
+        options={{
+          title: "Tài nguyên",
+          headerShown: false,
+          tabBarIcon: ({ color, focused }) => (
+            <Ionicons name={focused ? "folder" : "folder-outline"} size={20} color={color} />
+          ),
+        }}
+      />
+      <Tabs.Screen
         name="chat"
         options={{
           title: "Trò chuyện",
@@ -113,6 +123,7 @@ export default function TabLayout() {
       <Tabs.Screen name="attendance-management" options={{ title: "Quản lý công", href: null }} />
       <Tabs.Screen name="kpi" options={{ title: "KPI tháng", href: null }} />
       <Tabs.Screen name="org-chart" options={{ title: "Sơ đồ tổ chức", href: null }} />
+      <Tabs.Screen name="blog" options={{ title: "Blog nội bộ & Thảo luận", href: null }} />
     </Tabs>
   );
 }
