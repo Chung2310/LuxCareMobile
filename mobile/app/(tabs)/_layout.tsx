@@ -63,17 +63,6 @@ export default function TabLayout() {
         }}
       />
       <Tabs.Screen
-        name="resources"
-        options={{
-          title: "Tài nguyên",
-          headerShown: false,
-          href: isEditor ? null : undefined,
-          tabBarIcon: ({ color, focused }) => (
-            <Ionicons name={focused ? "folder" : "folder-outline"} size={20} color={color} />
-          ),
-        }}
-      />
-      <Tabs.Screen
         name="chat"
         options={{
           title: "Trò chuyện",
@@ -108,6 +97,7 @@ export default function TabLayout() {
       />
 
       {/* Các phân hệ phụ không hiển thị trên Tab Bar */}
+      <Tabs.Screen name="resources" options={{ title: "Tài nguyên", href: null }} />
       <Tabs.Screen name="equipment" options={{ title: "Thiết bị", href: null }} />
       <Tabs.Screen name="modules" options={{ title: "Chức năng", href: null }} />
       <Tabs.Screen name="customers" options={{ title: "Khách hàng", href: null }} />
