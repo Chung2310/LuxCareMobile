@@ -61,7 +61,73 @@ export default function Recruitment() {
     setRevision((v) => v + 1);
   };
 
-  const scopeReady = user?.role === "admin" ? !!selectedBranch?._id : !!user?.branchId;
+  const scopeReady = Boolean(user?.companyCode || selectedBranch?._id || user?.branchId);
+
+  const [seeding, setSeeding] = useState(false);
+  const handleSeedDemo = async () => {
+    if (seeding || !access.manage) return;
+    setSeeding(true);
+    try {
+      await recruitment.createJob({
+        code: `BS-${Date.now().toString().slice(-4)}`,
+        title: "Bác sĩ Đa khoa",
+        department: "Khám bệnh",
+        headcount: 2,
+        employmentType: "full_time",
+        workplaceType: "onsite",
+        location: selectedBranch?.name || "Cơ sở chính",
+        salaryMin: 25000000,
+        salaryMax: 40000000,
+        showSalary: true,
+        description: "Khám, chẩn đoán và điều trị bệnh nhân tại phòng khám theo đúng quy trình chuyên môn.",
+        requirements: "Tốt nghiệp Đại học Y Dược, có CCHN khám chữa bệnh, tối thiểu 2 năm kinh nghiệm.",
+        benefits: "Lương thưởng cạnh tranh, BHXH theo luật, hỗ trợ ăn trưa, đào tạo chuyên sâu.",
+        status: "open",
+        applicationDeadline: new Date(Date.now() + 30 * 86400000).toISOString(),
+      });
+      await recruitment.createJob({
+        code: `DD-${Date.now().toString().slice(-4)}`,
+        title: "Điều dưỡng viên Chăm sóc",
+        department: "Điều dưỡng",
+        headcount: 5,
+        employmentType: "full_time",
+        workplaceType: "onsite",
+        location: selectedBranch?.name || "Cơ sở chính",
+        salaryMin: 12000000,
+        salaryMax: 18000000,
+        showSalary: true,
+        description: "Thực hiện y lệnh của bác sĩ, chăm sóc bệnh nhân, tiêm truyền và xử lý vết thương.",
+        requirements: "Tốt nghiệp CĐ/ĐH Điều dưỡng, có CCHN, nhanh nhẹn, tận tâm.",
+        benefits: "Phụ cấp trực ca, thưởng KPI hàng tháng, đồng phục và bảo hiểm đầy đủ.",
+        status: "open",
+        applicationDeadline: new Date(Date.now() + 20 * 86400000).toISOString(),
+      });
+      await recruitment.createJob({
+        code: `DS-${Date.now().toString().slice(-4)}`,
+        title: "Dược sĩ Nhà thuốc",
+        department: "Dược",
+        headcount: 2,
+        employmentType: "full_time",
+        workplaceType: "onsite",
+        location: selectedBranch?.name || "Cơ sở chính",
+        salaryMin: 15000000,
+        salaryMax: 22000000,
+        showSalary: true,
+        description: "Tư vấn và bán thuốc theo đơn, quản lý tồn kho, kiểm soát hạn dùng thuốc.",
+        requirements: "Tốt nghiệp Đại học Dược, có CCHN dược, nắm vững quy chế bán lẻ.",
+        benefits: "Hoa hồng doanh số bán lẻ, du lịch hàng năm, phụ cấp trách nhiệm.",
+        status: "open",
+        applicationDeadline: new Date(Date.now() + 25 * 86400000).toISOString(),
+      });
+      setSuccess("Đã khởi tạo thành công 3 tin tuyển dụng mẫu!");
+      setTimeout(() => setSuccess(null), 4000);
+      setRevision((v) => v + 1);
+    } catch (err) {
+      setError(messageOf(err));
+    } finally {
+      setSeeding(false);
+    }
+  };
 
   const loadData = useCallback(
     async (isRefresh = false) => {
@@ -296,13 +362,21 @@ export default function Recruitment() {
         >
           {/* Top Header Bar */}
           <View style={uiStyles.headerContainer}>
-            <View style={uiStyles.headerLeft}>
-              <Text style={uiStyles.headerTitle}>Tin tuyển dụng</Text>
-              <View style={uiStyles.branchRow}>
-                <View style={uiStyles.branchDot} />
-                <Text style={uiStyles.branchName}>
-                  {selectedBranch?.name || "Toàn công ty"}
-                </Text>
+            <View style={{ flexDirection: "row", alignItems: "center", gap: 10, flex: 1 }}>
+              <Pressable
+                onPress={() => (router.canGoBack() ? router.back() : router.push("/(tabs)/modules"))}
+                style={uiStyles.backBtn}
+              >
+                <Text style={{ fontSize: 18, color: "#334155", fontWeight: "700" }}>‹</Text>
+              </Pressable>
+              <View style={uiStyles.headerLeft}>
+                <Text style={uiStyles.headerTitle}>Tin tuyển dụng</Text>
+                <View style={uiStyles.branchRow}>
+                  <View style={uiStyles.branchDot} />
+                  <Text style={uiStyles.branchName}>
+                    {selectedBranch?.name || user?.branchName || "Toàn công ty"}
+                  </Text>
+                </View>
               </View>
             </View>
 
@@ -741,6 +815,28 @@ export default function Recruitment() {
                 <Pressable style={uiStyles.emptyStateResetBtn} onPress={handleClearSearch}>
                   <Text style={uiStyles.emptyStateResetText}>Xóa bộ lọc tìm kiếm</Text>
                 </Pressable>
+              ) : !deleted && access.manage ? (
+                <View style={{ flexDirection: "row", gap: 10, marginTop: 14 }}>
+                  <Pressable
+                    style={[uiStyles.createBtn, { paddingHorizontal: 16 }]}
+                    onPress={() => setEditing("new")}
+                  >
+                    <Text style={uiStyles.createBtnText}>+ Tạo tin mới</Text>
+                  </Pressable>
+                  <Pressable
+                    style={[
+                      uiStyles.createBtn,
+                      { backgroundColor: "#0284c7", paddingHorizontal: 16 },
+                      seeding && uiStyles.btnDisabled,
+                    ]}
+                    disabled={seeding}
+                    onPress={handleSeedDemo}
+                  >
+                    <Text style={uiStyles.createBtnText}>
+                      {seeding ? "Đang tạo..." : "✨ Thêm 3 tin mẫu"}
+                    </Text>
+                  </Pressable>
+                </View>
               ) : null}
             </View>
           )}
@@ -855,6 +951,16 @@ const uiStyles = StyleSheet.create({
     alignItems: "center",
     justifyContent: "space-between",
     marginBottom: 2,
+  },
+  backBtn: {
+    width: 32,
+    height: 32,
+    borderRadius: 8,
+    backgroundColor: "#ffffff",
+    borderWidth: 1,
+    borderColor: "#e2e8f0",
+    alignItems: "center",
+    justifyContent: "center",
   },
   headerLeft: {
     flex: 1,
