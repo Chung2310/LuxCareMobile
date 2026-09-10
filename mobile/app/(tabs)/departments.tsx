@@ -1,510 +1,667 @@
-import React, { useCallback, useEffect, useRef, useState } from "react";
+import React, { useCallback, useEffect, useMemo, useState } from "react";
 import {
-  ActivityIndicator,
   Alert,
   FlatList,
-  Modal,
-  Pressable,
   RefreshControl,
+  ScrollView,
   StyleSheet,
   Text,
-  TextInput,
+  TouchableOpacity,
   View,
 } from "react-native";
 import { SafeAreaView } from "react-native-safe-area-context";
-import { router, useFocusEffect } from "expo-router";
-import type { DepartmentRecord } from "../../../src/services/departmentService";
-import type { UserProfile } from "../../../src/types/common";
-import { departments, roster } from "../../src/api/services";
-import { messageOf, useSession } from "../../src/auth/SessionProvider";
-import { DepartmentForm } from "../../src/features/departments/DepartmentForm";
-import { LegacyForm } from "../../src/features/departments/LegacyForm";
-import { colors } from "../../src/ui";
+import { Ionicons } from "@expo/vector-icons";
+import { useFocusEffect } from "expo-router";
 
-const CODE_PALETTES = [
-  { bg: "#dbeafe", text: "#1d4ed8" },
-  { bg: "#dcfce7", text: "#15803d" },
-  { bg: "#fef3c7", text: "#b45309" },
-  { bg: "#f3e8ff", text: "#7e22ce" },
-  { bg: "#ffe4e6", text: "#be123c" },
-  { bg: "#ccfbf1", text: "#0f766e" },
+import {
+  DepartmentCard,
+  DepartmentCreateModal,
+  DepartmentDetailModal,
+  DepartmentLegacyModal,
+  DepartmentStatCards,
+  RoomCard,
+  RoomModal,
+  type DepartmentFilterMode,
+  type DepartmentInput,
+  type DepartmentRecord,
+  type DepartmentStatMetrics,
+  type DepartmentTabType,
+  type RoomInput,
+  type RoomRecord,
+} from "../../src/components/departments";
+import { PageLoadingView, SearchInput } from "../../src/components/common";
+import {
+  branches as branchService,
+  departments as deptService,
+  rooms as roomService,
+  roster,
+} from "../../src/api/services";
+import { useSession } from "../../src/auth/SessionProvider";
+import { useAppLoading } from "../../src/context/LoadingContext";
+import type { UserProfile } from "../../../../src/types/common";
+import type { BranchRecord } from "../../../../src/services/branchService";
+
+const ROOM_TYPE_FILTER_OPTIONS: Array<{ id: string; label: string }> = [
+  { id: "all", label: "Tất cả loại" },
+  { id: "clinic", label: "Phòng khám" },
+  { id: "treatment", label: "Thủ thuật / Đ.trị" },
+  { id: "storage", label: "Kho vật tư / Dược" },
+  { id: "office", label: "Văn phòng" },
+  { id: "meeting", label: "Phòng họp" },
+  { id: "other", label: "Khác" },
 ];
 
-function getCodePalette(code: string) {
-  let hash = 0;
-  for (let i = 0; i < code.length; i++) {
-    hash = code.charCodeAt(i) + ((hash << 5) - hash);
-  }
-  const index = Math.abs(hash) % CODE_PALETTES.length;
-  return CODE_PALETTES[index];
-}
+export default function DepartmentsScreen() {
+  const { user, selectedBranch } = useSession();
+  const { navigateWithLoading } = useAppLoading();
 
-export default function Departments() {
-  const { user } = useSession();
-  const canManage = ["admin", "superadmin"].includes(user?.role || "");
+  // Quyền quản lý (admin, superadmin, branch_owner, manager)
+  const canManage = useMemo(() => {
+    if (!user) return false;
+    const r = user.role;
+    return r === "admin" || r === "superadmin" || r === "branch_owner" || r === "manager";
+  }, [user]);
 
-  const [data, setData] = useState<DepartmentRecord[]>([]);
-  const [search, setSearch] = useState("");
-  const [query, setQuery] = useState("");
-  const [error, setError] = useState<string | null>(null);
-  const [loading, setLoading] = useState(false);
-  const [revision, setRevision] = useState(0);
+  // Tab: "departments" (Phòng ban) | "rooms" (Phòng chức năng)
+  const [activeTab, setActiveTab] = useState<DepartmentTabType>("departments");
 
-  // Filter mode: "all" | "active" | "inactive"
-  const [filterMode, setFilterMode] = useState<"all" | "active" | "inactive">("all");
+  // Dữ liệu Phòng ban
+  const [deptList, setDeptList] = useState<DepartmentRecord[]>([]);
+  const [deptLoading, setDeptLoading] = useState(true);
+  const [deptSearch, setDeptSearch] = useState("");
+  const [filterMode, setFilterMode] = useState<DepartmentFilterMode>("all");
 
-  // Modals state
-  const [editing, setEditing] = useState<DepartmentRecord | "new" | null>(null);
-  const [legacy, setLegacy] = useState(false);
-  const legacyLock = useRef(false);
+  // Dữ liệu Phòng chức năng
+  const [roomList, setRoomList] = useState<RoomRecord[]>([]);
+  const [roomLoading, setRoomLoading] = useState(false);
+  const [roomSearch, setRoomSearch] = useState("");
+  const [selectedRoomType, setSelectedRoomType] = useState<string>("all");
+  const [selectedBranchId, setSelectedBranchId] = useState<string>("");
 
-  // People for manager selection
-  const [people, setPeople] = useState<UserProfile[]>([]);
-  const [peopleLoading, setPeopleLoading] = useState(false);
-  const [peopleError, setPeopleError] = useState<string | null>(null);
-  const [peopleRevision, setPeopleRevision] = useState(0);
+  // Chi nhánh & Nhân sự phụ trách
+  const [branchList, setBranchList] = useState<BranchRecord[]>([]);
+  const [colleagues, setColleagues] = useState<UserProfile[]>([]);
 
+  // Modals Phòng ban
+  const [detailDept, setDetailDept] = useState<DepartmentRecord | null>(null);
+  const [createDeptVisible, setCreateDeptVisible] = useState(false);
+  const [legacyModalVisible, setLegacyModalVisible] = useState(false);
+
+  // Modals Phòng chức năng
+  const [editingRoom, setEditingRoom] = useState<RoomRecord | "new" | null>(null);
+
+  // Trạng thái làm mới
+  const [refreshing, setRefreshing] = useState(false);
+
+  // 1. Tải danh sách Chi nhánh & Nhân sự (Trưởng bộ phận)
   useEffect(() => {
-    let mounted = true;
-    if (!editing) return;
-    setPeopleLoading(true);
-    setPeopleError(null);
-    void roster
-      .colleagues()
-      .then((value) => {
-        if (mounted) setPeople(value);
-      })
-      .catch((err) => {
-        if (mounted) setPeopleError(messageOf(err));
-      })
-      .finally(() => {
-        if (mounted) setPeopleLoading(false);
-      });
+    let active = true;
+    void (async () => {
+      try {
+        const [bList, cList] = await Promise.all([
+          branchService.list().catch(() => [] as BranchRecord[]),
+          roster.colleagues().catch(() => [] as UserProfile[]),
+        ]);
+        if (active) {
+          const activeBranches = bList.filter((b) => b.isActive);
+          setBranchList(activeBranches);
+          setColleagues(cList);
+
+          const defaultBranch =
+            selectedBranch?._id ||
+            user?.branchId ||
+            (activeBranches.length > 0 ? activeBranches[0]._id : "");
+          setSelectedBranchId(defaultBranch);
+        }
+      } catch {
+        if (active) {
+          setBranchList([]);
+          setColleagues([]);
+        }
+      }
+    })();
     return () => {
-      mounted = false;
+      active = false;
     };
-  }, [editing, peopleRevision]);
+  }, [selectedBranch, user]);
 
-  useFocusEffect(
-    useCallback(() => {
-      let mounted = true;
-      setLoading(true);
-      setError(null);
-      setData([]);
+  // 2. Tải danh sách Phòng ban
+  const loadDepartments = useCallback(async (isSilent = false) => {
+    if (!isSilent) setDeptLoading(true);
+    try {
+      const data = await deptService.list();
+      setDeptList(data || []);
+    } catch (err: any) {
+      Alert.alert("Lỗi tải phòng ban", err.message || "Không thể tải danh sách phòng ban.");
+    } finally {
+      setDeptLoading(false);
+      setRefreshing(false);
+    }
+  }, []);
 
-      const activeOnly = filterMode === "active" ? true : undefined;
-
-      void departments
-        .list({ search: query, activeOnly })
-        .then((value) => {
-          if (mounted) {
-            if (filterMode === "inactive") {
-              setData(value.filter((d) => !d.isActive));
-            } else {
-              setData(value);
-            }
-          }
-        })
-        .catch((err) => {
-          if (mounted) setError(messageOf(err));
-        })
-        .finally(() => {
-          if (mounted) setLoading(false);
+  // 3. Tải danh sách Phòng chức năng
+  const loadRooms = useCallback(
+    async (isSilent = false) => {
+      if (!isSilent) setRoomLoading(true);
+      try {
+        const data = await roomService.list({
+          branchId: selectedBranchId || undefined,
         });
-
-      return () => {
-        mounted = false;
-      };
-    }, [query, revision, user?.uid, filterMode]),
+        setRoomList(data || []);
+      } catch (err: any) {
+        Alert.alert("Lỗi tải phòng chức năng", err.message || "Không thể tải danh sách phòng.");
+      } finally {
+        setRoomLoading(false);
+        setRefreshing(false);
+      }
+    },
+    [selectedBranchId],
   );
 
-  const handleSearchSubmit = () => {
-    setQuery(search.trim());
-    setPage(1);
-    setRevision((v) => v + 1);
-  };
+  // Focus effect: nạp dữ liệu ban đầu
+  useFocusEffect(
+    useCallback(() => {
+      void loadDepartments(deptList.length > 0);
+      void loadRooms(roomList.length > 0);
+    }, [loadDepartments, loadRooms]),
+  );
 
-  const handleResetFilters = () => {
-    setSearch("");
-    setQuery("");
-    setFilterMode("all");
-    setPage(1);
-    setRevision((v) => v + 1);
-  };
-
-  const remove = async (id: string) => {
-    setError(null);
-    try {
-      await departments.delete(id);
-      setEditing(null);
-      setPage(1);
-      setRevision((v) => v + 1);
-    } catch (err) {
-      setError(messageOf(err));
+  // Handle pull-to-refresh
+  const handleRefresh = async () => {
+    setRefreshing(true);
+    if (activeTab === "departments") {
+      await loadDepartments(true);
+    } else {
+      await loadRooms(true);
     }
   };
 
-  // Pagination state
-  const PAGE_SIZE = 10;
-  const [page, setPage] = useState(1);
+  // Thống kê phòng ban
+  const deptMetrics: DepartmentStatMetrics = useMemo(() => {
+    const total = deptList.length;
+    const active = deptList.filter((d) => d.isActive).length;
+    const inactive = total - active;
+    const totalStaff = deptList.reduce((acc, curr) => acc + (curr.employeeCount || 0), 0);
+    return { total, active, inactive, totalStaff };
+  }, [deptList]);
 
-  // Metrics calculation
-  const totalCount = data.length;
-  const activeCount = data.filter((d) => d.isActive).length;
-  const inactiveCount = data.filter((d) => !d.isActive).length;
+  // Lọc phòng ban theo tìm kiếm & trạng thái
+  const filteredDepartments = useMemo(() => {
+    const q = deptSearch.toLowerCase().trim();
+    return deptList.filter((item) => {
+      if (filterMode === "active" && !item.isActive) return false;
+      if (filterMode === "inactive" && item.isActive) return false;
+      if (!q) return true;
+      return (
+        item.name.toLowerCase().includes(q) ||
+        item.code.toLowerCase().includes(q) ||
+        (item.description || "").toLowerCase().includes(q) ||
+        (item.managerName || "").toLowerCase().includes(q)
+      );
+    });
+  }, [deptList, deptSearch, filterMode]);
 
-  const totalPages = Math.max(1, Math.ceil(data.length / PAGE_SIZE));
-  const pagedData = data.slice((page - 1) * PAGE_SIZE, page * PAGE_SIZE);
+  // Lọc phòng chức năng theo tìm kiếm, chi nhánh & loại phòng
+  const filteredRooms = useMemo(() => {
+    const q = roomSearch.toLowerCase().trim();
+    return roomList.filter((item) => {
+      if (selectedBranchId && item.branchId && item.branchId !== selectedBranchId) {
+        return false;
+      }
+      if (selectedRoomType !== "all" && (item.type || "other") !== selectedRoomType) {
+        return false;
+      }
+      if (!q) return true;
+      return (
+        item.name.toLowerCase().includes(q) ||
+        item.code.toLowerCase().includes(q) ||
+        (item.description || "").toLowerCase().includes(q) ||
+        (item.floor || "").toLowerCase().includes(q)
+      );
+    });
+  }, [roomList, roomSearch, selectedBranchId, selectedRoomType]);
+
+  // CRUD Phòng ban
+  const handleSaveDepartment = async (id: string, input: Partial<DepartmentInput>) => {
+    await deptService.update(id, input);
+    await loadDepartments(true);
+  };
+
+  const handleCreateDepartment = async (input: DepartmentInput) => {
+    await deptService.create(input);
+    await loadDepartments(true);
+  };
+
+  const handleDeleteDepartment = async (id: string) => {
+    await deptService.delete(id);
+    await loadDepartments(true);
+  };
+
+  // CRUD Phòng chức năng
+  const handleSaveRoom = async (id: string | null, input: RoomInput) => {
+    if (id) {
+      await roomService.update(id, input);
+    } else {
+      await roomService.create(input);
+    }
+    await loadRooms(true);
+  };
+
+  const handleDeleteRoom = async (id: string) => {
+    await roomService.delete(id);
+    await loadRooms(true);
+  };
+
+  // Điều hướng sơ đồ tổ chức
+  const handleViewOrgChart = (dept?: DepartmentRecord) => {
+    navigateWithLoading("/(tabs)/org-chart", {
+      title: dept ? `Sơ đồ: ${dept.name}` : "Sơ đồ tổ chức",
+      icon: "git-network",
+      color: "#059669",
+      bgColor: "#ecfdf5",
+    });
+  };
+
+  const isInitialLoading = activeTab === "departments" ? deptLoading && deptList.length === 0 : roomLoading && roomList.length === 0;
 
   return (
     <SafeAreaView edges={["top"]} style={styles.container}>
-      {/* Header Bar */}
-      <View style={styles.headerRow}>
-        <View style={{ flex: 1 }}>
-          <Text style={styles.pageTitle}>Phòng ban</Text>
-          <Text style={styles.pageSubtitle}>Sơ đồ tổ chức & phân bổ nhân sự</Text>
+      {/* 1. TOP HEADER BAR */}
+      <View style={styles.headerBar}>
+        <View style={styles.headerLeft}>
+          <Text style={styles.screenTitle}>Phòng ban & Cơ sở</Text>
+          <Text style={styles.screenSubtitle}>
+            Cơ cấu tổ chức & quản lý phòng chức năng
+          </Text>
         </View>
 
-        <View style={{ flexDirection: "row", alignItems: "center", gap: 8 }}>
-          <Pressable
-            style={({ pressed }) => [styles.orgChartBtn, pressed && { opacity: 0.85 }]}
-            onPress={() => router.push("/(tabs)/org-chart" as any)}
+        <View style={styles.headerRightButtons}>
+          {/* Nút Sơ đồ tổ chức */}
+          <TouchableOpacity
+            style={styles.orgChartBtn}
+            onPress={() => handleViewOrgChart()}
+            activeOpacity={0.75}
           >
-            <Text style={styles.orgChartBtnText}>🌳 Sơ đồ</Text>
-          </Pressable>
+            <Ionicons name="git-network-outline" size={15} color="#059669" />
+            <Text style={styles.orgChartBtnText}>Sơ đồ</Text>
+          </TouchableOpacity>
 
+          {/* Nút Thêm mới */}
           {canManage && (
-            <Pressable
-              style={({ pressed }) => [styles.addBtn, pressed && { opacity: 0.85 }]}
-              onPress={() => setEditing("new")}
+            <TouchableOpacity
+              style={styles.addBtn}
+              onPress={() => {
+                if (activeTab === "departments") {
+                  setCreateDeptVisible(true);
+                } else {
+                  setEditingRoom("new");
+                }
+              }}
+              activeOpacity={0.75}
             >
-              <Text style={styles.addBtnText}>+ Thêm mới</Text>
-            </Pressable>
+              <Ionicons name="add" size={16} color="#ffffff" />
+              <Text style={styles.addBtnText}>Thêm</Text>
+            </TouchableOpacity>
           )}
         </View>
       </View>
 
-      {/* FlatList for all content */}
-      <FlatList
-        style={styles.flatList}
-        contentContainerStyle={styles.listContent}
-        data={pagedData}
-        keyExtractor={(item) => item._id}
-        refreshControl={
-          <RefreshControl
-            refreshing={loading}
-            onRefresh={() => setRevision((v) => v + 1)}
-            colors={[colors.primary]}
+      {/* 2. SUB-TAB SEGMENT SWITCHER */}
+      <View style={styles.tabSwitcher}>
+        <TouchableOpacity
+          style={[styles.tabButton, activeTab === "departments" && styles.tabButtonActive]}
+          onPress={() => setActiveTab("departments")}
+          activeOpacity={0.8}
+        >
+          <Ionicons
+            name="business"
+            size={16}
+            color={activeTab === "departments" ? "#059669" : "#64748b"}
           />
-        }
-        showsVerticalScrollIndicator={false}
-        ListHeaderComponent={
-          <View style={styles.headerComponent}>
-            {/* Quick Stat Metric Badges */}
-            <View style={styles.statsRow}>
-              {/* All Card */}
-              <Pressable
-                style={[styles.statCard, filterMode === "all" && styles.statCardActive]}
-                onPress={() => {
-                  setFilterMode("all");
-                  setPage(1);
-                }}
-              >
-                <Text style={[styles.statCount, filterMode === "all" && styles.statCountActive]}>
-                  {totalCount}
-                </Text>
-                <Text style={[styles.statLabel, filterMode === "all" && styles.statLabelActive]}>
-                  Tất cả phòng ban
-                </Text>
-              </Pressable>
+          <Text
+            style={[
+              styles.tabButtonText,
+              activeTab === "departments" && styles.tabButtonTextActive,
+            ]}
+          >
+            Phòng ban ({deptList.length})
+          </Text>
+        </TouchableOpacity>
 
-              {/* Active Card */}
-              <Pressable
-                style={[styles.statCard, filterMode === "active" && styles.statCardActive]}
-                onPress={() => {
-                  setFilterMode("active");
-                  setPage(1);
-                }}
-              >
-                <Text style={[styles.statCount, filterMode === "active" && styles.statCountActive]}>
-                  {activeCount}
-                </Text>
-                <Text style={[styles.statLabel, filterMode === "active" && styles.statLabelActive]}>
-                  Đang hoạt động
-                </Text>
-              </Pressable>
+        <TouchableOpacity
+          style={[styles.tabButton, activeTab === "rooms" && styles.tabButtonActive]}
+          onPress={() => {
+            setActiveTab("rooms");
+            if (roomList.length === 0) void loadRooms();
+          }}
+          activeOpacity={0.8}
+        >
+          <Ionicons
+            name="grid"
+            size={16}
+            color={activeTab === "rooms" ? "#059669" : "#64748b"}
+          />
+          <Text
+            style={[
+              styles.tabButtonText,
+              activeTab === "rooms" && styles.tabButtonTextActive,
+            ]}
+          >
+            Phòng chức năng ({roomList.length})
+          </Text>
+        </TouchableOpacity>
+      </View>
 
-              {/* Inactive Card */}
-              <Pressable
-                style={[styles.statCard, filterMode === "inactive" && styles.statCardActive]}
-                onPress={() => {
-                  setFilterMode("inactive");
-                  setPage(1);
-                }}
-              >
-                <Text style={[styles.statCount, filterMode === "inactive" && styles.statCountActive]}>
-                  {inactiveCount}
-                </Text>
-                <Text style={[styles.statLabel, filterMode === "inactive" && styles.statLabelActive]}>
-                  Tạm ngừng
-                </Text>
-              </Pressable>
-            </View>
+      {/* 3. MAIN CONTENT: FLATLIST CHO PHÒNG BAN HOẶC PHÒNG CHỨC NĂNG */}
+      {isInitialLoading ? (
+        <PageLoadingView
+          title={
+            activeTab === "departments"
+              ? "Đang tải danh sách phòng ban..."
+              : "Đang tải danh sách phòng chức năng..."
+          }
+        />
+      ) : activeTab === "departments" ? (
+        <FlatList
+          style={styles.flatList}
+          contentContainerStyle={styles.listContent}
+          data={filteredDepartments}
+          keyExtractor={(item) => item._id}
+          refreshControl={
+            <RefreshControl
+              refreshing={refreshing}
+              onRefresh={handleRefresh}
+              colors={["#059669"]}
+            />
+          }
+          showsVerticalScrollIndicator={false}
+          keyboardShouldPersistTaps="handled"
+          ListHeaderComponent={
+            <View style={styles.listHeaderSection}>
+              {/* Thẻ thống kê nhanh */}
+              <DepartmentStatCards
+                metrics={deptMetrics}
+                filterMode={filterMode}
+                onSelectFilter={setFilterMode}
+              />
 
-            {/* Search & Actions Card */}
-            <View style={styles.filterCard}>
-              <View style={styles.searchRow}>
-                <View style={styles.searchInputWrap}>
-                  <Text style={styles.searchIcon}>🔍</Text>
-                  <TextInput
-                    style={styles.searchInput}
-                    placeholder="Tìm theo mã hoặc tên phòng ban..."
-                    placeholderTextColor="#94a3b8"
-                    value={search}
-                    onChangeText={setSearch}
-                    onSubmitEditing={handleSearchSubmit}
-                    returnKeyType="search"
-                  />
-                  {search.length > 0 && (
-                    <Pressable
-                      onPress={() => {
-                        setSearch("");
-                        setQuery("");
-                        setPage(1);
-                        setRevision((v) => v + 1);
-                      }}
-                      style={styles.clearBtn}
-                    >
-                      <Text style={styles.clearBtnText}>✕</Text>
-                    </Pressable>
-                  )}
-                </View>
-
-                <Pressable
-                  style={({ pressed }) => [styles.searchBtn, pressed && { opacity: 0.85 }]}
-                  onPress={handleSearchSubmit}
-                >
-                  <Text style={styles.searchBtnText}>Tìm</Text>
-                </Pressable>
+              {/* Ô tìm kiếm phòng ban */}
+              <View style={styles.searchSection}>
+                <SearchInput
+                  value={deptSearch}
+                  onChangeText={setDeptSearch}
+                  placeholder="Tìm theo mã, tên, chức năng phòng ban..."
+                  onClear={() => setDeptSearch("")}
+                />
               </View>
 
+              {/* Nút Chuẩn hóa tên phòng ban cũ */}
               {canManage && (
-                <Pressable
-                  style={({ pressed }) => [styles.legacyBtn, pressed && { opacity: 0.85 }]}
-                  onPress={() => setLegacy(true)}
+                <TouchableOpacity
+                  style={styles.legacyMergeBar}
+                  onPress={() => setLegacyModalVisible(true)}
+                  activeOpacity={0.75}
                 >
-                  <Text style={styles.legacyBtnIcon}>🔄</Text>
-                  <Text style={styles.legacyBtnText}>Chuẩn hóa tên phòng ban cũ</Text>
-                </Pressable>
+                  <View style={styles.legacyMergeLeft}>
+                    <Ionicons name="git-merge" size={16} color="#0d9488" />
+                    <Text style={styles.legacyMergeText}>
+                      Chuẩn hóa các tên phòng ban cũ trong hệ thống
+                    </Text>
+                  </View>
+                  <Ionicons name="chevron-forward" size={14} color="#0d9488" />
+                </TouchableOpacity>
               )}
-            </View>
 
-            {/* Error Banner */}
-            {error && (
-              <View style={styles.errorBanner}>
-                <Text style={styles.errorBannerText}>⚠️ {error}</Text>
+              {/* Header đếm số lượng */}
+              <View style={styles.countSummaryRow}>
+                <Text style={styles.countSummaryText}>
+                  Hiển thị{" "}
+                  <Text style={styles.countBold}>{filteredDepartments.length}</Text> phòng ban
+                </Text>
+                {deptSearch.length > 0 && (
+                  <TouchableOpacity onPress={() => setDeptSearch("")}>
+                    <Text style={styles.resetFilterText}>Xóa lọc tìm kiếm</Text>
+                  </TouchableOpacity>
+                )}
               </View>
-            )}
-
-            {/* List count summary */}
-            <View style={styles.listHeaderRow}>
-              <Text style={styles.listCountText}>
-                Tìm thấy <Text style={{ fontWeight: "700", color: "#0f172a" }}>{data.length}</Text> phòng ban
-              </Text>
-              <Text style={styles.listPageIndicator}>
-                Trang {page}/{totalPages}
-              </Text>
             </View>
-          </View>
-        }
-        ListEmptyComponent={
-          loading ? (
-            <View style={styles.loadingBox}>
-              <ActivityIndicator size="large" color="#059669" />
-              <Text style={styles.loadingText}>Đang tải danh sách phòng ban...</Text>
-            </View>
-          ) : (
+          }
+          renderItem={({ item }) => (
+            <DepartmentCard
+              department={item}
+              onPress={(dept) => setDetailDept(dept)}
+              onViewOrgChart={handleViewOrgChart}
+            />
+          )}
+          ListEmptyComponent={
             <View style={styles.emptyCard}>
-              <Text style={styles.emptyIcon}>🏢</Text>
-              <Text style={styles.emptyTitle}>Không có phòng ban phù hợp</Text>
-              <Text style={styles.emptyText}>
-                Không tìm thấy phòng ban nào khớp với điều kiện lọc hiện tại.
+              <Ionicons name="business-outline" size={44} color="#94a3b8" />
+              <Text style={styles.emptyTitle}>Không tìm thấy phòng ban nào</Text>
+              <Text style={styles.emptySubtitle}>
+                {deptSearch
+                  ? `Không có kết quả nào khớp với "${deptSearch}". Hãy thử từ khóa khác.`
+                  : "Chưa có phòng ban nào trong danh mục hoặc trạng thái đã chọn."}
               </Text>
-              {(query || filterMode !== "all") && (
-                <Pressable style={styles.emptyResetBtn} onPress={handleResetFilters}>
+              {(deptSearch.length > 0 || filterMode !== "all") && (
+                <TouchableOpacity
+                  style={styles.emptyResetBtn}
+                  onPress={() => {
+                    setDeptSearch("");
+                    setFilterMode("all");
+                  }}
+                >
                   <Text style={styles.emptyResetBtnText}>Xóa bộ lọc</Text>
-                </Pressable>
+                </TouchableOpacity>
               )}
             </View>
-          )
-        }
-        ListFooterComponent={
-          data.length > 0 ? (
-            <View style={styles.paginationCard}>
-              <Pressable
-                style={[styles.pageBtn, page <= 1 && styles.pageBtnDisabled]}
-                disabled={page <= 1}
-                onPress={() => setPage((v) => Math.max(1, v - 1))}
-              >
-                <Text style={[styles.pageBtnText, page <= 1 && styles.pageBtnTextDisabled]}>
-                  ‹ Trước
-                </Text>
-              </Pressable>
-
-              <View style={styles.pageCenterInfo}>
-                <Text style={styles.pageIndicatorBold}>
-                  Trang {page} / {totalPages}
-                </Text>
-                <Text style={styles.pageSubText} numberOfLines={1}>
-                  {`Hiển thị ${(page - 1) * PAGE_SIZE + 1}–${Math.min(
-                    page * PAGE_SIZE,
-                    data.length,
-                  )} / ${data.length} phòng ban`}
-                </Text>
-              </View>
-
-              <Pressable
-                style={[styles.pageBtn, page >= totalPages && styles.pageBtnDisabled]}
-                disabled={page >= totalPages}
-                onPress={() => setPage((v) => Math.min(totalPages, v + 1))}
-              >
-                <Text
-                  style={[
-                    styles.pageBtnText,
-                    page >= totalPages && styles.pageBtnTextDisabled,
-                  ]}
-                >
-                  Sau ›
-                </Text>
-              </Pressable>
-            </View>
-          ) : null
-        }
-        renderItem={({ item }) => {
-          const palette = getCodePalette(item.code || item.name);
-
-          return (
-            <Pressable
-              style={({ pressed }) => [styles.deptCard, pressed && { opacity: 0.92 }]}
-              onPress={() => setEditing(item)}
-            >
-              {/* Card Header: Code Badge, Name & Status */}
-              <View style={styles.cardHeaderRow}>
-                <View style={[styles.codeBadge, { backgroundColor: palette.bg }]}>
-                  <Text style={[styles.codeBadgeText, { color: palette.text }]}>
-                    {item.code}
-                  </Text>
-                </View>
-
-                <View style={{ flex: 1 }}>
-                  <Text style={styles.deptName}>{item.name}</Text>
-                  <Text style={styles.deptOrder}>Thứ tự hiển thị: #{item.sortOrder}</Text>
-                </View>
-
-                <View
-                  style={[
-                    styles.statusBadge,
-                    item.isActive ? styles.statusBadgeActive : styles.statusBadgeInactive,
-                  ]}
-                >
-                  <Text
-                    style={[
-                      styles.statusBadgeText,
-                      item.isActive
-                        ? styles.statusBadgeTextActive
-                        : styles.statusBadgeTextInactive,
-                    ]}
+          }
+          ListFooterComponent={<View style={{ height: 30 }} />}
+        />
+      ) : (
+        /* ROOMS LIST */
+        <FlatList
+          style={styles.flatList}
+          contentContainerStyle={styles.listContent}
+          data={filteredRooms}
+          keyExtractor={(item) => item._id}
+          refreshControl={
+            <RefreshControl
+              refreshing={refreshing}
+              onRefresh={handleRefresh}
+              colors={["#059669"]}
+            />
+          }
+          showsVerticalScrollIndicator={false}
+          keyboardShouldPersistTaps="handled"
+          ListHeaderComponent={
+            <View style={styles.listHeaderSection}>
+              {/* Lọc theo Chi nhánh nếu có nhiều cơ sở */}
+              {branchList.length > 1 && (
+                <View style={styles.branchFilterBox}>
+                  <Text style={styles.branchFilterLabel}>Lọc theo cơ sở / chi nhánh:</Text>
+                  <ScrollView
+                    horizontal
+                    showsHorizontalScrollIndicator={false}
+                    style={styles.branchFilterScroll}
                   >
-                    {item.isActive ? "Hoạt động" : "Tạm ngừng"}
-                  </Text>
-                </View>
-              </View>
+                    <TouchableOpacity
+                      style={[
+                        styles.branchPill,
+                        !selectedBranchId && styles.branchPillActive,
+                      ]}
+                      onPress={() => setSelectedBranchId("")}
+                    >
+                      <Text
+                        style={[
+                          styles.branchPillText,
+                          !selectedBranchId && styles.branchPillTextActive,
+                        ]}
+                      >
+                        Tất cả ({branchList.length})
+                      </Text>
+                    </TouchableOpacity>
 
-              {/* Description if present */}
-              {!!item.description && (
-                <Text style={styles.deptDesc} numberOfLines={2}>
-                  {item.description}
-                </Text>
+                    {branchList.map((b) => (
+                      <TouchableOpacity
+                        key={b._id}
+                        style={[
+                          styles.branchPill,
+                          selectedBranchId === b._id && styles.branchPillActive,
+                        ]}
+                        onPress={() => setSelectedBranchId(b._id)}
+                      >
+                        <Text
+                          style={[
+                            styles.branchPillText,
+                            selectedBranchId === b._id && styles.branchPillTextActive,
+                          ]}
+                        >
+                          {b.name}
+                        </Text>
+                      </TouchableOpacity>
+                    ))}
+                  </ScrollView>
+                </View>
               )}
 
-              {/* Info Row: Employee count & Manager */}
-              <View style={styles.infoRow}>
-                <View style={styles.infoCol}>
-                  <Text style={styles.infoLabel}>👥 Nhân sự</Text>
-                  <Text style={styles.infoValue}>
-                    {item.employeeCount ?? 0} thành viên
-                  </Text>
-                </View>
-
-                <View style={styles.infoCol}>
-                  <Text style={styles.infoLabel}>👤 Trưởng bộ phận</Text>
-                  <Text style={styles.infoValue} numberOfLines={1}>
-                    {item.managerName || "Chưa phân công"}
-                  </Text>
-                </View>
+              {/* Lọc theo Loại phòng chức năng */}
+              <View style={styles.roomTypeFilterBox}>
+                <ScrollView
+                  horizontal
+                  showsHorizontalScrollIndicator={false}
+                  style={styles.roomTypeFilterScroll}
+                >
+                  {ROOM_TYPE_FILTER_OPTIONS.map((opt) => {
+                    const isSelected = selectedRoomType === opt.id;
+                    return (
+                      <TouchableOpacity
+                        key={opt.id}
+                        style={[
+                          styles.roomTypePill,
+                          isSelected && styles.roomTypePillActive,
+                        ]}
+                        onPress={() => setSelectedRoomType(opt.id)}
+                        activeOpacity={0.8}
+                      >
+                        <Text
+                          style={[
+                            styles.roomTypePillText,
+                            isSelected && styles.roomTypePillTextActive,
+                          ]}
+                        >
+                          {opt.label}
+                        </Text>
+                      </TouchableOpacity>
+                    );
+                  })}
+                </ScrollView>
               </View>
 
-              {/* Card Footer: Detail Link */}
-              <View style={styles.cardFooterRow}>
-                <View style={{ flex: 1 }} />
-                <View style={styles.detailLinkBadge}>
-                  <Text style={styles.detailLinkText}>
-                    {canManage ? "Chỉnh sửa & Chi tiết →" : "Xem chi tiết →"}
-                  </Text>
-                </View>
+              {/* Ô tìm kiếm phòng chức năng */}
+              <View style={styles.searchSection}>
+                <SearchInput
+                  value={roomSearch}
+                  onChangeText={setRoomSearch}
+                  placeholder="Tìm phòng khám, phòng phẫu thuật, kho..."
+                  onClear={() => setRoomSearch("")}
+                />
               </View>
-            </Pressable>
-          );
-        }}
+
+              {/* Header đếm số lượng */}
+              <View style={styles.countSummaryRow}>
+                <Text style={styles.countSummaryText}>
+                  Hiển thị <Text style={styles.countBold}>{filteredRooms.length}</Text> phòng chức năng
+                </Text>
+                {(roomSearch.length > 0 || selectedRoomType !== "all") && (
+                  <TouchableOpacity
+                    onPress={() => {
+                      setRoomSearch("");
+                      setSelectedRoomType("all");
+                    }}
+                  >
+                    <Text style={styles.resetFilterText}>Xóa bộ lọc</Text>
+                  </TouchableOpacity>
+                )}
+              </View>
+            </View>
+          }
+          renderItem={({ item }) => (
+            <RoomCard room={item} onPress={(room) => setEditingRoom(room)} />
+          )}
+          ListEmptyComponent={
+            <View style={styles.emptyCard}>
+              <Ionicons name="grid-outline" size={44} color="#94a3b8" />
+              <Text style={styles.emptyTitle}>Chưa có phòng chức năng nào</Text>
+              <Text style={styles.emptySubtitle}>
+                {roomSearch || selectedRoomType !== "all"
+                  ? `Không tìm thấy phòng nào khớp với bộ lọc đã chọn.`
+                  : "Chưa cấu hình phòng chức năng cho cơ sở này."}
+              </Text>
+              {(roomSearch.length > 0 || selectedRoomType !== "all") && (
+                <TouchableOpacity
+                  style={[styles.emptyResetBtn, { marginBottom: 12 }]}
+                  onPress={() => {
+                    setRoomSearch("");
+                    setSelectedRoomType("all");
+                  }}
+                >
+                  <Text style={styles.emptyResetBtnText}>Xóa bộ lọc</Text>
+                </TouchableOpacity>
+              )}
+              {canManage && (
+                <TouchableOpacity
+                  style={styles.emptyAddBtn}
+                  onPress={() => setEditingRoom("new")}
+                >
+                  <Text style={styles.emptyAddBtnText}>+ Thêm phòng chức năng</Text>
+                </TouchableOpacity>
+              )}
+            </View>
+          }
+          ListFooterComponent={<View style={{ height: 30 }} />}
+        />
+      )}
+
+      {/* 4. MODALS */}
+      {/* Modal Chi tiết & Chỉnh sửa phòng ban */}
+      <DepartmentDetailModal
+        visible={Boolean(detailDept)}
+        department={detailDept}
+        colleagues={colleagues}
+        canManage={canManage}
+        onClose={() => setDetailDept(null)}
+        onSave={handleSaveDepartment}
+        onDelete={handleDeleteDepartment}
+        onViewOrgChart={handleViewOrgChart}
       />
 
-      {/* Department Create / Edit Modal */}
-      <Modal
-        visible={editing !== null}
-        animationType="slide"
-        onRequestClose={() => setEditing(null)}
-      >
-        {editing && (
-          <DepartmentForm
-            editing={editing}
-            people={people}
-            peopleLoading={peopleLoading}
-            peopleError={peopleError}
-            onRetryPeople={() => setPeopleRevision((v) => v + 1)}
-            onClose={() => setEditing(null)}
-            onSaved={() => {
-              setEditing(null);
-              setRevision((v) => v + 1);
-            }}
-            onDelete={remove}
-            canManage={canManage}
-          />
-        )}
-      </Modal>
+      {/* Modal Thêm mới phòng ban */}
+      <DepartmentCreateModal
+        visible={createDeptVisible}
+        colleagues={colleagues}
+        onClose={() => setCreateDeptVisible(false)}
+        onCreate={handleCreateDepartment}
+      />
 
-      {/* Legacy Department Normalization Modal */}
-      <Modal
-        visible={legacy}
-        animationType="slide"
-        onRequestClose={() => {
-          if (!legacyLock.current) {
-            setLegacy(false);
-            setRevision((v) => v + 1);
-          }
-        }}
-      >
-        {legacy && (
-          <LegacyForm
-            onClose={() => {
-              setLegacy(false);
-              setRevision((v) => v + 1);
-            }}
-            setLocked={(value) => {
-              legacyLock.current = value;
-            }}
-          />
-        )}
-      </Modal>
+      {/* Modal Chuẩn hóa tên phòng ban cũ */}
+      <DepartmentLegacyModal
+        visible={legacyModalVisible}
+        departmentList={deptList}
+        onClose={() => setLegacyModalVisible(false)}
+        onMergedSuccess={() => void loadDepartments(true)}
+      />
+
+      {/* Modal Tạo/Sửa Phòng chức năng */}
+      <RoomModal
+        visible={Boolean(editingRoom)}
+        editingRoom={editingRoom}
+        branchList={branchList}
+        currentBranchId={selectedBranchId || branchList[0]?._id || ""}
+        canManage={canManage}
+        onClose={() => setEditingRoom(null)}
+        onSave={handleSaveRoom}
+        onDelete={handleDeleteRoom}
+      />
     </SafeAreaView>
   );
 }
@@ -514,54 +671,101 @@ const styles = StyleSheet.create({
     flex: 1,
     backgroundColor: "#f8fafc",
   },
-  headerRow: {
+  headerBar: {
     flexDirection: "row",
     alignItems: "center",
     justifyContent: "space-between",
     paddingHorizontal: 16,
-    paddingTop: 14,
-    paddingBottom: 8,
-    gap: 12,
+    paddingTop: 6,
+    paddingBottom: 10,
+    backgroundColor: "#ffffff",
+    borderBottomWidth: 1,
+    borderBottomColor: "#f1f5f9",
   },
-  pageTitle: {
-    fontSize: 22,
+  headerLeft: {
+    flex: 1,
+  },
+  screenTitle: {
+    fontSize: 18,
     fontWeight: "800",
     color: "#0f172a",
     letterSpacing: -0.3,
   },
-  pageSubtitle: {
-    fontSize: 13,
-    fontWeight: "500",
+  screenSubtitle: {
+    fontSize: 11.5,
     color: "#64748b",
-    marginTop: 2,
+    marginTop: 1,
   },
-  addBtn: {
-    backgroundColor: "#059669",
-    paddingVertical: 9,
-    paddingHorizontal: 14,
-    borderRadius: 12,
-    shadowColor: "#059669",
-    shadowOffset: { width: 0, height: 2 },
-    shadowOpacity: 0.2,
-    shadowRadius: 4,
-    elevation: 3,
-  },
-  addBtnText: {
-    color: "#ffffff",
-    fontSize: 13,
-    fontWeight: "700",
+  headerRightButtons: {
+    flexDirection: "row",
+    alignItems: "center",
+    gap: 8,
   },
   orgChartBtn: {
-    backgroundColor: "#eff6ff",
+    flexDirection: "row",
+    alignItems: "center",
+    gap: 4,
+    backgroundColor: "#ecfdf5",
+    paddingHorizontal: 10,
+    paddingVertical: 6,
+    borderRadius: 18,
     borderWidth: 1,
-    borderColor: "#bfdbfe",
-    paddingVertical: 9,
-    paddingHorizontal: 12,
-    borderRadius: 12,
+    borderColor: "#a7f3d0",
   },
   orgChartBtnText: {
-    color: "#2563eb",
-    fontSize: 13,
+    fontSize: 12,
+    fontWeight: "600",
+    color: "#059669",
+  },
+  addBtn: {
+    flexDirection: "row",
+    alignItems: "center",
+    gap: 3,
+    backgroundColor: "#059669",
+    paddingHorizontal: 12,
+    paddingVertical: 6,
+    borderRadius: 18,
+    shadowColor: "#059669",
+    shadowOffset: { width: 0, height: 2 },
+    shadowOpacity: 0.15,
+    shadowRadius: 3,
+    elevation: 2,
+  },
+  addBtnText: {
+    fontSize: 12,
+    fontWeight: "700",
+    color: "#ffffff",
+  },
+  tabSwitcher: {
+    flexDirection: "row",
+    backgroundColor: "#ffffff",
+    paddingHorizontal: 16,
+    paddingBottom: 8,
+    gap: 10,
+    borderBottomWidth: 1,
+    borderBottomColor: "#e2e8f0",
+  },
+  tabButton: {
+    flexDirection: "row",
+    alignItems: "center",
+    gap: 6,
+    paddingVertical: 6,
+    paddingHorizontal: 12,
+    borderRadius: 16,
+    backgroundColor: "#f8fafc",
+  },
+  tabButtonActive: {
+    backgroundColor: "#ecfdf5",
+    borderWidth: 1,
+    borderColor: "#a7f3d0",
+  },
+  tabButtonText: {
+    fontSize: 12.5,
+    fontWeight: "600",
+    color: "#64748b",
+  },
+  tabButtonTextActive: {
+    color: "#059669",
     fontWeight: "700",
   },
   flatList: {
@@ -569,346 +773,163 @@ const styles = StyleSheet.create({
   },
   listContent: {
     paddingHorizontal: 16,
-    paddingBottom: 70,
-    gap: 12,
+    paddingTop: 12,
   },
-  headerComponent: {
-    gap: 12,
-    marginBottom: 4,
+  listHeaderSection: {
+    marginBottom: 8,
   },
-  statsRow: {
-    flexDirection: "row",
-    gap: 8,
-    marginTop: 6,
+  searchSection: {
+    marginBottom: 10,
   },
-  statCard: {
-    flex: 1,
-    backgroundColor: "#ffffff",
-    borderRadius: 14,
-    paddingVertical: 10,
-    paddingHorizontal: 10,
-    borderWidth: 1,
-    borderColor: "#e2e8f0",
-  },
-  statCardActive: {
-    borderColor: "#059669",
-    backgroundColor: "#ecfdf5",
-  },
-  statCount: {
-    fontSize: 18,
-    fontWeight: "800",
-    color: "#0f172a",
-  },
-  statCountActive: {
-    color: "#059669",
-  },
-  statLabel: {
-    fontSize: 11,
-    fontWeight: "600",
-    color: "#64748b",
-    marginTop: 2,
-  },
-  statLabelActive: {
-    color: "#059669",
-  },
-  filterCard: {
-    backgroundColor: "#ffffff",
-    borderRadius: 16,
-    padding: 12,
-    borderWidth: 1,
-    borderColor: "#e2e8f0",
-    gap: 10,
-  },
-  searchRow: {
+  legacyMergeBar: {
     flexDirection: "row",
     alignItems: "center",
-    gap: 8,
-  },
-  searchInputWrap: {
-    flex: 1,
-    flexDirection: "row",
-    alignItems: "center",
-    backgroundColor: "#f8fafc",
-    borderWidth: 1,
-    borderColor: "#cbd5e1",
-    borderRadius: 12,
-    paddingHorizontal: 10,
-    height: 42,
-  },
-  searchIcon: {
-    fontSize: 14,
-    marginRight: 6,
-  },
-  searchInput: {
-    flex: 1,
-    fontSize: 13,
-    color: "#0f172a",
-    paddingVertical: 0,
-  },
-  clearBtn: {
-    padding: 4,
-  },
-  clearBtnText: {
-    fontSize: 13,
-    color: "#94a3b8",
-    fontWeight: "700",
-  },
-  searchBtn: {
-    backgroundColor: "#0f172a",
-    paddingHorizontal: 16,
-    height: 42,
-    borderRadius: 12,
-    alignItems: "center",
-    justifyContent: "center",
-  },
-  searchBtnText: {
-    color: "#ffffff",
-    fontSize: 13,
-    fontWeight: "700",
-  },
-  legacyBtn: {
-    flexDirection: "row",
-    alignItems: "center",
-    justifyContent: "center",
-    gap: 6,
-    backgroundColor: "#f8fafc",
-    borderWidth: 1,
-    borderColor: "#e2e8f0",
-    borderRadius: 10,
-    paddingVertical: 8,
+    justifyContent: "space-between",
+    backgroundColor: "#f0fdfa",
     paddingHorizontal: 12,
+    paddingVertical: 9,
+    borderRadius: 12,
+    borderWidth: 1,
+    borderColor: "#ccfbf1",
+    marginBottom: 10,
   },
-  legacyBtnIcon: {
-    fontSize: 13,
+  legacyMergeLeft: {
+    flexDirection: "row",
+    alignItems: "center",
+    gap: 8,
+    flex: 1,
   },
-  legacyBtnText: {
+  legacyMergeText: {
     fontSize: 12,
     fontWeight: "600",
-    color: "#475569",
+    color: "#0f766e",
   },
-  errorBanner: {
-    backgroundColor: "#fff1f2",
-    borderRadius: 12,
-    padding: 12,
-    borderWidth: 1,
-    borderColor: "#fecdd3",
-  },
-  errorBannerText: {
-    color: "#e11d48",
-    fontSize: 13,
-    fontWeight: "600",
-  },
-  listHeaderRow: {
+  countSummaryRow: {
     flexDirection: "row",
     alignItems: "center",
     justifyContent: "space-between",
     paddingHorizontal: 2,
+    marginBottom: 8,
   },
-  listCountText: {
-    fontSize: 13,
-    color: "#475569",
-    fontWeight: "500",
+  countSummaryText: {
+    fontSize: 12,
+    color: "#64748b",
   },
-  deptCard: {
-    backgroundColor: "#ffffff",
-    borderRadius: 16,
-    borderWidth: 1,
-    borderColor: "#e2e8f0",
-    padding: 14,
-    gap: 10,
-    shadowColor: "#0f172a",
-    shadowOffset: { width: 0, height: 1 },
-    shadowOpacity: 0.04,
-    shadowRadius: 3,
-    elevation: 1,
-  },
-  cardHeaderRow: {
-    flexDirection: "row",
-    alignItems: "center",
-    gap: 10,
-  },
-  codeBadge: {
-    paddingVertical: 6,
-    paddingHorizontal: 10,
-    borderRadius: 10,
-    minWidth: 44,
-    alignItems: "center",
-    justifyContent: "center",
-  },
-  codeBadgeText: {
-    fontSize: 13,
-    fontWeight: "800",
-  },
-  deptName: {
-    fontSize: 15,
+  countBold: {
     fontWeight: "700",
     color: "#0f172a",
   },
-  deptOrder: {
-    fontSize: 11,
-    color: "#64748b",
-    marginTop: 2,
-  },
-  statusBadge: {
-    paddingVertical: 4,
-    paddingHorizontal: 8,
-    borderRadius: 8,
-  },
-  statusBadgeActive: {
-    backgroundColor: "#dcfce7",
-  },
-  statusBadgeInactive: {
-    backgroundColor: "#f1f5f9",
-  },
-  statusBadgeText: {
-    fontSize: 11,
-    fontWeight: "700",
-  },
-  statusBadgeTextActive: {
-    color: "#15803d",
-  },
-  statusBadgeTextInactive: {
-    color: "#64748b",
-  },
-  deptDesc: {
-    fontSize: 12,
-    color: "#64748b",
-    lineHeight: 18,
-  },
-  infoRow: {
-    flexDirection: "row",
-    backgroundColor: "#f8fafc",
-    borderRadius: 10,
-    padding: 10,
-    gap: 10,
-  },
-  infoCol: {
-    flex: 1,
-    gap: 2,
-  },
-  infoLabel: {
-    fontSize: 10,
-    fontWeight: "700",
-    color: "#94a3b8",
-    textTransform: "uppercase",
-  },
-  infoValue: {
+  resetFilterText: {
     fontSize: 12,
     fontWeight: "600",
-    color: "#334155",
-  },
-  cardFooterRow: {
-    flexDirection: "row",
-    alignItems: "center",
-  },
-  detailLinkBadge: {
-    flexDirection: "row",
-    alignItems: "center",
-  },
-  detailLinkText: {
-    fontSize: 12,
-    fontWeight: "700",
     color: "#059669",
   },
-  loadingBox: {
-    alignItems: "center",
-    paddingVertical: 40,
-    gap: 12,
+  branchFilterBox: {
+    marginBottom: 10,
   },
-  loadingText: {
-    fontSize: 13,
+  branchFilterLabel: {
+    fontSize: 11.5,
+    fontWeight: "600",
     color: "#64748b",
+    marginBottom: 6,
+  },
+  branchFilterScroll: {
+    flexDirection: "row",
+  },
+  branchPill: {
+    paddingHorizontal: 12,
+    paddingVertical: 5,
+    borderRadius: 14,
+    backgroundColor: "#ffffff",
+    borderWidth: 1,
+    borderColor: "#e2e8f0",
+    marginRight: 8,
+  },
+  branchPillActive: {
+    backgroundColor: "#059669",
+    borderColor: "#059669",
+  },
+  branchPillText: {
+    fontSize: 12,
+    fontWeight: "600",
+    color: "#475569",
+  },
+  branchPillTextActive: {
+    color: "#ffffff",
+  },
+  roomTypeFilterBox: {
+    marginBottom: 10,
+  },
+  roomTypeFilterScroll: {
+    flexDirection: "row",
+  },
+  roomTypePill: {
+    paddingHorizontal: 12,
+    paddingVertical: 5,
+    borderRadius: 14,
+    backgroundColor: "#ffffff",
+    borderWidth: 1,
+    borderColor: "#e2e8f0",
+    marginRight: 6,
+  },
+  roomTypePillActive: {
+    backgroundColor: "#059669",
+    borderColor: "#059669",
+  },
+  roomTypePillText: {
+    fontSize: 12,
+    fontWeight: "600",
+    color: "#64748b",
+  },
+  roomTypePillTextActive: {
+    color: "#ffffff",
   },
   emptyCard: {
     backgroundColor: "#ffffff",
-    borderRadius: 18,
-    padding: 24,
+    borderRadius: 16,
+    padding: 32,
     alignItems: "center",
+    marginTop: 20,
     borderWidth: 1,
     borderColor: "#e2e8f0",
-    gap: 8,
-  },
-  emptyIcon: {
-    fontSize: 36,
-    marginBottom: 4,
   },
   emptyTitle: {
-    fontSize: 16,
+    fontSize: 15,
     fontWeight: "700",
-    color: "#0f172a",
+    color: "#1e293b",
+    marginTop: 12,
+    marginBottom: 4,
   },
-  emptyText: {
-    fontSize: 13,
+  emptySubtitle: {
+    fontSize: 12.5,
     color: "#64748b",
     textAlign: "center",
+    lineHeight: 18,
+    marginBottom: 16,
+    maxWidth: 260,
   },
   emptyResetBtn: {
-    marginTop: 8,
-    backgroundColor: "#059669",
-    paddingVertical: 8,
+    backgroundColor: "#ecfdf5",
     paddingHorizontal: 16,
-    borderRadius: 10,
+    paddingVertical: 8,
+    borderRadius: 20,
+    borderWidth: 1,
+    borderColor: "#a7f3d0",
   },
   emptyResetBtnText: {
-    color: "#ffffff",
-    fontSize: 13,
-    fontWeight: "700",
-  },
-  listPageIndicator: {
-    fontSize: 12,
-    color: "#64748b",
+    fontSize: 12.5,
     fontWeight: "600",
+    color: "#059669",
   },
-  paginationCard: {
-    flexDirection: "row",
-    alignItems: "center",
-    justifyContent: "space-between",
-    backgroundColor: "#ffffff",
-    borderRadius: 14,
-    paddingVertical: 10,
-    paddingHorizontal: 8,
-    borderWidth: 1,
-    borderColor: "#e2e8f0",
-    marginTop: 8,
-    gap: 6,
-  },
-  pageBtn: {
+  emptyAddBtn: {
+    backgroundColor: "#059669",
+    paddingHorizontal: 16,
     paddingVertical: 8,
-    paddingHorizontal: 10,
-    borderRadius: 8,
-    backgroundColor: "#f8fafc",
-    borderWidth: 1,
-    borderColor: "#e2e8f0",
-    minWidth: 64,
-    alignItems: "center",
-    justifyContent: "center",
+    borderRadius: 20,
   },
-  pageBtnDisabled: {
-    opacity: 0.4,
-  },
-  pageBtnText: {
-    fontSize: 12,
-    fontWeight: "700",
-    color: "#0f172a",
-  },
-  pageBtnTextDisabled: {
-    color: "#94a3b8",
-  },
-  pageCenterInfo: {
-    flex: 1,
-    alignItems: "center",
-    justifyContent: "center",
-    paddingHorizontal: 4,
-    gap: 2,
-  },
-  pageIndicatorBold: {
-    fontSize: 13,
-    fontWeight: "800",
-    color: "#0f172a",
-  },
-  pageSubText: {
-    fontSize: 11,
-    color: "#64748b",
-    fontWeight: "500",
+  emptyAddBtnText: {
+    fontSize: 12.5,
+    fontWeight: "600",
+    color: "#ffffff",
   },
 });
