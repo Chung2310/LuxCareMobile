@@ -58,6 +58,18 @@ export function availableModules(user: UserProfile | null) {
       visible: hr && !!user?.companyCode,
     },
     {
+      title: "Lịch & chấm công",
+      description: "Trạng thái hôm nay, lịch sử cá nhân và lịch làm việc",
+      href: "/(tabs)/attendance" as const,
+      visible: hr,
+    },
+    {
+      title: "Đơn từ & phép",
+      description: "Nộp đơn, biểu mẫu và phê duyệt",
+      href: "/(tabs)/leave" as const,
+      visible: hr,
+    },
+    {
       title: "Quản lý công",
       description: "Chỉnh trạng thái, ghi chú và xem lịch sử",
       href: "/(tabs)/attendance-management" as const,
