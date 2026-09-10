@@ -71,6 +71,7 @@ export interface InventoryTransaction {
   performerName: string; // Dược sĩ Nguyễn Thị Mai...
   reason: string; // Nhập kho định kỳ, Xuất cấp phòng mổ khẩn cấp...
   createdAt: string; // ISO hoặc định dạng ngày giờ
+  rawCreatedAt?: string;
   status: "completed" | "pending";
 }
 

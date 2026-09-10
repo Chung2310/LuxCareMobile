@@ -1,6 +1,5 @@
 // Common Components
-export * from "./common/SearchBar";
-export * from "./common/CategoryTabs";
+export * from "./common";
 
 // Module Components
 export * from "./modules/types";

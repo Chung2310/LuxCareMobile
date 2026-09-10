@@ -10,11 +10,13 @@ import {
 } from "react-native";
 import { Ionicons } from "@expo/vector-icons";
 import type { InventorySupply } from "./types";
+import { AppButton, DatePickerField } from "../common";
 
 interface StockActionModalProps {
   visible: boolean;
   type: "in" | "out" | null;
   item: InventorySupply | null;
+  departments?: Array<{ id: string; name: string; code?: string } | string>;
   onClose: () => void;
   onConfirm: (payload: {
     supplyId: string;
@@ -27,31 +29,32 @@ interface StockActionModalProps {
   }) => void;
 }
 
-const DEPARTMENTS = [
-  "Khoa Cấp Cứu & Hồi Sức",
-  "Khoa Ngoại - Phòng Mổ",
-  "Khoa Khám Bệnh & Cận Lâm Sàng",
-  "Khoa Nội Tổng Hợp",
-  "Khoa Sản - Nhi",
-  "Khoa Dược - Nhà Thuốc Viện",
-  "Phòng Xét Nghiệm Trung Tâm",
-];
-
 export const StockActionModal: React.FC<StockActionModalProps> = ({
   visible,
   type,
   item,
+  departments = [],
   onClose,
   onConfirm,
 }) => {
   if (!item || !type) return null;
 
+  const deptList = React.useMemo(() => {
+    return departments.map((d) => (typeof d === "string" ? d : d.name)).filter(Boolean);
+  }, [departments]);
+
   const [quantity, setQuantity] = useState("10");
-  const [selectedDept, setSelectedDept] = useState(DEPARTMENTS[0]);
+  const [selectedDept, setSelectedDept] = useState(deptList[0] || "");
   const [batchNumber, setBatchNumber] = useState(item.batchNumber || "");
   const [expiryDate, setExpiryDate] = useState(item.expiryDate || "");
   const [reason, setReason] = useState("");
   const [errorMsg, setErrorMsg] = useState("");
+
+  React.useEffect(() => {
+    if (deptList.length > 0 && (!selectedDept || !deptList.includes(selectedDept))) {
+      setSelectedDept(deptList[0]);
+    }
+  }, [deptList]);
 
   const isStockOut = type === "out";
 
@@ -184,32 +187,37 @@ export const StockActionModal: React.FC<StockActionModalProps> = ({
             {/* Khoa phòng tiếp nhận (Nếu là xuất kho) */}
             {isStockOut && (
               <View style={styles.inputGroup}>
-                <Text style={styles.inputLabel}>Khoa / Phòng ban tiếp nhận:</Text>
-                <View style={styles.deptPillsContainer}>
-                  {DEPARTMENTS.map((dept) => {
-                    const isSelected = selectedDept === dept;
-                    return (
-                      <TouchableOpacity
-                        key={dept}
-                        style={[
-                          styles.deptPill,
-                          isSelected && styles.deptPillSelected,
-                        ]}
-                        onPress={() => setSelectedDept(dept)}
-                        activeOpacity={0.7}
-                      >
-                        <Text
+                {deptList.length === 0 ? (
+                  <Text style={{ fontSize: 13, color: "#64748b", fontStyle: "italic", marginVertical: 4 }}>
+                    Chưa có danh mục khoa/phòng ban. Vui lòng thiết lập tại phân hệ Phòng ban.
+                  </Text>
+                ) : (
+                  <View style={styles.deptPillsContainer}>
+                    {deptList.map((dept) => {
+                      const isSelected = selectedDept === dept;
+                      return (
+                        <TouchableOpacity
+                          key={dept}
                           style={[
-                            styles.deptPillText,
-                            isSelected && styles.deptPillTextSelected,
+                            styles.deptPill,
+                            isSelected && styles.deptPillSelected,
                           ]}
+                          onPress={() => setSelectedDept(dept)}
+                          activeOpacity={0.7}
                         >
-                          {dept}
-                        </Text>
-                      </TouchableOpacity>
-                    );
-                  })}
-                </View>
+                          <Text
+                            style={[
+                              styles.deptPillText,
+                              isSelected && styles.deptPillTextSelected,
+                            ]}
+                          >
+                            {dept}
+                          </Text>
+                        </TouchableOpacity>
+                      );
+                    })}
+                  </View>
+                )}
               </View>
             )}
 
@@ -224,14 +232,14 @@ export const StockActionModal: React.FC<StockActionModalProps> = ({
                   onChangeText={setBatchNumber}
                 />
 
-                <Text style={[styles.inputLabel, { marginTop: 12 }]}>
-                  Hạn sử dụng (YYYY-MM-DD):
-                </Text>
-                <TextInput
-                  style={styles.textInput}
-                  placeholder="Ví dụ: 2028-12-31"
+                <DatePickerField
+                  label="Hạn sử dụng (HSD)"
                   value={expiryDate}
-                  onChangeText={setExpiryDate}
+                  onChange={setExpiryDate}
+                  allowClear
+                  title="Chọn Hạn sử dụng (HSD)"
+                  placeholder="dd/MM/yyyy"
+                  style={{ marginTop: 12 }}
                 />
               </View>
             )}
@@ -259,26 +267,19 @@ export const StockActionModal: React.FC<StockActionModalProps> = ({
 
           {/* Nút Hoàn tất */}
           <View style={styles.sheetFooter}>
-            <TouchableOpacity
-              style={styles.cancelBtn}
+            <AppButton
+              variant="secondary"
+              title="Hủy bỏ"
               onPress={onClose}
-              activeOpacity={0.7}
-            >
-              <Text style={styles.cancelBtnText}>Hủy bỏ</Text>
-            </TouchableOpacity>
+              style={{ flex: 1 }}
+            />
 
-            <TouchableOpacity
-              style={[
-                styles.confirmBtn,
-                { backgroundColor: isStockOut ? "#0284c7" : "#059669" },
-              ]}
+            <AppButton
+              variant={isStockOut ? "blue" : "primary"}
+              title={isStockOut ? "Xác nhận xuất kho" : "Xác nhận nhập kho"}
               onPress={handleConfirm}
-              activeOpacity={0.8}
-            >
-              <Text style={styles.confirmBtnText}>
-                {isStockOut ? "Xác nhận xuất kho" : "Xác nhận nhập kho"}
-              </Text>
-            </TouchableOpacity>
+              style={{ flex: 2 }}
+            />
           </View>
         </View>
       </View>
@@ -425,13 +426,33 @@ const styles = StyleSheet.create({
   },
   textInput: {
     borderWidth: 1,
-    borderColor: "#cbd5e1",
+    borderColor: "#e2e8f0",
     borderRadius: 12,
-    paddingHorizontal: 14,
-    paddingVertical: 10,
+    paddingHorizontal: 12,
+    height: 44,
+    paddingVertical: 0,
     fontSize: 14,
     color: "#0f172a",
     backgroundColor: "#ffffff",
+  },
+  datePickerTrigger: {
+    backgroundColor: "#ffffff",
+    borderWidth: 1,
+    borderColor: "#e2e8f0",
+    borderRadius: 12,
+    paddingHorizontal: 12,
+    height: 44,
+    flexDirection: "row",
+    alignItems: "center",
+    justifyContent: "space-between",
+  },
+  datePickerText: {
+    fontSize: 14,
+    color: "#0f172a",
+    fontWeight: "500",
+  },
+  datePickerPlaceholder: {
+    color: "#94a3b8",
   },
   errorBox: {
     flexDirection: "row",

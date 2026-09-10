@@ -1,16 +1,17 @@
-import React, { useState } from "react";
+import React, { useMemo, useState } from "react";
 import {
   ActivityIndicator,
   FlatList,
   RefreshControl,
   StyleSheet,
   Text,
-  TextInput,
   TouchableOpacity,
   View,
 } from "react-native";
 import { Ionicons } from "@expo/vector-icons";
 import type { InventoryTransaction } from "./types";
+import { formatDateVN } from "../../features/credentials/DatePickerModal";
+import { AppButton, DateFilterPill, SearchInput } from "../common";
 
 interface TransactionsViewProps {
   transactions: InventoryTransaction[];
@@ -33,6 +34,18 @@ export function TransactionsView({
   onChangeSearch,
   onNewTransactionPress,
 }: TransactionsViewProps) {
+  const [selectedDate, setSelectedDate] = useState("");
+
+  const filteredByDateTransactions = useMemo(() => {
+    if (!selectedDate) return transactions;
+    const vnDate = formatDateVN(selectedDate);
+    return transactions.filter((t) => {
+      const matchCreated = t.createdAt && (t.createdAt.includes(selectedDate) || t.createdAt.includes(vnDate));
+      const matchRaw = t.rawCreatedAt && t.rawCreatedAt.includes(selectedDate);
+      return Boolean(matchCreated || matchRaw);
+    });
+  }, [transactions, selectedDate]);
+
   const inCount = transactions.filter((t) => t.type === "in").length;
   const outCount = transactions.filter((t) => t.type === "out").length;
 
@@ -85,7 +98,7 @@ export function TransactionsView({
               <>
                 <Text style={styles.dot}>•</Text>
                 <Ionicons name="calendar-outline" size={13} color="#64748b" />
-                <Text style={styles.metaText}>HSD: {item.expiryDate}</Text>
+                <Text style={styles.metaText}>HSD: {formatDateVN(item.expiryDate)}</Text>
               </>
             )}
           </View>
@@ -125,17 +138,11 @@ export function TransactionsView({
     <View style={styles.container}>
       {/* Search Bar & Filter Types */}
       <View style={styles.topControl}>
-        <View style={styles.searchBox}>
-          <Ionicons name="search-outline" size={17} color="#94a3b8" style={{ marginLeft: 10 }} />
-          <TextInput
-            style={styles.searchInput}
-            placeholder="Tìm theo mã phiếu, tên thuốc, khoa phòng..."
-            placeholderTextColor="#94a3b8"
-            value={searchQuery}
-            onChangeText={onChangeSearch}
-            clearButtonMode="while-editing"
-          />
-        </View>
+        <SearchInput
+          value={searchQuery}
+          onChangeText={onChangeSearch}
+          placeholder="Tìm theo mã phiếu, tên thuốc, khoa phòng..."
+        />
 
         {/* Filter Pills */}
         <View style={styles.filterRow}>
@@ -167,7 +174,38 @@ export function TransactionsView({
               Xuất cấp ({outCount})
             </Text>
           </TouchableOpacity>
+
+          <DateFilterPill
+            value={selectedDate}
+            onChange={setSelectedDate}
+            label="Ngày"
+          />
         </View>
+
+        {/* Quick Action Buttons: Tạo phiếu nhập / xuất */}
+        {onNewTransactionPress && (
+          <View style={styles.actionButtonsRow}>
+            <AppButton
+              variant="outline"
+              size="sm"
+              icon="arrow-down-circle"
+              title="Lập phiếu nhập kho"
+              onPress={() => onNewTransactionPress("in")}
+              style={styles.actionBtnIn}
+              textStyle={styles.actionBtnInText}
+            />
+
+            <AppButton
+              variant="secondary"
+              size="sm"
+              icon="arrow-up-circle"
+              title="Lập phiếu xuất cấp"
+              onPress={() => onNewTransactionPress("out")}
+              style={styles.actionBtnOut}
+              textStyle={styles.actionBtnOutText}
+            />
+          </View>
+        )}
       </View>
 
       {/* Loading state */}
@@ -178,7 +216,7 @@ export function TransactionsView({
         </View>
       ) : (
         <FlatList
-          data={transactions}
+          data={filteredByDateTransactions}
           keyExtractor={(item) => item.id}
           renderItem={renderTransactionItem}
           contentContainerStyle={styles.listContent}
@@ -229,6 +267,8 @@ const styles = StyleSheet.create({
   },
   filterRow: {
     flexDirection: "row",
+    flexWrap: "wrap",
+    alignItems: "center",
     gap: 8,
   },
   filterChip: {
@@ -253,6 +293,45 @@ const styles = StyleSheet.create({
     fontSize: 12,
     fontWeight: "600",
     color: "#64748b",
+  },
+  actionButtonsRow: {
+    flexDirection: "row",
+    gap: 8,
+    marginTop: 4,
+  },
+  actionBtnIn: {
+    flex: 1,
+    flexDirection: "row",
+    alignItems: "center",
+    justifyContent: "center",
+    gap: 6,
+    paddingVertical: 9,
+    borderRadius: 10,
+    backgroundColor: "#ecfdf5",
+    borderWidth: 1,
+    borderColor: "#a7f3d0",
+  },
+  actionBtnInText: {
+    fontSize: 12,
+    fontWeight: "700",
+    color: "#059669",
+  },
+  actionBtnOut: {
+    flex: 1,
+    flexDirection: "row",
+    alignItems: "center",
+    justifyContent: "center",
+    gap: 6,
+    paddingVertical: 9,
+    borderRadius: 10,
+    backgroundColor: "#f0f9ff",
+    borderWidth: 1,
+    borderColor: "#bae6fd",
+  },
+  actionBtnOutText: {
+    fontSize: 12,
+    fontWeight: "700",
+    color: "#0284c7",
   },
   filterChipTextActive: {
     color: "#ffffff",

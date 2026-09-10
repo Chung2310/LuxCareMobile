@@ -4,12 +4,13 @@ import {
   RefreshControl,
   StyleSheet,
   Text,
-  TextInput,
   TouchableOpacity,
   View,
 } from "react-native";
 import { Ionicons } from "@expo/vector-icons";
 import type { InventoryBatchItem, InventorySupply } from "./types";
+import { formatDateVN } from "../../features/credentials/DatePickerModal";
+import { DateFilterPill, SearchInput } from "../common";
 
 interface BatchesViewProps {
   supplies: InventorySupply[];
@@ -20,6 +21,7 @@ interface BatchesViewProps {
 export function BatchesView({ supplies, loading, onRefresh }: BatchesViewProps) {
   const [searchQuery, setSearchQuery] = useState("");
   const [filterStatus, setFilterStatus] = useState<"all" | "warning" | "valid">("all");
+  const [expiryFilterDate, setExpiryFilterDate] = useState("");
 
   // Chuyển đổi supplies thành danh sách lô hàng chi tiết
   const batches: InventoryBatchItem[] = useMemo(() => {
@@ -70,6 +72,13 @@ export function BatchesView({ supplies, loading, onRefresh }: BatchesViewProps) 
       list = list.filter((b) => b.expiryStatus === "valid");
     }
 
+    if (expiryFilterDate) {
+      const vnDate = formatDateVN(expiryFilterDate);
+      list = list.filter(
+        (b) => b.expiryDate.includes(expiryFilterDate) || b.expiryDate.includes(vnDate),
+      );
+    }
+
     if (!searchQuery.trim()) return list;
     const q = searchQuery.toLowerCase().trim();
     return list.filter(
@@ -79,7 +88,7 @@ export function BatchesView({ supplies, loading, onRefresh }: BatchesViewProps) 
         b.supplyCode.toLowerCase().includes(q) ||
         b.warehouseLocation.toLowerCase().includes(q),
     );
-  }, [batches, filterStatus, searchQuery]);
+  }, [batches, filterStatus, expiryFilterDate, searchQuery]);
 
   const warningCount = batches.filter(
     (b) => b.expiryStatus === "warning" || b.expiryStatus === "expired",
@@ -137,7 +146,7 @@ export function BatchesView({ supplies, loading, onRefresh }: BatchesViewProps) 
         <View style={styles.datesRow}>
           <View style={styles.dateCol}>
             <Text style={styles.dateLabel}>Ngày sản xuất (NSX)</Text>
-            <Text style={styles.dateValue}>{item.manufactureDate}</Text>
+            <Text style={styles.dateValue}>{formatDateVN(item.manufactureDate) || "N/A"}</Text>
           </View>
 
           <Ionicons name="arrow-forward" size={14} color="#94a3b8" />
@@ -151,7 +160,7 @@ export function BatchesView({ supplies, loading, onRefresh }: BatchesViewProps) 
                 isWarning && { color: "#ea580c", fontWeight: "700" },
               ]}
             >
-              {item.expiryDate}
+              {formatDateVN(item.expiryDate) || "Không giới hạn"}
             </Text>
           </View>
         </View>
@@ -177,17 +186,11 @@ export function BatchesView({ supplies, loading, onRefresh }: BatchesViewProps) 
     <View style={styles.container}>
       {/* Top Search & Filter */}
       <View style={styles.topControl}>
-        <View style={styles.searchBox}>
-          <Ionicons name="search-outline" size={17} color="#94a3b8" style={{ marginLeft: 10 }} />
-          <TextInput
-            style={styles.searchInput}
-            placeholder="Tìm theo số lô LOT, tên thuốc, vị trí..."
-            placeholderTextColor="#94a3b8"
-            value={searchQuery}
-            onChangeText={setSearchQuery}
-            clearButtonMode="while-editing"
-          />
-        </View>
+        <SearchInput
+          value={searchQuery}
+          onChangeText={setSearchQuery}
+          placeholder="Tìm theo số lô LOT, tên thuốc, vị trí..."
+        />
 
         <View style={styles.filterRow}>
           <TouchableOpacity
@@ -217,6 +220,13 @@ export function BatchesView({ supplies, loading, onRefresh }: BatchesViewProps) 
               Còn hạn an toàn ({batches.length - warningCount})
             </Text>
           </TouchableOpacity>
+
+          <DateFilterPill
+            value={expiryFilterDate}
+            onChange={setExpiryFilterDate}
+            label="Hạn dùng"
+            title="Lọc lô theo ngày hết hạn"
+          />
         </View>
       </View>
 
@@ -280,6 +290,8 @@ const styles = StyleSheet.create({
   },
   filterRow: {
     flexDirection: "row",
+    flexWrap: "wrap",
+    alignItems: "center",
     gap: 8,
   },
   filterChip: {

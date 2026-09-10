@@ -15,7 +15,22 @@ export interface DatePickerModalProps {
   onChange: (dateStr: string) => void;
   title?: string;
   allowClear?: boolean;
+  clearLabel?: string;
+  showYearShortcuts?: boolean;
   baseDateForShortcuts?: string; // YYYY-MM-DD
+}
+
+/**
+ * Chuyển đổi định dạng ISO (YYYY-MM-DD) sang định dạng ngày Việt Nam (dd/MM/yyyy)
+ */
+export function formatDateVN(dateStr?: string | null): string {
+  if (!dateStr) return "";
+  const clean = dateStr.slice(0, 10);
+  const parts = clean.split("-");
+  if (parts.length === 3 && parts[0].length === 4) {
+    return `${parts[2]}/${parts[1]}/${parts[0]}`;
+  }
+  return dateStr;
 }
 
 const WEEK_DAYS = ["T2", "T3", "T4", "T5", "T6", "T7", "CN"];
@@ -56,6 +71,8 @@ export function DatePickerModal({
   onChange,
   title = "Chọn ngày",
   allowClear = false,
+  clearLabel = "Không thời hạn",
+  showYearShortcuts = true,
   baseDateForShortcuts,
 }: DatePickerModalProps) {
   const initial = useMemo(() => parseDateStr(value), [value]);
@@ -138,7 +155,7 @@ export function DatePickerModal({
   };
 
   // Build calendar matrix
-  const calendarCells = [];
+  const calendarCells: { day: number; isCurrentMonth: boolean }[] = [];
   // Leading empty/prev month days
   for (let i = startDayOfWeek - 1; i >= 0; i--) {
     calendarCells.push({ day: prevMonthDays - i, isCurrentMonth: false });
@@ -153,6 +170,15 @@ export function DatePickerModal({
   while (calendarCells.length < totalCells) {
     calendarCells.push({ day: nextD++, isCurrentMonth: false });
   }
+
+  // Chia calendarCells thành từng hàng tuần đúng 7 cột (T2 -> CN), tránh lỗi flexWrap bị rớt cột CN
+  const calendarWeeks = useMemo(() => {
+    const weeks: { day: number; isCurrentMonth: boolean }[][] = [];
+    for (let i = 0; i < calendarCells.length; i += 7) {
+      weeks.push(calendarCells.slice(i, i + 7));
+    }
+    return weeks;
+  }, [calendarCells]);
 
   const todayStr = useMemo(() => {
     const now = new Date();
@@ -176,7 +202,7 @@ export function DatePickerModal({
               <Text style={styles.dialogTitle}>{title}</Text>
               <Text style={styles.dialogSubtitle}>
                 {selectedDate
-                  ? `Đang chọn: ${selectedDate.split("-").reverse().join("/")}`
+                  ? `Đang chọn: ${formatDateVN(selectedDate)}`
                   : "Chưa chọn ngày"}
               </Text>
             </View>
@@ -226,43 +252,52 @@ export function DatePickerModal({
             ))}
           </View>
 
-          {/* Days Grid */}
+          {/* Days Grid - hiển thị theo từng tuần cố định 7 ngày */}
           <View style={styles.daysGrid}>
-            {calendarCells.map((cell, idx) => {
-              if (!cell.isCurrentMonth) {
-                return (
-                  <View key={`cell-${idx}`} style={styles.dayCell}>
-                    <Text style={styles.otherMonthText}>{cell.day}</Text>
-                  </View>
-                );
-              }
+            {calendarWeeks.map((week, wIdx) => (
+              <View key={`week-${wIdx}`} style={styles.weekRow}>
+                {week.map((cell, dayColIdx) => {
+                  const isSunday = dayColIdx === 6;
+                  const isSaturday = dayColIdx === 5;
 
-              const cellDateStr = `${viewYear}-${pad(viewMonth + 1)}-${pad(cell.day)}`;
-              const isSelected = selectedDate === cellDateStr;
-              const isToday = todayStr === cellDateStr;
+                  if (!cell.isCurrentMonth) {
+                    return (
+                      <View key={`cell-${dayColIdx}`} style={styles.dayCell}>
+                        <Text style={styles.otherMonthText}>{cell.day}</Text>
+                      </View>
+                    );
+                  }
 
-              return (
-                <Pressable
-                  key={`cell-${idx}`}
-                  style={[
-                    styles.dayCell,
-                    isSelected && styles.dayCellSelected,
-                    isToday && !isSelected && styles.dayCellToday,
-                  ]}
-                  onPress={() => handleSelectDay(cell.day)}
-                >
-                  <Text
-                    style={[
-                      styles.dayText,
-                      isSelected && styles.dayTextSelected,
-                      isToday && !isSelected && styles.dayTextToday,
-                    ]}
-                  >
-                    {cell.day}
-                  </Text>
-                </Pressable>
-              );
-            })}
+                  const cellDateStr = `${viewYear}-${pad(viewMonth + 1)}-${pad(cell.day)}`;
+                  const isSelected = selectedDate === cellDateStr;
+                  const isToday = todayStr === cellDateStr;
+
+                  return (
+                    <Pressable
+                      key={`cell-${dayColIdx}`}
+                      style={[
+                        styles.dayCell,
+                        isSelected && styles.dayCellSelected,
+                        isToday && !isSelected && styles.dayCellToday,
+                      ]}
+                      onPress={() => handleSelectDay(cell.day)}
+                    >
+                      <Text
+                        style={[
+                          styles.dayText,
+                          isSunday && !isSelected && { color: "#e11d48", fontWeight: "700" },
+                          isSaturday && !isSelected && { color: "#0284c7" },
+                          isSelected && styles.dayTextSelected,
+                          isToday && !isSelected && styles.dayTextToday,
+                        ]}
+                      >
+                        {cell.day}
+                      </Text>
+                    </Pressable>
+                  );
+                })}
+              </View>
+            ))}
           </View>
 
           {/* Quick Shortcuts */}
@@ -273,17 +308,21 @@ export function DatePickerModal({
 
             {allowClear && (
               <>
-                <Pressable style={styles.shortcutChip} onPress={() => handleQuickAddYears(1)}>
-                  <Text style={styles.shortcutChipText}>+1 năm</Text>
-                </Pressable>
-                <Pressable style={styles.shortcutChip} onPress={() => handleQuickAddYears(3)}>
-                  <Text style={styles.shortcutChipText}>+3 năm</Text>
-                </Pressable>
-                <Pressable style={styles.shortcutChip} onPress={() => handleQuickAddYears(5)}>
-                  <Text style={styles.shortcutChipText}>+5 năm</Text>
-                </Pressable>
+                {showYearShortcuts && (
+                  <>
+                    <Pressable style={styles.shortcutChip} onPress={() => handleQuickAddYears(1)}>
+                      <Text style={styles.shortcutChipText}>+1 năm</Text>
+                    </Pressable>
+                    <Pressable style={styles.shortcutChip} onPress={() => handleQuickAddYears(3)}>
+                      <Text style={styles.shortcutChipText}>+3 năm</Text>
+                    </Pressable>
+                    <Pressable style={styles.shortcutChip} onPress={() => handleQuickAddYears(5)}>
+                      <Text style={styles.shortcutChipText}>+5 năm</Text>
+                    </Pressable>
+                  </>
+                )}
                 <Pressable style={[styles.shortcutChip, styles.shortcutChipClear]} onPress={handleClear}>
-                  <Text style={styles.shortcutChipClearText}>Không thời hạn</Text>
+                  <Text style={styles.shortcutChipClearText}>{clearLabel}</Text>
                 </Pressable>
               </>
             )}
@@ -420,13 +459,15 @@ const styles = StyleSheet.create({
     color: "#64748b",
   },
   daysGrid: {
+    gap: 4,
+  },
+  weekRow: {
     flexDirection: "row",
-    flexWrap: "wrap",
-    rowGap: 4,
+    alignItems: "center",
   },
   dayCell: {
-    width: `${100 / 7}%`,
-    aspectRatio: 1.1,
+    flex: 1,
+    height: 38,
     alignItems: "center",
     justifyContent: "center",
     borderRadius: 12,

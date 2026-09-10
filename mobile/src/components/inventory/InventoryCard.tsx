@@ -5,8 +5,8 @@ import type { InventorySupply } from "./types";
 
 interface InventoryCardProps {
   item: InventorySupply;
-  onStockIn: (item: InventorySupply) => void;
-  onStockOut: (item: InventorySupply) => void;
+  onStockIn?: (item: InventorySupply) => void;
+  onStockOut?: (item: InventorySupply) => void;
   onDetail: (item: InventorySupply) => void;
   onEdit?: (item: InventorySupply) => void;
   onDelete?: (item: InventorySupply) => void;
@@ -14,8 +14,6 @@ interface InventoryCardProps {
 
 export const InventoryCard: React.FC<InventoryCardProps> = ({
   item,
-  onStockIn,
-  onStockOut,
   onDetail,
   onEdit,
   onDelete,
@@ -151,28 +149,7 @@ export const InventoryCard: React.FC<InventoryCardProps> = ({
         </Text>
       </View>
 
-      {/* Action Buttons Row 1: Nhập kho & Xuất kho */}
-      <View style={styles.actionsRow}>
-        <TouchableOpacity
-          style={styles.actionBtnIn}
-          onPress={() => onStockIn(item)}
-          activeOpacity={0.7}
-        >
-          <Ionicons name="arrow-down-circle" size={15} color="#059669" />
-          <Text style={styles.actionBtnInText}>Nhập kho</Text>
-        </TouchableOpacity>
-
-        <TouchableOpacity
-          style={styles.actionBtnOut}
-          onPress={() => onStockOut(item)}
-          activeOpacity={0.7}
-        >
-          <Ionicons name="arrow-up-circle" size={15} color="#0284c7" />
-          <Text style={styles.actionBtnOutText}>Xuất kho</Text>
-        </TouchableOpacity>
-      </View>
-
-      {/* Action Buttons Row 2: Chi tiết, Sửa, Xóa */}
+      {/* Action Buttons: Chi tiết, Sửa, Xóa */}
       <View style={styles.subActionsRow}>
         <TouchableOpacity
           style={styles.actionBtnDetail}

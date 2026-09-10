@@ -17,11 +17,11 @@ import { Ionicons } from "@expo/vector-icons";
 
 import {
   BatchesView,
+  BatchStockModal,
   CategoriesView,
   InventoryCard,
   InventoryStatCards,
   InventoryTabsNav,
-  StockActionModal,
   SuppliersView,
   SupplyDetailModal,
   SupplyFormModal,
@@ -35,17 +35,10 @@ import {
   type InventoryTransaction,
   type InventoryWarehouse,
 } from "../../src/components/inventory";
-import { supplyApi } from "../../src/api/supplyApi";
+import { SearchInput } from "../../src/components/common";
+import { supplyApi, type BatchStockPayload } from "../../src/api/supplyApi";
 
-const CATEGORY_FILTERS = [
-  { id: "all", label: "Tất cả" },
-  { id: "Vật tư tiêu hao", label: "Vật tư tiêu hao" },
-  { id: "Dược phẩm", label: "Dược phẩm" },
-  { id: "Phẫu thuật", label: "Phẫu thuật" },
-  { id: "Sinh phẩm xét nghiệm", label: "Sinh phẩm xét nghiệm" },
-  { id: "low-stock", label: "Cảnh báo sắp hết" },
-  { id: "expiring", label: "Sắp hết hạn" },
-];
+
 
 export default function InventoryScreen() {
   // Tab điều hướng chính
@@ -66,6 +59,7 @@ export default function InventoryScreen() {
   const [suppliers, setSuppliers] = useState<InventorySupplier[]>([]);
   const [warehouses, setWarehouses] = useState<InventoryWarehouse[]>([]);
   const [categories, setCategories] = useState<InventoryCategory[]>([]);
+  const [departments, setDepartments] = useState<Array<{ id: string; name: string; code?: string }>>([]);
 
   // Loading states
   const [loadingSupplies, setLoadingSupplies] = useState(false);
@@ -83,14 +77,14 @@ export default function InventoryScreen() {
   const [txSearchQuery, setTxSearchQuery] = useState("");
 
   // Modal actions
-  const [actionModal, setActionModal] = useState<{
+  const [batchModal, setBatchModal] = useState<{
     visible: boolean;
-    type: "in" | "out" | null;
-    item: InventorySupply | null;
+    type: "in" | "out";
+    initialSupply?: InventorySupply | null;
   }>({
     visible: false,
-    type: null,
-    item: null,
+    type: "in",
+    initialSupply: null,
   });
 
   const [detailModalItem, setDetailModalItem] = useState<InventorySupply | null>(null);
@@ -226,12 +220,23 @@ export default function InventoryScreen() {
     }
   }, []);
 
-  // Tải ban đầu các danh mục, kho bãi và nhà cung cấp cho dropdown
+  // Tải danh sách khoa / phòng ban thực tế
+  const loadDepartmentsData = useCallback(async () => {
+    try {
+      const list = await supplyApi.getDepartments();
+      setDepartments(list);
+    } catch {
+      setDepartments([]);
+    }
+  }, []);
+
+  // Tải ban đầu các danh mục, kho bãi, nhà cung cấp và phòng ban
   useEffect(() => {
     void loadCategoriesData();
     void loadWarehousesData();
     void loadSuppliersData();
-  }, [loadCategoriesData, loadWarehousesData, loadSuppliersData]);
+    void loadDepartmentsData();
+  }, [loadCategoriesData, loadWarehousesData, loadSuppliersData, loadDepartmentsData]);
 
   // Effect tải dữ liệu tương ứng khi đổi tab
   useEffect(() => {
@@ -254,6 +259,29 @@ export default function InventoryScreen() {
     loadWarehousesData,
     loadCategoriesData,
   ]);
+
+  // Danh mục phân loại động (lấy từ dữ liệu thật trong cơ sở dữ liệu)
+  const dynamicCategoryFilters = useMemo(() => {
+    const list: Array<{ id: string; label: string }> = [{ id: "all", label: "Tất cả" }];
+    const seen = new Set<string>();
+    for (const cat of categories) {
+      const name = (cat.name || "").trim();
+      if (name && !seen.has(name.toLowerCase())) {
+        seen.add(name.toLowerCase());
+        list.push({ id: name, label: name });
+      }
+    }
+    for (const sup of supplies) {
+      const catName = (sup.category || "").trim();
+      if (catName && catName !== "Chưa phân loại" && !seen.has(catName.toLowerCase())) {
+        seen.add(catName.toLowerCase());
+        list.push({ id: catName, label: catName });
+      }
+    }
+    list.push({ id: "low-stock", label: "Cảnh báo sắp hết" });
+    list.push({ id: "expiring", label: "Sắp hết hạn" });
+    return list;
+  }, [categories, supplies]);
 
   // Bộ lọc danh sách vật tư hiển thị
   const filteredSupplies = useMemo(() => {
@@ -285,52 +313,31 @@ export default function InventoryScreen() {
   }, [supplies, selectedCategory, searchQuery]);
 
   const handleStockIn = (item: InventorySupply) => {
-    setActionModal({
+    setBatchModal({
       visible: true,
       type: "in",
-      item,
+      initialSupply: item,
     });
   };
 
   const handleStockOut = (item: InventorySupply) => {
-    setActionModal({
+    setBatchModal({
       visible: true,
       type: "out",
-      item,
+      initialSupply: item,
     });
   };
 
-  // Xác nhận nhập/xuất kho gọi trực tiếp API backend
-  const handleConfirmStockAction = async (payload: {
-    supplyId: string;
-    type: "in" | "out";
-    quantity: number;
-    department?: string;
-    batchNumber?: string;
-    expiryDate?: string;
-    reason: string;
-  }) => {
+  // Xác nhận nhập/xuất kho theo lô đa mặt hàng (Batch Stock)
+  const handleBatchStockSubmit = async (payload: BatchStockPayload) => {
     try {
-      if (payload.type === "in") {
-        await supplyApi.stockIn(payload.supplyId, {
-          quantity: payload.quantity,
-          batchNumber: payload.batchNumber,
-          expiryDate: payload.expiryDate,
-          reason: payload.reason,
-        });
-      } else {
-        await supplyApi.stockOut(payload.supplyId, {
-          quantity: payload.quantity,
-          recipientDepartment: payload.department || "Kho Dược",
-          reason: payload.reason,
-        });
-      }
+      await supplyApi.batchStock(payload);
 
       Alert.alert(
-        payload.type === "in" ? "Nhập kho thành công!" : "Xuất kho thành công!",
-        `${payload.type === "in" ? "Đã nhập thêm" : "Đã xuất cấp"} ${payload.quantity} đơn vị.${
-          payload.department ? `\nKhoa phòng nhận: ${payload.department}` : ""
-        }`,
+        "Thành công",
+        payload.type === "in"
+          ? `Đã hoàn tất lập phiếu nhập kho (${payload.items.length} mặt hàng).`
+          : `Đã hoàn tất lập phiếu xuất cấp (${payload.items.length} mặt hàng).`,
         [{ text: "Đóng", style: "default" }],
       );
 
@@ -338,7 +345,8 @@ export default function InventoryScreen() {
       void loadSuppliesData();
       void loadTransactionsData();
     } catch (err: any) {
-      Alert.alert("Lỗi thao tác", err.message || "Không thể thực hiện giao dịch.");
+      Alert.alert("Lỗi thao tác", err.message || "Không thể thực hiện lập phiếu.");
+      throw err;
     }
   };
 
@@ -456,22 +464,11 @@ export default function InventoryScreen() {
         <View style={styles.tabContentContainer}>
           {/* Thanh Search Bar */}
           <View style={styles.searchSection}>
-            <View style={styles.searchContainer}>
-              <Ionicons name="search-outline" size={18} color="#94a3b8" style={styles.searchIcon} />
-              <TextInput
-                style={styles.searchInput}
-                placeholder="Tìm tên thuốc, mã vật tư, số lô..."
-                placeholderTextColor="#94a3b8"
-                value={searchQuery}
-                onChangeText={setSearchQuery}
-                clearButtonMode="while-editing"
-              />
-              {searchQuery.length > 0 && (
-                <TouchableOpacity onPress={() => setSearchQuery("")}>
-                  <Ionicons name="close-circle" size={18} color="#94a3b8" />
-                </TouchableOpacity>
-              )}
-            </View>
+            <SearchInput
+              value={searchQuery}
+              onChangeText={setSearchQuery}
+              placeholder="Tìm tên thuốc, mã vật tư, số lô..."
+            />
           </View>
 
           {/* Danh sách vật tư */}
@@ -481,8 +478,6 @@ export default function InventoryScreen() {
             renderItem={({ item }) => (
               <InventoryCard
                 item={item}
-                onStockIn={handleStockIn}
-                onStockOut={handleStockOut}
                 onDetail={setDetailModalItem}
                 onEdit={handleEditSupply}
                 onDelete={handleDeleteSupply}
@@ -507,11 +502,32 @@ export default function InventoryScreen() {
                   onSelectFilter={setSelectedCategory}
                 />
 
-                {/* Bộ lọc ngang danh mục */}
+                {/* 2 Nút Lập phiếu Nhập / Xuất Kho theo lô */}
+                <View style={styles.quickVoucherBar}>
+                  <TouchableOpacity
+                    style={styles.quickVoucherBtnIn}
+                    onPress={() => setBatchModal({ visible: true, type: "in", initialSupply: null })}
+                    activeOpacity={0.8}
+                  >
+                    <Ionicons name="arrow-down-circle" size={16} color="#059669" />
+                    <Text style={styles.quickVoucherTextIn}>+ Nhập kho</Text>
+                  </TouchableOpacity>
+
+                  <TouchableOpacity
+                    style={styles.quickVoucherBtnOut}
+                    onPress={() => setBatchModal({ visible: true, type: "out", initialSupply: null })}
+                    activeOpacity={0.8}
+                  >
+                    <Ionicons name="arrow-up-circle" size={16} color="#0284c7" />
+                    <Text style={styles.quickVoucherTextOut}>+ Xuất cấp</Text>
+                  </TouchableOpacity>
+                </View>
+
+                {/* Bộ lọc ngang danh mục lấy từ dữ liệu thật */}
                 <FlatList
                   horizontal
                   showsHorizontalScrollIndicator={false}
-                  data={CATEGORY_FILTERS}
+                  data={dynamicCategoryFilters}
                   keyExtractor={(cat) => cat.id}
                   contentContainerStyle={styles.categoryFilterList}
                   renderItem={({ item: cat }) => {
@@ -574,9 +590,9 @@ export default function InventoryScreen() {
             style={styles.fabBtn}
             onPress={handleCreateSupply}
             activeOpacity={0.85}
+            accessibilityLabel="Thêm vật tư"
           >
-            <Ionicons name="add" size={20} color="#ffffff" />
-            <Text style={styles.fabBtnText}>Thêm vật tư</Text>
+            <Ionicons name="add" size={24} color="#ffffff" />
           </TouchableOpacity>
         </View>
       )}
@@ -591,6 +607,9 @@ export default function InventoryScreen() {
           onChangeTypeFilter={setTxTypeFilter}
           searchQuery={txSearchQuery}
           onChangeSearch={setTxSearchQuery}
+          onNewTransactionPress={(type) =>
+            setBatchModal({ visible: true, type, initialSupply: null })
+          }
         />
       )}
 
@@ -695,13 +714,17 @@ export default function InventoryScreen() {
         />
       )}
 
-      {/* 4. Action Sheet Modal Nhập / Xuất Kho */}
-      <StockActionModal
-        visible={actionModal.visible}
-        type={actionModal.type}
-        item={actionModal.item}
-        onClose={() => setActionModal({ visible: false, type: null, item: null })}
-        onConfirm={handleConfirmStockAction}
+      {/* 4. Modal Lập Phiếu Nhập / Xuất Kho Đa Mặt Hàng */}
+      <BatchStockModal
+        visible={batchModal.visible}
+        initialType={batchModal.type}
+        initialSupply={batchModal.initialSupply}
+        supplies={supplies}
+        suppliers={suppliers}
+        warehouses={warehouses}
+        departments={departments}
+        onClose={() => setBatchModal((prev) => ({ ...prev, visible: false, initialSupply: null }))}
+        onSubmit={handleBatchStockSubmit}
       />
 
       {/* 5. Modal Xem Chi Tiết Vật Tư Y Tế */}
@@ -868,23 +891,17 @@ const styles = StyleSheet.create({
     position: "absolute",
     bottom: 20,
     right: 16,
-    flexDirection: "row",
-    alignItems: "center",
-    backgroundColor: "#059669",
-    paddingHorizontal: 16,
-    paddingVertical: 11,
+    width: 48,
+    height: 48,
     borderRadius: 24,
-    gap: 6,
+    alignItems: "center",
+    justifyContent: "center",
+    backgroundColor: "#059669",
     shadowColor: "#059669",
     shadowOffset: { width: 0, height: 4 },
     shadowOpacity: 0.35,
     shadowRadius: 6,
     elevation: 6,
-  },
-  fabBtnText: {
-    color: "#ffffff",
-    fontSize: 13,
-    fontWeight: "700",
   },
   tabContentContainer: {
     flex: 1,
@@ -919,6 +936,56 @@ const styles = StyleSheet.create({
   listHeader: {
     paddingHorizontal: 16,
     paddingTop: 14,
+  },
+  quickVoucherBar: {
+    flexDirection: "row",
+    gap: 10,
+    marginTop: 12,
+    marginBottom: 4,
+  },
+  quickVoucherBtnIn: {
+    flex: 1,
+    flexDirection: "row",
+    alignItems: "center",
+    justifyContent: "center",
+    gap: 6,
+    paddingVertical: 10,
+    borderRadius: 12,
+    backgroundColor: "#ecfdf5",
+    borderWidth: 1.5,
+    borderColor: "#a7f3d0",
+    shadowColor: "#059669",
+    shadowOffset: { width: 0, height: 1 },
+    shadowOpacity: 0.1,
+    shadowRadius: 2,
+    elevation: 1,
+  },
+  quickVoucherTextIn: {
+    fontSize: 12.5,
+    fontWeight: "700",
+    color: "#059669",
+  },
+  quickVoucherBtnOut: {
+    flex: 1,
+    flexDirection: "row",
+    alignItems: "center",
+    justifyContent: "center",
+    gap: 6,
+    paddingVertical: 10,
+    borderRadius: 12,
+    backgroundColor: "#f0f9ff",
+    borderWidth: 1.5,
+    borderColor: "#bae6fd",
+    shadowColor: "#0284c7",
+    shadowOffset: { width: 0, height: 1 },
+    shadowOpacity: 0.1,
+    shadowRadius: 2,
+    elevation: 1,
+  },
+  quickVoucherTextOut: {
+    fontSize: 12.5,
+    fontWeight: "700",
+    color: "#0284c7",
   },
   categoryFilterList: {
     gap: 8,
