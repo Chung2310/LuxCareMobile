@@ -2,7 +2,7 @@ import type { ServiceItem, ServiceModule } from "./types";
 
 export const DEFAULT_PINNED_IDS = [
   "att-checkin",
-  "hr-leave",
+  "hr-calendar",
   "pay-slips",
   "op-inventory",
 ];
@@ -24,12 +24,12 @@ export const LUXCARE_MODULES: ServiceModule[] = [
         status: "active",
       },
       {
-        id: "pop-leave",
-        title: "Đơn từ\n& Nghỉ phép",
-        icon: "receipt",
+        id: "pop-calendar",
+        title: "Lịch làm việc",
+        icon: "calendar",
         color: "#0d9488",
         bgColor: "#f0fdfa",
-        route: "/(tabs)/leave",
+        route: "/(tabs)/calendar-events",
         moduleId: "popular",
         status: "active",
       },
@@ -181,12 +181,12 @@ export const LUXCARE_MODULES: ServiceModule[] = [
         status: "active",
       },
       {
-        id: "hr-leave",
-        title: "Đơn từ\n& Nghỉ phép",
-        icon: "receipt",
+        id: "hr-calendar",
+        title: "Lịch làm việc",
+        icon: "calendar",
         color: "#059669",
         bgColor: "#ecfdf5",
-        route: "/(tabs)/leave",
+        route: "/(tabs)/calendar-events",
         moduleId: "hr",
         status: "active",
       },
