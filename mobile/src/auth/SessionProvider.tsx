@@ -1,6 +1,7 @@
 import React, { createContext, useContext, useEffect, useState } from "react";
 import { AppState } from "react-native";
 import { api, configurationError, getMe } from "../api/services";
+import { socketService } from "../api/socketService";
 import type { UserProfile } from "../../../src/types/common";
 import type { BranchRecord } from "../../../src/services/branchService";
 
@@ -38,15 +39,40 @@ export function SessionProvider({ children }: React.PropsWithChildren) {
     }
   };
   useEffect(() => {
+    // Configure socket once with the server origin so it can connect later.
+    if (api.getOrigin()) {
+      socketService.configure({
+        origin: api.getOrigin(),
+        onSessionReplaced: () => {
+          // Another device signed in with the same account.
+          // Expire immediately – no need to call the HTTP logout endpoint.
+          setUser(null);
+          setSelectedBranch(null);
+        },
+      });
+    }
     api.onSessionExpired = () => {
+      socketService.disconnect();
       setUser(null);
       setSelectedBranch(null);
     };
     void retry();
     return () => {
       api.onSessionExpired = () => {};
+      socketService.disconnect();
     };
   }, []);
+  // Connect socket once we have an authenticated user.
+  // The token may rotate after a refresh, so we re-read it on each user change.
+  useEffect(() => {
+    if (!user) {
+      socketService.disconnect();
+      return;
+    }
+    const token = api.getAccessToken();
+    if (token) socketService.connect(token);
+  }, [user?.uid]);
+
   useEffect(() => {
     if (!user) return;
     let active = true;
@@ -96,6 +122,9 @@ export function SessionProvider({ children }: React.PropsWithChildren) {
           try {
             setUser(await getMe());
             setError(null);
+            // Connect socket with the new access token.
+            const token = api.getAccessToken();
+            if (token) socketService.connect(token);
           } catch (error) {
             await api.clear();
             throw error;
@@ -105,6 +134,7 @@ export function SessionProvider({ children }: React.PropsWithChildren) {
           try {
             await api.logout();
           } finally {
+            socketService.disconnect();
             setUser(null);
             setSelectedBranch(null);
             setError(null);
