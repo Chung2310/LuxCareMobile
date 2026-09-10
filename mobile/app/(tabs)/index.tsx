@@ -252,7 +252,7 @@ export default function Home() {
               {/* Nút Truy cập Blog – thay thế thanh tìm kiếm */}
               <Pressable
                 style={({ pressed }) => [uiStyles.blogBtn, pressed && { opacity: 0.82 }]}
-                onPress={() => router.push("/(tabs)/notifications")}
+                onPress={() => router.push("/(tabs)/blog")}
                 accessibilityLabel="Truy cập blog"
               >
                 <Ionicons name="megaphone" size={18} color="#059669" />

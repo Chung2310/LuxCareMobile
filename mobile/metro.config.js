@@ -5,10 +5,11 @@ const config = getDefaultConfig(__dirname);
 config.watchFolders = [path.resolve(__dirname, "../src"), path.resolve(__dirname, "../shared")];
 config.resolver.nodeModulesPaths = [path.resolve(__dirname, "node_modules")];
 config.resolver.resolveRequest = (context, moduleName, platform) => {
-  // Shared sources must resolve React from the native project, not the web root.
-  const nativeRuntime = /^(react|react-native)(\/|$)/.test(moduleName);
+  // Any non-relative module import (react, react-native, react-native-svg, etc.)
+  // must strictly resolve from mobile/node_modules to prevent duplicate native component registrations.
+  const isBareModule = !moduleName.startsWith(".") && !path.isAbsolute(moduleName);
   return context.resolveRequest(
-    nativeRuntime ? { ...context, originModulePath: path.join(__dirname, "package.json") } : context,
+    isBareModule ? { ...context, originModulePath: path.join(__dirname, "package.json") } : context,
     moduleName,
     platform,
   );

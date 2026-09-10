@@ -20,6 +20,8 @@ import { createMonthlyKpiService } from "../../../src/services/monthlyKpiService
 import { createKanbanMediaService } from "../../../src/services/kanbanMediaService";
 import { createEquipmentService } from "../../../src/services/equipmentService";
 import { createWorkflowService } from "../../../src/services/workflowService";
+import { createResourceService } from "../../../src/services/resourceService";
+import { createBlogService } from "../../../src/services/blogService";
 
 const origin = process.env.EXPO_PUBLIC_API_URL?.trim();
 export let configurationError: string | null = !origin ? "Chưa cấu hình EXPO_PUBLIC_API_URL trong mobile/.env." : null;
@@ -41,6 +43,7 @@ function createApi() {
   }
 }
 export const api = createApi();
+export const blog = createBlogService(api.transport);
 export const payroll = createPayrollService(api.transport);
 export const credentials = createHrCredentialService(api.transport);
 export const contracts = createHrContractService(api.transport);
@@ -60,6 +63,7 @@ export const monthlyKpi = createMonthlyKpiService(api.transport);
 export const kanbanMedia = createKanbanMediaService(api.transport);
 export const equipment = createEquipmentService(api.transport);
 export const workflow = createWorkflowService(api.transport);
+export const resources = createResourceService(api.transport);
 export async function getMe(): Promise<UserProfile> {
   const response = await api.transport.fetch("/api/v1/auth/me");
   const { user } = await response.json();
