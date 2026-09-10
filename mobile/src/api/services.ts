@@ -23,6 +23,8 @@ import { createWorkflowService } from "../../../src/services/workflowService";
 import { createResourceService } from "../../../src/services/resourceService";
 import { createBlogService } from "../../../src/services/blogService";
 import { createRoomService } from "../../../src/services/roomService";
+import { createTrainingService } from "../../../src/services/trainingService";
+import { createChatService } from "../../../src/services/chatService";
 
 const origin = process.env.EXPO_PUBLIC_API_URL?.trim();
 export let configurationError: string | null = !origin ? "Chưa cấu hình EXPO_PUBLIC_API_URL trong mobile/.env." : null;
@@ -66,9 +68,12 @@ export const equipment = createEquipmentService(api.transport);
 export const workflow = createWorkflowService(api.transport);
 export const resources = createResourceService(api.transport);
 export const rooms = createRoomService(api.transport);
+export const training = createTrainingService(api.transport);
+export const chat = createChatService(api.transport);
 export async function getMe(): Promise<UserProfile> {
   const response = await api.transport.fetch("/api/v1/auth/me");
   const { user } = await response.json();
   if (!user || !(user._id || user.uid)) throw new Error("Hồ sơ người dùng không hợp lệ.");
   return { ...user, uid: user._id || user.uid };
 }
+

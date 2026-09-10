@@ -33,8 +33,8 @@ import {
 import { supplyApi } from "../../src/api/supplyApi";
 import { branches as branchService } from "../../src/api/services";
 import { useSession } from "../../src/auth/SessionProvider";
-import type { UserProfile } from "../../../../src/types/common";
-import type { BranchRecord } from "../../../../src/services/branchService";
+import type { UserProfile } from "../../../src/types/common";
+import type { BranchRecord } from "../../../src/services/branchService";
 
 const ROLE_FILTERS: Array<{ id: string; label: string }> = [
   { id: "all", label: "Tất cả vai trò" },
@@ -186,7 +186,7 @@ export default function UsersScreen() {
     });
     // Cập nhật selected user modal nếu đang mở
     if (detailUser && ((detailUser as any)._id === id || detailUser.uid === id)) {
-      setDetailUser((prev) => (prev ? { ...prev, ...data } : null));
+      setDetailUser((prev: UserProfile | null) => (prev ? { ...prev, ...data } : null));
     }
   };
 

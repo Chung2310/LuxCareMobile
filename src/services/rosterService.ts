@@ -2,7 +2,26 @@ import { browserTransport, type ServiceTransport } from "./serviceTransport";
 import { parseApiErrorResponse } from "./apiClientError";
 import type { UserProfile } from "../types/common";
 export type EmployeeProfileInput = Partial<
-  Pick<UserProfile, "displayName" | "phone" | "birthDate" | "jobTitle" | "qualification" | "division">
+  Pick<
+    UserProfile,
+    | "displayName"
+    | "email"
+    | "phone"
+    | "birthDate"
+    | "jobTitle"
+    | "qualification"
+    | "division"
+    | "department"
+    | "departmentId"
+    | "role"
+    | "branchId"
+    | "branchName"
+    | "isLeader"
+    | "monthlySalary"
+    | "jobDescriptionLink"
+    | "level"
+    | "status"
+  >
 >;
 export function createRosterService({ fetch, getAccessToken }: ServiceTransport) {
   async function request(path: string, init: RequestInit = {}) {

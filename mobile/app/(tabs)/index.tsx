@@ -12,7 +12,7 @@ import {
   TextInput,
   View,
 } from "react-native";
-import { router, useFocusEffect } from "expo-router";
+import { Redirect, router, useFocusEffect } from "expo-router";
 import { SafeAreaView } from "react-native-safe-area-context";
 import { Ionicons } from "@expo/vector-icons";
 import type {
@@ -28,6 +28,7 @@ import { canUseModule } from "../../src/auth/access";
 import { useAppLoading } from "../../src/context/LoadingContext";
 import { DashboardOverviewSection } from "../../src/components/dashboard";
 import { getAllServicesFlat, LUXCARE_MODULES } from "../../src/components";
+import { isBlogEditorUser } from "../../../src/utils/permissionUtils";
 
 const { width: SCREEN_WIDTH } = Dimensions.get("window");
 
@@ -45,6 +46,11 @@ interface LuxCareFeature {
 export default function Home() {
   const { user, selectedBranch } = useSession();
   const { navigateWithLoading } = useAppLoading();
+  const isEditor = isBlogEditorUser(user);
+
+  if (isEditor) {
+    return <Redirect href="/(tabs)/blog" />;
+  }
   const [data, setData] = useState<DashboardSummary | null>(null);
   const [params, setParams] = useState<DashboardSummaryParams>({ filter: "day" });
   const [actions, setActions] = useState<DashboardActionItems | null>(null);
@@ -134,12 +140,12 @@ export default function Home() {
         route: "/(tabs)/attendance",
       },
       {
-        id: "leave",
-        title: "Đơn từ\n& Nghỉ phép",
-        icon: "receipt",
+        id: "calendar-events",
+        title: "Lịch làm việc",
+        icon: "calendar",
         color: "#7c3aed", // Tím violet nổi bật
         bgColor: "#f5f3ff",
-        route: "/(tabs)/leave",
+        route: "/(tabs)/calendar-events",
         badge: actions?.pendingApprovals.length ? `${actions.pendingApprovals.length}` : undefined,
       },
       {
@@ -153,7 +159,7 @@ export default function Home() {
       },
       {
         id: "payslips",
-        title: "Phiếu lương\ncá nhân",
+        title: "Bảng lương",
         icon: "wallet",
         color: "#d97706", // Cam vàng amber
         bgColor: "#fffbeb",
@@ -239,7 +245,7 @@ export default function Home() {
     },
     {
       id: "payslip",
-      title: "Phiếu lương\ncá nhân",
+      title: "Bảng lương",
       icon: "newspaper",
       color: "#059669",
       route: "/(tabs)/payslips",
@@ -361,18 +367,18 @@ export default function Home() {
               <Pressable
                 style={({ pressed }) => [uiStyles.topQuickItem, pressed && { opacity: 0.8 }]}
                 onPress={() =>
-                  navigateWithLoading("/(tabs)/leave", {
-                    title: "Đơn từ & Nghỉ phép",
-                    icon: "document-text-outline",
+                  navigateWithLoading("/(tabs)/calendar-events", {
+                    title: "Lịch làm việc",
+                    icon: "calendar-outline",
                     color: "#7c3aed",
                     bgColor: "#f5f3ff",
                   })
                 }
               >
                 <View style={[uiStyles.topQuickIconBox, { borderColor: "rgba(124, 58, 237, 0.18)" }]}>
-                  <Ionicons name="document-text-outline" size={25} color="#7c3aed" />
+                  <Ionicons name="calendar-outline" size={25} color="#7c3aed" />
                 </View>
-                <Text style={uiStyles.topQuickLabel}>Nộp đơn</Text>
+                <Text style={uiStyles.topQuickLabel}>Lịch làm việc</Text>
               </Pressable>
 
               <Pressable

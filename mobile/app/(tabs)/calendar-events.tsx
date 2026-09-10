@@ -12,8 +12,11 @@ import {
 } from "react-native";
 import { SafeAreaView } from "react-native-safe-area-context";
 import { router, useFocusEffect } from "expo-router";
+import { Ionicons } from "@expo/vector-icons";
+import { ShiftForm } from "../../src/features/shifts/ShiftForm";
+import { HolidayForm } from "../../src/features/calendar/HolidayForm";
 import type { CalendarItem, CalendarItemInput } from "../../../src/services/hrCalendarService";
-import type { AttendanceLog, WorkShift } from "../../../src/services/attendanceService";
+import type { AttendanceLog, WorkShift, ShiftEmployee } from "../../../src/services/attendanceService";
 import type { WorkCalendarDay } from "../../../src/services/companyWorkCalendarService";
 import type { LeaveApplication } from "../../../src/types/leave";
 import type { UserProfile } from "../../../src/types/common";
@@ -123,6 +126,33 @@ function formatFullDateTime(isoString?: string): string {
   }
 }
 
+function parseIsoDatePart(isoString?: string): string {
+  if (!isoString) return "";
+  try {
+    const d = new Date(isoString);
+    if (isNaN(d.getTime())) return "";
+    const y = d.getFullYear();
+    const m = String(d.getMonth() + 1).padStart(2, "0");
+    const day = String(d.getDate()).padStart(2, "0");
+    return `${y}-${m}-${day}`;
+  } catch {
+    return "";
+  }
+}
+
+function parseIsoTimePart(isoString?: string): string {
+  if (!isoString) return "09:00";
+  try {
+    const d = new Date(isoString);
+    if (isNaN(d.getTime())) return "09:00";
+    const h = String(d.getHours()).padStart(2, "0");
+    const m = String(d.getMinutes()).padStart(2, "0");
+    return `${h}:${m}`;
+  } catch {
+    return "09:00";
+  }
+}
+
 function calculateWorkedDuration(checkInTime?: string | Date, checkOutTime?: string | Date): string {
   if (!checkInTime || !checkOutTime) return "--";
   try {
@@ -178,6 +208,7 @@ export default function CalendarEvents() {
   const [attendanceLogs, setAttendanceLogs] = useState<AttendanceLog[]>([]);
   const [leaveApps, setLeaveApps] = useState<LeaveApplication[]>([]);
   const [shifts, setShifts] = useState<WorkShift[]>([]);
+  const [shiftEmployees, setShiftEmployees] = useState<ShiftEmployee[]>([]);
   const [holidays, setHolidays] = useState<WorkCalendarDay[]>([]);
   const [employees, setEmployees] = useState<UserProfile[]>([]);
 
@@ -201,8 +232,36 @@ export default function CalendarEvents() {
   // Modal State for View Event Detail
   const [viewingItem, setViewingItem] = useState<CalendarItem | null>(null);
 
-  // Shifts / Holidays Sub-view Mode
-  const [shiftViewMode, setShiftViewMode] = useState<"shifts" | "holidays">("shifts");
+  // Modal State for Edit Schedule Event & Hours
+  const [editingCalendarItem, setEditingCalendarItem] = useState<CalendarItem | null>(null);
+  const [editType, setEditType] = useState<"event" | "leave" | "wfh" | "exception" | "reminder">("event");
+  const [editTitle, setEditTitle] = useState<string>("");
+  const [editDesc, setEditDesc] = useState<string>("");
+  const [editStartDate, setEditStartDate] = useState<string>("");
+  const [editStartTime, setEditStartTime] = useState<string>("09:00");
+  const [editEndDate, setEditEndDate] = useState<string>("");
+  const [editEndTime, setEditEndTime] = useState<string>("10:00");
+  const [editAssigneeId, setEditAssigneeId] = useState<string>("");
+  const [isUpdatingEvent, setIsUpdatingEvent] = useState<boolean>(false);
+
+  // Shifts / Employee Assignments / Holidays Sub-view Mode & CRUD states
+  const [shiftViewMode, setShiftViewMode] = useState<"shifts" | "employees" | "holidays">("shifts");
+  const [editingShift, setEditingShift] = useState<WorkShift | "new" | null>(null);
+  const [editingHoliday, setEditingHoliday] = useState<WorkCalendarDay | "new" | null>(null);
+  const [isSyncingHolidays, setIsSyncingHolidays] = useState<boolean>(false);
+  const [employeeSearchQuery, setEmployeeSearchQuery] = useState<string>("");
+
+  // Modal State for Edit Employee Shift & Hours
+  const [editingEmployeeShift, setEditingEmployeeShift] = useState<ShiftEmployee | null>(null);
+  const [assignShiftId, setAssignShiftId] = useState<string>("");
+  const [assignEffectiveFrom, setAssignEffectiveFrom] = useState<string>(todayStr);
+  const [assignEffectiveTo, setAssignEffectiveTo] = useState<string>("");
+  const [assignDaysOfWeek, setAssignDaysOfWeek] = useState<number[]>([1, 2, 3, 4, 5]);
+  const [isCustomHoursMode, setIsCustomHoursMode] = useState<boolean>(false);
+  const [customStartTime, setCustomStartTime] = useState<string>("08:00");
+  const [customEndTime, setCustomEndTime] = useState<string>("17:00");
+  const [customShiftName, setCustomShiftName] = useState<string>("");
+  const [isSavingEmployeeShift, setIsSavingEmployeeShift] = useState<boolean>(false);
 
   /* ==========================================================================
      3. DATA FETCHING
@@ -231,6 +290,9 @@ export default function CalendarEvents() {
         }).catch(() => {}),
         attendance.shifts().then((res) => {
           if (active) setShifts(res || []);
+        }).catch(() => {}),
+        attendance.assignments().then((res) => {
+          if (active) setShiftEmployees(res || []);
         }).catch(() => {}),
         workCalendar.list(year).then((res) => {
           if (active) setHolidays(res || []);
@@ -434,6 +496,164 @@ export default function CalendarEvents() {
       },
     ]);
   }
+
+  function handleOpenEditEvent(item: CalendarItem) {
+    setEditingCalendarItem(item);
+    setEditType(item.type || "event");
+    setEditTitle(item.title || "");
+    setEditDesc(item.description || "");
+    setEditStartDate(parseIsoDatePart(item.startDate) || todayStr);
+    setEditStartTime(parseIsoTimePart(item.startDate));
+    setEditEndDate(parseIsoDatePart(item.endDate) || todayStr);
+    setEditEndTime(parseIsoTimePart(item.endDate));
+    setEditAssigneeId(item.employeeId || item.assigneeId || user?.uid || "");
+    setViewingItem(null);
+  }
+
+  async function handleSaveEditEvent() {
+    if (!editingCalendarItem) return;
+    if (!editTitle.trim()) {
+      Alert.alert("Lỗi", "Vui lòng nhập tiêu đề sự kiện.");
+      return;
+    }
+    if (!editStartDate || !editEndDate) {
+      Alert.alert("Lỗi", "Vui lòng nhập ngày bắt đầu và kết thúc.");
+      return;
+    }
+
+    try {
+      setIsUpdatingEvent(true);
+      const startIso = `${editStartDate}T${editStartTime}:00`;
+      const endIso = `${editEndDate}T${editEndTime}:00`;
+      const selectedEmp = employees.find((e) => e.uid === editAssigneeId);
+
+      const targetId = editingCalendarItem.id || editingCalendarItem._id;
+      if (!targetId) throw new Error("Không tìm thấy mã lịch trình.");
+
+      const payload: Partial<CalendarItemInput> = {
+        title: editTitle.trim(),
+        description: editDesc.trim() || undefined,
+        type: editType,
+        startDate: startIso,
+        endDate: endIso,
+        employeeId: editAssigneeId || undefined,
+        employeeName: selectedEmp?.displayName || editingCalendarItem.employeeName,
+        assigneeId: editAssigneeId || undefined,
+        status: "approved",
+      };
+
+      await hrCalendar.update(targetId, payload);
+      Alert.alert("Thành công", "Đã cập nhật giờ làm và lịch trình.");
+      setEditingCalendarItem(null);
+      setRevision((v) => v + 1);
+    } catch (err) {
+      Alert.alert("Lỗi", messageOf(err));
+    } finally {
+      setIsUpdatingEvent(false);
+    }
+  }
+
+  function handleOpenEditEmployeeShift(emp: ShiftEmployee) {
+    setEditingEmployeeShift(emp);
+    const currentShiftId = emp.assignment?.shiftId || (shifts[0]?._id || "");
+    setAssignShiftId(currentShiftId);
+    setAssignEffectiveFrom(emp.assignment?.effectiveFrom || todayStr);
+    setAssignEffectiveTo(emp.assignment?.effectiveTo || "");
+
+    const currentShift = shifts.find((s) => s._id === currentShiftId);
+    if (emp.assignment?.daysOfWeek && emp.assignment.daysOfWeek.length > 0) {
+      setAssignDaysOfWeek(emp.assignment.daysOfWeek);
+    } else if (currentShift?.workingDays && currentShift.workingDays.length > 0) {
+      setAssignDaysOfWeek(currentShift.workingDays);
+    } else {
+      setAssignDaysOfWeek([1, 2, 3, 4, 5]);
+    }
+
+    setIsCustomHoursMode(false);
+    setCustomStartTime(currentShift?.startTime || "08:30");
+    setCustomEndTime(currentShift?.endTime || "17:30");
+    setCustomShiftName(`Ca riêng - ${emp.displayName || emp.email.split("@")[0]}`);
+  }
+
+  function toggleAssignDay(dayVal: number) {
+    setAssignDaysOfWeek((prev) =>
+      prev.includes(dayVal) ? prev.filter((d) => d !== dayVal) : [...prev, dayVal].sort()
+    );
+  }
+
+  async function handleSaveEmployeeShift() {
+    if (!editingEmployeeShift) return;
+    if (!assignEffectiveFrom.trim()) {
+      Alert.alert("Lỗi", "Vui lòng nhập ngày bắt đầu hiệu lực.");
+      return;
+    }
+    if (assignDaysOfWeek.length === 0) {
+      Alert.alert("Lỗi", "Vui lòng chọn ít nhất một ngày làm việc trong tuần.");
+      return;
+    }
+
+    try {
+      setIsSavingEmployeeShift(true);
+      let finalShiftId = assignShiftId;
+
+      if (isCustomHoursMode) {
+        if (!customStartTime || !customEndTime) {
+          Alert.alert("Lỗi", "Vui lòng nhập đầy đủ giờ bắt đầu và kết thúc.");
+          setIsSavingEmployeeShift(false);
+          return;
+        }
+        const sName = customShiftName.trim() || `Ca ${customStartTime}-${customEndTime} (${editingEmployeeShift.displayName || "NV"})`;
+        const sCode = `CUSTOM_${Date.now().toString().slice(-4)}`;
+        const newShift = await attendance.createShift({
+          code: sCode,
+          name: sName,
+          color: "#6366f1",
+          startTime: customStartTime,
+          endTime: customEndTime,
+          crossesMidnight: customStartTime > customEndTime,
+          workingDays: assignDaysOfWeek,
+          allowedLateMinutes: 15,
+          allowedEarlyLeaveMinutes: 15,
+          isDefault: false,
+          isActive: true,
+        });
+        finalShiftId = newShift._id;
+      }
+
+      if (!finalShiftId) {
+        Alert.alert("Lỗi", "Vui lòng chọn ca làm việc.");
+        setIsSavingEmployeeShift(false);
+        return;
+      }
+
+      await attendance.assign({
+        employeeIds: [editingEmployeeShift._id],
+        shiftId: finalShiftId,
+        effectiveFrom: assignEffectiveFrom.trim(),
+        effectiveTo: assignEffectiveTo.trim() || undefined,
+        daysOfWeek: assignDaysOfWeek,
+      });
+
+      Alert.alert("Thành công", `Đã lưu phân ca và giờ làm việc cho ${editingEmployeeShift.displayName || editingEmployeeShift.email}.`);
+      setEditingEmployeeShift(null);
+      setRevision((v) => v + 1);
+    } catch (err) {
+      Alert.alert("Lỗi", messageOf(err));
+    } finally {
+      setIsSavingEmployeeShift(false);
+    }
+  }
+
+  const filteredShiftEmployees = useMemo(() => {
+    if (!employeeSearchQuery.trim()) return shiftEmployees;
+    const q = employeeSearchQuery.toLowerCase();
+    return shiftEmployees.filter((emp) => {
+      const nameMatch = (emp.displayName || "").toLowerCase().includes(q);
+      const emailMatch = (emp.email || "").toLowerCase().includes(q);
+      const deptMatch = (emp.department || "").toLowerCase().includes(q);
+      return nameMatch || emailMatch || deptMatch;
+    });
+  }, [shiftEmployees, employeeSearchQuery]);
 
   /* ==========================================================================
      7. RENDER SUB-TAB 1: LỊCH TRÌNH (SCHEDULE)
@@ -648,9 +868,23 @@ export default function CalendarEvents() {
                       <View style={[s.eventBadge, { backgroundColor: meta.bg, borderColor: meta.border }]}>
                         <Text style={[s.eventBadgeTxt, { color: meta.text }]}>{meta.label}</Text>
                       </View>
-                      <Text style={s.eventTimeTxt}>
-                        {formatTimeOnly(item.startDate)} - {formatTimeOnly(item.endDate)}
-                      </Text>
+                      <View style={{ flexDirection: "row", alignItems: "center", gap: 6 }}>
+                        <Text style={s.eventTimeTxt}>
+                          {formatTimeOnly(item.startDate)} - {formatTimeOnly(item.endDate)}
+                        </Text>
+                        {(isManager || item.creatorId === user?.uid || item.employeeId === user?.uid) && (
+                          <Pressable
+                            hitSlop={8}
+                            onPress={(e) => {
+                              e.stopPropagation?.();
+                              handleOpenEditEvent(item);
+                            }}
+                            style={s.miniEditBtn}
+                          >
+                            <Ionicons name="pencil" size={13} color="#4f46e5" />
+                          </Pressable>
+                        )}
+                      </View>
                     </View>
                     <Text style={s.eventCardTitle} numberOfLines={2}>{item.title}</Text>
                     {!!item.description && (
@@ -689,7 +923,21 @@ export default function CalendarEvents() {
                     <View style={[s.eventBadge, { backgroundColor: meta.bg, borderColor: meta.border }]}>
                       <Text style={[s.eventBadgeTxt, { color: meta.text }]}>{meta.label}</Text>
                     </View>
-                    <Text style={s.listDateTxt}>{formatDateDisplay(item.startDate)}</Text>
+                    <View style={{ flexDirection: "row", alignItems: "center", gap: 6 }}>
+                      <Text style={s.listDateTxt}>{formatDateDisplay(item.startDate)}</Text>
+                      {(isManager || item.creatorId === user?.uid || item.employeeId === user?.uid) && (
+                        <Pressable
+                          hitSlop={8}
+                          onPress={(e) => {
+                            e.stopPropagation?.();
+                            handleOpenEditEvent(item);
+                          }}
+                          style={s.miniEditBtn}
+                        >
+                          <Ionicons name="pencil" size={13} color="#4f46e5" />
+                        </Pressable>
+                      )}
+                    </View>
                   </View>
                   <Text style={s.eventCardTitle}>{item.title}</Text>
                   <Text style={s.listRangeTxt}>
@@ -820,7 +1068,7 @@ export default function CalendarEvents() {
           <Text style={s.sectionHeader}>Danh sách đơn từ</Text>
           <Text style={s.sectionSub}>Nghỉ phép, làm từ xa & giải trình chấm công</Text>
         </View>
-        <Pressable style={s.createReqBtn} onPress={() => router.push("/(tabs)/leave")}>
+        <Pressable style={s.createReqBtn} onPress={() => router.push("/(tabs)/leave?create=1")}>
           <Text style={s.createReqTxt}>+ Nộp đơn</Text>
         </Pressable>
       </View>
@@ -865,18 +1113,138 @@ export default function CalendarEvents() {
   );
 
   /* ==========================================================================
-     10. RENDER SUB-TAB 4: CA & NGÀY LỄ (SHIFTS & HOLIDAYS)
+     10. CRUD HANDLERS & RENDER SUB-TAB 4: CA & NGÀY LỄ (SHIFTS & HOLIDAYS)
      ========================================================================== */
+  const handleDeleteShift = (sh: WorkShift) => {
+    Alert.alert(
+      "Xóa ca làm việc?",
+      `Bạn có chắc chắn muốn xóa ca "${sh.name}" (${sh.code})? Ca đã được phân cho nhân viên có thể bị backend từ chối xóa; hãy ngừng hoạt động nếu cần.`,
+      [
+        { text: "Hủy", style: "cancel" },
+        {
+          text: "Xóa",
+          style: "destructive",
+          onPress: async () => {
+            try {
+              await attendance.removeShift(sh._id);
+              setRevision((v) => v + 1);
+            } catch (e) {
+              Alert.alert("Lỗi xóa ca", messageOf(e));
+            }
+          },
+        },
+      ],
+    );
+  };
+
+  const handleDeleteHoliday = (h: WorkCalendarDay) => {
+    Alert.alert(
+      "Xóa ngày nghỉ lễ?",
+      `Bạn có chắc chắn muốn xóa ngày lễ "${h.name}" (${h.date})?`,
+      [
+        { text: "Hủy", style: "cancel" },
+        {
+          text: "Xóa",
+          style: "destructive",
+          onPress: async () => {
+            try {
+              await workCalendar.remove(h._id);
+              setRevision((v) => v + 1);
+            } catch (e) {
+              Alert.alert("Lỗi xóa ngày lễ", messageOf(e));
+            }
+          },
+        },
+      ],
+    );
+  };
+
+  const handleToggleHolidayApplied = (h: WorkCalendarDay) => {
+    if (h.isApplied) {
+      Alert.alert(
+        "Tắt áp dụng ngày lễ?",
+        `Tắt áp dụng ngày "${h.name}" (${h.date}). Ngày này sẽ được tính như ngày làm việc bình thường.`,
+        [
+          { text: "Hủy", style: "cancel" },
+          {
+            text: "Xác nhận tắt",
+            style: "destructive",
+            onPress: async () => {
+              try {
+                await workCalendar.update(h._id, { isApplied: false, adminReason: "Tắt bởi quản lý" });
+                setRevision((v) => v + 1);
+              } catch (e) {
+                Alert.alert("Lỗi", messageOf(e));
+              }
+            },
+          },
+        ],
+      );
+    } else {
+      Alert.alert(
+        "Bật áp dụng ngày lễ?",
+        `Bật lại ngày "${h.name}" (${h.date}) để nhân viên được tính công nghỉ lễ.`,
+        [
+          { text: "Hủy", style: "cancel" },
+          {
+            text: "Bật áp dụng",
+            onPress: async () => {
+              try {
+                await workCalendar.update(h._id, { isApplied: true });
+                setRevision((v) => v + 1);
+              } catch (e) {
+                Alert.alert("Lỗi", messageOf(e));
+              }
+            },
+          },
+        ],
+      );
+    }
+  };
+
+  const handleSyncHolidays = () => {
+    Alert.alert(
+      "Đồng bộ ngày lễ quốc gia?",
+      `Đồng bộ toàn bộ lịch nghỉ lễ chuẩn quốc gia năm ${year} cho doanh nghiệp.`,
+      [
+        { text: "Hủy", style: "cancel" },
+        {
+          text: "Đồng bộ",
+          onPress: async () => {
+            setIsSyncingHolidays(true);
+            try {
+              await workCalendar.sync(year);
+              setRevision((v) => v + 1);
+              Alert.alert("Thành công", `Đã đồng bộ lịch nghỉ lễ năm ${year}`);
+            } catch (e) {
+              Alert.alert("Lỗi đồng bộ", messageOf(e));
+            } finally {
+              setIsSyncingHolidays(false);
+            }
+          },
+        },
+      ],
+    );
+  };
+
   const renderShiftsHolidaysTab = () => (
     <ScrollView style={{ flex: 1 }} contentContainerStyle={s.tabScroll} showsVerticalScrollIndicator={false}>
-      {/* Sub-toggle: Shifts vs Holidays */}
+      {/* Sub-toggle: Shifts vs Employee Assignments vs Holidays */}
       <View style={s.shiftSubToggleRow}>
         <Pressable
           style={[s.shiftSubBtn, shiftViewMode === "shifts" && s.shiftSubBtnActive]}
           onPress={() => setShiftViewMode("shifts")}
         >
           <Text style={[s.shiftSubTxt, shiftViewMode === "shifts" ? s.shiftSubTxtActive : s.shiftSubTxtInactive]}>
-            ⏰ Ca làm việc ({shifts.length})
+            ⏰ Ca làm ({shifts.length})
+          </Text>
+        </Pressable>
+        <Pressable
+          style={[s.shiftSubBtn, shiftViewMode === "employees" && s.shiftSubBtnActive]}
+          onPress={() => setShiftViewMode("employees")}
+        >
+          <Text style={[s.shiftSubTxt, shiftViewMode === "employees" ? s.shiftSubTxtActive : s.shiftSubTxtInactive]}>
+            👥 Phân ca & Giờ ({shiftEmployees.length})
           </Text>
         </Pressable>
         <Pressable
@@ -884,37 +1252,270 @@ export default function CalendarEvents() {
           onPress={() => setShiftViewMode("holidays")}
         >
           <Text style={[s.shiftSubTxt, shiftViewMode === "holidays" ? s.shiftSubTxtActive : s.shiftSubTxtInactive]}>
-            🏖️ Lịch nghỉ lễ ({holidays.length})
+            🏖️ Nghỉ lễ ({holidays.length})
           </Text>
         </Pressable>
       </View>
 
       {shiftViewMode === "shifts" ? (
-        <View style={{ marginTop: 10 }}>
+        <View style={{ marginTop: 10, gap: 10 }}>
+          {/* Action Header for Shifts */}
+          <View style={s.subSectionHeaderRow}>
+            <View style={{ flex: 1 }}>
+              <Text style={s.sectionHeader}>Danh sách ca làm việc</Text>
+              <Text style={s.sectionSub}>Khung giờ chấm công & ngày làm việc</Text>
+            </View>
+            {isManager && (
+              <Pressable
+                style={({ pressed }) => [s.actionHeaderBtn, pressed && { opacity: 0.85 }]}
+                onPress={() => setEditingShift("new")}
+              >
+                <Ionicons name="add" size={16} color="#ffffff" />
+                <Text style={s.actionHeaderBtnText}>Thêm ca</Text>
+              </Pressable>
+            )}
+          </View>
+
           {shifts.length === 0 ? (
             <View style={s.emptyBox}>
               <Text style={{ fontSize: 32, marginBottom: 8 }}>⏰</Text>
               <Text style={s.emptyTitle}>Chưa cấu hình ca làm việc</Text>
+              <Text style={s.emptySub}>Bấm "Thêm ca" bên trên để tạo ca làm việc đầu tiên</Text>
+              {isManager && (
+                <Pressable style={s.emptyActionBtn} onPress={() => setEditingShift("new")}>
+                  <Text style={s.emptyActionBtnText}>+ Thêm ca làm việc</Text>
+                </Pressable>
+              )}
             </View>
           ) : (
             shifts.map((sh) => {
               const breakInfo = sh.breakPeriods && sh.breakPeriods.length > 0 ? sh.breakPeriods[0] : null;
+              const isOvernight = sh.crossesMidnight || sh.startTime > sh.endTime;
 
               return (
                 <View key={sh._id || sh.code} style={s.shiftCard}>
+                  {/* Top: Name & Code */}
                   <View style={s.shiftCardTop}>
-                    <Text style={s.shiftName}>{sh.name}</Text>
+                    <View style={{ flexDirection: "row", alignItems: "center", gap: 8, flex: 1 }}>
+                      <View style={[s.shiftColorDot, { backgroundColor: sh.color || "#059669" }]} />
+                      <Text style={s.shiftName}>{sh.name}</Text>
+                      {sh.isDefault && (
+                        <View style={s.defaultBadge}>
+                          <Text style={s.defaultBadgeText}>Mặc định</Text>
+                        </View>
+                      )}
+                    </View>
                     <View style={s.shiftCodeBadge}>
                       <Text style={s.shiftCodeTxt}>{sh.code}</Text>
                     </View>
                   </View>
-                  <Text style={s.shiftTime}>
-                    ⏰ Giờ làm: {sh.startTime} - {sh.endTime}
-                  </Text>
+
+                  {/* Hours & Overnight */}
+                  <View style={{ flexDirection: "row", alignItems: "center", gap: 8, marginTop: 4 }}>
+                    <Text style={s.shiftTime}>
+                      ⏰ Giờ làm: {sh.startTime} – {sh.endTime}
+                    </Text>
+                    {isOvernight && (
+                      <View style={s.overnightBadge}>
+                        <Text style={s.overnightText}>🌙 Qua đêm</Text>
+                      </View>
+                    )}
+                  </View>
+
+                  {/* Working days pills */}
+                  <View style={s.shiftDaysWrap}>
+                    <Text style={s.shiftDaysLabel}>Ngày làm:</Text>
+                    {[
+                      { v: 1, l: "T2" },
+                      { v: 2, l: "T3" },
+                      { v: 3, l: "T4" },
+                      { v: 4, l: "T5" },
+                      { v: 5, l: "T6" },
+                      { v: 6, l: "T7" },
+                      { v: 0, l: "CN" },
+                    ].map((d) => {
+                      const active = (sh.workingDays || []).includes(d.v);
+                      return (
+                        <View key={d.v} style={[s.shiftDayMiniPill, active && s.shiftDayMiniPillActive]}>
+                          <Text style={[s.shiftDayMiniText, active && s.shiftDayMiniTextActive]}>
+                            {d.l}
+                          </Text>
+                        </View>
+                      );
+                    })}
+                  </View>
+
+                  {/* Break & Tolerance info */}
                   {breakInfo && (
                     <Text style={s.shiftBreak}>
-                      ☕ Nghỉ trưa: {breakInfo.startTime} - {breakInfo.endTime}
+                      ☕ Nghỉ trưa: {breakInfo.startTime} – {breakInfo.endTime}
                     </Text>
+                  )}
+
+                  <View style={{ flexDirection: "row", alignItems: "center", gap: 8, marginTop: 4 }}>
+                    <Text style={s.shiftTolerance}>
+                      ⏱️ Trễ: {sh.allowedLateMinutes}p · Sớm: {sh.allowedEarlyLeaveMinutes}p
+                    </Text>
+                    <View style={[s.statusPill, { backgroundColor: sh.isActive ? "#ecfdf5" : "#f1f5f9" }]}>
+                      <Text style={[s.statusPillText, { color: sh.isActive ? "#059669" : "#94a3b8" }]}>
+                        {sh.isActive ? "● Hoạt động" : "○ Tạm ngừng"}
+                      </Text>
+                    </View>
+                  </View>
+
+                  {/* Manager Action Buttons */}
+                  {isManager && (
+                    <View style={s.cardActionRow}>
+                      <Pressable
+                        style={({ pressed }) => [s.editActionBtn, pressed && { opacity: 0.7 }]}
+                        onPress={() => setEditingShift(sh)}
+                      >
+                        <Ionicons name="pencil" size={14} color="#0284c7" />
+                        <Text style={s.editActionText}>Sửa ca</Text>
+                      </Pressable>
+
+                      <Pressable
+                        style={({ pressed }) => [s.deleteActionBtn, pressed && { opacity: 0.7 }]}
+                        onPress={() => handleDeleteShift(sh)}
+                      >
+                        <Ionicons name="trash-outline" size={14} color="#e11d48" />
+                        <Text style={s.deleteActionText}>Xóa</Text>
+                      </Pressable>
+                    </View>
+                  )}
+                </View>
+              );
+            })
+          )}
+        </View>
+      ) : shiftViewMode === "employees" ? (
+        <View style={{ marginTop: 10, gap: 10 }}>
+          {/* Action Header for Employee Shifts */}
+          <View style={s.subSectionHeaderRow}>
+            <View style={{ flex: 1 }}>
+              <Text style={s.sectionHeader}>Phân ca & Giờ làm từng nhân sự</Text>
+              <Text style={s.sectionSub}>Sửa khung giờ làm việc và ca trực cụ thể cho từng nhân viên</Text>
+            </View>
+          </View>
+
+          {/* Search Box for Employees */}
+          <View style={s.searchBox}>
+            <Text style={{ color: "#94a3b8", fontSize: 13, marginRight: 6 }}>🔍</Text>
+            <TextInput
+              style={s.searchInput}
+              placeholder="Tìm nhân viên theo tên, email, phòng ban…"
+              placeholderTextColor="#94a3b8"
+              value={employeeSearchQuery}
+              onChangeText={setEmployeeSearchQuery}
+            />
+            {!!employeeSearchQuery && (
+              <Pressable onPress={() => setEmployeeSearchQuery("")} hitSlop={6}>
+                <Text style={{ color: "#94a3b8", fontWeight: "700", paddingHorizontal: 4 }}>✕</Text>
+              </Pressable>
+            )}
+          </View>
+
+          {filteredShiftEmployees.length === 0 ? (
+            <View style={s.emptyBox}>
+              <Text style={{ fontSize: 32, marginBottom: 8 }}>👥</Text>
+              <Text style={s.emptyTitle}>Không tìm thấy nhân viên nào</Text>
+              <Text style={s.emptySub}>Thử tìm kiếm với từ khóa khác hoặc tải lại</Text>
+            </View>
+          ) : (
+            filteredShiftEmployees.map((emp) => {
+              const currentShift = shifts.find((sh) => sh._id === emp.assignment?.shiftId);
+              const hasAssignment = !!emp.assignment && !!currentShift;
+              const assignedDays = emp.assignment?.daysOfWeek || currentShift?.workingDays || [];
+
+              return (
+                <View key={emp._id} style={s.empShiftCard}>
+                  {/* Top row: Avatar, Name, Department */}
+                  <View style={s.empCardTop}>
+                    <View style={s.empAvatar}>
+                      <Text style={s.empAvatarText}>
+                        {(emp.displayName || emp.email || "NV").charAt(0).toUpperCase()}
+                      </Text>
+                    </View>
+                    <View style={{ flex: 1 }}>
+                      <View style={{ flexDirection: "row", alignItems: "center", gap: 6, flexWrap: "wrap" }}>
+                        <Text style={s.empName}>{emp.displayName || emp.email}</Text>
+                        {!!emp.department && (
+                          <View style={s.empDeptBadge}>
+                            <Text style={s.empDeptText}>{emp.department}</Text>
+                          </View>
+                        )}
+                      </View>
+                      <Text style={s.empEmail}>{emp.email}</Text>
+                    </View>
+                  </View>
+
+                  {/* Shift & Work Hours detail */}
+                  <View style={s.empShiftBox}>
+                    {hasAssignment ? (
+                      <>
+                        <View style={{ flexDirection: "row", alignItems: "center", justifyContent: "space-between", marginBottom: 6 }}>
+                          <View style={{ flexDirection: "row", alignItems: "center", gap: 6 }}>
+                            <View style={[s.shiftColorDot, { backgroundColor: currentShift.color || "#4f46e5" }]} />
+                            <Text style={s.empAssignedShiftName}>{currentShift.name}</Text>
+                            <Text style={s.shiftCodeMini}>({currentShift.code})</Text>
+                          </View>
+                          <View style={s.empHoursPill}>
+                            <Text style={s.empHoursPillText}>
+                              ⏰ {currentShift.startTime} – {currentShift.endTime}
+                            </Text>
+                          </View>
+                        </View>
+
+                        {/* Active working days */}
+                        <View style={s.empDaysRow}>
+                          <Text style={s.empDaysLabel}>Ngày làm:</Text>
+                          {[
+                            { v: 1, l: "T2" },
+                            { v: 2, l: "T3" },
+                            { v: 3, l: "T4" },
+                            { v: 4, l: "T5" },
+                            { v: 5, l: "T6" },
+                            { v: 6, l: "T7" },
+                            { v: 0, l: "CN" },
+                          ].map((d) => {
+                            const active = assignedDays.includes(d.v);
+                            return (
+                              <View key={d.v} style={[s.empDayPill, active && s.empDayPillActive]}>
+                                <Text style={[s.empDayPillText, active && s.empDayPillTextActive]}>
+                                  {d.l}
+                                </Text>
+                              </View>
+                            );
+                          })}
+                        </View>
+
+                        {/* Effective period */}
+                        <View style={{ flexDirection: "row", alignItems: "center", gap: 6, marginTop: 6 }}>
+                          <Text style={s.empPeriodText}>
+                            📅 Hiệu lực: {emp.assignment?.effectiveFrom || "--"}
+                            {emp.assignment?.effectiveTo ? ` → ${emp.assignment.effectiveTo}` : " (Vô thời hạn)"}
+                          </Text>
+                        </View>
+                      </>
+                    ) : (
+                      <View style={s.unassignedBox}>
+                        <Ionicons name="alert-circle-outline" size={16} color="#d97706" />
+                        <Text style={s.unassignedText}>Chưa cài đặt giờ làm việc cố định</Text>
+                      </View>
+                    )}
+                  </View>
+
+                  {/* Action Row */}
+                  {isManager && (
+                    <View style={s.empActionRow}>
+                      <Pressable
+                        style={({ pressed }) => [s.editHoursBtn, pressed && { opacity: 0.8 }]}
+                        onPress={() => handleOpenEditEmployeeShift(emp)}
+                      >
+                        <Ionicons name="time-outline" size={15} color="#4f46e5" />
+                        <Text style={s.editHoursBtnText}>Sửa giờ / Đổi ca</Text>
+                      </Pressable>
+                    </View>
                   )}
                 </View>
               );
@@ -922,22 +1523,145 @@ export default function CalendarEvents() {
           )}
         </View>
       ) : (
-        <View style={{ marginTop: 10 }}>
+        <View style={{ marginTop: 10, gap: 10 }}>
+          {/* Action Header for Holidays */}
+          <View style={s.subSectionHeaderRow}>
+            <View style={{ flex: 1 }}>
+              <Text style={s.sectionHeader}>Lịch nghỉ lễ năm {year}</Text>
+              <Text style={s.sectionSub}>Lễ hưởng lương & làm bù</Text>
+            </View>
+            {isManager && (
+              <View style={{ flexDirection: "row", gap: 6 }}>
+                <Pressable
+                  style={({ pressed }) => [s.syncHeaderBtn, pressed && { opacity: 0.85 }]}
+                  onPress={handleSyncHolidays}
+                  disabled={isSyncingHolidays}
+                >
+                  <Ionicons name="cloud-download-outline" size={15} color="#475569" />
+                  <Text style={s.syncHeaderBtnText}>
+                    {isSyncingHolidays ? "Đang đồng bộ..." : "Đồng bộ lễ"}
+                  </Text>
+                </Pressable>
+
+                <Pressable
+                  style={({ pressed }) => [s.actionHeaderBtn, pressed && { opacity: 0.85 }]}
+                  onPress={() => setEditingHoliday("new")}
+                >
+                  <Ionicons name="add" size={16} color="#ffffff" />
+                  <Text style={s.actionHeaderBtnText}>Thêm ngày</Text>
+                </Pressable>
+              </View>
+            )}
+          </View>
+
           {holidays.length === 0 ? (
             <View style={s.emptyBox}>
               <Text style={{ fontSize: 32, marginBottom: 8 }}>🏖️</Text>
               <Text style={s.emptyTitle}>Chưa có lịch nghỉ lễ trong năm {year}</Text>
+              <Text style={s.emptySub}>Bấm nút bên dưới để đồng bộ lịch nghỉ lễ quốc gia hoặc thêm ngày mới</Text>
+              {isManager && (
+                <View style={{ flexDirection: "row", gap: 10, marginTop: 8 }}>
+                  <Pressable style={s.emptyActionBtn} onPress={handleSyncHolidays}>
+                    <Text style={s.emptyActionBtnText}>Đồng bộ lễ quốc gia</Text>
+                  </Pressable>
+                  <Pressable style={[s.emptyActionBtn, { backgroundColor: "#059669" }]} onPress={() => setEditingHoliday("new")}>
+                    <Text style={s.emptyActionBtnText}>+ Thêm ngày mới</Text>
+                  </Pressable>
+                </View>
+              )}
             </View>
           ) : (
-            holidays.map((h, i) => (
-              <View key={h._id || `holiday-${i}`} style={s.holidayCard}>
-                <View style={s.holidayCardTop}>
-                  <Text style={s.holidayName}>{h.name || "Ngày nghỉ lễ"}</Text>
-                  <Text style={s.holidayDate}>{formatDateDisplay(h.date)}</Text>
+            holidays.map((h, i) => {
+              const dayTypeLabel =
+                h.dayType === "substitute_holiday"
+                  ? "Nghỉ bù"
+                  : h.dayType === "working_override"
+                    ? "Làm bù"
+                    : "Nghỉ lễ";
+              const dayTypeBg =
+                h.dayType === "substitute_holiday"
+                  ? "#fffbeb"
+                  : h.dayType === "working_override"
+                    ? "#eef2ff"
+                    : "#ecfdf5";
+              const dayTypeCol =
+                h.dayType === "substitute_holiday"
+                  ? "#d97706"
+                  : h.dayType === "working_override"
+                    ? "#4f46e5"
+                    : "#059669";
+
+              return (
+                <View key={h._id || `holiday-${i}`} style={s.holidayCard}>
+                  {/* Top: Name & Day Type badge */}
+                  <View style={s.holidayCardTop}>
+                    <Text style={s.holidayName}>{h.name || "Ngày nghỉ lễ"}</Text>
+                    <View style={[s.holidayTypeTag, { backgroundColor: dayTypeBg }]}>
+                      <Text style={[s.holidayTypeTagText, { color: dayTypeCol }]}>
+                        {dayTypeLabel}
+                      </Text>
+                    </View>
+                  </View>
+
+                  {/* Date & Metadata */}
+                  <View style={{ flexDirection: "row", alignItems: "center", gap: 8, marginTop: 4 }}>
+                    <Text style={s.holidayDate}>{formatDateDisplay(h.date)}</Text>
+                    <Text style={{ fontSize: 11, color: "#94a3b8" }}>·</Text>
+                    <Text style={s.holidaySourceText}>
+                      {h.source === "system" ? "Lễ quốc gia" : "Tự tạo"}
+                    </Text>
+                    <Text style={{ fontSize: 11, color: "#94a3b8" }}>·</Text>
+                    <View style={[s.statusPill, { backgroundColor: h.isApplied ? "#ecfdf5" : "#fff1f2" }]}>
+                      <Text style={[s.statusPillText, { color: h.isApplied ? "#059669" : "#e11d48" }]}>
+                        {h.isApplied ? "Đang áp dụng" : "Đã tắt"}
+                      </Text>
+                    </View>
+                  </View>
+
+                  {/* Admin Reason if any */}
+                  {!!h.adminReason && (
+                    <Text style={s.holidayReason}>Ghi chú: {h.adminReason}</Text>
+                  )}
+
+                  {/* Manager Action Buttons */}
+                  {isManager && (
+                    <View style={s.cardActionRow}>
+                      <Pressable
+                        style={({ pressed }) => [s.toggleActionBtn, pressed && { opacity: 0.7 }]}
+                        onPress={() => handleToggleHolidayApplied(h)}
+                      >
+                        <Ionicons
+                          name={h.isApplied ? "eye-off-outline" : "checkmark-circle-outline"}
+                          size={14}
+                          color={h.isApplied ? "#d97706" : "#059669"}
+                        />
+                        <Text style={[s.toggleActionText, { color: h.isApplied ? "#d97706" : "#059669" }]}>
+                          {h.isApplied ? "Tắt áp dụng" : "Bật áp dụng"}
+                        </Text>
+                      </Pressable>
+
+                      <Pressable
+                        style={({ pressed }) => [s.editActionBtn, pressed && { opacity: 0.7 }]}
+                        onPress={() => setEditingHoliday(h)}
+                      >
+                        <Ionicons name="pencil" size={14} color="#0284c7" />
+                        <Text style={s.editActionText}>Sửa</Text>
+                      </Pressable>
+
+                      {h.source === "admin" && (
+                        <Pressable
+                          style={({ pressed }) => [s.deleteActionBtn, pressed && { opacity: 0.7 }]}
+                          onPress={() => handleDeleteHoliday(h)}
+                        >
+                          <Ionicons name="trash-outline" size={14} color="#e11d48" />
+                          <Text style={s.deleteActionText}>Xóa</Text>
+                        </Pressable>
+                      )}
+                    </View>
+                  )}
                 </View>
-                <Text style={s.holidayReason}>{h.adminReason || "Lịch nghỉ lễ theo quy định"}</Text>
-              </View>
-            ))
+              );
+            })
           )}
         </View>
       )}
@@ -1050,119 +1774,168 @@ export default function CalendarEvents() {
       {/* MODAL: ADD EVENT */}
       <Modal visible={isAddModalOpen} animationType="slide" transparent onRequestClose={() => setIsAddModalOpen(false)}>
         <Pressable style={s.modalBackdrop} onPress={() => setIsAddModalOpen(false)}>
-          <Pressable style={s.modalSheet} onPress={() => {}}>
+          <Pressable style={[s.modalSheet, { maxHeight: "92%" }]} onPress={() => {}}>
             <View style={s.modalHandle} />
-            <Text style={s.modalTitle}>Thêm lịch trình mới</Text>
+            <ScrollView showsVerticalScrollIndicator={false}>
+              <Text style={s.modalTitle}>Thêm lịch trình mới</Text>
 
-            {/* Type selector */}
-            <Text style={s.formLabel}>Loại lịch trình</Text>
-            <ScrollView horizontal showsHorizontalScrollIndicator={false} contentContainerStyle={{ gap: 6, marginBottom: 12 }}>
-              {(["event", "leave", "wfh", "exception", "reminder"] as const).map((tKey) => {
-                const meta = EVENT_TYPE_MAP[tKey];
-                const active = newType === tKey;
-                return (
+              {/* Employee / Assignee selector */}
+              <Text style={s.formLabel}>Nhân sự áp dụng</Text>
+              <ScrollView horizontal showsHorizontalScrollIndicator={false} contentContainerStyle={{ gap: 6, marginBottom: 12 }}>
+                {employees.map((emp) => {
+                  const isSelected = newAssigneeId === emp.uid;
+                  return (
+                    <Pressable
+                      key={emp.uid}
+                      style={[s.empPickPill, isSelected && s.empPickPillActive]}
+                      onPress={() => setNewAssigneeId(emp.uid)}
+                    >
+                      <View style={[s.miniAvatar, isSelected && { backgroundColor: "#4f46e5" }]}>
+                        <Text style={[s.miniAvatarText, isSelected && { color: "#ffffff" }]}>
+                          {(emp.displayName || emp.email).charAt(0).toUpperCase()}
+                        </Text>
+                      </View>
+                      <Text style={[s.empPickPillText, isSelected && s.empPickPillTextActive]}>
+                        {emp.displayName || emp.email}
+                      </Text>
+                    </Pressable>
+                  );
+                })}
+              </ScrollView>
+
+              {/* Type selector */}
+              <Text style={s.formLabel}>Loại lịch trình</Text>
+              <ScrollView horizontal showsHorizontalScrollIndicator={false} contentContainerStyle={{ gap: 6, marginBottom: 12 }}>
+                {(["event", "leave", "wfh", "exception", "reminder"] as const).map((tKey) => {
+                  const meta = EVENT_TYPE_MAP[tKey];
+                  const active = newType === tKey;
+                  return (
+                    <Pressable
+                      key={tKey}
+                      style={[s.modalTypePill, active && { backgroundColor: meta.bg, borderColor: meta.border }]}
+                      onPress={() => setNewType(tKey)}
+                    >
+                      <View style={[s.dotIndicator, { backgroundColor: meta.dot }]} />
+                      <Text style={[s.modalTypeTxt, active && { color: meta.text, fontWeight: "800" }]}>
+                        {meta.label}
+                      </Text>
+                    </Pressable>
+                  );
+                })}
+              </ScrollView>
+
+              {/* Title */}
+              <Text style={s.formLabel}>Tiêu đề *</Text>
+              <TextInput
+                style={s.formInput}
+                placeholder="VD: Họp giao ban, Nghỉ phép cá nhân..."
+                placeholderTextColor="#94a3b8"
+                value={newTitle}
+                onChangeText={setNewTitle}
+              />
+
+              {/* Description */}
+              <Text style={s.formLabel}>Mô tả</Text>
+              <TextInput
+                style={[s.formInput, { height: 60, textAlignVertical: "top" }]}
+                placeholder="Chi tiết công việc hoặc ghi chú..."
+                placeholderTextColor="#94a3b8"
+                multiline
+                value={newDesc}
+                onChangeText={setNewDesc}
+              />
+
+              {/* Quick time chips */}
+              <Text style={s.formLabel}>Gợi ý khung giờ nhanh</Text>
+              <ScrollView horizontal showsHorizontalScrollIndicator={false} contentContainerStyle={{ gap: 6, marginBottom: 10 }}>
+                {[
+                  { l: "Cả ngày (08:00 – 17:30)", s: "08:00", e: "17:30" },
+                  { l: "Ca sáng (08:00 – 12:00)", s: "08:00", e: "12:00" },
+                  { l: "Ca chiều (13:30 – 17:30)", s: "13:30", e: "17:30" },
+                  { l: "09:00 – 10:00", s: "09:00", e: "10:00" },
+                  { l: "14:00 – 15:00", s: "14:00", e: "15:00" },
+                ].map((p, idx) => (
                   <Pressable
-                    key={tKey}
-                    style={[s.modalTypePill, active && { backgroundColor: meta.bg, borderColor: meta.border }]}
-                    onPress={() => setNewType(tKey)}
+                    key={idx}
+                    style={s.presetTimeChip}
+                    onPress={() => {
+                      setNewStartTime(p.s);
+                      setNewEndTime(p.e);
+                    }}
                   >
-                    <View style={[s.dotIndicator, { backgroundColor: meta.dot }]} />
-                    <Text style={[s.modalTypeTxt, active && { color: meta.text, fontWeight: "800" }]}>
-                      {meta.label}
-                    </Text>
+                    <Text style={s.presetTimeText}>{p.l}</Text>
                   </Pressable>
-                );
-              })}
+                ))}
+              </ScrollView>
+
+              {/* Date & Time Row */}
+              <View style={{ flexDirection: "row", gap: 8, marginBottom: 12 }}>
+                <View style={{ flex: 1 }}>
+                  <Text style={s.formLabel}>Bắt đầu (YYYY-MM-DD)</Text>
+                  <TextInput
+                    style={s.formInput}
+                    placeholder="YYYY-MM-DD"
+                    placeholderTextColor="#94a3b8"
+                    value={newStartDate}
+                    onChangeText={setNewStartDate}
+                  />
+                </View>
+                <View style={{ width: 85 }}>
+                  <Text style={s.formLabel}>Giờ</Text>
+                  <TextInput
+                    style={s.formInput}
+                    placeholder="HH:mm"
+                    placeholderTextColor="#94a3b8"
+                    value={newStartTime}
+                    onChangeText={setNewStartTime}
+                  />
+                </View>
+              </View>
+
+              <View style={{ flexDirection: "row", gap: 8, marginBottom: 16 }}>
+                <View style={{ flex: 1 }}>
+                  <Text style={s.formLabel}>Kết thúc (YYYY-MM-DD)</Text>
+                  <TextInput
+                    style={s.formInput}
+                    placeholder="YYYY-MM-DD"
+                    placeholderTextColor="#94a3b8"
+                    value={newEndDate}
+                    onChangeText={setNewEndDate}
+                  />
+                </View>
+                <View style={{ width: 85 }}>
+                  <Text style={s.formLabel}>Giờ</Text>
+                  <TextInput
+                    style={s.formInput}
+                    placeholder="HH:mm"
+                    placeholderTextColor="#94a3b8"
+                    value={newEndTime}
+                    onChangeText={setNewEndTime}
+                  />
+                </View>
+              </View>
+
+              {/* Action buttons */}
+              <View style={{ flexDirection: "row", gap: 10, marginTop: 6 }}>
+                <Pressable
+                  style={[s.modalBtn, { backgroundColor: "#f1f5f9" }]}
+                  onPress={() => setIsAddModalOpen(false)}
+                >
+                  <Text style={{ fontWeight: "700", color: "#475569" }}>Hủy</Text>
+                </Pressable>
+                <Pressable
+                  style={[s.modalBtn, { backgroundColor: "#4f46e5" }]}
+                  onPress={handleCreateEvent}
+                  disabled={isSavingEvent}
+                >
+                  {isSavingEvent ? (
+                    <ActivityIndicator color="#ffffff" size="small" />
+                  ) : (
+                    <Text style={{ fontWeight: "800", color: "#ffffff" }}>Tạo lịch trình</Text>
+                  )}
+                </Pressable>
+              </View>
             </ScrollView>
-
-            {/* Title */}
-            <Text style={s.formLabel}>Tiêu đề *</Text>
-            <TextInput
-              style={s.formInput}
-              placeholder="VD: Họp giao ban, Nghỉ phép cá nhân..."
-              placeholderTextColor="#94a3b8"
-              value={newTitle}
-              onChangeText={setNewTitle}
-            />
-
-            {/* Description */}
-            <Text style={s.formLabel}>Mô tả</Text>
-            <TextInput
-              style={[s.formInput, { height: 60, textAlignVertical: "top" }]}
-              placeholder="Chi tiết công việc hoặc ghi chú..."
-              placeholderTextColor="#94a3b8"
-              multiline
-              value={newDesc}
-              onChangeText={setNewDesc}
-            />
-
-            {/* Date & Time Row */}
-            <View style={{ flexDirection: "row", gap: 8, marginBottom: 12 }}>
-              <View style={{ flex: 1 }}>
-                <Text style={s.formLabel}>Bắt đầu (YYYY-MM-DD)</Text>
-                <TextInput
-                  style={s.formInput}
-                  placeholder="YYYY-MM-DD"
-                  placeholderTextColor="#94a3b8"
-                  value={newStartDate}
-                  onChangeText={setNewStartDate}
-                />
-              </View>
-              <View style={{ width: 80 }}>
-                <Text style={s.formLabel}>Giờ</Text>
-                <TextInput
-                  style={s.formInput}
-                  placeholder="HH:mm"
-                  placeholderTextColor="#94a3b8"
-                  value={newStartTime}
-                  onChangeText={setNewStartTime}
-                />
-              </View>
-            </View>
-
-            <View style={{ flexDirection: "row", gap: 8, marginBottom: 16 }}>
-              <View style={{ flex: 1 }}>
-                <Text style={s.formLabel}>Kết thúc (YYYY-MM-DD)</Text>
-                <TextInput
-                  style={s.formInput}
-                  placeholder="YYYY-MM-DD"
-                  placeholderTextColor="#94a3b8"
-                  value={newEndDate}
-                  onChangeText={setNewEndDate}
-                />
-              </View>
-              <View style={{ width: 80 }}>
-                <Text style={s.formLabel}>Giờ</Text>
-                <TextInput
-                  style={s.formInput}
-                  placeholder="HH:mm"
-                  placeholderTextColor="#94a3b8"
-                  value={newEndTime}
-                  onChangeText={setNewEndTime}
-                />
-              </View>
-            </View>
-
-            {/* Action buttons */}
-            <View style={{ flexDirection: "row", gap: 10, marginTop: 6 }}>
-              <Pressable
-                style={[s.modalBtn, { backgroundColor: "#f1f5f9" }]}
-                onPress={() => setIsAddModalOpen(false)}
-              >
-                <Text style={{ fontWeight: "700", color: "#475569" }}>Hủy</Text>
-              </Pressable>
-              <Pressable
-                style={[s.modalBtn, { backgroundColor: "#4f46e5" }]}
-                onPress={handleCreateEvent}
-                disabled={isSavingEvent}
-              >
-                {isSavingEvent ? (
-                  <ActivityIndicator color="#ffffff" size="small" />
-                ) : (
-                  <Text style={{ fontWeight: "800", color: "#ffffff" }}>Tạo lịch trình</Text>
-                )}
-              </Pressable>
-            </View>
           </Pressable>
         </Pressable>
       </Modal>
@@ -1218,13 +1991,21 @@ export default function CalendarEvents() {
                   )}
                 </View>
 
-                <View style={{ flexDirection: "row", gap: 10, marginTop: 16 }}>
+                <View style={{ flexDirection: "row", gap: 8, marginTop: 16 }}>
+                  {(isManager || viewingItem.creatorId === user?.uid || viewingItem.employeeId === user?.uid) && (
+                    <Pressable
+                      style={[s.modalBtn, { backgroundColor: "#eef2ff", borderWidth: 1, borderColor: "#c7d2fe" }]}
+                      onPress={() => handleOpenEditEvent(viewingItem)}
+                    >
+                      <Text style={{ fontWeight: "700", color: "#4338ca" }}>✏️ Sửa giờ</Text>
+                    </Pressable>
+                  )}
                   {(isManager || viewingItem.creatorId === user?.uid) && (
                     <Pressable
                       style={[s.modalBtn, { backgroundColor: "#fff1f2", borderWidth: 1, borderColor: "#fecdd3" }]}
                       onPress={() => handleDeleteEvent(viewingItem.id || viewingItem._id)}
                     >
-                      <Text style={{ fontWeight: "700", color: "#be123c" }}>Xóa lịch này</Text>
+                      <Text style={{ fontWeight: "700", color: "#be123c" }}>Xóa</Text>
                     </Pressable>
                   )}
                   <Pressable
@@ -1238,6 +2019,449 @@ export default function CalendarEvents() {
             )}
           </Pressable>
         </Pressable>
+      </Modal>
+
+      {/* MODAL: EDIT CALENDAR EVENT & WORK HOURS */}
+      <Modal
+        visible={editingCalendarItem !== null}
+        animationType="slide"
+        transparent
+        onRequestClose={() => setEditingCalendarItem(null)}
+      >
+        <Pressable style={s.modalBackdrop} onPress={() => setEditingCalendarItem(null)}>
+          <Pressable style={[s.modalSheet, { maxHeight: "92%" }]} onPress={() => {}}>
+            <View style={s.modalHandle} />
+            <ScrollView showsVerticalScrollIndicator={false}>
+              <Text style={s.modalTitle}>Sửa giờ làm & Lịch trình</Text>
+
+              {/* Assignee / Employee Picker */}
+              <Text style={s.formLabel}>Nhân sự thực hiện *</Text>
+              <ScrollView horizontal showsHorizontalScrollIndicator={false} contentContainerStyle={{ gap: 6, marginBottom: 12 }}>
+                {employees.map((emp) => {
+                  const isSelected = editAssigneeId === emp.uid;
+                  return (
+                    <Pressable
+                      key={emp.uid}
+                      style={[s.empPickPill, isSelected && s.empPickPillActive]}
+                      onPress={() => setEditAssigneeId(emp.uid)}
+                    >
+                      <View style={[s.miniAvatar, isSelected && { backgroundColor: "#4f46e5" }]}>
+                        <Text style={[s.miniAvatarText, isSelected && { color: "#ffffff" }]}>
+                          {(emp.displayName || emp.email).charAt(0).toUpperCase()}
+                        </Text>
+                      </View>
+                      <Text style={[s.empPickPillText, isSelected && s.empPickPillTextActive]}>
+                        {emp.displayName || emp.email}
+                      </Text>
+                    </Pressable>
+                  );
+                })}
+              </ScrollView>
+
+              {/* Type selector */}
+              <Text style={s.formLabel}>Loại lịch trình</Text>
+              <ScrollView horizontal showsHorizontalScrollIndicator={false} contentContainerStyle={{ gap: 6, marginBottom: 12 }}>
+                {(["event", "leave", "wfh", "exception", "reminder"] as const).map((tKey) => {
+                  const meta = EVENT_TYPE_MAP[tKey];
+                  const active = editType === tKey;
+                  return (
+                    <Pressable
+                      key={tKey}
+                      style={[s.modalTypePill, active && { backgroundColor: meta.bg, borderColor: meta.border }]}
+                      onPress={() => setEditType(tKey)}
+                    >
+                      <View style={[s.dotIndicator, { backgroundColor: meta.dot }]} />
+                      <Text style={[s.modalTypeTxt, active && { color: meta.text, fontWeight: "800" }]}>
+                        {meta.label}
+                      </Text>
+                    </Pressable>
+                  );
+                })}
+              </ScrollView>
+
+              {/* Title */}
+              <Text style={s.formLabel}>Tiêu đề *</Text>
+              <TextInput
+                style={s.formInput}
+                placeholder="Tiêu đề sự kiện hoặc lịch làm việc..."
+                placeholderTextColor="#94a3b8"
+                value={editTitle}
+                onChangeText={setEditTitle}
+              />
+
+              {/* Description */}
+              <Text style={s.formLabel}>Mô tả</Text>
+              <TextInput
+                style={[s.formInput, { height: 60, textAlignVertical: "top" }]}
+                placeholder="Chi tiết công việc hoặc ghi chú..."
+                placeholderTextColor="#94a3b8"
+                multiline
+                value={editDesc}
+                onChangeText={setEditDesc}
+              />
+
+              {/* Quick time chips */}
+              <Text style={s.formLabel}>Gợi ý khung giờ nhanh</Text>
+              <ScrollView horizontal showsHorizontalScrollIndicator={false} contentContainerStyle={{ gap: 6, marginBottom: 10 }}>
+                {[
+                  { l: "Cả ngày (08:00 – 17:30)", s: "08:00", e: "17:30" },
+                  { l: "Ca sáng (08:00 – 12:00)", s: "08:00", e: "12:00" },
+                  { l: "Ca chiều (13:30 – 17:30)", s: "13:30", e: "17:30" },
+                  { l: "09:00 – 10:00", s: "09:00", e: "10:00" },
+                  { l: "14:00 – 15:00", s: "14:00", e: "15:00" },
+                ].map((p, idx) => (
+                  <Pressable
+                    key={idx}
+                    style={s.presetTimeChip}
+                    onPress={() => {
+                      setEditStartTime(p.s);
+                      setEditEndTime(p.e);
+                    }}
+                  >
+                    <Text style={s.presetTimeText}>{p.l}</Text>
+                  </Pressable>
+                ))}
+              </ScrollView>
+
+              {/* Start Date & Time */}
+              <View style={{ flexDirection: "row", gap: 8, marginBottom: 12 }}>
+                <View style={{ flex: 1 }}>
+                  <Text style={s.formLabel}>Bắt đầu (YYYY-MM-DD) *</Text>
+                  <TextInput
+                    style={s.formInput}
+                    placeholder="YYYY-MM-DD"
+                    placeholderTextColor="#94a3b8"
+                    value={editStartDate}
+                    onChangeText={setEditStartDate}
+                  />
+                </View>
+                <View style={{ width: 85 }}>
+                  <Text style={s.formLabel}>Giờ (HH:mm) *</Text>
+                  <TextInput
+                    style={s.formInput}
+                    placeholder="HH:mm"
+                    placeholderTextColor="#94a3b8"
+                    value={editStartTime}
+                    onChangeText={setEditStartTime}
+                  />
+                </View>
+              </View>
+
+              {/* End Date & Time */}
+              <View style={{ flexDirection: "row", gap: 8, marginBottom: 16 }}>
+                <View style={{ flex: 1 }}>
+                  <Text style={s.formLabel}>Kết thúc (YYYY-MM-DD) *</Text>
+                  <TextInput
+                    style={s.formInput}
+                    placeholder="YYYY-MM-DD"
+                    placeholderTextColor="#94a3b8"
+                    value={editEndDate}
+                    onChangeText={setEditEndDate}
+                  />
+                </View>
+                <View style={{ width: 85 }}>
+                  <Text style={s.formLabel}>Giờ (HH:mm) *</Text>
+                  <TextInput
+                    style={s.formInput}
+                    placeholder="HH:mm"
+                    placeholderTextColor="#94a3b8"
+                    value={editEndTime}
+                    onChangeText={setEditEndTime}
+                  />
+                </View>
+              </View>
+
+              {/* Action buttons */}
+              <View style={{ flexDirection: "row", gap: 10, marginTop: 4 }}>
+                <Pressable
+                  style={[s.modalBtn, { backgroundColor: "#f1f5f9" }]}
+                  onPress={() => setEditingCalendarItem(null)}
+                >
+                  <Text style={{ fontWeight: "700", color: "#475569" }}>Hủy</Text>
+                </Pressable>
+                <Pressable
+                  style={[s.modalBtn, { backgroundColor: "#4f46e5" }]}
+                  onPress={handleSaveEditEvent}
+                  disabled={isUpdatingEvent}
+                >
+                  {isUpdatingEvent ? (
+                    <ActivityIndicator color="#ffffff" size="small" />
+                  ) : (
+                    <Text style={{ fontWeight: "800", color: "#ffffff" }}>Cập nhật lịch</Text>
+                  )}
+                </Pressable>
+              </View>
+            </ScrollView>
+          </Pressable>
+        </Pressable>
+      </Modal>
+
+      {/* MODAL: EDIT EMPLOYEE SHIFT & WORK HOURS */}
+      <Modal
+        visible={editingEmployeeShift !== null}
+        animationType="slide"
+        transparent
+        onRequestClose={() => setEditingEmployeeShift(null)}
+      >
+        <Pressable style={s.modalBackdrop} onPress={() => setEditingEmployeeShift(null)}>
+          <Pressable style={[s.modalSheet, { maxHeight: "92%" }]} onPress={() => {}}>
+            <View style={s.modalHandle} />
+            <ScrollView showsVerticalScrollIndicator={false}>
+              <Text style={s.modalTitle}>Sửa giờ làm & Phân ca</Text>
+              {editingEmployeeShift && (
+                <View style={s.modalEmpBanner}>
+                  <View style={s.empAvatar}>
+                    <Text style={s.empAvatarText}>
+                      {(editingEmployeeShift.displayName || editingEmployeeShift.email || "NV").charAt(0).toUpperCase()}
+                    </Text>
+                  </View>
+                  <View style={{ flex: 1 }}>
+                    <Text style={{ fontSize: 14, fontWeight: "800", color: "#0f172a" }}>
+                      {editingEmployeeShift.displayName || editingEmployeeShift.email}
+                    </Text>
+                    <Text style={{ fontSize: 11, color: "#64748b" }}>{editingEmployeeShift.email}</Text>
+                    {!!editingEmployeeShift.department && (
+                      <Text style={{ fontSize: 11, color: "#4f46e5", fontWeight: "600", marginTop: 2 }}>
+                        {editingEmployeeShift.department}
+                      </Text>
+                    )}
+                  </View>
+                </View>
+              )}
+
+              {/* Mode switch: Existing shift vs Custom hours */}
+              <Text style={s.formLabel}>Phương thức phân ca & giờ làm</Text>
+              <View style={s.modeSegmentBox}>
+                <Pressable
+                  style={[s.modeSegmentBtn, !isCustomHoursMode && s.modeSegmentBtnActive]}
+                  onPress={() => setIsCustomHoursMode(false)}
+                >
+                  <Text style={[s.modeSegmentBtnText, !isCustomHoursMode && s.modeSegmentBtnTextActive]}>
+                    Chọn ca có sẵn ({shifts.length})
+                  </Text>
+                </Pressable>
+                <Pressable
+                  style={[s.modeSegmentBtn, isCustomHoursMode && s.modeSegmentBtnActive]}
+                  onPress={() => setIsCustomHoursMode(true)}
+                >
+                  <Text style={[s.modeSegmentBtnText, isCustomHoursMode && s.modeSegmentBtnTextActive]}>
+                    Tùy chỉnh giờ riêng
+                  </Text>
+                </Pressable>
+              </View>
+
+              {!isCustomHoursMode ? (
+                <>
+                  <Text style={s.formLabel}>Chọn ca làm việc *</Text>
+                  <View style={{ gap: 8, marginBottom: 12 }}>
+                    {shifts.map((sh) => {
+                      const isSelected = assignShiftId === sh._id;
+                      return (
+                        <Pressable
+                          key={sh._id}
+                          style={[s.shiftPickCard, isSelected && s.shiftPickCardSelected]}
+                          onPress={() => {
+                            setAssignShiftId(sh._id);
+                            if (sh.workingDays && sh.workingDays.length > 0) {
+                              setAssignDaysOfWeek(sh.workingDays);
+                            }
+                          }}
+                        >
+                          <View style={{ flexDirection: "row", alignItems: "center", gap: 8, flex: 1 }}>
+                            <View style={[s.shiftColorDot, { backgroundColor: sh.color || "#4f46e5" }]} />
+                            <View>
+                              <Text style={[s.shiftPickName, isSelected && { color: "#4338ca", fontWeight: "800" }]}>
+                                {sh.name}
+                              </Text>
+                              <Text style={s.shiftPickCode}>{sh.code}</Text>
+                            </View>
+                          </View>
+                          <View style={[s.shiftPickHoursBadge, isSelected && { backgroundColor: "#e0e7ff" }]}>
+                            <Text style={[s.shiftPickHoursText, isSelected && { color: "#3730a3" }]}>
+                              ⏰ {sh.startTime} – {sh.endTime}
+                            </Text>
+                          </View>
+                        </Pressable>
+                      );
+                    })}
+                  </View>
+                </>
+              ) : (
+                <>
+                  <Text style={s.formLabel}>Tên ca làm tùy chỉnh</Text>
+                  <TextInput
+                    style={s.formInput}
+                    placeholder="VD: Ca part-time, Ca điều dưỡng sáng..."
+                    placeholderTextColor="#94a3b8"
+                    value={customShiftName}
+                    onChangeText={setCustomShiftName}
+                  />
+
+                  {/* Quick time preset chips */}
+                  <Text style={s.formLabel}>Gợi ý khung giờ nhanh</Text>
+                  <ScrollView horizontal showsHorizontalScrollIndicator={false} contentContainerStyle={{ gap: 6, marginBottom: 10 }}>
+                    {[
+                      { l: "08:00 – 17:00", s: "08:00", e: "17:00" },
+                      { l: "08:30 – 17:30", s: "08:30", e: "17:30" },
+                      { l: "09:00 – 18:00", s: "09:00", e: "18:00" },
+                      { l: "Ca sáng (08:00 – 12:00)", s: "08:00", e: "12:00" },
+                      { l: "Ca chiều (13:30 – 17:30)", s: "13:30", e: "17:30" },
+                      { l: "Ca tối (18:00 – 22:00)", s: "18:00", e: "22:00" },
+                    ].map((p, idx) => (
+                      <Pressable
+                        key={idx}
+                        style={s.presetTimeChip}
+                        onPress={() => {
+                          setCustomStartTime(p.s);
+                          setCustomEndTime(p.e);
+                        }}
+                      >
+                        <Text style={s.presetTimeText}>{p.l}</Text>
+                      </Pressable>
+                    ))}
+                  </ScrollView>
+
+                  <View style={{ flexDirection: "row", gap: 10, marginBottom: 12 }}>
+                    <View style={{ flex: 1 }}>
+                      <Text style={s.formLabel}>Giờ bắt đầu (HH:mm) *</Text>
+                      <TextInput
+                        style={s.formInput}
+                        placeholder="08:30"
+                        placeholderTextColor="#94a3b8"
+                        value={customStartTime}
+                        onChangeText={setCustomStartTime}
+                      />
+                    </View>
+                    <View style={{ flex: 1 }}>
+                      <Text style={s.formLabel}>Giờ kết thúc (HH:mm) *</Text>
+                      <TextInput
+                        style={s.formInput}
+                        placeholder="17:30"
+                        placeholderTextColor="#94a3b8"
+                        value={customEndTime}
+                        onChangeText={setCustomEndTime}
+                      />
+                    </View>
+                  </View>
+                </>
+              )}
+
+              {/* Working Days of Week Toggle */}
+              <Text style={s.formLabel}>Các ngày làm việc trong tuần *</Text>
+              <View style={{ flexDirection: "row", gap: 6, marginBottom: 12 }}>
+                {[
+                  { v: 1, l: "T2" },
+                  { v: 2, l: "T3" },
+                  { v: 3, l: "T4" },
+                  { v: 4, l: "T5" },
+                  { v: 5, l: "T6" },
+                  { v: 6, l: "T7" },
+                  { v: 0, l: "CN" },
+                ].map((d) => {
+                  const active = assignDaysOfWeek.includes(d.v);
+                  return (
+                    <Pressable
+                      key={d.v}
+                      style={[s.dayToggleBtn, active && s.dayToggleBtnActive]}
+                      onPress={() => toggleAssignDay(d.v)}
+                    >
+                      <Text style={[s.dayToggleBtnText, active && s.dayToggleBtnTextActive]}>
+                        {d.l}
+                      </Text>
+                    </Pressable>
+                  );
+                })}
+              </View>
+
+              {/* Effective Date Range */}
+              <View style={{ flexDirection: "row", gap: 10, marginBottom: 16 }}>
+                <View style={{ flex: 1 }}>
+                  <Text style={s.formLabel}>Hiệu lực từ (YYYY-MM-DD) *</Text>
+                  <TextInput
+                    style={s.formInput}
+                    placeholder="YYYY-MM-DD"
+                    placeholderTextColor="#94a3b8"
+                    value={assignEffectiveFrom}
+                    onChangeText={setAssignEffectiveFrom}
+                  />
+                </View>
+                <View style={{ flex: 1 }}>
+                  <Text style={s.formLabel}>Đến ngày (tùy chọn)</Text>
+                  <TextInput
+                    style={s.formInput}
+                    placeholder="YYYY-MM-DD"
+                    placeholderTextColor="#94a3b8"
+                    value={assignEffectiveTo}
+                    onChangeText={setAssignEffectiveTo}
+                  />
+                </View>
+              </View>
+
+              {/* Action buttons */}
+              <View style={{ flexDirection: "row", gap: 10, marginTop: 4 }}>
+                <Pressable
+                  style={[s.modalBtn, { backgroundColor: "#f1f5f9" }]}
+                  onPress={() => setEditingEmployeeShift(null)}
+                >
+                  <Text style={{ fontWeight: "700", color: "#475569" }}>Hủy</Text>
+                </Pressable>
+                <Pressable
+                  style={[s.modalBtn, { backgroundColor: "#4f46e5" }]}
+                  onPress={handleSaveEmployeeShift}
+                  disabled={isSavingEmployeeShift}
+                >
+                  {isSavingEmployeeShift ? (
+                    <ActivityIndicator color="#ffffff" size="small" />
+                  ) : (
+                    <Text style={{ fontWeight: "800", color: "#ffffff" }}>Lưu giờ làm & Phân ca</Text>
+                  )}
+                </Pressable>
+              </View>
+            </ScrollView>
+          </Pressable>
+        </Pressable>
+      </Modal>
+
+      {/* MODAL: SHIFT CRUD */}
+      <Modal
+        visible={editingShift !== null}
+        animationType="slide"
+        onRequestClose={() => setEditingShift(null)}
+      >
+        <SafeAreaView style={{ flex: 1, backgroundColor: "#f8fafc" }} edges={["top"]}>
+          {editingShift !== null && (
+            <ShiftForm
+              shift={editingShift === "new" ? undefined : editingShift}
+              onClose={() => setEditingShift(null)}
+              onSuccess={() => {
+                setEditingShift(null);
+                setRevision((v) => v + 1);
+              }}
+              setLocked={() => {}}
+            />
+          )}
+        </SafeAreaView>
+      </Modal>
+
+      {/* MODAL: HOLIDAY CRUD */}
+      <Modal
+        visible={editingHoliday !== null}
+        animationType="slide"
+        onRequestClose={() => setEditingHoliday(null)}
+      >
+        <SafeAreaView style={{ flex: 1, backgroundColor: "#f8fafc" }} edges={["top"]}>
+          {editingHoliday !== null && (
+            <HolidayForm
+              holiday={editingHoliday === "new" ? undefined : editingHoliday}
+              year={year}
+              onClose={() => setEditingHoliday(null)}
+              onSuccess={() => {
+                setEditingHoliday(null);
+                setRevision((v) => v + 1);
+              }}
+            />
+          )}
+        </SafeAreaView>
       </Modal>
     </SafeAreaView>
   );
@@ -1707,7 +2931,194 @@ const s = StyleSheet.create({
   },
   holidayName: { fontSize: 13, fontWeight: "800", color: "#0f172a" },
   holidayDate: { fontSize: 11, fontWeight: "800", color: "#f43f5e" },
-  holidayReason: { fontSize: 11, color: "#64748b" },
+  holidayReason: { fontSize: 11, color: "#64748b", marginTop: 4 },
+  subSectionHeaderRow: {
+    flexDirection: "row",
+    alignItems: "center",
+    justifyContent: "space-between",
+    marginBottom: 4,
+  },
+  actionHeaderBtn: {
+    flexDirection: "row",
+    alignItems: "center",
+    gap: 4,
+    backgroundColor: "#059669",
+    paddingHorizontal: 12,
+    paddingVertical: 7,
+    borderRadius: 8,
+  },
+  actionHeaderBtnText: {
+    fontSize: 12,
+    fontWeight: "700",
+    color: "#ffffff",
+  },
+  syncHeaderBtn: {
+    flexDirection: "row",
+    alignItems: "center",
+    gap: 4,
+    backgroundColor: "#ffffff",
+    borderWidth: 1,
+    borderColor: "#cbd5e1",
+    paddingHorizontal: 10,
+    paddingVertical: 7,
+    borderRadius: 8,
+  },
+  syncHeaderBtnText: {
+    fontSize: 12,
+    fontWeight: "600",
+    color: "#475569",
+  },
+  emptyActionBtn: {
+    marginTop: 8,
+    backgroundColor: "#4f46e5",
+    paddingHorizontal: 14,
+    paddingVertical: 8,
+    borderRadius: 8,
+  },
+  emptyActionBtnText: {
+    fontSize: 12,
+    fontWeight: "700",
+    color: "#ffffff",
+  },
+  shiftColorDot: {
+    width: 10,
+    height: 10,
+    borderRadius: 5,
+  },
+  defaultBadge: {
+    backgroundColor: "#fef3c7",
+    paddingHorizontal: 6,
+    paddingVertical: 2,
+    borderRadius: 6,
+  },
+  defaultBadgeText: {
+    fontSize: 10,
+    fontWeight: "700",
+    color: "#b45309",
+  },
+  overnightBadge: {
+    backgroundColor: "#f5f3ff",
+    paddingHorizontal: 6,
+    paddingVertical: 2,
+    borderRadius: 6,
+  },
+  overnightText: {
+    fontSize: 10,
+    fontWeight: "700",
+    color: "#7c3aed",
+  },
+  shiftDaysWrap: {
+    flexDirection: "row",
+    alignItems: "center",
+    gap: 4,
+    marginTop: 6,
+  },
+  shiftDaysLabel: {
+    fontSize: 11,
+    color: "#64748b",
+    marginRight: 2,
+  },
+  shiftDayMiniPill: {
+    paddingHorizontal: 5,
+    paddingVertical: 2,
+    borderRadius: 4,
+    backgroundColor: "#f1f5f9",
+  },
+  shiftDayMiniPillActive: {
+    backgroundColor: "#059669",
+  },
+  shiftDayMiniText: {
+    fontSize: 10,
+    color: "#94a3b8",
+    fontWeight: "600",
+  },
+  shiftDayMiniTextActive: {
+    color: "#ffffff",
+    fontWeight: "700",
+  },
+  shiftTolerance: {
+    fontSize: 11,
+    color: "#64748b",
+  },
+  statusPill: {
+    paddingHorizontal: 6,
+    paddingVertical: 2,
+    borderRadius: 6,
+  },
+  statusPillText: {
+    fontSize: 10,
+    fontWeight: "700",
+  },
+  cardActionRow: {
+    flexDirection: "row",
+    alignItems: "center",
+    justifyContent: "flex-end",
+    gap: 8,
+    marginTop: 8,
+    paddingTop: 8,
+    borderTopWidth: 1,
+    borderTopColor: "#f1f5f9",
+  },
+  editActionBtn: {
+    flexDirection: "row",
+    alignItems: "center",
+    gap: 4,
+    backgroundColor: "#f0f9ff",
+    borderWidth: 1,
+    borderColor: "#bae6fd",
+    paddingHorizontal: 10,
+    paddingVertical: 5,
+    borderRadius: 6,
+  },
+  editActionText: {
+    fontSize: 11,
+    fontWeight: "700",
+    color: "#0284c7",
+  },
+  deleteActionBtn: {
+    flexDirection: "row",
+    alignItems: "center",
+    gap: 4,
+    backgroundColor: "#fff1f2",
+    borderWidth: 1,
+    borderColor: "#fecdd3",
+    paddingHorizontal: 10,
+    paddingVertical: 5,
+    borderRadius: 6,
+  },
+  deleteActionText: {
+    fontSize: 11,
+    fontWeight: "700",
+    color: "#e11d48",
+  },
+  toggleActionBtn: {
+    flexDirection: "row",
+    alignItems: "center",
+    gap: 4,
+    backgroundColor: "#f8fafc",
+    borderWidth: 1,
+    borderColor: "#cbd5e1",
+    paddingHorizontal: 10,
+    paddingVertical: 5,
+    borderRadius: 6,
+  },
+  toggleActionText: {
+    fontSize: 11,
+    fontWeight: "700",
+  },
+  holidayTypeTag: {
+    paddingHorizontal: 8,
+    paddingVertical: 3,
+    borderRadius: 6,
+  },
+  holidayTypeTagText: {
+    fontSize: 11,
+    fontWeight: "700",
+  },
+  holidaySourceText: {
+    fontSize: 11,
+    color: "#64748b",
+  },
 
   /* Center / Empty states */
   centerBox: {
@@ -1803,4 +3214,310 @@ const s = StyleSheet.create({
   },
   detailLbl: { fontSize: 11, color: "#64748b", fontWeight: "600" },
   detailVal: { fontSize: 12, fontWeight: "700", color: "#0f172a" },
+
+  miniEditBtn: {
+    padding: 4,
+    borderRadius: 6,
+    backgroundColor: "#eef2ff",
+  },
+
+  /* Employee Shift Cards */
+  empShiftCard: {
+    backgroundColor: "#ffffff",
+    borderRadius: 14,
+    borderWidth: 1,
+    borderColor: "#e2e8f0",
+    padding: 12,
+  },
+  empCardTop: {
+    flexDirection: "row",
+    alignItems: "center",
+    gap: 10,
+    marginBottom: 10,
+  },
+  empAvatar: {
+    width: 38,
+    height: 38,
+    borderRadius: 12,
+    backgroundColor: "#4f46e5",
+    alignItems: "center",
+    justifyContent: "center",
+  },
+  empAvatarText: {
+    fontSize: 15,
+    fontWeight: "900",
+    color: "#ffffff",
+  },
+  empName: {
+    fontSize: 13,
+    fontWeight: "800",
+    color: "#0f172a",
+  },
+  empEmail: {
+    fontSize: 11,
+    color: "#64748b",
+    marginTop: 1,
+  },
+  empDeptBadge: {
+    backgroundColor: "#eef2ff",
+    paddingHorizontal: 6,
+    paddingVertical: 1,
+    borderRadius: 4,
+  },
+  empDeptText: {
+    fontSize: 10,
+    color: "#4f46e5",
+    fontWeight: "700",
+  },
+  empShiftBox: {
+    backgroundColor: "#f8fafc",
+    borderRadius: 10,
+    borderWidth: 1,
+    borderColor: "#e2e8f0",
+    padding: 10,
+  },
+  empAssignedShiftName: {
+    fontSize: 12,
+    fontWeight: "800",
+    color: "#0f172a",
+  },
+  shiftCodeMini: {
+    fontSize: 10,
+    color: "#64748b",
+    fontWeight: "600",
+  },
+  empHoursPill: {
+    backgroundColor: "#ecfdf5",
+    paddingHorizontal: 8,
+    paddingVertical: 2,
+    borderRadius: 6,
+    borderWidth: 1,
+    borderColor: "#a7f3d0",
+  },
+  empHoursPillText: {
+    fontSize: 11,
+    fontWeight: "800",
+    color: "#047857",
+  },
+  empDaysRow: {
+    flexDirection: "row",
+    alignItems: "center",
+    gap: 4,
+    marginTop: 6,
+  },
+  empDaysLabel: {
+    fontSize: 10,
+    fontWeight: "700",
+    color: "#64748b",
+    marginRight: 2,
+  },
+  empDayPill: {
+    width: 22,
+    height: 22,
+    borderRadius: 11,
+    backgroundColor: "#e2e8f0",
+    alignItems: "center",
+    justifyContent: "center",
+  },
+  empDayPillActive: {
+    backgroundColor: "#4f46e5",
+  },
+  empDayPillText: {
+    fontSize: 9,
+    fontWeight: "700",
+    color: "#64748b",
+  },
+  empDayPillTextActive: {
+    color: "#ffffff",
+    fontWeight: "800",
+  },
+  empPeriodText: {
+    fontSize: 10,
+    color: "#64748b",
+    fontWeight: "600",
+  },
+  unassignedBox: {
+    flexDirection: "row",
+    alignItems: "center",
+    gap: 6,
+    paddingVertical: 4,
+  },
+  unassignedText: {
+    fontSize: 11,
+    fontWeight: "600",
+    color: "#d97706",
+  },
+  empActionRow: {
+    flexDirection: "row",
+    justifyContent: "flex-end",
+    marginTop: 8,
+    paddingTop: 8,
+    borderTopWidth: 1,
+    borderTopColor: "#f1f5f9",
+  },
+  editHoursBtn: {
+    flexDirection: "row",
+    alignItems: "center",
+    gap: 5,
+    backgroundColor: "#eef2ff",
+    borderWidth: 1,
+    borderColor: "#c7d2fe",
+    paddingHorizontal: 12,
+    paddingVertical: 6,
+    borderRadius: 8,
+  },
+  editHoursBtnText: {
+    fontSize: 11,
+    fontWeight: "800",
+    color: "#4338ca",
+  },
+
+  /* Modals for Shift & Hour Edit */
+  modalEmpBanner: {
+    flexDirection: "row",
+    alignItems: "center",
+    gap: 10,
+    backgroundColor: "#f8fafc",
+    borderRadius: 12,
+    borderWidth: 1,
+    borderColor: "#e2e8f0",
+    padding: 10,
+    marginBottom: 12,
+  },
+  modeSegmentBox: {
+    flexDirection: "row",
+    backgroundColor: "#f1f5f9",
+    borderRadius: 10,
+    padding: 3,
+    marginBottom: 12,
+  },
+  modeSegmentBtn: {
+    flex: 1,
+    alignItems: "center",
+    paddingVertical: 7,
+    borderRadius: 8,
+  },
+  modeSegmentBtnActive: {
+    backgroundColor: "#ffffff",
+    shadowColor: "#000",
+    shadowOpacity: 0.05,
+    shadowRadius: 2,
+    elevation: 1,
+  },
+  modeSegmentBtnText: {
+    fontSize: 11,
+    fontWeight: "700",
+    color: "#64748b",
+  },
+  modeSegmentBtnTextActive: {
+    color: "#4f46e5",
+    fontWeight: "800",
+  },
+  shiftPickCard: {
+    flexDirection: "row",
+    alignItems: "center",
+    justifyContent: "space-between",
+    backgroundColor: "#f8fafc",
+    borderWidth: 1,
+    borderColor: "#e2e8f0",
+    borderRadius: 10,
+    padding: 10,
+  },
+  shiftPickCardSelected: {
+    backgroundColor: "#eef2ff",
+    borderColor: "#818cf8",
+  },
+  shiftPickName: {
+    fontSize: 12,
+    fontWeight: "700",
+    color: "#0f172a",
+  },
+  shiftPickCode: {
+    fontSize: 10,
+    color: "#64748b",
+    marginTop: 1,
+  },
+  shiftPickHoursBadge: {
+    backgroundColor: "#f1f5f9",
+    paddingHorizontal: 8,
+    paddingVertical: 3,
+    borderRadius: 6,
+  },
+  shiftPickHoursText: {
+    fontSize: 10,
+    fontWeight: "700",
+    color: "#475569",
+  },
+  presetTimeChip: {
+    backgroundColor: "#f1f5f9",
+    borderWidth: 1,
+    borderColor: "#e2e8f0",
+    paddingHorizontal: 10,
+    paddingVertical: 5,
+    borderRadius: 8,
+  },
+  presetTimeText: {
+    fontSize: 11,
+    fontWeight: "700",
+    color: "#475569",
+  },
+  dayToggleBtn: {
+    flex: 1,
+    alignItems: "center",
+    paddingVertical: 8,
+    borderRadius: 8,
+    backgroundColor: "#f1f5f9",
+    borderWidth: 1,
+    borderColor: "#e2e8f0",
+  },
+  dayToggleBtnActive: {
+    backgroundColor: "#4f46e5",
+    borderColor: "#4f46e5",
+  },
+  dayToggleBtnText: {
+    fontSize: 11,
+    fontWeight: "700",
+    color: "#64748b",
+  },
+  dayToggleBtnTextActive: {
+    color: "#ffffff",
+    fontWeight: "800",
+  },
+  empPickPill: {
+    flexDirection: "row",
+    alignItems: "center",
+    gap: 6,
+    paddingHorizontal: 10,
+    paddingVertical: 6,
+    borderRadius: 20,
+    backgroundColor: "#f1f5f9",
+    borderWidth: 1,
+    borderColor: "#e2e8f0",
+  },
+  empPickPillActive: {
+    backgroundColor: "#eef2ff",
+    borderColor: "#6366f1",
+  },
+  miniAvatar: {
+    width: 20,
+    height: 20,
+    borderRadius: 10,
+    backgroundColor: "#cbd5e1",
+    alignItems: "center",
+    justifyContent: "center",
+  },
+  miniAvatarText: {
+    fontSize: 9,
+    fontWeight: "800",
+    color: "#475569",
+  },
+  empPickPillText: {
+    fontSize: 11,
+    fontWeight: "600",
+    color: "#475569",
+  },
+  empPickPillTextActive: {
+    color: "#4f46e5",
+    fontWeight: "800",
+  },
 });

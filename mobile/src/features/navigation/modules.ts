@@ -1,36 +1,37 @@
 import type { UserProfile } from "../../../../src/types/common";
 import { canUseModule, hasPermission } from "../../auth/access";
-import { calendarAccess } from "../calendar/model";
 import { recruitmentAccess } from "../recruitment/access";
 import { canReadContracts } from "../contracts/model";
 import { canReadCredentials } from "../credentials/model";
 import { canReadPayslips } from "../payroll/model";
 import { canReadPayrollRuns } from "../payroll/runModel";
 import { workflowAccess } from "../workflow/access";
+import { trainingAccess } from "../training/access";
 
 export function availableModules(user: UserProfile | null) {
   const hr = canUseModule(user, "hr");
   const recruitment = recruitmentAccess(user).read;
   const workflow = workflowAccess(user);
+  const training = trainingAccess(user);
 
   return [
     {
-      title: "Tra cứu bảng lương",
-      description: "Trạng thái kỳ và lương theo nhân viên",
-      href: "/(tabs)/payroll-runs" as const,
-      visible: canReadPayrollRuns(user),
-    },
-    {
-      title: "Phiếu lương của tôi",
-      description: "Kỳ lương đã phát hành, thu nhập và khấu trừ",
+      title: "Bảng lương",
+      description: "Tính và hiển thị bảng lương, phiếu lương cá nhân",
       href: "/(tabs)/payslips" as const,
-      visible: canReadPayslips(user),
+      visible: canReadPayslips(user) || canReadPayrollRuns(user),
     },
     {
       title: "Văn bằng & chứng chỉ",
       description: "Hồ sơ chuyên môn, thời hạn và tài liệu",
       href: "/(tabs)/credentials" as const,
       visible: canReadCredentials(user),
+    },
+    {
+      title: "Đào tạo",
+      description: "Khóa học nội bộ, bài giảng và tiến độ học tập",
+      href: "/(tabs)/training" as const,
+      visible: training.read,
     },
     {
       title: "Hợp đồng nhân sự",
@@ -63,39 +64,9 @@ export function availableModules(user: UserProfile | null) {
       visible: hr && !!user?.companyCode && hasPermission(user, "timekeeping:manage"),
     },
     {
-      title: "Nhân sự",
-      description: "Danh sách và hồ sơ nhân viên",
-      href: "/(tabs)/employees" as const,
-      visible: hr && (hasPermission(user, "user:read") || hasPermission(user, "hr:read")),
-    },
-    {
       title: "Công việc",
       description: "Công việc, dự án và KPI tháng",
       href: "/(tabs)/work" as const,
-      visible: hr,
-    },
-    {
-      title: "Lịch nghỉ & làm bù",
-      description: "Lịch doanh nghiệp và lịch sử thay đổi",
-      href: "/(tabs)/work-calendar" as const,
-      visible: calendarAccess(user).read,
-    },
-    {
-      title: "Quản lý & phân ca",
-      description: "Danh mục ca, giờ nghỉ và phân ca nhân sự",
-      href: "/(tabs)/shifts" as const,
-      visible: hr && hasPermission(user, "timekeeping:manage"),
-    },
-    {
-      title: "Lịch & chấm công",
-      description: "Trạng thái hôm nay, lịch sử cá nhân và lịch làm việc",
-      href: "/(tabs)/attendance" as const,
-      visible: hr,
-    },
-    {
-      title: "Đơn từ & phép",
-      description: "Nộp đơn, biểu mẫu và phê duyệt",
-      href: "/(tabs)/leave" as const,
       visible: hr,
     },
     {
@@ -132,6 +103,24 @@ export function availableModules(user: UserProfile | null) {
       title: "Sơ đồ tổ chức",
       description: "Cơ cấu phân cấp phòng ban và nhân sự",
       href: "/(tabs)/org-chart" as const,
+      visible: !!user,
+    },
+    {
+      title: "Thiết bị y tế",
+      description: "Quản lý danh mục, mượn trả & bảo trì thiết bị",
+      href: "/(tabs)/equipment" as const,
+      visible: !!user,
+    },
+    {
+      title: "Bản tin & Blog nội bộ",
+      description: "Bản tin công ty, chia sẻ kiến thức & thảo luận",
+      href: "/(tabs)/blog" as const,
+      visible: !!user,
+    },
+    {
+      title: "Trò chuyện nội bộ",
+      description: "Trao đổi tin nhắn, nhóm phòng ban & chia sẻ",
+      href: "/(tabs)/chat" as const,
       visible: !!user,
     },
   ].filter((item) => item.visible);

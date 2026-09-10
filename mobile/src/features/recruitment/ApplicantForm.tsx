@@ -1,166 +1,149 @@
-import { useRef, useState } from "react";
-import { Text } from "react-native";
-import type { RecruitmentApplicant } from "../../../../src/types/recruitment";
+import { Alert, Text } from "react-native";
+import { useState } from "react";
+import type { RecruitmentApplicant, RecruitmentJob } from "../../../../src/types/recruitment";
 import { recruitment } from "../../api/services";
 import { messageOf } from "../../auth/SessionProvider";
-import { Button, Card, ErrorText, Field, Page, styles } from "../../ui";
-import { applicantDraft, applicantPayload } from "./applicantFormModel";
-import { PeoplePicker } from "./PeoplePicker";
-import { recruiterPatch } from "./peopleModel";
-import { usePublicUpload } from "./usePublicUpload";
-type Duplicate = Pick<RecruitmentApplicant, "_id" | "fullName" | "email" | "phone" | "jobId">;
+import { Button, ErrorText, Field, styles } from "../../ui";
+import { ChoiceField } from "../leave/ChoiceField";
+import { RecruitmentModal } from "./RecruitmentModal";
+import { dateInput, dateOnly, numericOrNull } from "./recruitmentModel";
+
+type Draft = {
+  jobId: string;
+  fullName: string;
+  email: string;
+  phone: string;
+  birthDate: string;
+  address: string;
+  experience: string;
+  education: string;
+  skills: string;
+  expectedSalary: string;
+  availableDate: string;
+  source: string;
+  notes: string;
+  cvUrl: string;
+};
+
+function draftOf(applicant?: RecruitmentApplicant, defaultJobId = ""): Draft {
+  return {
+    jobId: applicant?.jobId || defaultJobId || "",
+    fullName: applicant?.fullName || "",
+    email: applicant?.email || "",
+    phone: applicant?.phone || "",
+    birthDate: dateInput(applicant?.birthDate),
+    address: applicant?.address || "",
+    experience: applicant?.experience || "",
+    education: applicant?.education || "",
+    skills: applicant?.skills?.join(", ") || "",
+    expectedSalary: applicant?.expectedSalary == null ? "" : String(applicant.expectedSalary),
+    availableDate: dateInput(applicant?.availableDate),
+    source: applicant?.source || "",
+    notes: applicant?.notes || "",
+    cvUrl: applicant?.cvUrl || "",
+  };
+}
+
 export function ApplicantForm({
   applicant,
+  jobs = [],
   jobId,
   onClose,
+  onSaved,
   setLocked,
 }: {
   applicant?: RecruitmentApplicant;
-  jobId: string;
+  jobs?: RecruitmentJob[];
+  jobId?: string;
   onClose: () => void;
-  setLocked: (value: boolean) => void;
+  onSaved?: () => Promise<void> | void;
+  setLocked?: (value: boolean) => void;
 }) {
-  const [draft, setDraft] = useState(() => applicantDraft(applicant));
-  const [recruiters, setRecruiters] = useState<string[]>(applicant?.recruiterId ? [applicant.recruiterId] : []);
+  const [draft, setDraft] = useState(() => draftOf(applicant, jobId));
   const [busy, setBusy] = useState(false);
-  const [blocked, setBlocked] = useState(false);
   const [error, setError] = useState<string | null>(null);
-  const [duplicates, setDuplicates] = useState<Duplicate[] | null>(null);
-  const lock = useRef(false);
-  const publicFile = usePublicUpload();
-  const upload = async () => {
-    if (lock.current || blocked || duplicates !== null) return;
-    lock.current = true;
-    setBusy(true);
-    setLocked(true);
-    setError(null);
-    try {
-      const file = await publicFile.pick();
-      if (file) setDraft((current) => ({ ...current, cvUrl: file.url }));
-    } catch (error) {
-      setError(messageOf(error));
-    } finally {
-      lock.current = false;
-      setBusy(false);
-      setLocked(false);
-    }
-  };
+  const update = (key: keyof Draft, value: string) =>
+    setDraft((current) => ({ ...current, [key]: value }));
+
   const save = async (confirmDuplicate = false) => {
-    if (lock.current || (confirmDuplicate && duplicates === null)) return;
-    let payload: ReturnType<typeof applicantPayload>;
-    try {
-      payload = applicantPayload(draft, applicant);
-      Object.assign(payload, publicFile.uploads.patch("applicant", draft.cvUrl));
-      if (!jobId) throw new Error("Chọn tin tuyển dụng trước khi thêm ứng viên.");
-    } catch (error) {
-      setError(messageOf(error));
-      return;
-    }
-    lock.current = true;
+    if (busy) return;
     setBusy(true);
-    setLocked(true);
     setError(null);
-    publicFile.uploads.dispatched(draft.cvUrl);
     try {
-      if (applicant)
-        await recruitment.updateApplicant(applicant._id, {
-          ...payload,
-          ...recruiterPatch(applicant.recruiterId, recruiters),
-          version: applicant.version,
-        });
-      else {
-        const result = await recruitment.createApplicant({
-          ...payload,
-          ...recruiterPatch(undefined, recruiters),
-          jobId,
-          ...(confirmDuplicate ? { confirmDuplicate: true } : {}),
-        });
-        if (result?.duplicateWarning) {
-          publicFile.uploads.duplicate(draft.cvUrl);
-          setDuplicates(result.matches || []);
+      if (!draft.jobId) throw new Error("Vui lòng chọn tin tuyển dụng.");
+      if (!draft.fullName.trim()) throw new Error("Vui lòng nhập họ tên ứng viên.");
+      const payload = {
+        jobId: draft.jobId,
+        fullName: draft.fullName.trim(),
+        email: draft.email.trim(),
+        phone: draft.phone.trim(),
+        birthDate: dateOnly(draft.birthDate),
+        address: draft.address.trim(),
+        experience: draft.experience.trim(),
+        education: draft.education.trim(),
+        skills: draft.skills.split(",").map((item) => item.trim()).filter(Boolean),
+        expectedSalary: numericOrNull(draft.expectedSalary, "Lương mong muốn"),
+        availableDate: dateOnly(draft.availableDate),
+        source: draft.source.trim(),
+        notes: draft.notes.trim(),
+        cvUrl: draft.cvUrl.trim(),
+        cvPublicId: "",
+      };
+      if (applicant) {
+        await recruitment.updateApplicant(applicant._id, { ...payload, version: applicant.version });
+      } else {
+        const result = await recruitment.createApplicant({ ...payload, confirmDuplicate });
+        if (result?.duplicateWarning && !confirmDuplicate) {
+          Alert.alert(
+            "Có hồ sơ trùng",
+            "LuxCare phát hiện hồ sơ có cùng email hoặc số điện thoại. Bạn có muốn vẫn tạo hồ sơ mới không?",
+            [
+              { text: "Quay lại", style: "cancel" },
+              { text: "Vẫn tạo", onPress: () => void save(true) },
+            ],
+          );
           return;
         }
-        if (!result?._id) throw new Error("Chưa xác nhận hồ sơ đã được tạo.");
       }
-      onClose();
-    } catch (error) {
-      const status = error && typeof error === "object" && "status" in error ? Number(error.status) : 0;
-      if (!status || status >= 500 || status === 409 || /phiên bản|version/i.test(messageOf(error))) {
-        setBlocked(true);
-        setError(`${messageOf(error)} Đóng và tải lại trước khi lưu tiếp.`);
-      } else setError(messageOf(error));
+      if (onSaved) {
+        await onSaved();
+      } else {
+        onClose();
+      }
+    } catch (err) {
+      setError(messageOf(err));
     } finally {
-      lock.current = false;
       setBusy(false);
-      setLocked(false);
     }
   };
-  const fields = [
-    { key: "fullName", label: "Họ tên" },
-    { key: "email", label: "Email" },
-    { key: "phone", label: "Điện thoại" },
-    { key: "birthDate", label: "Ngày sinh (YYYY-MM-DD)" },
-    { key: "address", label: "Địa chỉ" },
-    { key: "experience", label: "Kinh nghiệm" },
-    { key: "education", label: "Học vấn" },
-    { key: "skills", label: "Kỹ năng (cách nhau bằng dấu phẩy)" },
-    { key: "expectedSalary", label: "Lương mong muốn" },
-    { key: "availableDate", label: "Ngày có thể đi làm (YYYY-MM-DD)" },
-    { key: "source", label: "Nguồn ứng viên" },
-    { key: "notes", label: "Ghi chú" },
-    { key: "cvUrl", label: "Liên kết CV công khai (HTTP/HTTPS)" },
-  ] as const;
+
+  const choices = jobs.map((job) => ({
+    value: job._id,
+    label: `${job.code} · ${job.title || "Chưa đặt tên"}${job.status !== "open" ? ` · ${job.status}` : ""}`,
+  }));
+
   return (
-    <Page title={applicant ? "Sửa hồ sơ ứng viên" : "Thêm ứng viên"}>
+    <RecruitmentModal title={applicant ? "Sửa hồ sơ ứng viên" : "Thêm ứng viên"} visible onClose={onClose}>
       <Text style={styles.muted}>
-        Tin tuyển dụng: {jobId}. Hồ sơ mới cần tin đang mở và pipeline có giai đoạn hoạt động.
+        Hồ sơ mới cần gắn với một tin tuyển dụng. CV có thể là đường dẫn HTTP/HTTPS công khai.
       </Text>
-      {fields.map(({ key, label }) => (
-        <Field
-          key={key}
-          label={label}
-          value={draft[key]}
-          editable={!busy && !blocked && duplicates === null}
-          multiline={["experience", "education", "notes"].includes(key)}
-          keyboardType={key === "email" ? "email-address" : key === "expectedSalary" ? "numeric" : "default"}
-          onChangeText={(value) => setDraft((current) => ({ ...current, [key]: value }))}
-        />
-      ))}
-      <PeoplePicker
-        title="Người phụ trách tuyển dụng"
-        selected={recruiters}
-        onChange={setRecruiters}
-        disabled={busy || blocked || duplicates !== null}
-      />
-      <Text style={styles.muted}>
-        Để trống liên kết CV để gỡ. Khi thay/gỡ liên kết, LuxCare có thể xóa tệp công khai cũ do hệ thống lưu trữ.
-      </Text>
+      <ChoiceField label="Tin tuyển dụng" value={draft.jobId} choices={choices} disabled={busy} onChange={(value) => update("jobId", value)} />
+      <Field label="Họ tên" value={draft.fullName} editable={!busy} onChangeText={(value) => update("fullName", value)} />
+      <Field label="Email" value={draft.email} keyboardType="email-address" editable={!busy} onChangeText={(value) => update("email", value)} />
+      <Field label="Điện thoại" value={draft.phone} keyboardType="phone-pad" editable={!busy} onChangeText={(value) => update("phone", value)} />
+      <Field label="Ngày sinh (YYYY-MM-DD)" value={draft.birthDate} editable={!busy} onChangeText={(value) => update("birthDate", value)} />
+      <Field label="Địa chỉ" value={draft.address} editable={!busy} onChangeText={(value) => update("address", value)} />
+      <Field label="Kinh nghiệm" value={draft.experience} multiline editable={!busy} onChangeText={(value) => update("experience", value)} />
+      <Field label="Học vấn" value={draft.education} multiline editable={!busy} onChangeText={(value) => update("education", value)} />
+      <Field label="Kỹ năng (phân cách bằng dấu phẩy)" value={draft.skills} editable={!busy} onChangeText={(value) => update("skills", value)} />
+      <Field label="Lương mong muốn" value={draft.expectedSalary} keyboardType="numeric" editable={!busy} onChangeText={(value) => update("expectedSalary", value)} />
+      <Field label="Ngày có thể nhận việc (YYYY-MM-DD)" value={draft.availableDate} editable={!busy} onChangeText={(value) => update("availableDate", value)} />
+      <Field label="Nguồn ứng viên" value={draft.source} editable={!busy} onChangeText={(value) => update("source", value)} />
+      <Field label="Ghi chú" value={draft.notes} multiline editable={!busy} onChangeText={(value) => update("notes", value)} />
+      <Field label="Liên kết CV công khai" value={draft.cvUrl} keyboardType="url" editable={!busy} onChangeText={(value) => update("cvUrl", value)} />
       <ErrorText message={error} />
-      <Text style={styles.muted}>
-        Tệp tải lên ở đây là công khai: người có liên kết có thể xem. Hỗ trợ PDF, DOC, DOCX, tối đa 10 MB.
-      </Text>
-      <Button
-        title="Chọn và tải CV công khai"
-        disabled={busy || blocked || duplicates !== null}
-        onPress={() => void upload()}
-      />
-      {duplicates !== null ? (
-        <Card>
-          <Text style={styles.heading}>Có hồ sơ trùng email hoặc điện thoại</Text>
-          <Text style={styles.muted}>Hồ sơ mới chưa được tạo. Kiểm tra danh sách trước khi quyết định tạo thêm.</Text>
-          {duplicates.map((item) => (
-            <Text key={item._id} style={styles.text}>
-              {item.fullName} · {item.email} · {item.phone}
-              {"\n"}Tin: {item.jobId}
-            </Text>
-          ))}
-          <Button title="Xác nhận vẫn tạo hồ sơ mới" disabled={busy || blocked} onPress={() => void save(true)} />
-          <Button title="Quay lại sửa thông tin" disabled={busy || blocked} onPress={() => setDuplicates(null)} />
-        </Card>
-      ) : (
-        <Button title="Lưu hồ sơ" disabled={busy || blocked} onPress={() => void save()} />
-      )}
-      <Button title="Đóng và tải lại" disabled={busy} onPress={onClose} />
-    </Page>
+      <Button title={busy ? "Đang lưu..." : "Lưu hồ sơ"} disabled={busy} onPress={() => void save()} />
+      <Button title="Hủy" disabled={busy} onPress={onClose} />
+    </RecruitmentModal>
   );
 }

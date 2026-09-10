@@ -35,6 +35,7 @@ export interface BlogPost {
   dateGroup?: string;
   title?: string;
   content: string;
+  isPinned?: boolean;
   attachments?: BlogAttachment[];
   reactions?: { emoji: string; count: number; userReacted?: boolean }[];
 }
@@ -117,6 +118,7 @@ export function createBlogService({ fetch, getAccessToken }: ServiceTransport) {
       dateGroup: formattedGroup,
       title: raw.title?.trim() || undefined,
       content: rawContent,
+      isPinned: Boolean(raw.isPinned || raw.pinned || raw.is_pinned),
       attachments: Array.isArray(rawAttachments)
         ? rawAttachments.map((att: any, idx: number) => ({
             id: String(att._id || att.id || `att-${idx}`),
@@ -180,6 +182,21 @@ export function createBlogService({ fetch, getAccessToken }: ServiceTransport) {
       } catch {
         // Handled silently
       }
+    },
+
+    createPost: async (payload: { title?: string; content: string; tags?: string[]; attachments?: any[] }): Promise<BlogPost> => {
+      const response = await request("/api/v1/blogs", "POST", payload);
+      const body = await response.json();
+      const data = body.data || body;
+      return normalizePost(data);
+    },
+
+    deletePost: async (postId: string): Promise<void> => {
+      await request(`/api/v1/blogs/${encodeURIComponent(postId)}`, "DELETE");
+    },
+
+    togglePinPost: async (postId: string): Promise<void> => {
+      await request(`/api/v1/blogs/${encodeURIComponent(postId)}/pin`, "PATCH");
     },
   };
 }

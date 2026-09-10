@@ -6,6 +6,7 @@ import type { RecruitmentPipeline } from "../../../src/types/recruitment";
 import { recruitment } from "../../src/api/services";
 import { messageOf, useSession } from "../../src/auth/SessionProvider";
 import { RecruitmentSubnav } from "../../src/features/recruitment/RecruitmentSubnav";
+import { RecruitmentGate } from "../../src/features/recruitment/RecruitmentGate";
 import { Button, Card, EmptyState, ErrorText, Loading, Page, styles } from "../../src/ui";
 import { recruitmentAccess } from "../../src/features/recruitment/access";
 import { OUTCOMES } from "../../src/features/recruitment/applicantModel";
@@ -50,11 +51,7 @@ export default function Pipeline() {
     setRevision((value) => value + 1);
   };
   if (!access.read || !scopeReady)
-    return (
-      <Page title="Quy trình tuyển dụng">
-        <Text style={styles.text}>Cần quyền đọc tuyển dụng và chi nhánh hợp lệ.</Text>
-      </Page>
-    );
+    return <RecruitmentGate title="Quy trình tuyển dụng" user={user} access={access} scopeReady={scopeReady} />;
   return (
     <>
       <Page title="Quy trình tuyển dụng">

@@ -3,10 +3,13 @@ import { Ionicons } from "@expo/vector-icons";
 import { useSession } from "../../src/auth/SessionProvider";
 import { colors } from "../../src/ui";
 import { canUseModule } from "../../src/auth/access";
+import { isBlogEditorUser } from "../../../src/utils/permissionUtils";
 
 export default function TabLayout() {
   const { user, selectedBranch } = useSession();
   if (!user) return <Redirect href="/login" />;
+
+  const isEditor = isBlogEditorUser(user);
 
   return (
     <Tabs
@@ -16,19 +19,21 @@ export default function TabLayout() {
         tabBarInactiveTintColor: "#94a3b8",
         headerTitle: "LuxCare",
         headerShown: false,
-        tabBarStyle: {
-          backgroundColor: "#ffffff",
-          borderTopColor: "#e2e8f0",
-          borderTopWidth: 1,
-          height: 60,
-          paddingBottom: 8,
-          paddingTop: 6,
-          elevation: 8,
-          shadowColor: "#000",
-          shadowOffset: { width: 0, height: -2 },
-          shadowOpacity: 0.06,
-          shadowRadius: 6,
-        },
+        tabBarStyle: isEditor
+          ? { display: "none" }
+          : {
+              backgroundColor: "#ffffff",
+              borderTopColor: "#e2e8f0",
+              borderTopWidth: 1,
+              height: 60,
+              paddingBottom: 8,
+              paddingTop: 6,
+              elevation: 8,
+              shadowColor: "#000",
+              shadowOffset: { width: 0, height: -2 },
+              shadowOpacity: 0.06,
+              shadowRadius: 6,
+            },
         tabBarLabelStyle: {
           fontSize: 11,
           fontWeight: "600",
@@ -40,6 +45,7 @@ export default function TabLayout() {
         options={{
           title: "Trang chủ",
           headerShown: false,
+          href: isEditor ? null : undefined,
           tabBarIcon: ({ color, focused }) => (
             <Ionicons name={focused ? "home" : "home-outline"} size={22} color={color} />
           ),
@@ -50,7 +56,7 @@ export default function TabLayout() {
         options={{
           title: "Công việc",
           headerShown: false,
-          href: canUseModule(user, "hr") ? undefined : null,
+          href: isEditor ? null : canUseModule(user, "hr") ? undefined : null,
           tabBarIcon: ({ color, focused }) => (
             <Ionicons name={focused ? "briefcase" : "briefcase-outline"} size={22} color={color} />
           ),
@@ -61,6 +67,7 @@ export default function TabLayout() {
         options={{
           title: "Tài nguyên",
           headerShown: false,
+          href: isEditor ? null : undefined,
           tabBarIcon: ({ color, focused }) => (
             <Ionicons name={focused ? "folder" : "folder-outline"} size={20} color={color} />
           ),
@@ -71,6 +78,7 @@ export default function TabLayout() {
         options={{
           title: "Trò chuyện",
           headerShown: false,
+          href: isEditor ? null : undefined,
           tabBarIcon: ({ color, focused }) => (
             <Ionicons name={focused ? "chatbubble-ellipses" : "chatbubble-ellipses-outline"} size={22} color={color} />
           ),
@@ -81,6 +89,7 @@ export default function TabLayout() {
         options={{
           title: "Thông báo",
           headerShown: true,
+          href: isEditor ? null : undefined,
           tabBarIcon: ({ color, focused }) => (
             <Ionicons name={focused ? "notifications" : "notifications-outline"} size={22} color={color} />
           ),
@@ -91,6 +100,7 @@ export default function TabLayout() {
         options={{
           title: "Tài khoản",
           headerShown: true,
+          href: isEditor ? null : undefined,
           tabBarIcon: ({ color, focused }) => (
             <Ionicons name={focused ? "person" : "person-outline"} size={22} color={color} />
           ),
@@ -123,7 +133,8 @@ export default function TabLayout() {
       <Tabs.Screen name="attendance-management" options={{ title: "Quản lý công", href: null }} />
       <Tabs.Screen name="kpi" options={{ title: "KPI tháng", href: null }} />
       <Tabs.Screen name="org-chart" options={{ title: "Sơ đồ tổ chức", href: null }} />
-      <Tabs.Screen name="blog" options={{ title: "Blog nội bộ & Thảo luận", href: null }} />
+      <Tabs.Screen name="blog" options={{ title: "Blog nội bộ & Thảo luận", href: isEditor ? undefined : null }} />
+      <Tabs.Screen name="training" options={{ title: "Đào tạo", href: null }} />
     </Tabs>
   );
 }

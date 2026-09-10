@@ -78,11 +78,6 @@ export function PayslipDetails({ item }: { item: Pick<Payslip, "runId" | "employ
         </Text>
       ))}
       <Text style={styles.muted}>KPI áp dụng: {detail.appliedKpiPercent}%</Text>
-      {(data.warnings || []).map((warning, index) => (
-        <Text key={index} style={styles.muted}>
-          {warning}
-        </Text>
-      ))}
       <Text style={styles.muted}>
         Các khoản chi tiết theo dữ liệu và quy tắc hiển thị của LuxCare. Một số khoản đã nằm trong tổng khấu trừ; không
         cộng lại các dòng để suy ra thực nhận.

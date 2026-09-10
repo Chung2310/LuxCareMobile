@@ -7,7 +7,6 @@ import {
   Pressable,
   FlatList,
   Modal,
-  SafeAreaView,
   StatusBar,
   Alert,
   TouchableOpacity,
@@ -18,6 +17,7 @@ import {
   Linking,
   Platform,
 } from "react-native";
+import { SafeAreaView } from "react-native-safe-area-context";
 import { Ionicons } from "@expo/vector-icons";
 import { useFocusEffect } from "expo-router";
 import * as DocumentPicker from "expo-document-picker";
@@ -28,6 +28,94 @@ import { File as FSFile, Paths } from "expo-file-system";
 import { useSession } from "../../src/auth/SessionProvider";
 import { resources } from "../../src/api/services";
 import type { ResourceItem } from "../../../src/services/resourceService";
+
+// ── Custom Alert Modal ─────────────────────────────────────────────────────────
+function CustomAlert({
+  visible,
+  type,
+  title,
+  message,
+  onClose,
+}: {
+  visible: boolean;
+  type: "success" | "error" | "info";
+  title: string;
+  message: string;
+  onClose: () => void;
+}) {
+  if (!visible) return null;
+
+  const iconMap = {
+    success: { name: "checkmark-circle", color: "#10b981" },
+    error: { name: "close-circle", color: "#ef4444" },
+    info: { name: "information-circle", color: "#3b82f6" },
+  };
+  const icon = iconMap[type];
+
+  return (
+    <Modal visible={visible} transparent animationType="fade" onRequestClose={onClose}>
+      <View style={alertStyles.overlay}>
+        <View style={alertStyles.card}>
+          <Ionicons name={icon.name as any} size={56} color={icon.color} />
+          <Text style={alertStyles.title}>{title}</Text>
+          <Text style={alertStyles.message}>{message}</Text>
+          <TouchableOpacity style={[alertStyles.btn, { backgroundColor: icon.color }]} onPress={onClose}>
+            <Text style={alertStyles.btnText}>Đóng</Text>
+          </TouchableOpacity>
+        </View>
+      </View>
+    </Modal>
+  );
+}
+
+const alertStyles = StyleSheet.create({
+  overlay: {
+    flex: 1,
+    backgroundColor: "rgba(0,0,0,0.5)",
+    alignItems: "center",
+    justifyContent: "center",
+    padding: 20,
+  },
+  card: {
+    backgroundColor: "#ffffff",
+    borderRadius: 24,
+    padding: 32,
+    alignItems: "center",
+    gap: 16,
+    width: "100%",
+    maxWidth: 400,
+    shadowColor: "#000",
+    shadowOffset: { width: 0, height: 8 },
+    shadowOpacity: 0.15,
+    shadowRadius: 16,
+    elevation: 12,
+  },
+  title: {
+    fontSize: 20,
+    fontWeight: "800",
+    color: "#0f172a",
+    fontFamily: "Inter-Bold",
+  },
+  message: {
+    fontSize: 15,
+    color: "#64748b",
+    textAlign: "center",
+    fontFamily: "Inter-Regular",
+    lineHeight: 22,
+  },
+  btn: {
+    paddingHorizontal: 32,
+    paddingVertical: 12,
+    borderRadius: 12,
+    marginTop: 8,
+  },
+  btnText: {
+    color: "#ffffff",
+    fontSize: 15,
+    fontWeight: "700",
+    fontFamily: "Inter-Bold",
+  },
+});
 
 // ── In-App Resource Media & Document Viewer Modal ──────────────────────────────
 function ResourceViewerModal({
@@ -57,6 +145,26 @@ function ResourceViewerModal({
   ));
   const isLink = !!(item && (item.type === "link"));
 
+  // ── Audio player (expo-video supports audio playback natively) ───────────
+  const audioSource = isAudio ? (fileUrl || null) : null;
+  const audioPlayer = useVideoPlayer(audioSource, (p: any) => {
+    if (audioSource) {
+      p.loop = false;
+    }
+  });
+
+  const [isPlayingAudio, setIsPlayingAudio] = useState(false);
+
+  const handlePlayPauseAudio = () => {
+    if (isPlayingAudio) {
+      audioPlayer.pause();
+      setIsPlayingAudio(false);
+    } else {
+      audioPlayer.play();
+      setIsPlayingAudio(true);
+    }
+  };
+
   // ── Video player (expo-video) ─────────────────────────────────────────────
   const videoSource = isVideo ? (fileUrl || null) : null;
   const videoPlayer = useVideoPlayer(videoSource, (p: any) => {
@@ -66,10 +174,12 @@ function ResourceViewerModal({
     }
   });
 
-  // Dừng video khi modal đóng
+  // Dừng video & audio khi modal đóng
   useEffect(() => {
     if (!visible) {
       videoPlayer.pause();
+      audioPlayer.pause();
+      setIsPlayingAudio(false);
     }
   }, [visible]);
 
@@ -179,18 +289,25 @@ function ResourceViewerModal({
                 <Text style={viewerStyles.audioSub}>{item.size || "Audio"}</Text>
               </View>
 
-              <View style={viewerStyles.docActionsRow}>
-                {fileUrl ? (
-                  <TouchableOpacity
-                    style={viewerStyles.docPrimaryBtn}
-                    onPress={() => handleOpenInBrowser(fileUrl)}
-                  >
-                    <Ionicons name="musical-note" size={18} color="#ffffff" />
-                    <Text style={viewerStyles.docPrimaryBtnText}>Phát âm thanh</Text>
+              {/* Audio player controls */}
+              {fileUrl ? (
+                <View style={viewerStyles.audioPlayerBox}>
+                  <TouchableOpacity style={viewerStyles.audioPlayBtn} onPress={handlePlayPauseAudio}>
+                    <Ionicons
+                      name={isPlayingAudio ? "pause" : "play"}
+                      size={32}
+                      color="#ffffff"
+                    />
                   </TouchableOpacity>
-                ) : null}
+                  <Text style={[viewerStyles.audioTimeText, { marginTop: 8 }]}>
+                    {isPlayingAudio ? "Đang phát âm thanh..." : "Bấm để nghe âm thanh"}
+                  </Text>
+                </View>
+              ) : null}
+
+              <View style={viewerStyles.docActionsRow}>
                 <TouchableOpacity
-                  style={[viewerStyles.docSecondaryBtn, !fileUrl && { flex: 1 }]}
+                  style={[viewerStyles.docSecondaryBtn, { flex: 1 }]}
                   onPress={handleShareFile}
                 >
                   <Ionicons name="share-outline" size={18} color="#008852" />
@@ -390,13 +507,34 @@ export default function ResourcesScreen() {
   const [shareModalVisible, setShareModalVisible] = useState(false);
   const [trashModalVisible, setTrashModalVisible] = useState(false);
 
-  // Active dialogs: "filePicker" | "folder" | "link" | "audio" | "note" | null
-  const [activeDialog, setActiveDialog] = useState<"filePicker" | "folder" | "link" | "audio" | "note" | null>(null);
+  // Active dialogs: "filePicker" | "folder" | "link" | "audio" | null
+  const [activeDialog, setActiveDialog] = useState<"filePicker" | "folder" | "link" | "audio" | null>(null);
 
   // General Form fields
   const [formName, setFormName] = useState("");
   const [formUrlOrContent, setFormUrlOrContent] = useState("");
   const [submitting, setSubmitting] = useState(false);
+
+  // Custom Alert state
+  const [alertConfig, setAlertConfig] = useState<{
+    visible: boolean;
+    type: "success" | "error" | "info";
+    title: string;
+    message: string;
+  }>({
+    visible: false,
+    type: "info",
+    title: "",
+    message: "",
+  });
+
+  const showAlert = (type: "success" | "error" | "info", title: string, message: string) => {
+    setAlertConfig({ visible: true, type, title, message });
+  };
+
+  const hideAlert = () => {
+    setAlertConfig((prev) => ({ ...prev, visible: false }));
+  };
 
   // Rich Note & Drawing State
   const [noteTitle, setNoteTitle] = useState("");
@@ -590,7 +728,7 @@ export default function ResourcesScreen() {
           };
 
           setItems((prev) => [newItem, ...prev]);
-          Alert.alert("Thành công", `Đã tải tệp "${fileName}" lên thành công.`);
+          showAlert("success", "Thành công", `Đã tải tệp "${fileName}" lên thành công.`);
         }
       } else {
         const res = await DocumentPicker.getDocumentAsync({
@@ -624,11 +762,11 @@ export default function ResourcesScreen() {
           };
 
           setItems((prev) => [newItem, ...prev]);
-          Alert.alert("Thành công", `Đã tải tệp "${fileName}" lên thành công.`);
+          showAlert("success", "Thành công", `Đã tải tệp "${fileName}" lên thành công.`);
         }
       }
     } catch (e: any) {
-      Alert.alert("Lỗi tải tệp", e.message || "Không thể chọn tệp từ thiết bị.");
+      showAlert("error", "Lỗi tải tệp", e.message || "Không thể chọn tệp từ thiết bị.");
     }
   };
 
@@ -804,7 +942,7 @@ export default function ResourcesScreen() {
     <SafeAreaView style={styles.container}>
       <StatusBar barStyle="dark-content" backgroundColor="#ffffff" />
 
-      {/* Top Search Bar */}
+      {/* Search Bar - Moved to top for better spacing */}
       <View style={styles.searchHeaderContainer}>
         <View style={styles.searchBarBox}>
           <TouchableOpacity style={styles.menuIconBtn}>
@@ -818,36 +956,34 @@ export default function ResourcesScreen() {
             value={search}
             onChangeText={setSearch}
           />
-
-          <View style={styles.avatarCircle}>
-            <Text style={styles.avatarText}>{user?.displayName?.charAt(0)?.toUpperCase() || "LX"}</Text>
-          </View>
         </View>
       </View>
 
-      {/* Folder Breadcrumbs */}
-      <View style={styles.breadcrumbBar}>
-        <ScrollView horizontal showsHorizontalScrollIndicator={false} contentContainerStyle={styles.breadcrumbContent}>
-          {folderHistory.map((folder, idx) => (
-            <React.Fragment key={folder.id || "root"}>
-              {idx > 0 && <Ionicons name="chevron-forward" size={14} color="#94a3b8" style={{ marginHorizontal: 2 }} />}
-              <TouchableOpacity
-                onPress={() => handleNavigateBackFolder(idx)}
-                style={[styles.breadcrumbChip, idx === folderHistory.length - 1 && styles.breadcrumbChipActive]}
-              >
-                <Text style={[styles.breadcrumbText, idx === folderHistory.length - 1 && styles.breadcrumbTextActive]}>
-                  {folder.name}
-                </Text>
-              </TouchableOpacity>
-            </React.Fragment>
-          ))}
-        </ScrollView>
-      </View>
+      {/* Folder Breadcrumbs - Only render if deep in folders to save space */}
+      {folderHistory.length > 1 && (
+        <View style={styles.breadcrumbBar}>
+          <ScrollView horizontal showsHorizontalScrollIndicator={false} contentContainerStyle={styles.breadcrumbContent}>
+            {folderHistory.slice(1).map((folder, idx) => (
+              <React.Fragment key={folder.id || "root"}>
+                {idx > 0 && <Ionicons name="chevron-forward" size={14} color="#94a3b8" style={{ marginHorizontal: 2 }} />}
+                <TouchableOpacity
+                  onPress={() => handleNavigateBackFolder(idx + 1)}
+                  style={[styles.breadcrumbChip, idx === folderHistory.length - 2 && styles.breadcrumbChipActive]}
+                >
+                  <Text style={[styles.breadcrumbText, idx === folderHistory.length - 2 && styles.breadcrumbTextActive]}>
+                    {folder.name}
+                  </Text>
+                </TouchableOpacity>
+              </React.Fragment>
+            ))}
+          </ScrollView>
+        </View>
+      )}
 
       {/* Section Title & View Toggle & Trash Bin Bar */}
       <View style={styles.sectionControlRow}>
-        <View>
-          <Text style={styles.sectionControlTitle}>
+        <View style={{ flex: 1, paddingRight: 8 }}>
+          <Text style={styles.sectionControlTitle} numberOfLines={1}>
             {currentFolderId ? folderHistory[folderHistory.length - 1].name : "Danh sách tài nguyên"}
           </Text>
           <Text style={styles.sectionControlSub}>
@@ -1296,6 +1432,15 @@ export default function ResourcesScreen() {
           </View>
         </View>
       </Modal>
+
+      {/* Custom Alert */}
+      <CustomAlert
+        visible={alertConfig.visible}
+        type={alertConfig.type}
+        title={alertConfig.title}
+        message={alertConfig.message}
+        onClose={hideAlert}
+      />
     </SafeAreaView>
   );
 }
@@ -1347,6 +1492,27 @@ const viewerStyles = StyleSheet.create({
   },
   audioTitle: { fontSize: 17, fontWeight: "700", color: "#0f172a", textAlign: "center", fontFamily: "Inter-Bold" },
   audioSub: { fontSize: 13, color: "#64748b", fontFamily: "Inter-Regular" },
+  
+  audioPlayerBox: { width: "100%", alignItems: "center", gap: 12, paddingVertical: 12 },
+  audioProgressBar: { width: "100%", height: 6, backgroundColor: "#e2e8f0", borderRadius: 3, overflow: "hidden" },
+  audioProgressFill: { height: "100%", backgroundColor: "#008852", borderRadius: 3 },
+  audioTimeRow: { width: "100%", flexDirection: "row", justifyContent: "space-between", paddingHorizontal: 4 },
+  audioTimeText: { fontSize: 12, color: "#64748b", fontFamily: "Inter-Medium" },
+  audioPlayBtn: {
+    width: 64,
+    height: 64,
+    borderRadius: 32,
+    backgroundColor: "#008852",
+    alignItems: "center",
+    justifyContent: "center",
+    marginTop: 8,
+    shadowColor: "#008852",
+    shadowOffset: { width: 0, height: 4 },
+    shadowOpacity: 0.3,
+    shadowRadius: 8,
+    elevation: 6,
+  },
+  
   waveBarWrap: { flexDirection: "row", alignItems: "center", gap: 4, height: 48, marginVertical: 8 },
   waveBarLine: { width: 4, borderRadius: 2 },
   trackBarWrap: { width: "100%", gap: 6 },
@@ -1443,9 +1609,9 @@ const styles = StyleSheet.create({
 
   /* Search Header */
   searchHeaderContainer: {
-    paddingHorizontal: 16,
+    paddingHorizontal: 20,
     paddingTop: 12,
-    paddingBottom: 8,
+    paddingBottom: 10,
   },
   searchBarBox: {
     flexDirection: "row",
