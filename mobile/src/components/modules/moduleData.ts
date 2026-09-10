@@ -114,16 +114,6 @@ export const LUXCARE_MODULES: ServiceModule[] = [
         status: "active",
       },
       {
-        id: "pop-projects",
-        title: "Dự án\nđang chạy",
-        icon: "folder-open",
-        color: "#7c3aed",
-        bgColor: "#f5f3ff",
-        route: "/(tabs)/projects",
-        moduleId: "popular",
-        status: "active",
-      },
-      {
         id: "pop-calendar",
         title: "Lịch nghỉ\n& Làm bù",
         icon: "calendar",
@@ -361,8 +351,8 @@ export const LUXCARE_MODULES: ServiceModule[] = [
   },
   {
     id: "work",
-    title: "Công việc & Dự án",
-    shortTitle: "Công việc & Dự án",
+    title: "Công việc",
+    shortTitle: "Công việc",
     items: [
       {
         id: "work-my",
@@ -371,16 +361,6 @@ export const LUXCARE_MODULES: ServiceModule[] = [
         color: "#2563eb",
         bgColor: "#eff6ff",
         route: "/(tabs)/work",
-        moduleId: "work",
-        status: "active",
-      },
-      {
-        id: "work-projects",
-        title: "Dự án\nđang chạy",
-        icon: "folder-open",
-        color: "#7c3aed",
-        bgColor: "#f5f3ff",
-        route: "/(tabs)/projects",
         moduleId: "work",
         status: "active",
       },
