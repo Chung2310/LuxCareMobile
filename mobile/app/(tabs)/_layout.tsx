@@ -102,6 +102,7 @@ export default function TabLayout() {
       <Tabs.Screen name="modules" options={{ title: "Chức năng", href: null }} />
       <Tabs.Screen name="customers" options={{ title: "Khách hàng", href: null }} />
       <Tabs.Screen name="inventory" options={{ title: "Vật tư & Dược phẩm", href: null }} />
+      <Tabs.Screen name="users" options={{ title: "Quản lý người dùng", href: null }} />
       <Tabs.Screen name="attendance" options={{ title: "Chấm công", href: null }} />
       <Tabs.Screen name="leave" options={{ title: "Đơn từ", href: null }} />
       <Tabs.Screen name="departments" options={{ title: "Phòng ban", href: null }} />

@@ -14,3 +14,9 @@ export * from "./inventory";
 
 // Customer Components
 export * from "./customers";
+
+// User Management Components
+export * from "./users";
+
+// Dashboard Components
+export * from "./dashboard";
