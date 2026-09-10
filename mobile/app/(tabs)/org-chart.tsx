@@ -366,24 +366,19 @@ function ProfileModal({
           </View>
 
           <View style={s.actionRow}>
-            {!!emp.phone && (
-              <Pressable
-                style={s.actionBtn}
-                onPress={() => void Linking.openURL(`tel:${emp.phone}`)}
-              >
-                <Text style={s.actionIco}>📞</Text>
-                <Text style={s.actionLbl}>Gọi điện</Text>
-              </Pressable>
-            )}
-            {!!emp.email && (
-              <Pressable
-                style={s.actionBtn}
-                onPress={() => void Linking.openURL(`mailto:${emp.email}`)}
-              >
-                <Text style={s.actionIco}>✉️</Text>
-                <Text style={s.actionLbl}>Gửi email</Text>
-              </Pressable>
-            )}
+            <Pressable
+              style={s.actionBtn}
+              onPress={() => {
+                onClose();
+                router.push({
+                  pathname: "/(tabs)/chat",
+                  params: { peerId: emp.uid, name: emp.displayName || emp.email },
+                } as any);
+              }}
+            >
+              <Text style={s.actionIco}>💬</Text>
+              <Text style={s.actionLbl}>Nhắn tin nội bộ</Text>
+            </Pressable>
           </View>
         </Pressable>
       </Pressable>
@@ -626,15 +621,18 @@ function OrgListView({
               <View style={[s.catBadge, { backgroundColor: cat.bg }]}>
                 <Text style={[s.catBadgeText, { color: cat.text }]}>{cat.badge}</Text>
               </View>
-              {!!emp.phone && (
-                <Pressable
-                  hitSlop={8}
-                  style={s.listCallBtn}
-                  onPress={() => void Linking.openURL(`tel:${emp.phone}`)}
-                >
-                  <Text style={{ fontSize: 13 }}>📞</Text>
-                </Pressable>
-              )}
+              <Pressable
+                hitSlop={8}
+                style={s.listCallBtn}
+                onPress={() => {
+                  router.push({
+                    pathname: "/(tabs)/chat",
+                    params: { peerId: emp.uid, name: emp.displayName || emp.email },
+                  } as any);
+                }}
+              >
+                <Text style={{ fontSize: 13 }}>💬</Text>
+              </Pressable>
             </View>
           </Pressable>
         );

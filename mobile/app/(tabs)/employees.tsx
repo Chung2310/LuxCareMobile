@@ -238,18 +238,6 @@ export default function Employees() {
     });
   }, [items, selectedDept, search]);
 
-  const handleCall = (phone?: string) => {
-    if (!phone) {
-      Alert.alert("Thông báo", "Nhân sự này chưa cập nhật số điện thoại.");
-      return;
-    }
-    void Linking.openURL(`tel:${phone.replace(/\s+/g, "")}`);
-  };
-
-  const handleEmail = (email?: string) => {
-    if (!email) return;
-    void Linking.openURL(`mailto:${email}`);
-  };
 
   if (!allowed) {
     return (
@@ -469,16 +457,19 @@ export default function Employees() {
 
                 {/* Right Action Shortcuts */}
                 <View style={styles.actionShortcuts}>
-                  {Boolean(item.phone) && (
-                    <TouchableOpacity
-                      style={styles.phoneActionBtn}
-                      onPress={() => handleCall(item.phone)}
-                      activeOpacity={0.7}
-                      hitSlop={{ top: 8, bottom: 8, left: 8, right: 8 }}
-                    >
-                      <Ionicons name="call" size={15} color="#059669" />
-                    </TouchableOpacity>
-                  )}
+                  <TouchableOpacity
+                    style={styles.chatActionBtn}
+                    onPress={() => {
+                      router.push({
+                        pathname: "/(tabs)/chat",
+                        params: { peerId: item.uid, name: item.displayName || item.email },
+                      } as any);
+                    }}
+                    activeOpacity={0.7}
+                    hitSlop={{ top: 8, bottom: 8, left: 8, right: 8 }}
+                  >
+                    <Ionicons name="chatbubble-ellipses" size={15} color="#0284c7" />
+                  </TouchableOpacity>
                   <View style={styles.chevronBox}>
                     <Ionicons name="chevron-forward" size={16} color="#cbd5e1" />
                   </View>
@@ -932,44 +923,20 @@ export default function Employees() {
 
                 {/* Quick Action Shortcuts in Hero */}
                 <View style={styles.heroActionRow}>
-                  {Boolean(selected?.phone) && (
-                    <TouchableOpacity
-                      style={styles.heroActionBtn}
-                      onPress={() => handleCall(selected?.phone)}
-                      activeOpacity={0.8}
-                    >
-                      <View style={[styles.heroActionIconBox, { backgroundColor: "#ecfdf5" }]}>
-                        <Ionicons name="call" size={18} color="#059669" />
-                      </View>
-                      <Text style={styles.heroActionLabel}>Gọi điện</Text>
-                    </TouchableOpacity>
-                  )}
-
-                  {Boolean(selected?.email) && (
-                    <TouchableOpacity
-                      style={styles.heroActionBtn}
-                      onPress={() => handleEmail(selected?.email)}
-                      activeOpacity={0.8}
-                    >
-                      <View style={[styles.heroActionIconBox, { backgroundColor: "#eff6ff" }]}>
-                        <Ionicons name="mail" size={18} color="#2563eb" />
-                      </View>
-                      <Text style={styles.heroActionLabel}>Email</Text>
-                    </TouchableOpacity>
-                  )}
-
                   <TouchableOpacity
-                    style={styles.heroActionBtn}
+                    style={styles.heroInternalChatBtn}
                     onPress={() => {
+                      const peer = selected;
                       setSelected(null);
-                      router.push("/(tabs)/chat" as any);
+                      router.push({
+                        pathname: "/(tabs)/chat",
+                        params: { peerId: peer?.uid, name: peer?.displayName || peer?.email },
+                      } as any);
                     }}
-                    activeOpacity={0.8}
+                    activeOpacity={0.85}
                   >
-                    <View style={[styles.heroActionIconBox, { backgroundColor: "#fdf2f8" }]}>
-                      <Ionicons name="chatbubble-ellipses" size={18} color="#ec4899" />
-                    </View>
-                    <Text style={styles.heroActionLabel}>Nhắn tin</Text>
+                    <Ionicons name="chatbubble-ellipses" size={18} color="#ffffff" />
+                    <Text style={styles.heroInternalChatLabel}>Nhắn tin nội bộ</Text>
                   </TouchableOpacity>
                 </View>
               </View>
@@ -1340,13 +1307,15 @@ const styles = StyleSheet.create({
     alignItems: "center",
     gap: 6,
   },
-  phoneActionBtn: {
+  chatActionBtn: {
     width: 32,
     height: 32,
     borderRadius: 16,
-    backgroundColor: "#ecfdf5",
+    backgroundColor: "#f0f9ff",
     alignItems: "center",
     justifyContent: "center",
+    borderWidth: 1,
+    borderColor: "#bae6fd",
   },
   chevronBox: {
     paddingLeft: 2,
@@ -1509,14 +1478,32 @@ const styles = StyleSheet.create({
     color: "#2563eb",
   },
   heroActionRow: {
-    flexDirection: "row",
-    gap: 20,
     marginTop: 14,
     paddingTop: 14,
     borderTopWidth: 1,
     borderTopColor: "#f1f5f9",
     width: "100%",
+  },
+  heroInternalChatBtn: {
+    flexDirection: "row",
+    alignItems: "center",
     justifyContent: "center",
+    backgroundColor: "#0284c7",
+    paddingVertical: 12,
+    paddingHorizontal: 20,
+    borderRadius: 12,
+    gap: 8,
+    shadowColor: "#0284c7",
+    shadowOffset: { width: 0, height: 2 },
+    shadowOpacity: 0.2,
+    shadowRadius: 4,
+    elevation: 2,
+    width: "100%",
+  },
+  heroInternalChatLabel: {
+    fontSize: 14,
+    fontWeight: "800",
+    color: "#ffffff",
   },
   heroActionBtn: {
     alignItems: "center",
