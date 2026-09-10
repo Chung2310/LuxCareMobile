@@ -24,6 +24,7 @@ import * as DocumentPicker from "expo-document-picker";
 import * as ImagePicker from "expo-image-picker";
 import * as Sharing from "expo-sharing";
 import { useVideoPlayer, VideoView } from "expo-video";
+import { Audio, type AVPlaybackStatus } from "expo-av";
 import { File as FSFile, Paths } from "expo-file-system";
 import { useSession } from "../../src/auth/SessionProvider";
 import { resources } from "../../src/api/services";
@@ -159,7 +160,7 @@ function ResourceViewerModal({
       const { sound: newSound } = await Audio.Sound.createAsync(
         { uri: fileUrl },
         { shouldPlay: false },
-        (status) => {
+        (status: AVPlaybackStatus) => {
           if (status.isLoaded) {
             setAudioStatus({
               isPlaying: status.isPlaying,
