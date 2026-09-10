@@ -1,3 +1,4 @@
+import { View, ScrollView, Pressable, Text, StyleSheet } from "react-native";
 import { Redirect, Tabs } from "expo-router";
 import { Ionicons } from "@expo/vector-icons";
 import { useSession } from "../../src/auth/SessionProvider";
@@ -8,8 +9,6 @@ import { isBlogEditorUser } from "../../../src/utils/permissionUtils";
 function ScrollableTabBar({ state, descriptors, navigation, insets, isEditor }: any) {
   if (isEditor) return null;
 
-<<<<<<< Updated upstream
-=======
   return (
     <View
       style={[
@@ -147,7 +146,6 @@ const tabBarStyles = StyleSheet.create({
   },
 });
 
->>>>>>> Stashed changes
 export default function TabLayout() {
   const { user, selectedBranch } = useSession();
   if (!user) return <Redirect href="/login" />;
