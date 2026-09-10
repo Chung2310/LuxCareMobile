@@ -483,26 +483,6 @@ export const DashboardOverviewSection: React.FC<DashboardOverviewSectionProps> =
             <Text style={styles.capsuleSub}>Đang chạy</Text>
           </View>
         </TouchableOpacity>
-
-        {/* Bản tin & Blog */}
-        <TouchableOpacity
-          style={styles.capsuleItem}
-          onPress={() => onNavigate("/(tabs)/blog", "Bản tin & Blog")}
-          activeOpacity={0.8}
-        >
-          <View style={[styles.capsuleIcon, { backgroundColor: "#fff7ed" }]}>
-            <Ionicons name="newspaper" size={15} color="#ea580c" />
-          </View>
-          <View style={styles.capsuleContent}>
-            <Text style={[styles.capsuleNum, { color: "#ea580c" }]}>
-              Bản tin
-            </Text>
-            <Text style={styles.capsuleLabel} numberOfLines={1}>
-              Blog nội bộ
-            </Text>
-            <Text style={styles.capsuleSub}>Truyền thông</Text>
-          </View>
-        </TouchableOpacity>
       </View>
     </View>
   );
@@ -850,15 +830,15 @@ const styles = StyleSheet.create({
     marginBottom: 1,
   },
   capsuleLabel: {
-    fontSize: 10,
+    fontSize: 10.5,
     fontWeight: "700",
     color: "#334155",
     textAlign: "center",
   },
   capsuleSub: {
-    fontSize: 9,
+    fontSize: 9.5,
     color: "#94a3b8",
-    marginTop: 1,
+    marginTop: 2,
     textAlign: "center",
   },
 });

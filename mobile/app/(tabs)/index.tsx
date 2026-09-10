@@ -141,12 +141,12 @@ export default function Home() {
         route: "/(tabs)/attendance",
       },
       {
-        id: "calendar-events",
-        title: "Lịch làm việc",
-        icon: "calendar",
+        id: "leave",
+        title: "Đơn từ\n& Nghỉ phép",
+        icon: "receipt",
         color: "#7c3aed", // Tím violet nổi bật
         bgColor: "#f5f3ff",
-        route: "/(tabs)/calendar-events",
+        route: "/(tabs)/leave",
         badge: actions?.pendingApprovals.length ? `${actions.pendingApprovals.length}` : undefined,
       },
       {
@@ -399,18 +399,18 @@ export default function Home() {
               <Pressable
                 style={({ pressed }) => [uiStyles.topQuickItem, pressed && { opacity: 0.8 }]}
                 onPress={() =>
-                  navigateWithLoading("/(tabs)/calendar-events", {
-                    title: "Lịch làm việc",
-                    icon: "calendar-outline",
+                  navigateWithLoading("/(tabs)/leave?create=1", {
+                    title: "Đơn từ & Nghỉ phép",
+                    icon: "document-text-outline",
                     color: "#7c3aed",
                     bgColor: "#f5f3ff",
                   })
                 }
               >
                 <View style={[uiStyles.topQuickIconBox, { borderColor: "rgba(124, 58, 237, 0.18)" }]}>
-                  <Ionicons name="calendar-outline" size={25} color="#7c3aed" />
+                  <Ionicons name="document-text-outline" size={25} color="#7c3aed" />
                 </View>
-                <Text style={uiStyles.topQuickLabel}>Lịch làm việc</Text>
+                <Text style={uiStyles.topQuickLabel}>Nộp đơn</Text>
               </Pressable>
 
               <Pressable

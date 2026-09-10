@@ -20,3 +20,7 @@ export * from "./users";
 
 // Dashboard Components
 export * from "./dashboard";
+
+// Department & Room Components
+export * from "./departments";
+
