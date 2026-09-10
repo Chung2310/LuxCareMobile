@@ -19,6 +19,7 @@ export type EmployeeProfileInput = Partial<
     | "isLeader"
     | "monthlySalary"
     | "jobDescriptionLink"
+    | "parentId"
     | "level"
     | "status"
   >

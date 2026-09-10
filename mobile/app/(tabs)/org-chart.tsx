@@ -953,6 +953,7 @@ export default function OrgChart() {
         defaultBranchId={selectedBranch?._id || user?.branchId}
         companyCode={user?.companyCode}
         companyName={user?.companyName}
+        managers={empList}
       />
     </SafeAreaView>
   );

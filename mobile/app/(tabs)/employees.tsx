@@ -1098,6 +1098,7 @@ export default function Employees() {
         defaultBranchId={selectedBranch?._id || user?.branchId}
         companyCode={user?.companyCode}
         companyName={user?.companyName}
+        managers={items}
       />
     </>
   );
