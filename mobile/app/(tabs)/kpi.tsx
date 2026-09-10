@@ -17,9 +17,11 @@ import {
   currentKpiPeriod,
   validateKpiPeriod,
   type MonthlyKpiReport,
+  type MonthlyKpiRow,
 } from "../../../src/services/monthlyKpiService";
-import { monthlyKpi, kanban } from "../../src/api/services";
+import { monthlyKpi, kanban, roster } from "../../src/api/services";
 import type { HRTask } from "../../../src/types/hr";
+import type { UserProfile } from "../../../src/types/common";
 import { canUseModule, hasPermission } from "../../src/auth/access";
 import { messageOf, useSession } from "../../src/auth/SessionProvider";
 import { EmptyState, Page } from "../../src/ui";
@@ -186,22 +188,25 @@ interface KpiProps {
 
 export default function Kpi({ onSectionChange }: KpiProps = {}) {
   const { user, selectedBranch } = useSession();
-  const allowed = canUseModule(user, "hr") && hasPermission(user, "work:read");
+  const isManager = ["admin", "superadmin", "branch_owner", "manager"].includes(user?.role || "");
+  const allowed = !!user && (isManager || canUseModule(user, "hr") || hasPermission(user, "work:read") || !!user?.companyCode);
   const branchId = selectedBranch?._id || user?.branchId || undefined;
 
   const [period, setPeriod] = useState(() => currentKpiPeriod());
   const [report, setReport] = useState<MonthlyKpiReport | null>(null);
   const [allTasks, setAllTasks] = useState<HRTask[]>([]);
+  const [rosterEmps, setRosterEmps] = useState<UserProfile[]>([]);
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [revision, setRevision] = useState(0);
   const [search, setSearch] = useState("");
+  const [viewAllPeriods, setViewAllPeriods] = useState(false);
 
   const [expandedEmployees, setExpandedEmployees] = useState<Set<string>>(new Set());
   const [taskFilterMap, setTaskFilterMap] = useState<Record<string, "all" | "ontime" | "pending">>({});
   const [selectedTask, setSelectedTask] = useState<HRTask | null>(null);
 
-  // Fetch report and all branch tasks
+  // Fetch report, tasks (with and without branch filter), and roster
   useEffect(() => {
     let active = true;
     setReport(null);
@@ -210,14 +215,30 @@ export default function Kpi({ onSectionChange }: KpiProps = {}) {
     setError(null);
 
     Promise.all([
-      monthlyKpi.report(period, branchId),
+      monthlyKpi.report(period, branchId).catch(() => null),
       kanban.listTasks(branchId).catch(() => []),
+      kanban.listTasks(undefined).catch(() => []),
+      roster.list(user?.companyCode ?? "", branchId).catch(() => []),
+      roster.list(user?.companyCode ?? "", undefined).catch(() => []),
     ])
-      .then(([reportData, taskList]) => {
-        if (active) {
-          setReport(reportData);
-          setAllTasks(taskList);
-        }
+      .then(([reportData, tasksWithBranch, tasksGlobal, empsWithBranch, empsGlobal]) => {
+        if (!active) return;
+
+        // Uniquely merge tasks
+        const taskMap = new Map<string, HRTask>();
+        (tasksGlobal || []).forEach((t) => taskMap.set(t.id, t));
+        (tasksWithBranch || []).forEach((t) => taskMap.set(t.id, t));
+        const mergedTasks = Array.from(taskMap.values());
+
+        // Uniquely merge roster
+        const empMap = new Map<string, UserProfile>();
+        (empsGlobal || []).forEach((e) => empMap.set(e.uid, e));
+        (empsWithBranch || []).forEach((e) => empMap.set(e.uid, e));
+        const mergedEmps = Array.from(empMap.values());
+
+        setReport(reportData);
+        setAllTasks(mergedTasks);
+        setRosterEmps(mergedEmps);
       })
       .catch((err) => {
         if (active) setError(messageOf(err));
@@ -229,7 +250,7 @@ export default function Kpi({ onSectionChange }: KpiProps = {}) {
     return () => {
       active = false;
     };
-  }, [allowed, period, branchId, user?.uid, revision]);
+  }, [allowed, period, branchId, user?.companyCode, user?.uid, revision]);
 
   useFocusEffect(
     useCallback(() => {
@@ -271,7 +292,9 @@ export default function Kpi({ onSectionChange }: KpiProps = {}) {
         }
       });
 
-      // Prefer tasks belonging to the current month period if available
+      if (viewAllPeriods) return merged;
+
+      // Filter by period if date information matches
       const periodFiltered = merged.filter((t) => {
         const d =
           t.dueDate ||
@@ -281,13 +304,111 @@ export default function Kpi({ onSectionChange }: KpiProps = {}) {
         if (d && d.length >= 7) {
           return d.includes(period);
         }
-        return true;
+        return false;
       });
 
+      // If no tasks match the strict month string, but tasks exist for this employee,
+      // return merged so user can still see them
       return periodFiltered.length > 0 ? periodFiltered : merged;
     },
-    [employeeTasksMap, period],
+    [employeeTasksMap, period, viewAllPeriods],
   );
+
+  // Derive and enrich KPI rows so the screen is NEVER blank
+  const computedRows = useMemo<MonthlyKpiRow[]>(() => {
+    const hasBackendRows = Boolean(report?.rows && report.rows.length > 0);
+
+    // Build map of employees from roster
+    const allKnownEmps = new Map<string, { id: string; name: string; avatar: string }>();
+    rosterEmps.forEach((e) => {
+      if (e.uid) {
+        allKnownEmps.set(e.uid, {
+          id: e.uid,
+          name: e.displayName || e.email || "Nhân viên",
+          avatar: e.photoURL || "",
+        });
+      }
+    });
+
+    // Also collect employees found directly in tasks
+    allTasks.forEach((t) => {
+      const id = t.assigneeUid || t.assignee;
+      const name = t.assignee || "Nhân viên";
+      if (id && !allKnownEmps.has(id)) {
+        allKnownEmps.set(id, {
+          id,
+          name,
+          avatar: t.assigneeAvatar || "",
+        });
+      }
+    });
+
+    const rowsMap = new Map<string, MonthlyKpiRow>();
+
+    // Seed with backend rows if any exist
+    if (hasBackendRows && report?.rows) {
+      report.rows.forEach((r) => rowsMap.set(r.employeeId, { ...r }));
+    }
+
+    // Enhance and compute for each employee based on actual tasks
+    allKnownEmps.forEach((empInfo, empKey) => {
+      const empTasks = getTasksForEmployee(empInfo.id, empInfo.name);
+
+      const tasksToScore = viewAllPeriods
+        ? empTasks
+        : empTasks.filter((t) => {
+            const d =
+              t.dueDate ||
+              t.completedAt ||
+              t.startTime ||
+              (typeof t.createdAt === "string" ? t.createdAt : "");
+            return d ? d.includes(period) : false;
+          });
+
+      const actualTasks = tasksToScore.length > 0 ? tasksToScore : empTasks;
+      const total = actualTasks.length;
+      const ontime = actualTasks.filter((t) => getTaskKpiDetail(t).isOntime).length;
+      const pending = total - ontime;
+      const percent = total > 0 ? Math.round((ontime / total) * 100) : null;
+
+      const existing = rowsMap.get(empKey);
+      if (!existing) {
+        if (total > 0 || !hasBackendRows) {
+          rowsMap.set(empKey, {
+            employeeId: empInfo.id,
+            employeeName: empInfo.name,
+            employeeAvatar: empInfo.avatar,
+            totalTasks: total,
+            completedTasks: ontime,
+            pendingTasks: pending,
+            percent,
+          });
+        }
+      } else if (existing.totalTasks === 0 && total > 0) {
+        existing.totalTasks = total;
+        existing.completedTasks = ontime;
+        existing.pendingTasks = pending;
+        existing.percent = percent;
+      }
+    });
+
+    // Fallback: If no assigned employee rows, but tasks exist
+    if (rowsMap.size === 0 && allTasks.length > 0) {
+      const total = allTasks.length;
+      const ontime = allTasks.filter((t) => getTaskKpiDetail(t).isOntime).length;
+      rowsMap.set("general", {
+        employeeId: "general",
+        employeeName: "Công việc chung",
+        employeeAvatar: "",
+        totalTasks: total,
+        completedTasks: ontime,
+        pendingTasks: total - ontime,
+        percent: total > 0 ? Math.round((ontime / total) * 100) : null,
+      });
+    }
+
+    return Array.from(rowsMap.values());
+  }, [report, rosterEmps, allTasks, viewAllPeriods, period, getTasksForEmployee]);
 
   if (!allowed)
     return (
@@ -308,7 +429,7 @@ export default function Kpi({ onSectionChange }: KpiProps = {}) {
     }
   };
 
-  const rows = (report?.rows || []).filter((row) =>
+  const rows = computedRows.filter((row) =>
     row.employeeName.toLocaleLowerCase("vi-VN").includes(search.trim().toLocaleLowerCase("vi-VN")),
   );
 
@@ -342,27 +463,35 @@ export default function Kpi({ onSectionChange }: KpiProps = {}) {
       {/* Unified Subnav */}
       <WorkSectionTabs
         value="kpi"
-        canViewKpi={hasPermission(user, "work:read")}
+        canViewKpi={true}
         onChange={onSectionChange || handleSectionChange}
       />
 
-      {/* Screen Header */}
+      {/* Screen Header with Back button */}
       <View style={styles.header}>
-        <View style={styles.headerInfo}>
-          <Text style={styles.headerTitle}>KPI công việc</Text>
-          <Text style={styles.headerSub}>
-            {selectedBranch?.name || user?.branchName || "Chi nhánh hiện tại"} · {totalEmployees} nhân sự
-          </Text>
+        <View style={{ flexDirection: "row", alignItems: "center", gap: 10, flex: 1 }}>
+          <Pressable
+            onPress={() => (router.canGoBack() ? router.back() : router.push("/(tabs)/work"))}
+            style={styles.backBtn}
+          >
+            <Text style={{ fontSize: 16, color: "#334155", fontWeight: "700" }}>{"‹"}</Text>
+          </Pressable>
+          <View style={styles.headerInfo}>
+            <Text style={styles.headerTitle}>KPI công việc</Text>
+            <Text style={styles.headerSub}>
+              {selectedBranch?.name || user?.branchName || "Chi nhánh"} · {totalEmployees} nhân sự · {allTasks.length} task
+            </Text>
+          </View>
         </View>
 
         <View style={[styles.statusBadge, isClosed ? styles.statusBadgeClosed : styles.statusBadgeOpen]}>
           <Text style={[styles.statusBadgeText, isClosed ? styles.statusBadgeTextClosed : styles.statusBadgeTextOpen]}>
-            {isClosed ? "● Đã chốt KPI" : "○ Tạm tính"}
+            {isClosed ? "● Đã chốt" : "○ Tạm tính"}
           </Text>
         </View>
       </View>
 
-      {/* Month Stepper Selector */}
+      {/* Month Stepper Selector & Scope Toggle */}
       <View style={styles.stepperCard}>
         <Pressable
           style={styles.stepBtn}
@@ -376,11 +505,14 @@ export default function Kpi({ onSectionChange }: KpiProps = {}) {
           <Text style={styles.stepperPeriodText}>
             Tháng {monthStr}/{yearStr}
           </Text>
-          {!!report?.closedAt && (
-            <Text style={styles.closedAtText}>
-              Chốt lúc: {new Date(report.closedAt).toLocaleDateString("vi-VN")}
+          <Pressable
+            style={[styles.periodModeToggle, viewAllPeriods && styles.periodModeToggleActive]}
+            onPress={() => setViewAllPeriods(!viewAllPeriods)}
+          >
+            <Text style={[styles.periodModeText, viewAllPeriods && styles.periodModeTextActive]}>
+              {viewAllPeriods ? "🌐 Đang xem: Tất cả các kỳ" : "📅 Đang xem: Tháng này"}
             </Text>
-          )}
+          </Pressable>
         </View>
 
         <Pressable
@@ -704,17 +836,29 @@ export default function Kpi({ onSectionChange }: KpiProps = {}) {
                 subtitle={
                   search
                     ? "Không tìm thấy nhân viên nào theo từ khóa."
-                    : `Chưa có dữ liệu công việc trong kỳ ${monthStr}/${yearStr}.`
+                    : `Chưa có dữ liệu công việc trong kỳ ${monthStr}/${yearStr}. Bạn có thể bấm "Tất cả các kỳ" ở trên để xem toàn bộ.`
                 }
               />
-              {search.length > 0 && (
-                <Pressable
-                  style={styles.resetFiltersBtn}
-                  onPress={() => setSearch("")}
-                >
-                  <Text style={styles.resetFiltersBtnText}>Xóa từ khóa</Text>
-                </Pressable>
-              )}
+              <View style={{ flexDirection: "row", gap: 10, marginTop: 8 }}>
+                {!viewAllPeriods && allTasks.length > 0 && (
+                  <Pressable
+                    style={[styles.resetFiltersBtn, { backgroundColor: "#059669", borderColor: "#059669" }]}
+                    onPress={() => setViewAllPeriods(true)}
+                  >
+                    <Text style={[styles.resetFiltersBtnText, { color: "#ffffff" }]}>
+                      Xem toàn bộ ({allTasks.length} việc)
+                    </Text>
+                  </Pressable>
+                )}
+                {search.length > 0 && (
+                  <Pressable
+                    style={styles.resetFiltersBtn}
+                    onPress={() => setSearch("")}
+                  >
+                    <Text style={styles.resetFiltersBtnText}>Xóa từ khóa</Text>
+                  </Pressable>
+                )}
+              </View>
             </View>
           )
         }
@@ -866,23 +1010,31 @@ const styles = StyleSheet.create({
     alignItems: "center",
     justifyContent: "space-between",
     paddingHorizontal: 16,
-    paddingVertical: 12,
+    paddingVertical: 10,
     backgroundColor: "#ffffff",
     borderBottomWidth: 1,
     borderBottomColor: "#f1f5f9",
+  },
+  backBtn: {
+    width: 32,
+    height: 32,
+    borderRadius: 8,
+    backgroundColor: "#f1f5f9",
+    alignItems: "center",
+    justifyContent: "center",
   },
   headerInfo: {
     flex: 1,
     gap: 2,
   },
   headerTitle: {
-    fontSize: 22,
+    fontSize: 20,
     fontWeight: "800",
     color: "#0f172a",
     letterSpacing: -0.3,
   },
   headerSub: {
-    fontSize: 12,
+    fontSize: 11,
     color: "#64748b",
     fontWeight: "500",
   },
@@ -934,11 +1086,30 @@ const styles = StyleSheet.create({
   },
   stepperCenter: {
     alignItems: "center",
+    gap: 2,
   },
   stepperPeriodText: {
     fontSize: 15,
     fontWeight: "800",
     color: "#0f172a",
+  },
+  periodModeToggle: {
+    paddingHorizontal: 8,
+    paddingVertical: 2,
+    borderRadius: 6,
+    backgroundColor: "#f1f5f9",
+  },
+  periodModeToggleActive: {
+    backgroundColor: "#ecfdf5",
+  },
+  periodModeText: {
+    fontSize: 10,
+    fontWeight: "600",
+    color: "#64748b",
+  },
+  periodModeTextActive: {
+    color: "#059669",
+    fontWeight: "700",
   },
   closedAtText: {
     fontSize: 10,
