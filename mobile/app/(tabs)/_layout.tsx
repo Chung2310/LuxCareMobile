@@ -1,4 +1,5 @@
-import { Platform } from "react-native";
+import React, { useEffect, useRef } from "react";
+import { Animated, Platform, Pressable, StyleSheet, View } from "react-native";
 import { Redirect, Tabs } from "expo-router";
 import { useSafeAreaInsets } from "react-native-safe-area-context";
 import { Ionicons } from "@expo/vector-icons";
@@ -7,6 +8,156 @@ import { colors } from "../../src/ui";
 import { canUseModule } from "../../src/auth/access";
 import { isBlogEditorUser } from "../../../src/utils/permissionUtils";
 
+interface MomoTabIconProps {
+  name: keyof typeof Ionicons.glyphMap;
+  outlineName: keyof typeof Ionicons.glyphMap;
+  focused: boolean;
+}
+
+function MomoTabIcon({ name, outlineName, focused }: MomoTabIconProps) {
+  const scale = useRef(new Animated.Value(1)).current;
+  const translateY = useRef(new Animated.Value(0)).current;
+  const dotScale = useRef(new Animated.Value(focused ? 1 : 0)).current;
+
+  useEffect(() => {
+    if (focused) {
+      // Hiệu ứng nhảy nảy MoMo (Jump up & Spring elastic bounce)
+      scale.setValue(0.85);
+      translateY.setValue(0);
+      dotScale.setValue(0);
+
+      Animated.parallel([
+        Animated.sequence([
+          Animated.timing(translateY, {
+            toValue: -5,
+            duration: 130,
+            useNativeDriver: true,
+          }),
+          Animated.spring(translateY, {
+            toValue: 0,
+            friction: 3.5,
+            tension: 160,
+            useNativeDriver: true,
+          }),
+        ]),
+        Animated.sequence([
+          Animated.timing(scale, {
+            toValue: 1.22,
+            duration: 130,
+            useNativeDriver: true,
+          }),
+          Animated.spring(scale, {
+            toValue: 1,
+            friction: 3.5,
+            tension: 160,
+            useNativeDriver: true,
+          }),
+        ]),
+        Animated.spring(dotScale, {
+          toValue: 1,
+          friction: 4,
+          tension: 140,
+          useNativeDriver: true,
+        }),
+      ]).start();
+    } else {
+      Animated.parallel([
+        Animated.timing(scale, {
+          toValue: 1,
+          duration: 100,
+          useNativeDriver: true,
+        }),
+        Animated.timing(translateY, {
+          toValue: 0,
+          duration: 100,
+          useNativeDriver: true,
+        }),
+        Animated.timing(dotScale, {
+          toValue: 0,
+          duration: 100,
+          useNativeDriver: true,
+        }),
+      ]).start();
+    }
+  }, [focused]);
+
+  return (
+    <View style={momoStyles.iconWrapper}>
+      {/* Biểu tượng nảy đàn hồi (không khung bo) */}
+      <Animated.View
+        style={{
+          transform: [{ scale }, { translateY }],
+        }}
+      >
+        <Ionicons
+          name={focused ? name : outlineName}
+          size={23}
+          color={focused ? "#059669" : "#94a3b8"}
+        />
+      </Animated.View>
+
+      {/* Chấm chỉ báo nhỏ tinh tế bên dưới */}
+      <Animated.View
+        style={[
+          momoStyles.accentDot,
+          {
+            transform: [{ scale: dotScale }],
+            opacity: dotScale,
+          },
+        ]}
+      />
+    </View>
+  );
+}
+
+function MomoTabButton(props: any) {
+  const pressScale = useRef(new Animated.Value(1)).current;
+
+  const handlePressIn = () => {
+    Animated.spring(pressScale, {
+      toValue: 0.9,
+      speed: 50,
+      bounciness: 0,
+      useNativeDriver: true,
+    }).start();
+  };
+
+  const handlePressOut = () => {
+    Animated.spring(pressScale, {
+      toValue: 1,
+      friction: 3.5,
+      tension: 140,
+      useNativeDriver: true,
+    }).start();
+  };
+
+  return (
+    <Pressable
+      {...props}
+      onPressIn={(e) => {
+        handlePressIn();
+        props.onPressIn?.(e);
+      }}
+      onPressOut={(e) => {
+        handlePressOut();
+        props.onPressOut?.(e);
+      }}
+      style={[props.style, { flex: 1 }]}
+    >
+      <Animated.View
+        style={{
+          flex: 1,
+          alignItems: "center",
+          justifyContent: "center",
+          transform: [{ scale: pressScale }],
+        }}
+      >
+        {props.children}
+      </Animated.View>
+    </Pressable>
+  );
+}
+
 export default function TabLayout() {
   const { user, selectedBranch } = useSession();
   const insets = useSafeAreaInsets();
@@ -14,7 +165,7 @@ export default function TabLayout() {
 
   const isEditor = isBlogEditorUser(user);
   const bottomPadding = insets.bottom > 0 ? insets.bottom : (Platform.OS === "android" ? 12 : 10);
-  const tabHeight = 54 + bottomPadding;
+  const tabHeight = 56 + bottomPadding;
 
   return (
     <Tabs
@@ -24,24 +175,32 @@ export default function TabLayout() {
         tabBarInactiveTintColor: "#94a3b8",
         headerTitle: "LuxCare",
         headerShown: false,
+        tabBarButton: (props) => <MomoTabButton {...props} />,
         tabBarStyle: isEditor
           ? { display: "none" }
           : {
               backgroundColor: "#ffffff",
-              borderTopColor: "#e2e8f0",
+              borderTopColor: "rgba(226, 232, 240, 0.8)",
               borderTopWidth: 1,
+              borderTopLeftRadius: 22,
+              borderTopRightRadius: 22,
               height: tabHeight,
               paddingBottom: bottomPadding,
               paddingTop: 6,
-              elevation: 8,
-              shadowColor: "#000",
-              shadowOffset: { width: 0, height: -2 },
-              shadowOpacity: 0.06,
-              shadowRadius: 6,
+              elevation: 12,
+              shadowColor: "#0f172a",
+              shadowOffset: { width: 0, height: -4 },
+              shadowOpacity: 0.07,
+              shadowRadius: 12,
             },
         tabBarLabelStyle: {
-          fontSize: 11,
-          fontWeight: "600",
+          fontSize: 10.5,
+          fontWeight: "700",
+          letterSpacing: -0.15,
+          marginTop: 1,
+        },
+        tabBarItemStyle: {
+          paddingVertical: 2,
         },
       }}
     >
@@ -51,8 +210,8 @@ export default function TabLayout() {
           title: "Trang chủ",
           headerShown: false,
           href: isEditor ? null : undefined,
-          tabBarIcon: ({ color, focused }) => (
-            <Ionicons name={focused ? "home" : "home-outline"} size={22} color={color} />
+          tabBarIcon: ({ focused }) => (
+            <MomoTabIcon name="home" outlineName="home-outline" focused={focused} />
           ),
         }}
       />
@@ -62,8 +221,8 @@ export default function TabLayout() {
           title: "Công việc",
           headerShown: false,
           href: isEditor ? null : canUseModule(user, "hr") ? undefined : null,
-          tabBarIcon: ({ color, focused }) => (
-            <Ionicons name={focused ? "briefcase" : "briefcase-outline"} size={22} color={color} />
+          tabBarIcon: ({ focused }) => (
+            <MomoTabIcon name="briefcase" outlineName="briefcase-outline" focused={focused} />
           ),
         }}
       />
@@ -73,8 +232,8 @@ export default function TabLayout() {
           title: "Trò chuyện",
           headerShown: false,
           href: isEditor ? null : undefined,
-          tabBarIcon: ({ color, focused }) => (
-            <Ionicons name={focused ? "chatbubble-ellipses" : "chatbubble-ellipses-outline"} size={22} color={color} />
+          tabBarIcon: ({ focused }) => (
+            <MomoTabIcon name="chatbubble-ellipses" outlineName="chatbubble-ellipses-outline" focused={focused} />
           ),
         }}
       />
@@ -84,8 +243,8 @@ export default function TabLayout() {
           title: "Thông báo",
           headerShown: true,
           href: isEditor ? null : undefined,
-          tabBarIcon: ({ color, focused }) => (
-            <Ionicons name={focused ? "notifications" : "notifications-outline"} size={22} color={color} />
+          tabBarIcon: ({ focused }) => (
+            <MomoTabIcon name="notifications" outlineName="notifications-outline" focused={focused} />
           ),
         }}
       />
@@ -95,8 +254,8 @@ export default function TabLayout() {
           title: "Tài khoản",
           headerShown: true,
           href: isEditor ? null : undefined,
-          tabBarIcon: ({ color, focused }) => (
-            <Ionicons name={focused ? "person" : "person-outline"} size={22} color={color} />
+          tabBarIcon: ({ focused }) => (
+            <MomoTabIcon name="person" outlineName="person-outline" focused={focused} />
           ),
         }}
       />
@@ -133,3 +292,21 @@ export default function TabLayout() {
     </Tabs>
   );
 }
+
+const momoStyles = StyleSheet.create({
+  iconWrapper: {
+    width: 42,
+    height: 30,
+    alignItems: "center",
+    justifyContent: "center",
+  },
+  accentDot: {
+    position: "absolute",
+    bottom: -3,
+    width: 4,
+    height: 4,
+    borderRadius: 2,
+    backgroundColor: "#059669",
+  },
+});
+
