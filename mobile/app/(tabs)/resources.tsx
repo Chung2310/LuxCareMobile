@@ -24,7 +24,6 @@ import * as DocumentPicker from "expo-document-picker";
 import * as ImagePicker from "expo-image-picker";
 import * as Sharing from "expo-sharing";
 import { useVideoPlayer, VideoView } from "expo-video";
-import { Audio, type AVPlaybackStatus } from "expo-av";
 import { File as FSFile, Paths } from "expo-file-system";
 import { useSession } from "../../src/auth/SessionProvider";
 import { resources } from "../../src/api/services";
@@ -146,53 +145,23 @@ function ResourceViewerModal({
   ));
   const isLink = !!(item && (item.type === "link"));
 
-  // ── Audio player (expo-av) ────────────────────────────────────────────────
-  const [sound, setSound] = useState<Audio.Sound | null>(null);
-  const [audioStatus, setAudioStatus] = useState<{ isPlaying: boolean; position: number; duration: number }>({
-    isPlaying: false,
-    position: 0,
-    duration: 0,
+  // ── Audio player (expo-video supports audio playback natively) ───────────
+  const audioSource = isAudio ? (fileUrl || null) : null;
+  const audioPlayer = useVideoPlayer(audioSource, (p: any) => {
+    if (audioSource) {
+      p.loop = false;
+    }
   });
 
-  const loadAudio = useCallback(async () => {
-    if (!isAudio || !fileUrl) return;
-    try {
-      const { sound: newSound } = await Audio.Sound.createAsync(
-        { uri: fileUrl },
-        { shouldPlay: false },
-        (status: AVPlaybackStatus) => {
-          if (status.isLoaded) {
-            setAudioStatus({
-              isPlaying: status.isPlaying,
-              position: status.positionMillis,
-              duration: status.durationMillis || 0,
-            });
-          }
-        }
-      );
-      setSound(newSound);
-    } catch (e) {
-      console.error("Failed to load audio:", e);
-    }
-  }, [isAudio, fileUrl]);
+  const [isPlayingAudio, setIsPlayingAudio] = useState(false);
 
-  useEffect(() => {
-    if (visible && isAudio) {
-      void loadAudio();
-    }
-    return () => {
-      if (sound) {
-        void sound.unloadAsync();
-      }
-    };
-  }, [visible, isAudio, loadAudio]);
-
-  const handlePlayPauseAudio = async () => {
-    if (!sound) return;
-    if (audioStatus.isPlaying) {
-      await sound.pauseAsync();
+  const handlePlayPauseAudio = () => {
+    if (isPlayingAudio) {
+      audioPlayer.pause();
+      setIsPlayingAudio(false);
     } else {
-      await sound.playAsync();
+      audioPlayer.play();
+      setIsPlayingAudio(true);
     }
   };
 
@@ -205,10 +174,12 @@ function ResourceViewerModal({
     }
   });
 
-  // Dừng video khi modal đóng
+  // Dừng video & audio khi modal đóng
   useEffect(() => {
     if (!visible) {
       videoPlayer.pause();
+      audioPlayer.pause();
+      setIsPlayingAudio(false);
     }
   }, [visible]);
 
@@ -319,26 +290,18 @@ function ResourceViewerModal({
               </View>
 
               {/* Audio player controls */}
-              {fileUrl && sound ? (
+              {fileUrl ? (
                 <View style={viewerStyles.audioPlayerBox}>
-                  <View style={viewerStyles.audioProgressBar}>
-                    <View style={[viewerStyles.audioProgressFill, { width: `${(audioStatus.position / audioStatus.duration) * 100}%` }]} />
-                  </View>
-                  <View style={viewerStyles.audioTimeRow}>
-                    <Text style={viewerStyles.audioTimeText}>
-                      {Math.floor(audioStatus.position / 1000)}s
-                    </Text>
-                    <Text style={viewerStyles.audioTimeText}>
-                      {Math.floor(audioStatus.duration / 1000)}s
-                    </Text>
-                  </View>
                   <TouchableOpacity style={viewerStyles.audioPlayBtn} onPress={handlePlayPauseAudio}>
                     <Ionicons
-                      name={audioStatus.isPlaying ? "pause" : "play"}
+                      name={isPlayingAudio ? "pause" : "play"}
                       size={32}
                       color="#ffffff"
                     />
                   </TouchableOpacity>
+                  <Text style={[viewerStyles.audioTimeText, { marginTop: 8 }]}>
+                    {isPlayingAudio ? "Đang phát âm thanh..." : "Bấm để nghe âm thanh"}
+                  </Text>
                 </View>
               ) : null}
 
