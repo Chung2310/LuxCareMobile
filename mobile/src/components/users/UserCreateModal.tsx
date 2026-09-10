@@ -34,7 +34,6 @@ const ROLES_LIST: Array<{ id: UserRole; label: string; desc: string }> = [
   { id: "user", label: "Nhân viên", desc: "Nhân viên tác nghiệp chuyên môn / điều dưỡng / CSKH" },
   { id: "manager", label: "Quản lý", desc: "Trưởng khoa / Trưởng bộ phận phụ trách công việc" },
   { id: "branch_owner", label: "Chủ chi nhánh", desc: "Giám đốc / Phụ trách toàn diện cơ sở chi nhánh" },
-  { id: "admin", label: "Quản trị viên", desc: "Toàn quyền quản trị nhân sự và cấu hình hệ thống" },
 ];
 
 export const UserCreateModal: React.FC<UserCreateModalProps> = ({
@@ -113,6 +112,11 @@ export const UserCreateModal: React.FC<UserCreateModalProps> = ({
         Alert.alert("Số điện thoại không hợp lệ", "Số điện thoại không đúng định dạng (Ví dụ: 0912345678).");
         return;
       }
+    }
+
+    if (role === "admin" || (role as string) === "superadmin") {
+      Alert.alert("Không được phép", "Không được phép tạo nhân sự mới với vai trò Quản trị viên (Admin).");
+      return;
     }
 
     setLoading(true);

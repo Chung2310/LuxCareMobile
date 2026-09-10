@@ -76,6 +76,9 @@ export const userManagementApi = {
 
   // 2. Tạo mới tài khoản thành viên
   async createUser(input: CreateUserInput): Promise<{ success: boolean; uid?: string; message?: string }> {
+    if (input.role === "admin" || (input.role as string) === "superadmin") {
+      throw new Error("Không được phép tạo tài khoản mới với vai trò Quản trị viên (Admin).");
+    }
     const res = await api.transport.fetch("/api/v1/auth/register-user", {
       method: "POST",
       headers: { "Content-Type": "application/json" },
