@@ -23,11 +23,10 @@ import type {
 import type { DashboardSummaryParams } from "../../../src/services/dashboardService";
 import { dashboard } from "../../src/api/services";
 import { messageOf, useSession } from "../../src/auth/SessionProvider";
-import { colors } from "../../src/ui";
 import { canUseModule } from "../../src/auth/access";
 import { useAppLoading } from "../../src/context/LoadingContext";
 import { DashboardOverviewSection } from "../../src/components/dashboard";
-import { getAllServicesFlat, LUXCARE_MODULES } from "../../src/components";
+import { getAllServicesFlat, isServiceAccessible, LUXCARE_MODULES } from "../../src/components";
 import { isBlogEditorUser } from "../../../src/utils/permissionUtils";
 
 const { width: SCREEN_WIDTH } = Dimensions.get("window");
@@ -197,16 +196,16 @@ export default function Home() {
         bgColor: "#eef2ff",
         route: "/(tabs)/modules",
       },
-    ],
-    [actions],
+    ].filter((item) => item.id === "modules" || isServiceAccessible(item as any, user)) as LuxCareFeature[],
+    [actions, user],
   );
 
-  // Danh sách toàn bộ các tính năng để tìm kiếm toàn diện
-  const allServicesFlat = useMemo(() => getAllServicesFlat(LUXCARE_MODULES), []);
+  // Danh sách toàn bộ các tính năng để tìm kiếm toàn diện (đã lọc quyền)
+  const allServicesFlat = useMemo(() => getAllServicesFlat(LUXCARE_MODULES, user), [user]);
 
   const isSearching = searchQuery.trim().length > 0;
 
-  // Lọc theo tìm kiếm: Nếu không tìm kiếm -> hiển thị 8 dịch vụ chính; Nếu đang tìm kiếm -> quét toàn bộ chức năng
+  // Lọc theo tìm kiếm: Nếu không tìm kiếm -> hiển thị các dịch vụ chính được phép; Nếu đang tìm kiếm -> quét toàn bộ chức năng được phép
   const visibleServices = useMemo(() => {
     if (!isSearching) return luxcareServices;
     const q = searchQuery.toLowerCase().trim();
@@ -218,39 +217,43 @@ export default function Home() {
     );
   }, [allServicesFlat, isSearching, luxcareServices, searchQuery]);
 
-  // 4 Icon LuxCare Đề Xuất
-  const luxcareRecommendations = [
-    {
-      id: "overdue",
-      title: "Việc gấp\nquá hạn",
-      icon: "alert-circle",
-      color: "#dc2626",
-      route: "/(tabs)/work",
-      badge: actions?.overdueTasks.length ? `${actions.overdueTasks.length}` : undefined,
-    },
-    {
-      id: "leave-pending",
-      title: "Đơn chờ\nxét duyệt",
-      icon: "file-tray-full",
-      color: "#0d9488",
-      route: "/(tabs)/leave",
-      badge: actions?.pendingApprovals.length ? `${actions.pendingApprovals.length}` : undefined,
-    },
-    {
-      id: "projects",
-      title: "Dự án\nđang chạy",
-      icon: "git-network",
-      color: "#0284c7",
-      route: "/(tabs)/projects",
-    },
-    {
-      id: "payslip",
-      title: "Bảng lương",
-      icon: "newspaper",
-      color: "#059669",
-      route: "/(tabs)/payslips",
-    },
-  ];
+  // 4 Icon LuxCare Đề Xuất (đã lọc theo quyền)
+  const luxcareRecommendations = useMemo(
+    () =>
+      [
+        {
+          id: "overdue",
+          title: "Việc gấp\nquá hạn",
+          icon: "alert-circle",
+          color: "#dc2626",
+          route: "/(tabs)/work",
+          badge: actions?.overdueTasks.length ? `${actions.overdueTasks.length}` : undefined,
+        },
+        {
+          id: "leave-pending",
+          title: "Đơn chờ\nxét duyệt",
+          icon: "file-tray-full",
+          color: "#0d9488",
+          route: "/(tabs)/leave",
+          badge: actions?.pendingApprovals.length ? `${actions.pendingApprovals.length}` : undefined,
+        },
+        {
+          id: "projects",
+          title: "Dự án\nđang chạy",
+          icon: "git-network",
+          color: "#0284c7",
+          route: "/(tabs)/projects",
+        },
+        {
+          id: "payslip",
+          title: "Bảng lương",
+          icon: "newspaper",
+          color: "#059669",
+          route: "/(tabs)/payslips",
+        },
+      ].filter((item) => isServiceAccessible(item as any, user)),
+    [actions, user],
+  );
 
   const pendingCount = (actions?.overdueTasks.length || 0) + (actions?.pendingApprovals.length || 0);
 

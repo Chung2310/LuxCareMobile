@@ -15,6 +15,7 @@ import {
   CategoryTabs,
   DEFAULT_PINNED_IDS,
   EditPinnedModal,
+  getAccessibleModules,
   getAllServicesFlat,
   LUXCARE_MODULES,
   ModuleSection,
@@ -24,41 +25,48 @@ import {
   type ServiceItem,
   type ServiceModule,
 } from "../../src/components";
+import { useSession } from "../../src/auth/SessionProvider";
 import { useAppLoading } from "../../src/context/LoadingContext";
 
 export default function ModulesScreen() {
+  const { user } = useSession();
   const { navigateWithLoading } = useAppLoading();
   const [searchQuery, setSearchQuery] = useState("");
   const [selectedCategory, setSelectedCategory] = useState<string>("all");
   const [isEditModalOpen, setIsEditModalOpen] = useState(false);
   const [pinnedIds, setPinnedIds] = useState<string[]>(DEFAULT_PINNED_IDS);
 
-  // Danh sách phẳng tất cả dịch vụ
-  const allServicesList = useMemo(() => getAllServicesFlat(LUXCARE_MODULES), []);
+  // Danh sách phân hệ đã lọc theo quyền người dùng
+  const accessibleModules = useMemo(() => {
+    return getAccessibleModules(user, LUXCARE_MODULES);
+  }, [user]);
 
-  // Danh sách các dịch vụ được ghim hiện tại
+  // Danh sách phẳng tất cả dịch vụ người dùng có quyền
+  const allServicesList = useMemo(() => getAllServicesFlat(accessibleModules, user), [accessibleModules, user]);
+
+  // Danh sách các dịch vụ được ghim hiện tại (chỉ giữ dịch vụ có quyền)
   const pinnedServices = useMemo(() => {
     return pinnedIds
       .map((id) => allServicesList.find((s) => s.id === id))
       .filter((s): s is ServiceItem => Boolean(s));
   }, [pinnedIds, allServicesList]);
 
-  // Danh sách tabs lọc phân hệ
+  // Danh sách tabs lọc phân hệ (chỉ hiển thị phân hệ có dịch vụ khả dụng)
   const categoryTabs: CategoryTabItem[] = useMemo(() => {
     return [
       { id: "all", label: "Tất cả" },
-      ...LUXCARE_MODULES.map((mod) => ({
+      ...accessibleModules.map((mod) => ({
         id: mod.id,
         label: mod.shortTitle,
       })),
     ];
-  }, []);
+  }, [accessibleModules]);
 
   // Bộ lọc danh mục & tìm kiếm
   const filteredModules = useMemo(() => {
     const q = searchQuery.toLowerCase().trim();
 
-    return LUXCARE_MODULES
+    return accessibleModules
       .map((mod) => {
         if (selectedCategory !== "all" && mod.id !== selectedCategory) {
           return null;
@@ -78,7 +86,7 @@ export default function ModulesScreen() {
         };
       })
       .filter((m): m is ServiceModule => Boolean(m));
-  }, [selectedCategory, searchQuery]);
+  }, [accessibleModules, selectedCategory, searchQuery]);
 
   const handleBack = () => {
     if (router.canGoBack()) {

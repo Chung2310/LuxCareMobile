@@ -1,4 +1,13 @@
 import type { ServiceItem, ServiceModule } from "./types";
+import type { UserProfile } from "../../../../src/types/common";
+import { canUseModule, hasPermission } from "../../auth/access";
+import { recruitmentAccess } from "../../features/recruitment/access";
+import { canReadContracts } from "../../features/contracts/model";
+import { canReadCredentials } from "../../features/credentials/model";
+import { canReadPayslips } from "../../features/payroll/model";
+import { canReadPayrollRuns } from "../../features/payroll/runModel";
+import { workflowAccess } from "../../features/workflow/access";
+import { trainingAccess } from "../../features/training/access";
 
 export const DEFAULT_PINNED_IDS = [
   "att-checkin",
@@ -475,12 +484,101 @@ export const LUXCARE_MODULES: ServiceModule[] = [
   },
 ];
 
-export function getAllServicesFlat(modulesList = LUXCARE_MODULES): ServiceItem[] {
+export function isServiceAccessible(item: ServiceItem, user: UserProfile | null): boolean {
+  if (!user) return false;
+
+  const isManager = ["admin", "superadmin", "branch_owner", "manager"].includes(user.role || "");
+
+  // Route-based permission checks
+  switch (item.route) {
+    case "/(tabs)/users":
+    case "/(tabs)/roles":
+    case "/(tabs)/settings":
+      return isManager || hasPermission(user, "user:read");
+
+    case "/(tabs)/recruitment":
+      return recruitmentAccess(user).read;
+
+    case "/(tabs)/contracts":
+      return isManager || canReadContracts(user);
+
+    case "/(tabs)/credentials":
+      return isManager || canReadCredentials(user);
+
+    case "/(tabs)/training":
+      return isManager || trainingAccess(user).read;
+
+    case "/(tabs)/workflow":
+      return isManager || workflowAccess(user).read;
+
+    case "/(tabs)/payroll-runs":
+      return isManager || canReadPayrollRuns(user);
+
+    case "/(tabs)/payslips":
+      return isManager || canReadPayslips(user) || canReadPayrollRuns(user);
+
+    case "/(tabs)/attendance-management":
+      return isManager || (canUseModule(user, "hr") && hasPermission(user, "timekeeping:manage"));
+
+    case "/(tabs)/kpi":
+      return isManager || hasPermission(user, "work:read");
+
+    case "/(tabs)/work":
+    case "/(tabs)/projects":
+    case "/(tabs)/shifts":
+    case "/(tabs)/calendar-events":
+      return isManager || canUseModule(user, "hr");
+
+    case "/(tabs)/inventory":
+    case "/(tabs)/inventory-stock":
+    case "/(tabs)/inventory-expiry":
+    case "/(tabs)/inventory-audit":
+      return isManager || canUseModule(user, "supply");
+
+    case "/(tabs)/equipment":
+    case "/(tabs)/equipment-maintenance":
+    case "/(tabs)/equipment-repair":
+      return isManager || canUseModule(user, "equipment");
+
+    case "/(tabs)/chat":
+      return isManager || canUseModule(user, "chat");
+
+    case "/(tabs)/resources":
+      return isManager || canUseModule(user, "resource");
+
+    case "/(tabs)/attendance":
+    case "/(tabs)/leave":
+    case "/(tabs)/departments":
+    case "/(tabs)/employees":
+    case "/(tabs)/org-chart":
+    case "/(tabs)/customers":
+    case "/(tabs)/crm-survey":
+    case "/(tabs)/blog":
+    case "/(tabs)/notifications":
+    case "/(tabs)/knowledge":
+      return true;
+
+    default:
+      return true;
+  }
+}
+
+export function getAccessibleModules(user: UserProfile | null, modulesList = LUXCARE_MODULES): ServiceModule[] {
+  if (!user) return [];
+  return modulesList
+    .map((mod) => ({
+      ...mod,
+      items: mod.items.filter((item) => isServiceAccessible(item, user)),
+    }))
+    .filter((mod) => mod.items.length > 0);
+}
+
+export function getAllServicesFlat(modulesList = LUXCARE_MODULES, user?: UserProfile | null): ServiceItem[] {
   const list: ServiceItem[] = [];
   const seen = new Set<string>();
   for (const mod of modulesList) {
     for (const item of mod.items) {
-      if (!seen.has(item.id)) {
+      if (!seen.has(item.id) && (!user || isServiceAccessible(item, user))) {
         seen.add(item.id);
         list.push(item);
       }
@@ -488,3 +586,4 @@ export function getAllServicesFlat(modulesList = LUXCARE_MODULES): ServiceItem[]
   }
   return list;
 }
+
