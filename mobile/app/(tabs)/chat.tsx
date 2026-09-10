@@ -37,7 +37,7 @@ const BLUE_HEADER = "#0084ff";
 
 export default function ChatScreen() {
   const { user } = useSession();
-  const currentUserId = user?._id || user?.uid || "";
+  const currentUserId = (user as any)?._id || user?.uid || "";
 
   // Chat Rooms State
   const [rooms, setRooms] = useState<ChatRoom[]>([]);
@@ -74,7 +74,7 @@ export default function ChatScreen() {
   const [chatSearchQuery, setChatSearchQuery] = useState("");
 
   const flatListRef = useRef<FlatList>(null);
-  const pollingRef = useRef<NodeJS.Timeout | null>(null);
+  const pollingRef = useRef<ReturnType<typeof setTimeout> | null>(null);
 
   // 1. Fetch Rooms from API
   const loadRooms = useCallback(async (silent = false) => {
@@ -721,7 +721,7 @@ export default function ChatScreen() {
                               {/* Attachments */}
                               {item.attachments && item.attachments.length > 0 && (
                                 <View style={styles.msgAttachmentsWrap}>
-                                  {item.attachments.map((att, idx) => (
+                                  {item.attachments.map((att: any, idx: number) => (
                                     <View key={idx} style={styles.attItem}>
                                       {att.type?.startsWith("image") ? (
                                         <Image source={{ uri: att.url }} style={styles.attImage} resizeMode="cover" />
@@ -759,7 +759,7 @@ export default function ChatScreen() {
                           {item.reactions && item.reactions.length > 0 && (
                             <View style={styles.reactionBadge}>
                               <Text style={styles.reactionBadgeText}>
-                                {item.reactions.map((r) => r.emoji).join(" ")} {item.reactions.length}
+                                {item.reactions.map((r: any) => r.emoji).join(" ")} {item.reactions.length}
                               </Text>
                             </View>
                           )}
@@ -797,7 +797,6 @@ export default function ChatScreen() {
                 value={inputText}
                 onChangeText={setInputText}
                 multiline
-                maxHeight={90}
               />
 
               {inputText.trim().length === 0 ? (
