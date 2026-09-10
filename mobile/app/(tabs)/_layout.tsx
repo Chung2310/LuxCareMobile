@@ -1,4 +1,6 @@
+import { Platform } from "react-native";
 import { Redirect, Tabs } from "expo-router";
+import { useSafeAreaInsets } from "react-native-safe-area-context";
 import { Ionicons } from "@expo/vector-icons";
 import { useSession } from "../../src/auth/SessionProvider";
 import { colors } from "../../src/ui";
@@ -7,9 +9,12 @@ import { isBlogEditorUser } from "../../../src/utils/permissionUtils";
 
 export default function TabLayout() {
   const { user, selectedBranch } = useSession();
+  const insets = useSafeAreaInsets();
   if (!user) return <Redirect href="/login" />;
 
   const isEditor = isBlogEditorUser(user);
+  const bottomPadding = insets.bottom > 0 ? insets.bottom : (Platform.OS === "android" ? 12 : 10);
+  const tabHeight = 54 + bottomPadding;
 
   return (
     <Tabs
@@ -25,8 +30,8 @@ export default function TabLayout() {
               backgroundColor: "#ffffff",
               borderTopColor: "#e2e8f0",
               borderTopWidth: 1,
-              height: 60,
-              paddingBottom: 8,
+              height: tabHeight,
+              paddingBottom: bottomPadding,
               paddingTop: 6,
               elevation: 8,
               shadowColor: "#000",
