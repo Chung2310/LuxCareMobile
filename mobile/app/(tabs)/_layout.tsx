@@ -280,8 +280,6 @@ export default function TabLayout() {
       />
 
       {/* Các phân hệ phụ không hiển thị trên Tab Bar */}
-      <Tabs.Screen name="equipment" options={{ title: "Thiết bị", href: null }} />
-      <Tabs.Screen name="modules" options={{ title: "Chức năng", href: null }} />
       <Tabs.Screen name="customers" options={{ title: "Khách hàng", href: null }} />
       <Tabs.Screen name="inventory" options={{ title: "Vật tư & Dược phẩm", href: null }} />
       <Tabs.Screen name="users" options={{ title: "Quản lý người dùng", href: null }} />
