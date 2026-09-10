@@ -100,3 +100,34 @@ export function hasAnyPermission(
 ): boolean {
   return permissions.some((p) => hasPermission(user, p));
 }
+
+/**
+ * Kiểm tra xem người dùng có phải là Biên tập viên / BTV / Tác giả Blog có quyền đăng & quản lý bài viết hay không.
+ */
+export function isBlogEditorUser(user?: any): boolean {
+  if (!user) return false;
+  const role = String(user.role || "").toLowerCase();
+
+  // Explicit Editor / BTV roles
+  if (
+    role === "blog_editor" ||
+    role === "blog_author" ||
+    role === "content_creator" ||
+    role === "editor" ||
+    role === "btv" ||
+    role === "bien_tap_vien" ||
+    role === "ban biên tập" ||
+    role === "biên tập viên" ||
+    role === "ban bien tap"
+  ) {
+    return true;
+  }
+
+  if (user.canPostBlog === true) return true;
+  const permissions: string[] = Array.isArray(user.permissions) ? user.permissions : [];
+  return (
+    permissions.includes("blog:post") ||
+    permissions.includes("blog:publish") ||
+    permissions.includes("blog:manage")
+  );
+}

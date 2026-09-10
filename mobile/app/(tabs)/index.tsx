@@ -12,7 +12,7 @@ import {
   TextInput,
   View,
 } from "react-native";
-import { router, useFocusEffect } from "expo-router";
+import { Redirect, router, useFocusEffect } from "expo-router";
 import { SafeAreaView } from "react-native-safe-area-context";
 import { Ionicons } from "@expo/vector-icons";
 import type {
@@ -28,6 +28,7 @@ import { canUseModule } from "../../src/auth/access";
 import { useAppLoading } from "../../src/context/LoadingContext";
 import { DashboardOverviewSection } from "../../src/components/dashboard";
 import { getAllServicesFlat, LUXCARE_MODULES } from "../../src/components";
+import { isBlogEditorUser } from "../../../src/utils/permissionUtils";
 
 const { width: SCREEN_WIDTH } = Dimensions.get("window");
 
@@ -45,6 +46,11 @@ interface LuxCareFeature {
 export default function Home() {
   const { user, selectedBranch } = useSession();
   const { navigateWithLoading } = useAppLoading();
+  const isEditor = isBlogEditorUser(user);
+
+  if (isEditor) {
+    return <Redirect href="/(tabs)/blog" />;
+  }
   const [data, setData] = useState<DashboardSummary | null>(null);
   const [params, setParams] = useState<DashboardSummaryParams>({ filter: "day" });
   const [actions, setActions] = useState<DashboardActionItems | null>(null);
