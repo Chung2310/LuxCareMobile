@@ -55,7 +55,8 @@ export function SessionProvider({ children }: React.PropsWithChildren) {
         void getMe()
           .then((profile) => {
             if (active) {
-              if (profile.role !== "admin" || profile.companyCode !== user.companyCode) {
+              const isOwnerRole = ["admin", "superadmin", "branch_owner"].includes(profile.role || "");
+              if (!isOwnerRole || profile.companyCode !== user.companyCode) {
                 api.setBranchId(null);
                 setSelectedBranch(null);
               }
@@ -82,8 +83,9 @@ export function SessionProvider({ children }: React.PropsWithChildren) {
         updateUserProfile: (uid, data) =>
           setUser((current) => (current?.uid === uid ? { ...current, ...data } : current)),
         selectBranch: (branch) => {
-          if (user?.role !== "admin") throw new Error("Tài khoản không được chuyển chi nhánh.");
-          if (branch && (!branch.isActive || branch.companyCode.toUpperCase() !== user.companyCode?.toUpperCase()))
+          const isOwner = ["admin", "superadmin", "branch_owner"].includes(user?.role || "");
+          if (!isOwner) throw new Error("Tài khoản không được chuyển chi nhánh.");
+          if (branch && (!branch.isActive || branch.companyCode.toUpperCase() !== user?.companyCode?.toUpperCase()))
             throw new Error("Chi nhánh không khả dụng.");
           api.setBranchId(branch?._id || null);
           setSelectedBranch(branch);

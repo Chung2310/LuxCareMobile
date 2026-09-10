@@ -26,6 +26,7 @@ import { canUseModule, hasPermission } from "../../src/auth/access";
 import { messageOf, useSession } from "../../src/auth/SessionProvider";
 import { EmptyState, Page } from "../../src/ui";
 import { WorkSectionTabs, type WorkSection } from "../../src/features/work/WorkSectionTabs";
+import { BranchSelector } from "../../src/features/branches/BranchSelector";
 import {
   normalizePriority,
   normalizeTaskStatus,
@@ -188,9 +189,10 @@ interface KpiProps {
 
 export default function Kpi({ onSectionChange }: KpiProps = {}) {
   const { user, selectedBranch } = useSession();
-  const isManager = ["admin", "superadmin", "branch_owner", "manager"].includes(user?.role || "");
+  const isOwner = ["admin", "superadmin", "branch_owner"].includes(user?.role || "");
+  const isManager = isOwner || user?.role === "manager";
   const allowed = !!user && (isManager || canUseModule(user, "hr") || hasPermission(user, "work:read") || !!user?.companyCode);
-  const branchId = selectedBranch?._id || user?.branchId || undefined;
+  const branchId = selectedBranch ? selectedBranch._id : (isOwner ? undefined : user?.branchId || undefined);
 
   const [period, setPeriod] = useState(() => currentKpiPeriod());
   const [report, setReport] = useState<MonthlyKpiReport | null>(null);
@@ -478,9 +480,24 @@ export default function Kpi({ onSectionChange }: KpiProps = {}) {
           </Pressable>
           <View style={styles.headerInfo}>
             <Text style={styles.headerTitle}>KPI công việc</Text>
-            <Text style={styles.headerSub}>
-              {selectedBranch?.name || user?.branchName || "Chi nhánh"} · {totalEmployees} nhân sự · {allTasks.length} task
-            </Text>
+            {isOwner ? (
+              <BranchSelector
+                renderCustomTrigger={(open) => (
+                  <Pressable onPress={open} style={{ flexDirection: "row", alignItems: "center", gap: 5, marginTop: 2 }}>
+                    <View style={{ backgroundColor: "#ecfdf5", borderColor: "#a7f3d0", borderWidth: 1, paddingHorizontal: 6, paddingVertical: 1.5, borderRadius: 6 }}>
+                      <Text style={{ fontSize: 11, color: "#059669", fontWeight: "700" }}>
+                        📍 {selectedBranch?.name || "Toàn hệ thống"} ▾
+                      </Text>
+                    </View>
+                    <Text style={styles.headerSub}>· {totalEmployees} nhân sự</Text>
+                  </Pressable>
+                )}
+              />
+            ) : (
+              <Text style={styles.headerSub}>
+                {selectedBranch?.name || user?.branchName || "Chi nhánh"} · {totalEmployees} nhân sự · {allTasks.length} task
+              </Text>
+            )}
           </View>
         </View>
 

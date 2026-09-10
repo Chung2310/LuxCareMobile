@@ -1,6 +1,7 @@
 import React, { useMemo, useState } from "react";
 import {
   Alert,
+  Pressable,
   ScrollView,
   StyleSheet,
   Text,
@@ -27,9 +28,11 @@ import {
 } from "../../src/components";
 import { useSession } from "../../src/auth/SessionProvider";
 import { useAppLoading } from "../../src/context/LoadingContext";
+import { BranchSelector } from "../../src/features/branches/BranchSelector";
 
 export default function ModulesScreen() {
-  const { user } = useSession();
+  const { user, selectedBranch } = useSession();
+  const isOwner = ["admin", "superadmin", "branch_owner"].includes(user?.role || "");
   const { navigateWithLoading } = useAppLoading();
   const [searchQuery, setSearchQuery] = useState("");
   const [selectedCategory, setSelectedCategory] = useState<string>("all");
@@ -141,6 +144,33 @@ export default function ModulesScreen() {
         keyboardShouldPersistTaps="handled"
         stickyHeaderIndices={!searchQuery.trim() ? [1] : undefined}
       >
+        {/* Branch Selector for Business Owners */}
+        {isOwner && !searchQuery.trim() && (
+          <View style={{ paddingHorizontal: 16, paddingTop: 8, paddingBottom: 4 }}>
+            <BranchSelector
+              renderCustomTrigger={(open) => (
+                <Pressable
+                  style={styles.branchSelectTrigger}
+                  onPress={open}
+                  accessibilityRole="button"
+                  accessibilityLabel="Chọn chi nhánh làm việc"
+                >
+                  <View style={{ flexDirection: "row", alignItems: "center", gap: 6, flex: 1 }}>
+                    <Ionicons name="business" size={15} color="#059669" />
+                    <Text style={{ fontSize: 12, fontWeight: "600", color: "#64748b" }}>Chi nhánh:</Text>
+                    <Text style={{ fontSize: 12, fontWeight: "800", color: "#0f172a", flex: 1 }} numberOfLines={1}>
+                      {selectedBranch?.name || "Toàn hệ thống (Tất cả chi nhánh)"}
+                    </Text>
+                  </View>
+                  <View style={styles.branchChangeBadge}>
+                    <Text style={styles.branchChangeText}>Đổi ▾</Text>
+                  </View>
+                </Pressable>
+              )}
+            />
+          </View>
+        )}
+
         {/* Component Dịch vụ được ghim */}
         {!searchQuery.trim() && (
           <PinnedServicesSection
@@ -240,5 +270,34 @@ const styles = StyleSheet.create({
     color: "#94a3b8",
     textAlign: "center",
     lineHeight: 18,
+  },
+  branchSelectTrigger: {
+    flexDirection: "row",
+    alignItems: "center",
+    justifyContent: "space-between",
+    backgroundColor: "#ffffff",
+    paddingHorizontal: 14,
+    paddingVertical: 10,
+    borderRadius: 12,
+    borderWidth: 1,
+    borderColor: "#e2e8f0",
+    shadowColor: "#059669",
+    shadowOffset: { width: 0, height: 1 },
+    shadowOpacity: 0.05,
+    shadowRadius: 3,
+    elevation: 1,
+  },
+  branchChangeBadge: {
+    backgroundColor: "#ecfdf5",
+    paddingHorizontal: 8,
+    paddingVertical: 3,
+    borderRadius: 6,
+    borderWidth: 1,
+    borderColor: "#a7f3d0",
+  },
+  branchChangeText: {
+    fontSize: 11,
+    fontWeight: "700",
+    color: "#047857",
   },
 });

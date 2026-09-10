@@ -22,6 +22,7 @@ import { JobForm } from "../../src/features/recruitment/JobForm";
 import { AttachmentPanel } from "../../src/features/recruitment/AttachmentPanel";
 import { PublicDocumentLink } from "../../src/features/recruitment/PublicDocumentLink";
 import { EmptyState, ErrorText, Loading, Page, styles as baseStyles } from "../../src/ui";
+import { BranchSelector } from "../../src/features/branches/BranchSelector";
 
 const WORKPLACE_LABELS: Record<string, string> = {
   onsite: "Tại chỗ",
@@ -31,6 +32,7 @@ const WORKPLACE_LABELS: Record<string, string> = {
 
 export default function Recruitment() {
   const { user, selectedBranch } = useSession();
+  const isOwner = ["admin", "superadmin", "branch_owner"].includes(user?.role || "");
   const access = recruitmentAccess(user);
 
   const [jobs, setJobs] = useState<RecruitmentJob[]>([]);
@@ -61,7 +63,7 @@ export default function Recruitment() {
     setRevision((v) => v + 1);
   };
 
-  const scopeReady = Boolean(user?.companyCode || selectedBranch?._id || user?.branchId);
+  const scopeReady = Boolean(user?.companyCode || selectedBranch?._id || user?.branchId || isOwner);
 
   const [seeding, setSeeding] = useState(false);
   const handleSeedDemo = async () => {
@@ -371,12 +373,39 @@ export default function Recruitment() {
               </Pressable>
               <View style={uiStyles.headerLeft}>
                 <Text style={uiStyles.headerTitle}>Tin tuyển dụng</Text>
-                <View style={uiStyles.branchRow}>
-                  <View style={uiStyles.branchDot} />
-                  <Text style={uiStyles.branchName}>
-                    {selectedBranch?.name || user?.branchName || "Toàn công ty"}
-                  </Text>
-                </View>
+                {isOwner ? (
+                  <BranchSelector
+                    renderCustomTrigger={(open) => (
+                      <Pressable
+                        onPress={open}
+                        style={[
+                          uiStyles.branchRow,
+                          {
+                            backgroundColor: "#f0fdf4",
+                            borderColor: "#bbf7d0",
+                            borderWidth: 1,
+                            paddingHorizontal: 8,
+                            paddingVertical: 2,
+                            borderRadius: 10,
+                            marginTop: 2,
+                          },
+                        ]}
+                      >
+                        <View style={[uiStyles.branchDot, { backgroundColor: "#16a34a" }]} />
+                        <Text style={[uiStyles.branchName, { color: "#15803d", fontWeight: "700" }]}>
+                          {selectedBranch?.name || "Toàn công ty"} ▾
+                        </Text>
+                      </Pressable>
+                    )}
+                  />
+                ) : (
+                  <View style={uiStyles.branchRow}>
+                    <View style={uiStyles.branchDot} />
+                    <Text style={uiStyles.branchName}>
+                      {selectedBranch?.name || user?.branchName || "Toàn công ty"}
+                    </Text>
+                  </View>
+                )}
               </View>
             </View>
 
