@@ -123,6 +123,7 @@ export default function TabLayout() {
       <Tabs.Screen name="kpi" options={{ title: "KPI tháng", href: null }} />
       <Tabs.Screen name="org-chart" options={{ title: "Sơ đồ tổ chức", href: null }} />
       <Tabs.Screen name="blog" options={{ title: "Blog nội bộ & Thảo luận", href: null }} />
+      <Tabs.Screen name="training" options={{ title: "Đào tạo", href: null }} />
     </Tabs>
   );
 }

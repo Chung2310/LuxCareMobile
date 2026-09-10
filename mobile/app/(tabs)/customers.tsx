@@ -35,7 +35,7 @@ import {
 } from "../../src/api/customerLeadApi";
 import { branches as branchService } from "../../src/api/services";
 import { useSession } from "../../src/auth/SessionProvider";
-import type { BranchRecord } from "../../../../src/services/branchService";
+import type { BranchRecord } from "../../../src/services/branchService";
 
 const STATUS_FILTERS: Array<{ id: string; label: string }> = [
   { id: "all", label: "Tất cả" },

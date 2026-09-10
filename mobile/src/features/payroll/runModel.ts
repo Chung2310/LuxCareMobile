@@ -19,7 +19,7 @@ export function effectiveRunLines(run: PayrollRun) {
 export const runStatuses: Record<string, string> = {
   draft: "Nháp",
   calculated: "Đã tính",
-  review: "Đang kiểm tra",
+  review: "Kiểm tra",
   closed: "Đã chốt",
-  paid: "Đã trả",
+  paid: "Đã thanh toán",
 };

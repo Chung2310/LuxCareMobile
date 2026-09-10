@@ -149,7 +149,7 @@ export default function Home() {
       },
       {
         id: "payslips",
-        title: "Phiếu lương\ncá nhân",
+        title: "Bảng lương",
         icon: "wallet",
         color: "#d97706", // Cam vàng amber
         bgColor: "#fffbeb",
@@ -225,7 +225,7 @@ export default function Home() {
     },
     {
       id: "payslip",
-      title: "Phiếu lương\ncá nhân",
+      title: "Bảng lương",
       icon: "newspaper",
       color: "#059669",
       route: "/(tabs)/payslips",
@@ -332,7 +332,7 @@ export default function Home() {
 
               <Pressable
                 style={({ pressed }) => [uiStyles.topQuickItem, pressed && { opacity: 0.8 }]}
-                onPress={() => router.push("/(tabs)/leave")}
+                onPress={() => router.push("/(tabs)/leave?create=1")}
               >
                 <View style={[uiStyles.topQuickIconBox, { borderColor: "rgba(124, 58, 237, 0.18)" }]}>
                   <Ionicons name="document-text-outline" size={25} color="#7c3aed" />

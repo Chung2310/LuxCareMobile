@@ -59,7 +59,7 @@ function ResourceViewerModal({
 
   // ── Video player (expo-video) ─────────────────────────────────────────────
   const videoSource = isVideo ? (fileUrl || null) : null;
-  const videoPlayer = useVideoPlayer(videoSource, (p) => {
+  const videoPlayer = useVideoPlayer(videoSource, (p: any) => {
     if (videoSource) {
       p.loop = false;
       p.play();

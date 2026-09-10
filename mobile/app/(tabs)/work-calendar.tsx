@@ -12,6 +12,7 @@ import { messageOf, useSession } from "../../src/auth/SessionProvider";
 import { Button, Card, EmptyState, ErrorText, Field, Loading, Page, styles } from "../../src/ui";
 import { ChoiceField } from "../../src/features/leave/ChoiceField";
 import { calendarAccess, calendarInput, calendarToggle, DAY_TYPES } from "../../src/features/calendar/model";
+import { HolidayForm } from "../../src/features/calendar/HolidayForm";
 export default function WorkCalendar() {
   const { user } = useSession();
   const access = calendarAccess(user);
@@ -200,35 +201,22 @@ export default function WorkCalendar() {
           if (!lock.current) close();
         }}
       >
-        <SafeAreaView style={styles.page}>
-          <Page title={audit ? "Lịch sử thay đổi" : toggle ? "Áp dụng lịch" : "Ngày lịch doanh nghiệp"}>
-            {editing && (
-              <>
-                <Field label="Ngày (YYYY-MM-DD)" value={date} editable={!disabled} onChangeText={setDate} />
-                <Field label="Tên ngày" value={name} editable={!disabled} onChangeText={setName} />
-                <ChoiceField
-                  label="Loại ngày"
-                  value={dayType}
-                  choices={DAY_TYPES}
-                  disabled={disabled}
-                  onChange={(value) => setDayType(value as WorkCalendarDayType)}
-                />
-                <Button
-                  title="Lưu ngày"
-                  disabled={disabled}
-                  onPress={() => {
-                    try {
-                      const input = calendarInput(date.trim(), name, dayType);
-                      void run(() =>
-                        editing === "new" ? workCalendar.create(input) : workCalendar.update(editing._id, input),
-                      );
-                    } catch (error) {
-                      setError(messageOf(error));
-                    }
-                  }}
-                />
-              </>
-            )}
+        <SafeAreaView style={{ flex: 1, backgroundColor: "#f8fafc" }} edges={["top"]}>
+          {editing ? (
+            <HolidayForm
+              holiday={editing === "new" ? undefined : editing}
+              year={year}
+              onClose={close}
+              onSuccess={() => {
+                close();
+                setRevision((v) => v + 1);
+              }}
+              setLocked={(v) => {
+                lock.current = v;
+              }}
+            />
+          ) : (
+            <Page title={audit ? "Lịch sử thay đổi" : "Áp dụng lịch"}>
             {toggle && (
               <>
                 <Text style={styles.text}>
@@ -276,6 +264,7 @@ export default function WorkCalendar() {
             <ErrorText message={error} />
             <Button title="Đóng" disabled={busy} onPress={close} />
           </Page>
+          )}
         </SafeAreaView>
       </Modal>
     </>

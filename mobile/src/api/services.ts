@@ -22,6 +22,7 @@ import { createEquipmentService } from "../../../src/services/equipmentService";
 import { createWorkflowService } from "../../../src/services/workflowService";
 import { createResourceService } from "../../../src/services/resourceService";
 import { createBlogService } from "../../../src/services/blogService";
+import { createTrainingService } from "../../../src/services/trainingService";
 
 const origin = process.env.EXPO_PUBLIC_API_URL?.trim();
 export let configurationError: string | null = !origin ? "Chưa cấu hình EXPO_PUBLIC_API_URL trong mobile/.env." : null;
@@ -64,6 +65,7 @@ export const kanbanMedia = createKanbanMediaService(api.transport);
 export const equipment = createEquipmentService(api.transport);
 export const workflow = createWorkflowService(api.transport);
 export const resources = createResourceService(api.transport);
+export const training = createTrainingService(api.transport);
 export async function getMe(): Promise<UserProfile> {
   const response = await api.transport.fetch("/api/v1/auth/me");
   const { user } = await response.json();
