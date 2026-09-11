@@ -13,7 +13,7 @@ import { Ionicons } from "@expo/vector-icons";
 import type { NoticePayload } from "./payload";
 
 export interface RealtimeBannerData {
-  data: NoticePayload;
+  data?: NoticePayload | Partial<NoticePayload>;
   title: string;
   body: string;
 }

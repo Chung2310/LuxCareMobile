@@ -6,6 +6,8 @@ export type NotificationCategory =
   | "warehouse"
   | "training"
   | "system"
+  | "chat"
+  | "blog"
   | "general";
 
 export interface CategoryInfo {
@@ -19,6 +21,8 @@ export interface CategoryInfo {
     | "cube-outline"
     | "school-outline"
     | "settings-outline"
+    | "chatbubbles-outline"
+    | "newspaper-outline"
     | "notifications-outline";
   color: string;
   bg: string;
@@ -147,6 +151,38 @@ export function detectNotificationCategory(
       color: "#475569",
       bg: "#f1f5f9",
       borderColor: "#cbd5e1",
+    };
+  }
+
+  if (
+    action?.tab === "chat" ||
+    combined.includes("tin nhắn") ||
+    combined.includes("chat") ||
+    combined.includes("trò chuyện")
+  ) {
+    return {
+      category: "chat",
+      label: "Trò chuyện",
+      iconName: "chatbubbles-outline",
+      color: "#0284c7",
+      bg: "#f0f9ff",
+      borderColor: "#bae6fd",
+    };
+  }
+
+  if (
+    action?.tab === "blog" ||
+    combined.includes("blog") ||
+    combined.includes("bài viết") ||
+    combined.includes("bản tin")
+  ) {
+    return {
+      category: "blog",
+      label: "Bản tin & Blog",
+      iconName: "newspaper-outline",
+      color: "#9333ea",
+      bg: "#faf5ff",
+      borderColor: "#e9d5ff",
     };
   }
 

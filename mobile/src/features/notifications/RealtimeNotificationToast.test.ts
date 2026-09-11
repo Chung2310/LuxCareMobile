@@ -48,6 +48,20 @@ describe("detectNotificationCategory", () => {
     expect(res.label).toBe("Hệ thống");
   });
 
+  it("detects chat / tin nhắn notifications", () => {
+    const res = detectNotificationCategory("Tin nhắn mới", "Bác sĩ Nam vừa gửi một tin nhắn");
+    expect(res.category).toBe("chat");
+    expect(res.label).toBe("Trò chuyện");
+    expect(res.color).toBe("#0284c7");
+  });
+
+  it("detects blog / bài viết notifications", () => {
+    const res = detectNotificationCategory("Blog có bài viết mới", "Thông báo lịch nghỉ lễ Quốc khánh");
+    expect(res.category).toBe("blog");
+    expect(res.label).toBe("Bản tin & Blog");
+    expect(res.color).toBe("#9333ea");
+  });
+
   it("falls back to general notifications", () => {
     const res = detectNotificationCategory("Chào mừng bạn", "Chúc một ngày làm việc hiệu quả");
     expect(res.category).toBe("general");
