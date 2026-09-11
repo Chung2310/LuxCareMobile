@@ -174,6 +174,15 @@ export default function BlogScreen() {
       markBlogSeen(posts.map(post => post.id));
   }, [focused, loading, posts, postsScope, user?.uid, user?.companyCode, markBlogSeen]);
 
+  // Auto-scroll to bottom (newest post) after data loads
+  useEffect(() => {
+    if (!loading && posts.length > 0) {
+      setTimeout(() => {
+        scrollViewRef.current?.scrollToEnd({ animated: false });
+      }, 100);
+    }
+  }, [loading, posts]);
+
   const loadBlogData = async () => {
     const version = ++requestVersion.current;
     setLoading(true);

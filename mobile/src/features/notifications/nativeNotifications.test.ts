@@ -27,7 +27,7 @@ describe("native notification module loading", () => {
     });
     const runtimeRequire = (name: string) => {
       if (name === "expo") return { isRunningInExpoGo: () => expoGo };
-      if (name === "react-native") return { Platform: { OS: platform } };
+      if (name === "react-native") return { Platform: { OS: platform }, StyleSheet: { create: (s: any) => s } };
       if (name === "expo-notifications") return loadNative();
       throw new Error(`Unexpected dependency: ${name}`);
     };

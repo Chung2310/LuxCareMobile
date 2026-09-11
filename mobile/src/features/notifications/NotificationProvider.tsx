@@ -1,5 +1,6 @@
 import React, { createContext, useCallback, useContext, useEffect, useRef, useState } from "react";
 import { AppState, Linking, Platform, Pressable, Text, View } from "react-native";
+import { Ionicons } from "@expo/vector-icons";
 import type { NotificationPermissionsStatus } from "expo-notifications";
 import { nativeNotifications as Notifications, nativeNotificationsUnavailableReason } from "./nativeNotifications";
 import Constants from "expo-constants";
@@ -194,8 +195,89 @@ export function NotificationProvider({ children }: React.PropsWithChildren) {
 export function NotificationPermissionNotice() {
   const { permissionDenied, pushError } = useNotifications();
   if (!permissionDenied && !pushError) return null;
-  return <View style={{ padding: 12, backgroundColor: "#fffbeb" }}>
-    <Text>{permissionDenied ? "Thông báo đang tắt. Bật trong Cài đặt để nhận thông báo khi không mở ứng dụng." : pushError}</Text>
-    {permissionDenied && <Pressable onPress={() => void Linking.openSettings()}><Text style={{ color: "#065f46", marginTop: 8 }}>Mở Cài đặt</Text></Pressable>}
-  </View>;
+  return (
+    <View style={permissionStyles.container}>
+      <View style={permissionStyles.iconBox}>
+        <Ionicons name="notifications-off-outline" size={19} color="#d97706" />
+      </View>
+      <View style={permissionStyles.content}>
+        <Text style={permissionStyles.title}>
+          {permissionDenied ? "Chưa cấp quyền thông báo" : "Thông báo ứng dụng"}
+        </Text>
+        <Text style={permissionStyles.desc}>
+          {permissionDenied
+            ? "Bật quyền thông báo trong Cài đặt để không bỏ lỡ phân công công việc, ca làm và tin tức mới."
+            : pushError}
+        </Text>
+        {permissionDenied && (
+          <Pressable
+            style={({ pressed }) => [
+              permissionStyles.btn,
+              pressed && { opacity: 0.75 },
+            ]}
+            onPress={() => void Linking.openSettings()}
+          >
+            <Text style={permissionStyles.btnText}>Mở Cài đặt</Text>
+            <Ionicons name="chevron-forward" size={13} color="#059669" />
+          </Pressable>
+        )}
+      </View>
+    </View>
+  );
 }
+
+const permissionStyles = {
+  container: {
+    flexDirection: "row" as const,
+    alignItems: "flex-start" as const,
+    backgroundColor: "#fffbeb",
+    borderWidth: 1,
+    borderColor: "#fde68a",
+    borderRadius: 14,
+    padding: 12,
+    marginHorizontal: 16,
+    marginTop: 10,
+    marginBottom: 4,
+    gap: 12,
+  },
+  iconBox: {
+    width: 36,
+    height: 36,
+    borderRadius: 10,
+    backgroundColor: "#fef3c7",
+    alignItems: "center" as const,
+    justifyContent: "center" as const,
+  },
+  content: {
+    flex: 1,
+    gap: 4,
+  },
+  title: {
+    fontSize: 13,
+    fontWeight: "700" as const,
+    color: "#92400e",
+  },
+  desc: {
+    fontSize: 12,
+    color: "#78350f",
+    lineHeight: 18,
+  },
+  btn: {
+    flexDirection: "row" as const,
+    alignItems: "center" as const,
+    gap: 2,
+    alignSelf: "flex-start" as const,
+    marginTop: 4,
+    paddingVertical: 4,
+    paddingHorizontal: 10,
+    backgroundColor: "#ecfdf5",
+    borderWidth: 1,
+    borderColor: "#a7f3d0",
+    borderRadius: 8,
+  },
+  btnText: {
+    fontSize: 12,
+    fontWeight: "700" as const,
+    color: "#059669",
+  },
+};

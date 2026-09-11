@@ -32,6 +32,8 @@ export interface BlogPost {
   authorAvatar?: string;
   authorRoleBadge?: string;
   createdAt: string;
+  /** Unix timestamp (ms) of creation — use this for sorting, not createdAt which is a formatted display string */
+  createdAtTs: number;
   dateGroup?: string;
   title?: string;
   content: string;
@@ -100,6 +102,8 @@ export function createBlogService({ fetch, getAccessToken }: ServiceTransport) {
     const tagList = Array.isArray(raw.tags) ? raw.tags : [raw.category || raw.channelName || "Thông báo"];
     const mainTag = tagList[0] || "Thông báo";
 
+    const createdAtTs = createdAtStr ? (new Date(createdAtStr).getTime() || Date.now()) : Date.now();
+
     return {
       id: String(raw.id || raw._id || `post-${Math.random().toString(36).substring(2, 9)}`),
       channelId: String(raw.channelId || mainTag),
@@ -115,6 +119,7 @@ export function createBlogService({ fetch, getAccessToken }: ServiceTransport) {
       authorAvatar: raw.authorAvatar || raw.author?.avatar,
       authorRoleBadge: raw.authorRole || raw.authorRoleBadge || "Ban Biên Tập",
       createdAt: formattedDate,
+      createdAtTs,
       dateGroup: formattedGroup,
       title: raw.title?.trim() || undefined,
       content: rawContent,

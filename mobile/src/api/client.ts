@@ -123,7 +123,10 @@ export class MobileApi {
   }
 
   async restore() {
-    this.refreshToken = await this.storage.read();
+    const generation = this.generation;
+    const stored = await this.storage.read();
+    if (generation !== this.generation) throw new Error("Phiên đăng nhập đã thay đổi.");
+    this.refreshToken = stored;
     if (!this.refreshToken) return false;
     await this.refresh();
     return true;

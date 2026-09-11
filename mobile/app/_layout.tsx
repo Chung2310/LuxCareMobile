@@ -43,7 +43,7 @@ function Routes() {
     });
   }, [minTimeElapsed, loading, fontsLoaded, fadeAnim]);
 
-  if ((!splashFinished && loading) || !fontsLoaded) {
+  if (loading || !fontsLoaded) {
     return (
       <View style={splashStyles.container}>
         <StatusBar style="dark" />

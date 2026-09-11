@@ -17,6 +17,29 @@ function setup(network: typeof fetch) {
   return { api, storage };
 }
 describe("native API sessions", () => {
+  it("retains refresh credentials on a 503 during autologin", async () => {
+    const { api, storage } = setup(async () => json({ code: "AUTH_TEMPORARILY_UNAVAILABLE", message: "Retry later" }, 503));
+    const expired = vi.fn();
+    api.onSessionExpired = expired;
+    await api.setSession("access", "refresh");
+    await expect(api.restore()).rejects.toMatchObject({ status: 503 });
+    expect(await storage.read()).toBe("refresh");
+    expect(expired).not.toHaveBeenCalled();
+  });
+  it("does not restore credentials read before a concurrent logout", async () => {
+    let resolveRead!: (value: string) => void;
+    const network = vi.fn();
+    const api = new MobileApi("https://example.com", {
+      read: () => new Promise(resolve => { resolveRead = resolve; }),
+      write: async () => {}, clear: async () => {},
+    }, network);
+    const pending = api.restore();
+    await api.clear();
+    resolveRead("old-refresh");
+    await expect(pending).rejects.toThrow("Phiên đăng nhập đã thay đổi.");
+    expect(network).not.toHaveBeenCalled();
+    expect(api.getAccessToken()).toBeNull();
+  });
   it("explains attendance gate errors that only contain a reason code", async () => {
     const { api } = setup(async () => json({ reasonCode: "outside_radius" }, 403));
     await expect(api.transport.fetch("/api/v1/timekeeping/check-in", { method: "POST" })).rejects.toMatchObject({

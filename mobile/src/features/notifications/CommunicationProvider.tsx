@@ -11,6 +11,7 @@ import { useSession } from "../../auth/SessionProvider";
 import { canUseModule } from "../../auth/access";
 import type { BlogPost } from "../../../../src/services/blogService";
 import { countBlogUnread, mergeBlogSeen } from "./communicationState";
+import { RealtimeNotificationToast } from "./RealtimeNotificationToast";
 export { communicationBadge } from "./communicationState";
 
 type State = { blogUnread: number; chatUnread: number; blogRevision: number; chatRevision: number;
@@ -183,11 +184,29 @@ export function CommunicationProvider({ children }: React.PropsWithChildren) {
   const chatUnread = chatCount.scope === scope && canUseModule(user, "chat") ? chatCount.count : 0;
   return <Context.Provider value={{ blogUnread, chatUnread, blogRevision, chatRevision, markBlogSeen, setActiveChatRoom, refreshChat }}>
     {children}
-    {banner?.scope === scope && user && <View style={{ position: "absolute", top: insets.top + 8, left: 16, right: 16, borderRadius: 16, padding: 16, backgroundColor: "#065f46", zIndex: 2100, elevation: 21 }}>
-      <Pressable onPress={() => {
-        router.push(banner.roomId ? { pathname: "/(tabs)/chat", params: { roomId: banner.roomId } } : "/(tabs)/blog"); setBanner(null);
-      }}><Text style={{ color: "white", fontWeight: "700" }}>{banner.title}</Text><Text numberOfLines={2} style={{ color: "white" }}>{banner.body}</Text></Pressable>
-      <Pressable accessibilityLabel="Đóng thông báo" onPress={() => setBanner(null)}><Text style={{ color: "white", marginTop: 8 }}>Đóng</Text></Pressable>
-    </View>}
+    {banner?.scope === scope && user && (
+      <RealtimeNotificationToast
+        banner={{
+          title: banner.title,
+          body: banner.body,
+          data: {
+            action: {
+              tab: banner.roomId ? "chat" : "blog",
+              subTab: banner.roomId ? "Trò chuyện" : "Bản tin",
+            },
+          },
+        }}
+        topInset={insets.top}
+        onPress={() => {
+          router.push(
+            banner.roomId
+              ? { pathname: "/(tabs)/chat", params: { roomId: banner.roomId } }
+              : "/(tabs)/blog"
+          );
+          setBanner(null);
+        }}
+        onDismiss={() => setBanner(null)}
+      />
+    )}
   </Context.Provider>;
 }

@@ -12,6 +12,7 @@ import {
 } from "react-native";
 import { SafeAreaView } from "react-native-safe-area-context";
 import { router, useFocusEffect } from "expo-router";
+import { Ionicons } from "@expo/vector-icons";
 import type {
   GetNotificationsResponse,
   NotifType,
@@ -21,6 +22,7 @@ import { notifications } from "../../src/api/services";
 import { messageOf, useSession } from "../../src/auth/SessionProvider";
 import { notificationTarget } from "../../src/features/navigation/notificationTarget";
 import { useNotifications, NotificationPermissionNotice } from "../../src/features/notifications/NotificationProvider";
+import { detectNotificationCategory } from "../../src/features/notifications/category";
 
 function formatNotificationTime(isoString: string): string {
   try {
@@ -48,21 +50,6 @@ function formatNotificationTime(isoString: string): string {
     return `${day}/${month}/${year} ${hours}:${mins}`;
   } catch {
     return isoString;
-  }
-}
-
-function getNotificationTypeInfo(type: string) {
-  switch (type) {
-    case "task":
-      return { label: "Công việc", icon: "📋", color: "#2563eb", bg: "#eff6ff" };
-    case "training":
-      return { label: "Đào tạo", icon: "🎓", color: "#7c3aed", bg: "#f5f3ff" };
-    case "he-thong":
-      return { label: "Hệ thống", icon: "⚙️", color: "#475569", bg: "#f1f5f9" };
-    case "kho":
-      return { label: "Kho", icon: "📦", color: "#d97706", bg: "#fffbeb" };
-    default:
-      return { label: "Thông báo", icon: "🔔", color: "#059669", bg: "#ecfdf5" };
   }
 }
 
@@ -169,13 +156,17 @@ export default function Notifications() {
   const totalPages = data ? Math.ceil(data.total / data.limit) || 1 : 1;
   const unreadCount = data?.unreadCount || 0;
 
-  const filterTabs: Array<{ id: string; label: string; unreadBadge?: boolean }> = [
-    { id: "all", label: "Tất cả" },
-    { id: "unread", label: unreadCount > 0 ? `Chưa đọc (${unreadCount})` : "Chưa đọc" },
-    { id: "task", label: "📋 Công việc" },
-    { id: "training", label: "🎓 Đào tạo" },
-    { id: "he-thong", label: "⚙️ Hệ thống" },
-    { id: "kho", label: "📦 Kho" },
+  const filterTabs: Array<{
+    id: string;
+    label: string;
+    icon?: React.ComponentProps<typeof Ionicons>["name"];
+  }> = [
+    { id: "all", label: "Tất cả", icon: "apps-outline" },
+    { id: "unread", label: unreadCount > 0 ? `Chưa đọc (${unreadCount})` : "Chưa đọc", icon: "mail-unread-outline" },
+    { id: "task", label: "Công việc", icon: "checkbox-outline" },
+    { id: "training", label: "Đào tạo", icon: "school-outline" },
+    { id: "kho", label: "Kho & Thiết bị", icon: "cube-outline" },
+    { id: "he-thong", label: "Hệ thống", icon: "settings-outline" },
   ];
 
   const currentTab = unreadOnly ? "unread" : type || "all";
@@ -196,7 +187,7 @@ export default function Notifications() {
   };
 
   const renderItem = ({ item }: { item: WebNotification }) => {
-    const typeInfo = getNotificationTypeInfo(item.type);
+    const categoryInfo = detectNotificationCategory(item.title, item.body, item.action);
     const destination = item.action ? notificationTarget(item, user) : null;
     const isUnread = !item.read;
 
@@ -205,12 +196,28 @@ export default function Notifications() {
         {/* Type Icon and Status Header */}
         <View style={styles.cardHeader}>
           <View style={styles.typeBadgeRow}>
-            <View style={[styles.typeIconBox, { backgroundColor: typeInfo.bg }]}>
-              <Text style={styles.typeIcon}>{typeInfo.icon}</Text>
+            <View
+              style={[
+                styles.typeIconBox,
+                { backgroundColor: categoryInfo.bg, borderColor: categoryInfo.borderColor },
+              ]}
+            >
+              <Ionicons name={categoryInfo.iconName} size={18} color={categoryInfo.color} />
             </View>
-            <View>
-              <Text style={[styles.typeLabel, { color: typeInfo.color }]}>{typeInfo.label}</Text>
-              <Text style={styles.timeText}>{formatNotificationTime(item.createdAt)}</Text>
+            <View style={{ gap: 2 }}>
+              <View style={styles.categoryRow}>
+                <View
+                  style={[
+                    styles.categoryBadge,
+                    { backgroundColor: categoryInfo.bg, borderColor: categoryInfo.borderColor },
+                  ]}
+                >
+                  <Text style={[styles.categoryBadgeText, { color: categoryInfo.color }]}>
+                    {categoryInfo.label}
+                  </Text>
+                </View>
+                <Text style={styles.timeText}>• {formatNotificationTime(item.createdAt)}</Text>
+              </View>
             </View>
           </View>
 
@@ -242,7 +249,7 @@ export default function Notifications() {
             onPress={() => void openNotification(item)}
           >
             <Text style={styles.targetBtnText}>{destination.target.label}</Text>
-            <Text style={styles.targetBtnArrow}>→</Text>
+            <Ionicons name="arrow-forward" size={14} color="#15803d" />
           </Pressable>
         )}
 
@@ -258,7 +265,7 @@ export default function Notifications() {
               disabled={busy}
               onPress={() => void mutate(() => notifications.markAsRead(item._id))}
             >
-              <Text style={styles.markReadBtnIcon}>✓</Text>
+              <Ionicons name="checkmark-done" size={15} color="#059669" />
               <Text style={styles.markReadBtnText}>Đánh dấu đã đọc</Text>
             </Pressable>
           )}
@@ -281,7 +288,7 @@ export default function Notifications() {
               ])
             }
           >
-            <Text style={styles.deleteBtnIcon}>🗑️</Text>
+            <Ionicons name="trash-outline" size={14} color="#ef4444" />
             <Text style={styles.deleteBtnText}>Xóa</Text>
           </Pressable>
         </View>
@@ -313,7 +320,7 @@ export default function Notifications() {
             disabled={busy}
             onPress={handleMarkAllRead}
           >
-            <Text style={styles.markAllBtnIcon}>✓✓</Text>
+            <Ionicons name="checkmark-done" size={15} color="#059669" />
             <Text style={styles.markAllBtnText}>Đọc hết</Text>
           </Pressable>
         )}
@@ -335,6 +342,14 @@ export default function Notifications() {
                 onPress={() => handleSelectTab(tab.id)}
                 disabled={busy}
               >
+                {tab.icon && (
+                  <Ionicons
+                    name={tab.icon}
+                    size={14}
+                    color={active ? "#ffffff" : "#475569"}
+                    style={{ marginRight: 5 }}
+                  />
+                )}
                 <Text
                   style={[
                     styles.filterPillText,
@@ -379,7 +394,9 @@ export default function Notifications() {
             </View>
           ) : (
             <View style={styles.emptyContainer}>
-              <Text style={styles.emptyIcon}>📭</Text>
+              <View style={styles.emptyIconBox}>
+                <Ionicons name="notifications-outline" size={28} color="#94a3b8" />
+              </View>
               <Text style={styles.emptyTitle}>Chưa có thông báo nào</Text>
               <Text style={styles.emptySub}>
                 {unreadOnly
@@ -392,7 +409,10 @@ export default function Notifications() {
                 style={styles.refreshBtn}
                 onPress={() => setRevision((v) => v + 1)}
               >
-                <Text style={styles.refreshBtnText}>🔄 Làm mới</Text>
+                <View style={{ flexDirection: "row", alignItems: "center", gap: 5 }}>
+                  <Ionicons name="reload-outline" size={14} color="#334155" />
+                  <Text style={styles.refreshBtnText}>Làm mới</Text>
+                </View>
               </Pressable>
             </View>
           )
@@ -583,20 +603,28 @@ const styles = StyleSheet.create({
     gap: 10,
   },
   typeIconBox: {
-    width: 34,
-    height: 34,
-    borderRadius: 10,
+    width: 36,
+    height: 36,
+    borderRadius: 11,
     alignItems: "center",
     justifyContent: "center",
+    borderWidth: 1,
   },
-  typeIcon: {
-    fontSize: 16,
+  categoryRow: {
+    flexDirection: "row",
+    alignItems: "center",
+    gap: 6,
   },
-  typeLabel: {
-    fontSize: 11,
+  categoryBadge: {
+    paddingVertical: 2.5,
+    paddingHorizontal: 7,
+    borderRadius: 6,
+    borderWidth: 1,
+  },
+  categoryBadgeText: {
+    fontSize: 10.5,
     fontWeight: "700",
-    textTransform: "uppercase",
-    letterSpacing: 0.4,
+    letterSpacing: 0.2,
   },
   timeText: {
     fontSize: 12,
@@ -712,8 +740,13 @@ const styles = StyleSheet.create({
     paddingHorizontal: 20,
     gap: 10,
   },
-  emptyIcon: {
-    fontSize: 48,
+  emptyIconBox: {
+    width: 60,
+    height: 60,
+    borderRadius: 30,
+    backgroundColor: "#f1f5f9",
+    alignItems: "center",
+    justifyContent: "center",
     marginBottom: 4,
   },
   emptyTitle: {
