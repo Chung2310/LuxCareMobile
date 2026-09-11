@@ -1,6 +1,7 @@
 import React, { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import {
   ActivityIndicator,
+  AppState,
   Alert,
   Animated,
   BackHandler,
@@ -37,6 +38,9 @@ import * as FileSystem from "expo-file-system/legacy";
 import { File } from "expo-file-system";
 import * as Sharing from "expo-sharing";
 import { useSession } from "../../src/auth/SessionProvider";
+import { useFocusEffect, useLocalSearchParams, router } from "expo-router";
+import { useCommunication } from "../../src/features/notifications/CommunicationProvider";
+import { socketService } from "../../src/api/socketService";
 import { api, chat, kanbanMedia } from "../../src/api/services";
 import { userManagementApi } from "../../src/api/userManagementApi";
 import type {
@@ -507,6 +511,17 @@ function AnimatedReactionItem({
 }
 
 export default function ChatScreen() {
+  const { chatRevision, setActiveChatRoom, refreshChat } = useCommunication();
+  const { roomId: requestedRoom } = useLocalSearchParams<{ roomId?: string }>();
+  const [focused, setFocused] = useState(false);
+  const focusedRef = useRef(false);
+  const activeIdRef = useRef<string | null>(null);
+  const messageVersion = useRef(0);
+  const roomsVersion = useRef(0);
+  useFocusEffect(useCallback(() => {
+    focusedRef.current = true; setFocused(true);
+    return () => { focusedRef.current = false; setFocused(false); messageVersion.current++; };
+  }, []));
   const insets = useSafeAreaInsets();
   const { user } = useSession();
   const currentUserId = (user as any)?._id || user?.uid || "";
@@ -520,6 +535,16 @@ export default function ChatScreen() {
 
   // Active Chat Room State
   const [activeRoom, setActiveRoom] = useState<ChatRoom | null>(null);
+  activeIdRef.current = activeRoom?._id || null;
+  useEffect(() => {
+    setActiveChatRoom(focused ? activeRoom?._id || null : null);
+    return () => setActiveChatRoom(null);
+  }, [focused, activeRoom?._id, setActiveChatRoom]);
+  useEffect(() => {
+    if (!requestedRoom || !focused) return;
+    const room = rooms.find(item => item._id === requestedRoom);
+    if (room) { setActiveRoom(room); router.setParams({ roomId: undefined }); }
+  }, [requestedRoom, rooms, focused]);
   const [messages, setMessages] = useState<ChatMessage[]>([]);
   const [loadingMessages, setLoadingMessages] = useState(false);
   const [inputText, setInputText] = useState("");
@@ -635,10 +660,13 @@ export default function ChatScreen() {
 
   // 1. Fetch Rooms from API
   const loadRooms = useCallback(async (silent = false) => {
+    const version = ++roomsVersion.current;
     if (!silent) setLoadingRooms(true);
     try {
       const data = await chat.getRooms();
+      if (version !== roomsVersion.current) return;
       setRooms(data);
+      setActiveRoom(current => current ? data.find(room => room._id === current._id) || null : null);
     } catch (err: any) {
       if (err?.message?.includes("canceled") || err?.name === "AbortError") return;
       console.warn("Lỗi tải danh sách phòng chat:", err?.message);
@@ -649,8 +677,8 @@ export default function ChatScreen() {
   }, []);
 
   useEffect(() => {
-    void loadRooms();
-  }, [loadRooms]);
+    if (focused) void loadRooms(true);
+  }, [loadRooms, focused, chatRevision]);
 
   const onRefresh = useCallback(() => {
     setRefreshing(true);
@@ -659,15 +687,18 @@ export default function ChatScreen() {
 
   // 2. Load Messages for Active Room
   const loadMessages = useCallback(async (roomId: string, silent = false) => {
+    const version = ++messageVersion.current;
     if (!silent) setLoadingMessages(true);
     try {
       const data = await chat.getMessages(roomId, 60);
+      if (version !== messageVersion.current || roomId !== activeIdRef.current || !focusedRef.current || AppState.currentState !== "active") return;
       // Sắp xếp theo thứ tự thời gian tăng dần (cũ ở trên, mới nhất ở dưới cùng giống Zalo)
       const sorted = [...data].sort(
         (a, b) => new Date(a.createdAt).getTime() - new Date(b.createdAt).getTime(),
       );
       setMessages(sorted);
-      void chat.markAsRead(roomId);
+      if (data.some(message => !message.readBy?.includes(currentUserId)))
+        void chat.markAsRead(roomId).then(refreshChat).catch(() => {});
 
       // Nếu mới vào phòng lần đầu, cuộn xuống dưới cùng
       if (!initialScrollDoneRef.current) {
@@ -680,25 +711,34 @@ export default function ChatScreen() {
       if (err?.message?.includes("canceled") || err?.name === "AbortError") return;
       console.warn("Lỗi tải tin nhắn:", err?.message);
     } finally {
-      setLoadingMessages(false);
+      if (version === messageVersion.current) setLoadingMessages(false);
     }
-  }, []);
+  }, [currentUserId, refreshChat]);
 
-  // Polling for real-time messages when a room is active
+  useEffect(() => socketService.subscribe("internal_messages_read", event => {
+    if (!focusedRef.current) return;
+    void loadRooms(true);
+    if (event?.roomId !== activeIdRef.current || typeof event.userId !== "string") return;
+    setMessages(current => current.map(message => message.readBy?.includes(event.userId) ? message : {
+      ...message, readBy: [...(message.readBy || []), event.userId],
+    }));
+  }), [loadRooms]);
+
+  // Socket updates immediately; polling is only a fallback while disconnected.
   useEffect(() => {
-    if (activeRoom?._id) {
-      void loadMessages(activeRoom._id);
+    if (focused && activeRoom?._id) {
+      void loadMessages(activeRoom._id, initialScrollDoneRef.current);
       if (pollingRef.current) clearInterval(pollingRef.current);
       pollingRef.current = setInterval(() => {
-        void loadMessages(activeRoom._id, true);
-      }, 3500);
+        if (!socketService.isConnected && AppState.currentState === "active") void loadMessages(activeRoom._id, true);
+      }, 15000);
     } else {
       if (pollingRef.current) clearInterval(pollingRef.current);
     }
     return () => {
       if (pollingRef.current) clearInterval(pollingRef.current);
     };
-  }, [activeRoom?._id, loadMessages]);
+  }, [focused, activeRoom?._id, loadMessages, chatRevision]);
 
   // 3. Open Conversation
   const handleOpenRoom = (room: ChatRoom) => {
@@ -4837,4 +4877,3 @@ const styles = StyleSheet.create({
     color: "#dc2626",
   },
 });
-

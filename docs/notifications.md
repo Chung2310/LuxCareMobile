@@ -1,5 +1,15 @@
 # Thông báo realtime và push mobile
 
+## Chat và Blog realtime
+
+`CommunicationProvider` nghe các event có sẵn của backend: `internal_new_message`, `internal_room_updated/deleted`, `internal_message_edited/deleted/reaction`, `internal_messages_read`, `blog_post_created/deleted/pinned/liked`. Không cần thêm endpoint backend cho phần realtime này.
+
+Chat hiển thị banner khi nhận tin của người khác ngoài phòng đang xem, mở đúng phòng khi chạm banner, và lấy số chưa đọc từ API cho tab/icon chức năng. Phòng đang mở cập nhật theo socket; polling 15 giây chỉ dự phòng khi mất socket. App không đánh dấu đã đọc khi tab không hiển thị hoặc app chạy nền.
+
+Blog hiển thị banner bài mới và số bài chưa xem trên icon ở trang chủ, danh sách chức năng và mục ghim. Đánh dấu đã xem khi kênh được tải thành công trong màn hình đang mở. Chỉ tính 50 bài API đang trả về, không tính bài tự đăng. Lần đồng bộ đầu tiên trên thiết bị lấy các bài hiện tại làm mốc; các bài mới sau đó được đếm. Trạng thái xem lưu riêng theo API server/công ty/tài khoản trên thiết bị, chưa đồng bộ đã xem giữa nhiều thiết bị. Khi reconnect/foreground, tải lại API để cập nhật nội dung và badge.
+
+Phần Chat/Blog này là realtime trong app, chạy được trên Expo Go; chưa bổ sung push nền cho hai loại nội dung này.
+
 Expo Go: không nạp `expo-notifications` hoặc gọi API native push. Vẫn dùng socket, banner và badge trong ứng dụng; màn hình Thông báo giải thích giới hạn này. Luồng xin quyền và push native chạy trong development/release build của LuxCare.
 
 Backend: `E:/Igen/LuxCare`. Mobile: `mobile/`.

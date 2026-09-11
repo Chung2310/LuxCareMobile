@@ -1,4 +1,4 @@
-import React, { useState, useEffect, useRef, useMemo } from "react";
+import React, { useState, useEffect, useRef, useMemo, useCallback } from "react";
 import {
   StyleSheet,
   View,
@@ -24,7 +24,8 @@ import * as Sharing from "expo-sharing";
 import * as FileSystem from "expo-file-system/legacy";
 import { File } from "expo-file-system";
 import { SafeAreaView } from "react-native-safe-area-context";
-import { useRouter } from "expo-router";
+import { useRouter, useFocusEffect } from "expo-router";
+import { useCommunication } from "../../src/features/notifications/CommunicationProvider";
 import { Ionicons } from "@expo/vector-icons";
 import Svg, { Path } from "react-native-svg";
 import { useSession } from "../../src/auth/SessionProvider";
@@ -59,6 +60,13 @@ function PinIcon({ size = 15, color = "#92400e", style }: { size?: number; color
 }
 
 export default function BlogScreen() {
+  const { blogRevision, markBlogSeen } = useCommunication();
+  const [focused, setFocused] = useState(false);
+  const requestVersion = useRef(0);
+  useFocusEffect(useCallback(() => {
+    setFocused(true);
+    return () => { setFocused(false); requestVersion.current++; };
+  }, []));
   const router = useRouter();
   const { user, logout } = useSession();
   const isEditor = isBlogEditorUser(user);
@@ -156,20 +164,28 @@ export default function BlogScreen() {
   const scrollViewRef = useRef<ScrollView>(null);
 
   useEffect(() => {
-    void loadBlogData();
-  }, [selectedChannel]);
+    if (focused) void loadBlogData();
+  }, [selectedChannel, focused, blogRevision, user?.uid, user?.companyCode]);
+
+  useEffect(() => {
+    if (focused && !loading) markBlogSeen(posts.map(post => post.id));
+  }, [focused, loading, posts, markBlogSeen]);
 
   const loadBlogData = async () => {
+    const version = ++requestVersion.current;
     setLoading(true);
     try {
       const fetchedChannels = await blog.getChannels();
+      if (version !== requestVersion.current) return;
       if (fetchedChannels.length > 0) setChannels(fetchedChannels);
 
-      const fetchedPosts = await blog.getPosts(selectedChannel.id);
+      const fetchedPosts = await blog.getPosts(selectedChannel.id, true);
+      if (version !== requestVersion.current) return;
       setPosts(fetchedPosts);
     } catch {
       // Handled in service fallback
     } finally {
+      if (version !== requestVersion.current) return;
       setLoading(false);
       setRefreshing(false);
     }
@@ -2167,4 +2183,3 @@ const styles = StyleSheet.create({
     fontWeight: "600",
   },
 });
-

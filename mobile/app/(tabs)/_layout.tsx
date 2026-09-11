@@ -4,6 +4,7 @@ import { Redirect, Tabs } from "expo-router";
 import { useSafeAreaInsets } from "react-native-safe-area-context";
 import { Ionicons } from "@expo/vector-icons";
 import { useSession } from "../../src/auth/SessionProvider";
+import { useCommunication } from "../../src/features/notifications/CommunicationProvider";
 import { useNotifications } from "../../src/features/notifications/NotificationProvider";
 import { colors } from "../../src/ui";
 import { canUseModule } from "../../src/auth/access";
@@ -160,6 +161,7 @@ function MomoTabButton(props: any) {
 }
 
 export default function TabLayout() {
+  const { chatUnread } = useCommunication();
   const { unreadCount } = useNotifications();
   const { user, selectedBranch } = useSession();
   const insets = useSafeAreaInsets();
@@ -233,6 +235,7 @@ export default function TabLayout() {
         name="chat"
         options={{
           title: "Trò chuyện",
+          tabBarBadge: chatUnread > 0 ? (chatUnread > 99 ? "99+" : chatUnread) : undefined,
           headerShown: false,
           href: isEditor ? null : undefined,
           tabBarIcon: ({ focused }) => (

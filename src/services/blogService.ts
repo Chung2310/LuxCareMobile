@@ -164,7 +164,7 @@ export function createBlogService({ fetch, getAccessToken }: ServiceTransport) {
       return DEFAULT_BLOG_CHANNELS;
     },
 
-    getPosts: async (channelId = "all"): Promise<BlogPost[]> => {
+    getPosts: async (channelId = "all", strict = false): Promise<BlogPost[]> => {
       try {
         const queryParams = new URLSearchParams();
         if (channelId && channelId !== "all" && channelId !== "tat-ca") {
@@ -192,7 +192,8 @@ export function createBlogService({ fetch, getAccessToken }: ServiceTransport) {
           return list.map(normalizePost);
         }
       } catch {
-        // Return empty array if request fails
+        // Preserve the previous snapshot when realtime refresh fails.
+        if (strict) throw new Error("Không thể tải bài viết Blog.");
       }
       return [];
     },

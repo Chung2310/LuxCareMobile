@@ -24,6 +24,7 @@ import type {
 import type { DashboardSummaryParams } from "../../../src/services/dashboardService";
 import { dashboard } from "../../src/api/services";
 import { messageOf, useSession } from "../../src/auth/SessionProvider";
+import { useCommunication, communicationBadge } from "../../src/features/notifications/CommunicationProvider";
 import { canUseModule } from "../../src/auth/access";
 import { useAppLoading } from "../../src/context/LoadingContext";
 import { DashboardOverviewSection } from "../../src/components/dashboard";
@@ -46,6 +47,8 @@ interface LuxCareFeature {
 }
 
 export default function Home() {
+  const { blogUnread, chatUnread } = useCommunication();
+  const badgeFor = (item: { route: string; badge?: string }) => communicationBadge(item.route, blogUnread, chatUnread, item.badge);
   const { user, selectedBranch } = useSession();
   const { unreadCount, refresh: refreshNotifications } = useNotifications();
   const { navigateWithLoading } = useAppLoading();
@@ -653,9 +656,9 @@ export default function Home() {
                 >
                   <View style={uiStyles.iconWrapper}>
                     <Ionicons name={item.icon} size={28} color={item.color} />
-                    {item.badge && (
+                    {badgeFor(item) && (
                       <View style={uiStyles.serviceBadge}>
-                        <Text style={uiStyles.serviceBadgeText}>{item.badge}</Text>
+                        <Text style={uiStyles.serviceBadgeText}>{badgeFor(item)}</Text>
                       </View>
                     )}
                   </View>
@@ -689,9 +692,9 @@ export default function Home() {
                 >
                   <View style={uiStyles.recommendIconBox}>
                     <Ionicons name={item.icon as any} size={28} color={item.color} />
-                    {item.badge && (
+                    {badgeFor(item) && (
                       <View style={uiStyles.serviceBadge}>
-                        <Text style={uiStyles.serviceBadgeText}>{item.badge}</Text>
+                        <Text style={uiStyles.serviceBadgeText}>{badgeFor(item)}</Text>
                       </View>
                     )}
                   </View>

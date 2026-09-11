@@ -6,6 +6,7 @@ import { useFonts } from "expo-font";
 import { SafeAreaProvider } from "react-native-safe-area-context";
 import { SessionProvider, useSession } from "../src/auth/SessionProvider";
 import { NotificationProvider } from "../src/features/notifications/NotificationProvider";
+import { CommunicationProvider } from "../src/features/notifications/CommunicationProvider";
 import { LoadingProvider } from "../src/context/LoadingContext";
 import { Button, ErrorText, Page } from "../src/ui";
 
@@ -107,10 +108,12 @@ export default function RootLayout() {
     <SafeAreaProvider>
       <SessionProvider>
         <NotificationProvider>
+        <CommunicationProvider>
         <LoadingProvider>
           <StatusBar style="dark" />
           <Routes />
         </LoadingProvider>
+        </CommunicationProvider>
         </NotificationProvider>
       </SessionProvider>
     </SafeAreaProvider>
