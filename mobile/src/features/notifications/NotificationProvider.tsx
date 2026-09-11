@@ -12,6 +12,7 @@ import { useSession } from "../../auth/SessionProvider";
 import { notificationTarget } from "../navigation/notificationTarget";
 import { belongsToUser, parseNoticePayload, type NoticePayload } from "./payload";
 import { RealtimeNotificationToast } from "./RealtimeNotificationToast";
+import { playNotificationSound, stopNotificationSound } from "./notificationSound";
 
 // Foreground presentation is owned by the same banner for socket and push events.
 if (Notifications) Notifications.setNotificationHandler({ handleNotification: async () => ({
@@ -27,6 +28,7 @@ async function initialPermission() {
   if (!permissionRequest) permissionRequest = (async () => {
     if (Platform.OS === "android") await Notifications.setNotificationChannelAsync("default", {
       name: "Thông báo LuxCare", importance: Notifications.AndroidImportance.HIGH,
+      sound: "default",
     });
     const permission = await Notifications.getPermissionsAsync();
     return permission.status === "undetermined" && permission.canAskAgain
@@ -86,6 +88,7 @@ export function NotificationProvider({ children }: React.PropsWithChildren) {
     setUnreadCount(0);
     setWorkUnread(0);
     setBanner(null);
+    stopNotificationSound();
     setPushError(nativeNotificationsUnavailableReason);
     let active = true;
     let registering = false;
@@ -147,8 +150,10 @@ export function NotificationProvider({ children }: React.PropsWithChildren) {
       if (seen.current.has(data.notificationId)) return;
       seen.current.add(data.notificationId);
       if (seen.current.size > 200) seen.current.delete(seen.current.values().next().value!);
-      if (AppState.currentState === "active") setBanner({ data,
-        title: typeof title === "string" ? title : "Thông báo LuxCare", body: typeof body === "string" ? body : "" });
+      if (AppState.currentState === "active") {
+        setBanner({ data, title: typeof title === "string" ? title : "Thông báo LuxCare", body: typeof body === "string" ? body : "" });
+        playNotificationSound();
+      }
     };
     const off = socketService.subscribe("new_notification", raw => receive(raw, raw?.title, raw?.body));
     const offChanged = socketService.subscribe("notifications:changed", refresh);

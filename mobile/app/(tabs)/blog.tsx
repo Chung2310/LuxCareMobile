@@ -28,6 +28,7 @@ import { SafeAreaView } from "react-native-safe-area-context";
 import { useRouter, useFocusEffect } from "expo-router";
 import { useCommunication } from "../../src/features/notifications/CommunicationProvider";
 import { saveDownloadedMedia } from "../../src/features/blog/saveDownloadedMedia";
+import { prepareLocalBlogFile } from "../../src/features/blog/prepareLocalBlogFile";
 import { Ionicons } from "@expo/vector-icons";
 import Svg, { Path } from "react-native-svg";
 import { useSession } from "../../src/auth/SessionProvider";
@@ -363,10 +364,7 @@ export default function BlogScreen() {
       const file = new File(uri);
       base64 = await file.base64();
     } catch {
-      const fs = await import("expo-file-system");
-      if (fs.readAsStringAsync) {
-        base64 = await fs.readAsStringAsync(uri, { encoding: "base64" as any });
-      }
+      base64 = await FileSystem.readAsStringAsync(uri, { encoding: "base64" });
     }
 
     if (base64) {
@@ -412,9 +410,11 @@ export default function BlogScreen() {
                 url: att.localUri,
                 size: att.sizeBytes ?? 0,
               });
+            } else {
+              throw new Error("Tệp chưa được tải lên máy chủ.");
             }
           } catch (uploadErr) {
-            console.warn("[BlogScreen] Tải tệp lên Cloudinary thất bại:", uploadErr);
+            throw new Error(`Không thể tải lên tệp "${att.name}". Vui lòng chọn lại tệp hoặc thử lại. Bài viết chưa được đăng.`);
           }
         }
       }
@@ -654,16 +654,7 @@ export default function BlogScreen() {
         }
         localUri = res.uri;
       } else if (url.startsWith("file://") || url.startsWith("content://")) {
-        // Tệp cục bộ đã có sẵn trên máy
-        localUri = url;
-        try {
-          if (url !== destPath) {
-            await FileSystem.copyAsync({ from: url, to: destPath });
-            localUri = destPath;
-          }
-        } catch {
-          // nếu copy thất bại, vẫn sử dụng url ban đầu
-        }
+        localUri = await prepareLocalBlogFile(url, destPath, FileSystem);
       } else if (url.startsWith("data:")) {
         try {
           const base64Data = url.includes(",") ? url.split(",")[1] : url;
@@ -672,7 +663,7 @@ export default function BlogScreen() {
           });
           localUri = destPath;
         } catch (b64Err) {
-          console.warn("Lỗi ghi file base64:", b64Err);
+          throw new Error("Không thể tạo tệp từ dữ liệu đính kèm. Vui lòng thử lại.");
         }
       }
 
@@ -726,7 +717,7 @@ export default function BlogScreen() {
       }
 
       if (await Sharing.isAvailableAsync()) {
-        await Sharing.shareAsync(res.uri, { mimeType: getMimeType(ext), dialogTitle: "Lưu tệp đã tải" });
+        await Sharing.shareAsync(localUri, { mimeType: getMimeType(ext), dialogTitle: "Lưu tệp đã tải" });
         return;
       }
       // The sandbox copy is not necessarily accessible in Photos/Downloads.

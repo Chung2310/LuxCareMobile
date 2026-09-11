@@ -56,6 +56,10 @@ Kiểm thử thiết bị: dùng hai tài khoản, thử chat cá nhân và nhó
 
 ## Xác minh
 
+Âm thanh: banner foreground (thông báo chung, chat và Blog) phát file người dùng cung cấp `mobile/assets/notification_sound/universfield-new-notification-051-494246.mp3` (khoảng 2,46 giây), đóng gói cùng ứng dụng. Không còn tạo tiếng chuông WAV bằng code. Âm thanh chạy sau kiểm tra người nhận, mute và chống trùng event; giới hạn một tiếng mỗi giây khi nhiều tin đến cùng lúc. Không phát cho chat đang mở hoặc đã tắt thông báo. Dừng/giải phóng player khi app chuyển nền hoặc đổi phiên. Không thay đổi audio mode toàn ứng dụng.
+
+Push nền tiếp tục dùng `sound: "default"`, kênh Android `default` khai báo âm thanh mặc định. Âm thanh thực tế phụ thuộc âm lượng, chế độ im lặng/Không làm phiền và cài đặt thông báo của hệ điều hành. Nếu người dùng đã tắt tiếng kênh Android, cần bật lại trong Cài đặt; ứng dụng không ghi đè lựa chọn đó. Âm báo foreground hiện dành cho Android/iOS, chưa hỗ trợ web.
+
 Kiểm thử tự động: `npm test -- mobile/src/features/notifications/payload.test.ts mobile/src/api/socketService.test.ts mobile/src/api/client.test.ts mobile/src/features/navigation/notificationTarget.test.ts`; backend chạy `npx vitest run server/service/mobile-push.service.test.ts`. Chạy typecheck ở hai dự án và export Android/iOS.
 
 Trên thiết bị thật: cài mới → xin quyền trước login → đăng nhập → tạo công việc cho người dùng từ tài khoản khác → nhận đúng một banner foreground → background/khóa màn hình → nhận push → chạm mở đúng màn hình. Kiểm tra thêm từ chối quyền/mở Settings, mở từ trạng thái app chưa chạy, offline/reconnect, đọc/xóa/badge, logout/đổi phiên và token hết hiệu lực.
