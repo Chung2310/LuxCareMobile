@@ -29,6 +29,10 @@ export class MobileApi {
     }
   }
   onSessionExpired: () => void = () => {};
+  /** Returns the current in-memory access token (null if not authenticated). */
+  getAccessToken() {
+    return this.accessToken;
+  }
 
   constructor(
     private origin: string,

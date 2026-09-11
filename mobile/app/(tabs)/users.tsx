@@ -509,6 +509,7 @@ export default function UsersScreen() {
         defaultBranchId={selectedBranch?._id || currentUser?.branchId}
         companyCode={currentUser?.companyCode}
         companyName={currentUser?.companyName}
+        managers={users}
       />
 
       {/* 8. Modal Chi tiết & Phân quyền người dùng */}

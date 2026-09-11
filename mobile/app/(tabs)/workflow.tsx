@@ -1,6 +1,6 @@
 import { useCallback, useRef, useState, type MutableRefObject } from "react";
 import { Alert, Linking, Modal, Pressable, Text, View } from "react-native";
-import { useFocusEffect } from "expo-router";
+import { router, useFocusEffect } from "expo-router";
 import type { TaskAttachment, Workflow, WorkflowEdge, WorkflowStep } from "../../../src/types/hr";
 import { workflow } from "../../src/api/services";
 import { messageOf, useSession } from "../../src/auth/SessionProvider";
@@ -11,7 +11,7 @@ import { Button, Card, EmptyState, ErrorText, Loading, Page, styles } from "../.
 export default function WorkflowPage() {
   const { user, selectedBranch } = useSession();
   const access = workflowAccess(user);
-  const scopeReady = user?.role === "admin" ? !!selectedBranch?._id : !!user?.branchId;
+  const scopeReady = !!user?.companyCode || !!selectedBranch?._id || !!user?.branchId || user?.role === "superadmin";
   const [items, setItems] = useState<Workflow[]>([]);
   const [selected, setSelected] = useState<Workflow | null>(null);
   const [stepDetail, setStepDetail] = useState<{ step: WorkflowStep; index: number } | null>(null);
@@ -20,6 +20,29 @@ export default function WorkflowPage() {
   const [error, setError] = useState<string | null>(null);
   const [revision, setRevision] = useState(0);
   const formLock = useRef(false);
+
+  const HeaderBack = () => (
+    <View style={{ flexDirection: "row", alignItems: "center", gap: 8, marginBottom: 4 }}>
+      <Pressable
+        onPress={() => (router.canGoBack() ? router.back() : router.push("/(tabs)/modules"))}
+        style={{
+          paddingHorizontal: 10,
+          paddingVertical: 6,
+          borderRadius: 8,
+          backgroundColor: "#ffffff",
+          borderWidth: 1,
+          borderColor: "#e2e8f0",
+          flexDirection: "row",
+          alignItems: "center",
+          gap: 4,
+          alignSelf: "flex-start",
+        }}
+      >
+        <Text style={{ fontSize: 14, color: "#475569", fontWeight: "700" }}>{"‹"}</Text>
+        <Text style={{ fontSize: 12, color: "#475569", fontWeight: "700" }}>Quay lại</Text>
+      </Pressable>
+    </View>
+  );
 
   useFocusEffect(
     useCallback(() => {
@@ -76,6 +99,7 @@ export default function WorkflowPage() {
   if (!access.read || !scopeReady) {
     return (
       <Page title="Quy trình làm việc">
+        <HeaderBack />
         <Text style={styles.text}>Cần quyền xem quy trình và một chi nhánh hợp lệ để sử dụng chức năng này.</Text>
       </Page>
     );
@@ -85,6 +109,7 @@ export default function WorkflowPage() {
     return (
       <>
         <Page title={selected.name || "Quy trình chưa đặt tên"}>
+          <HeaderBack />
           <View style={styles.row}>
             <Button title="← Danh sách" onPress={() => setSelected(null)} />
             {access.manage && <Button title="Sửa" onPress={() => setEditing(selected)} />}
@@ -144,6 +169,7 @@ export default function WorkflowPage() {
   return (
     <>
       <Page title="Quy trình làm việc">
+        <HeaderBack />
         <View style={styles.row}>
           <View style={{ flex: 1 }}>
             <Text style={styles.muted}>{items.length} quy trình trong chi nhánh hiện tại</Text>

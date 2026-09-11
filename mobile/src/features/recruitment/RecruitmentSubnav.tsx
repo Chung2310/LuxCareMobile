@@ -7,12 +7,11 @@ const sections: Array<{
   key: RecruitmentSection;
   label: string;
   icon: string;
-  href: "/(tabs)/recruitment" | "/(tabs)/applicants" | "/(tabs)/interviews" | "/(tabs)/recruitment-pipeline";
+  href: "/(tabs)/recruitment" | "/(tabs)/applicants" | "/(tabs)/interviews";
 }> = [
   { key: "jobs", label: "Tin tuyển dụng", icon: "💼", href: "/(tabs)/recruitment" },
   { key: "applicants", label: "Ứng viên", icon: "👥", href: "/(tabs)/applicants" },
   { key: "interviews", label: "Lịch phỏng vấn", icon: "📅", href: "/(tabs)/interviews" },
-  { key: "pipeline", label: "Quy trình", icon: "📊", href: "/(tabs)/recruitment-pipeline" },
 ];
 
 export function RecruitmentSubnav({ active }: { active: RecruitmentSection }) {

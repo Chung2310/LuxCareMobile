@@ -1,4 +1,4 @@
-import React, { useState } from "react";
+import React, { useEffect, useMemo, useState } from "react";
 import {
   Alert,
   KeyboardAvoidingView,
@@ -14,10 +14,19 @@ import {
 import { SafeAreaView } from "react-native-safe-area-context";
 import { Ionicons } from "@expo/vector-icons";
 import { AppButton } from "../common/AppButton";
+import { DatePickerField } from "../common/DatePickerField";
 import { DropdownSelectField } from "../common/DropdownSelectField";
 import { ROLE_MAP } from "./UserCard";
-import type { CreateUserInput, UserRole } from "../../api/userManagementApi";
+import { userManagementApi, type CreateUserInput, type UserRole } from "../../api/userManagementApi";
 import type { BranchRecord } from "../../../../src/services/branchService";
+
+export interface ManagerOption {
+  uid: string;
+  displayName: string;
+  role?: string;
+  jobTitle?: string;
+  department?: string;
+}
 
 interface UserCreateModalProps {
   visible: boolean;
@@ -28,13 +37,13 @@ interface UserCreateModalProps {
   defaultBranchId?: string;
   companyCode?: string;
   companyName?: string;
+  managers?: ManagerOption[];
 }
 
 const ROLES_LIST: Array<{ id: UserRole; label: string; desc: string }> = [
   { id: "user", label: "Nhân viên", desc: "Nhân viên tác nghiệp chuyên môn / điều dưỡng / CSKH" },
   { id: "manager", label: "Quản lý", desc: "Trưởng khoa / Trưởng bộ phận phụ trách công việc" },
   { id: "branch_owner", label: "Chủ chi nhánh", desc: "Giám đốc / Phụ trách toàn diện cơ sở chi nhánh" },
-  { id: "admin", label: "Quản trị viên", desc: "Toàn quyền quản trị nhân sự và cấu hình hệ thống" },
 ];
 
 export const UserCreateModal: React.FC<UserCreateModalProps> = ({
@@ -46,6 +55,7 @@ export const UserCreateModal: React.FC<UserCreateModalProps> = ({
   defaultBranchId,
   companyCode,
   companyName,
+  managers,
 }) => {
   const [displayName, setDisplayName] = useState("");
   const [email, setEmail] = useState("");
@@ -56,12 +66,59 @@ export const UserCreateModal: React.FC<UserCreateModalProps> = ({
   const [department, setDepartment] = useState("");
   const [phone, setPhone] = useState("");
   const [jobTitle, setJobTitle] = useState("");
+  const [birthDate, setBirthDate] = useState("");
+  const [monthlySalary, setMonthlySalary] = useState("");
+  const [parentId, setParentId] = useState("");
+  const [jobDescriptionLink, setJobDescriptionLink] = useState("");
   const [loading, setLoading] = useState(false);
 
   // Sub-picker modals
   const [showRolePicker, setShowRolePicker] = useState(false);
   const [showBranchPicker, setShowBranchPicker] = useState(false);
   const [showDeptPicker, setShowDeptPicker] = useState(false);
+  const [showManagerPicker, setShowManagerPicker] = useState(false);
+  const [managerSearch, setManagerSearch] = useState("");
+  const [internalManagers, setInternalManagers] = useState<ManagerOption[]>([]);
+
+  useEffect(() => {
+    if (visible && (!managers || managers.length === 0)) {
+      userManagementApi
+        .getUsers({ companyCode })
+        .then((userList) => {
+          setInternalManagers(
+            userList.map((u) => ({
+              uid: (u as any)._id || u.uid,
+              displayName: u.displayName,
+              role: u.role,
+              jobTitle: u.jobTitle,
+              department: u.department,
+            }))
+          );
+        })
+        .catch(() => {});
+    }
+  }, [visible, managers, companyCode]);
+
+  const managerList = managers && managers.length > 0 ? managers : internalManagers;
+
+  const filteredManagers = useMemo(() => {
+    if (!managerSearch.trim()) return managerList;
+    const q = managerSearch.trim().toLowerCase();
+    return managerList.filter(
+      (m) =>
+        m.displayName?.toLowerCase().includes(q) ||
+        m.jobTitle?.toLowerCase().includes(q) ||
+        m.department?.toLowerCase().includes(q)
+    );
+  }, [managerList, managerSearch]);
+
+  const selectedManager = managerList.find((m) => m.uid === parentId);
+  const selectedManagerLabel = selectedManager
+    ? `${selectedManager.displayName}${selectedManager.jobTitle ? ` (${selectedManager.jobTitle})` : ""}`
+    : "-- Cấp cao nhất / Không có --";
+
+  const salaryNum = monthlySalary.replace(/[^0-9]/g, "");
+  const salaryPreview = salaryNum ? Number(salaryNum).toLocaleString("vi-VN") + " đ" : "";
 
   const resetForm = () => {
     setDisplayName("");
@@ -73,6 +130,11 @@ export const UserCreateModal: React.FC<UserCreateModalProps> = ({
     setDepartment("");
     setPhone("");
     setJobTitle("");
+    setBirthDate("");
+    setMonthlySalary("");
+    setParentId("");
+    setJobDescriptionLink("");
+    setManagerSearch("");
   };
 
   const handleClose = () => {
@@ -115,6 +177,26 @@ export const UserCreateModal: React.FC<UserCreateModalProps> = ({
       }
     }
 
+    const trimmedBirthDate = birthDate.trim();
+    if (trimmedBirthDate) {
+      const dateRegex = /^\d{4}-\d{2}-\d{2}$/;
+      if (!dateRegex.test(trimmedBirthDate)) {
+        Alert.alert(
+          "Ngày sinh không hợp lệ",
+          "Vui lòng nhập ngày sinh theo định dạng YYYY-MM-DD (Ví dụ: 1995-08-20)."
+        );
+        return;
+      }
+    }
+
+    if (role === "admin" || (role as string) === "superadmin") {
+      Alert.alert("Không được phép", "Không được phép tạo nhân sự mới với vai trò Quản trị viên (Admin).");
+      return;
+    }
+
+    const cleanedSalary = monthlySalary.replace(/[^0-9]/g, "");
+    const parsedSalary = cleanedSalary ? parseInt(cleanedSalary, 10) : undefined;
+
     setLoading(true);
     try {
       await onSubmit({
@@ -126,6 +208,10 @@ export const UserCreateModal: React.FC<UserCreateModalProps> = ({
         branchId: branchId || undefined,
         department: department || undefined,
         division: jobTitle.trim() || undefined,
+        birthDate: trimmedBirthDate || undefined,
+        monthlySalary: parsedSalary,
+        parentId: parentId || undefined,
+        jobDescriptionLink: jobDescriptionLink.trim() || undefined,
         companyCode: companyCode || undefined,
         companyName: companyName || undefined,
       });
@@ -285,6 +371,17 @@ export const UserCreateModal: React.FC<UserCreateModalProps> = ({
               />
             </View>
 
+            {/* Quản lý trực tiếp */}
+            <DropdownSelectField
+              label="Quản lý trực tiếp (Cấp trên)"
+              value={selectedManagerLabel}
+              placeholder="Chọn quản lý trực tiếp..."
+              icon="people-outline"
+              iconColor="#0284c7"
+              iconBgColor="#e0f2fe"
+              onPress={() => setShowManagerPicker(true)}
+            />
+
             {/* Số điện thoại */}
             <View style={styles.fieldGroup}>
               <Text style={styles.fieldLabel}>Số điện thoại</Text>
@@ -295,6 +392,46 @@ export const UserCreateModal: React.FC<UserCreateModalProps> = ({
                 keyboardType="phone-pad"
                 value={phone}
                 onChangeText={setPhone}
+              />
+            </View>
+
+            {/* Ngày sinh */}
+            <DatePickerField
+              label="Ngày sinh"
+              value={birthDate}
+              onChange={setBirthDate}
+              title="Chọn ngày sinh"
+              placeholder="Chọn ngày sinh..."
+              allowClear
+            />
+
+            {/* Mức lương tháng */}
+            <View style={styles.fieldGroup}>
+              <Text style={styles.fieldLabel}>Mức lương cơ bản hàng tháng (VNĐ)</Text>
+              <TextInput
+                style={styles.input}
+                placeholder="VD: 15000000"
+                placeholderTextColor="#94a3b8"
+                keyboardType="numeric"
+                value={monthlySalary}
+                onChangeText={setMonthlySalary}
+              />
+              {salaryPreview ? (
+                <Text style={styles.salaryPreviewText}>= {salaryPreview} / tháng</Text>
+              ) : null}
+            </View>
+
+            {/* Link mô tả công việc */}
+            <View style={styles.fieldGroup}>
+              <Text style={styles.fieldLabel}>Đường dẫn mô tả công việc (JD Link)</Text>
+              <TextInput
+                style={styles.input}
+                placeholder="https://drive.google.com/..."
+                placeholderTextColor="#94a3b8"
+                autoCapitalize="none"
+                keyboardType="url"
+                value={jobDescriptionLink}
+                onChangeText={setJobDescriptionLink}
               />
             </View>
           </ScrollView>
@@ -481,6 +618,104 @@ export const UserCreateModal: React.FC<UserCreateModalProps> = ({
             </View>
           </TouchableOpacity>
         </Modal>
+
+        {/* Modal Picker: Quản lý trực tiếp */}
+        <Modal
+          visible={showManagerPicker}
+          transparent
+          animationType="fade"
+          onRequestClose={() => setShowManagerPicker(false)}
+        >
+          <TouchableOpacity
+            style={styles.pickerBackdrop}
+            activeOpacity={1}
+            onPress={() => setShowManagerPicker(false)}
+          >
+            <View style={[styles.pickerCard, { maxHeight: "80%" }]}>
+              <Text style={styles.pickerTitle}>Chọn quản lý trực tiếp</Text>
+              
+              <View style={styles.searchBox}>
+                <Ionicons name="search" size={16} color="#94a3b8" />
+                <TextInput
+                  style={styles.searchInput}
+                  placeholder="Tìm theo tên hoặc chức vụ..."
+                  placeholderTextColor="#94a3b8"
+                  value={managerSearch}
+                  onChangeText={setManagerSearch}
+                  autoCapitalize="none"
+                />
+                {managerSearch ? (
+                  <TouchableOpacity onPress={() => setManagerSearch("")}>
+                    <Ionicons name="close-circle" size={16} color="#94a3b8" />
+                  </TouchableOpacity>
+                ) : null}
+              </View>
+
+              <ScrollView style={{ maxHeight: 300 }} keyboardShouldPersistTaps="handled">
+                <TouchableOpacity
+                  style={[
+                    styles.pickerItem,
+                    parentId === "" && styles.pickerItemActive,
+                  ]}
+                  onPress={() => {
+                    setParentId("");
+                    setShowManagerPicker(false);
+                  }}
+                >
+                  <View style={{ flex: 1 }}>
+                    <Text
+                      style={[
+                        styles.pickerItemText,
+                        parentId === "" && styles.pickerItemTextActive,
+                      ]}
+                    >
+                      -- Cấp cao nhất / Không có quản lý trực tiếp --
+                    </Text>
+                  </View>
+                  {parentId === "" && (
+                    <Ionicons name="checkmark" size={18} color="#059669" />
+                  )}
+                </TouchableOpacity>
+
+                {filteredManagers.map((m) => {
+                  const isSelected = parentId === m.uid;
+                  return (
+                    <TouchableOpacity
+                      key={m.uid}
+                      style={[
+                        styles.pickerItem,
+                        isSelected && styles.pickerItemActive,
+                      ]}
+                      onPress={() => {
+                        setParentId(m.uid);
+                        setShowManagerPicker(false);
+                      }}
+                    >
+                      <View style={{ flex: 1 }}>
+                        <Text
+                          style={[
+                            styles.pickerItemText,
+                            isSelected && styles.pickerItemTextActive,
+                          ]}
+                        >
+                          {m.displayName}
+                        </Text>
+                        {(m.jobTitle || m.department) ? (
+                          <Text style={styles.pickerSubText}>
+                            {[m.jobTitle, m.department].filter(Boolean).join(" • ")}
+                          </Text>
+                        ) : null}
+                      </View>
+                      {isSelected && (
+                        <Ionicons name="checkmark" size={18} color="#059669" />
+                      )}
+                    </TouchableOpacity>
+                  );
+                })}
+              </ScrollView>
+            </View>
+          </TouchableOpacity>
+        </Modal>
       </SafeAreaView>
     </Modal>
   );
@@ -638,5 +873,34 @@ const styles = StyleSheet.create({
   pickerItemTextActive: {
     color: "#059669",
     fontWeight: "600",
+  },
+  pickerSubText: {
+    fontSize: 11.5,
+    color: "#64748b",
+    marginTop: 2,
+  },
+  salaryPreviewText: {
+    fontSize: 12.5,
+    fontWeight: "600",
+    color: "#059669",
+    marginTop: 3,
+  },
+  searchBox: {
+    flexDirection: "row",
+    alignItems: "center",
+    backgroundColor: "#f8fafc",
+    borderWidth: 1,
+    borderColor: "#cbd5e1",
+    borderRadius: 10,
+    paddingHorizontal: 10,
+    height: 38,
+    marginBottom: 10,
+    gap: 6,
+  },
+  searchInput: {
+    flex: 1,
+    fontSize: 13,
+    color: "#0f172a",
+    paddingVertical: 0,
   },
 });

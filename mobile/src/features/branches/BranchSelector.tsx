@@ -28,7 +28,8 @@ export function BranchSelector({
   const [loading, setLoading] = useState(false);
   const revision = useRef(0);
 
-  if (user?.role !== "admin") return null;
+  const isOwner = ["admin", "superadmin", "branch_owner"].includes(user?.role || "");
+  if (!isOwner || !user) return null;
 
   const load = async () => {
     const request = ++revision.current;
@@ -56,7 +57,7 @@ export function BranchSelector({
   };
 
   const currentBranchName =
-    selectedBranch?.name || user.branchName || "Chi nhánh mặc định của tài khoản";
+    selectedBranch?.name || "Toàn hệ thống (Tất cả chi nhánh)";
 
   return (
     <>
@@ -123,7 +124,7 @@ export function BranchSelector({
             contentContainerStyle={styles.modalScrollContent}
             keyboardShouldPersistTaps="handled"
           >
-            {/* Option: Default Branch */}
+            {/* Option: Toàn hệ thống (Tất cả chi nhánh) */}
             <Pressable
               style={[
                 styles.branchCard,
@@ -131,14 +132,16 @@ export function BranchSelector({
               ]}
               onPress={() => choose(null)}
             >
-              <View style={[styles.codeBadge, { backgroundColor: "#f1f5f9" }]}>
-                <Text style={[styles.codeBadgeText, { color: "#475569" }]}>MẶC ĐỊNH</Text>
+              <View style={[styles.codeBadge, { backgroundColor: "#ecfdf5", borderColor: "#a7f3d0", borderWidth: 1 }]}>
+                <Text style={[styles.codeBadgeText, { color: "#047857" }]}>🌐 TẤT CẢ</Text>
               </View>
 
               <View style={{ flex: 1 }}>
-                <Text style={styles.branchName}>Chi nhánh mặc định của tài khoản</Text>
+                <Text style={[styles.branchName, !selectedBranch && { color: "#047857", fontWeight: "800" }]}>
+                  Toàn hệ thống (Tất cả chi nhánh)
+                </Text>
                 <Text style={styles.branchAddress}>
-                  {user.branchName ? `Được gán: ${user.branchName}` : "Theo thiết lập ban đầu của hệ thống"}
+                  Xem dữ liệu tổng hợp toàn doanh nghiệp
                 </Text>
               </View>
 

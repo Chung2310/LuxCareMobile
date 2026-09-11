@@ -22,6 +22,8 @@ import type { UserProfile } from "../../../src/types/common";
 import type { EmployeeProfileInput } from "../../../src/services/rosterService";
 import type { DepartmentRecord } from "../../../src/services/departmentService";
 import type { BranchRecord } from "../../../src/services/branchService";
+import { UserCreateModal } from "../../src/components/users";
+import { userManagementApi, type CreateUserInput } from "../../src/api/userManagementApi";
 import { getRoleDisplayName } from "../../../src/utils/permissionUtils";
 import { branches, departments, roster } from "../../src/api/services";
 import { messageOf, useSession } from "../../src/auth/SessionProvider";
@@ -83,6 +85,7 @@ export default function Employees() {
   const [refreshing, setRefreshing] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [revision, setRevision] = useState(0);
+  const [createModalVisible, setCreateModalVisible] = useState(false);
 
   // Selected employee for detail view & edit
   const [selected, setSelected] = useState<UserProfile | null>(null);
@@ -92,6 +95,17 @@ export default function Employees() {
   const [busy, setBusy] = useState(false);
   const lock = useRef(false);
   const [formError, setFormError] = useState<string | null>(null);
+
+  const handleCreateUser = async (data: CreateUserInput) => {
+    try {
+      await userManagementApi.createUser(data);
+      Alert.alert("Thành công", "Đã thêm nhân sự mới vào hệ thống.");
+      setCreateModalVisible(false);
+      setRevision((v) => v + 1);
+    } catch (err: any) {
+      Alert.alert("Lỗi", err?.message || "Không thể tạo tài khoản nhân sự.");
+    }
+  };
 
   const loadData = useCallback(
     async (isRefresh = false) => {
@@ -238,18 +252,6 @@ export default function Employees() {
     });
   }, [items, selectedDept, search]);
 
-  const handleCall = (phone?: string) => {
-    if (!phone) {
-      Alert.alert("Thông báo", "Nhân sự này chưa cập nhật số điện thoại.");
-      return;
-    }
-    void Linking.openURL(`tel:${phone.replace(/\s+/g, "")}`);
-  };
-
-  const handleEmail = (email?: string) => {
-    if (!email) return;
-    void Linking.openURL(`mailto:${email}`);
-  };
 
   if (!allowed) {
     return (
@@ -297,6 +299,17 @@ export default function Employees() {
                 </View>
 
                 <View style={styles.headerRight}>
+                  {canManageUsers && (
+                    <TouchableOpacity
+                      style={styles.addEmployeeBtn}
+                      onPress={() => setCreateModalVisible(true)}
+                      activeOpacity={0.8}
+                    >
+                      <Ionicons name="person-add" size={14} color="#ffffff" />
+                      <Text style={styles.addEmployeeText}>Thêm</Text>
+                    </TouchableOpacity>
+                  )}
+
                   <TouchableOpacity
                     style={styles.refreshBtn}
                     onPress={() => setRevision((v) => v + 1)}
@@ -469,16 +482,19 @@ export default function Employees() {
 
                 {/* Right Action Shortcuts */}
                 <View style={styles.actionShortcuts}>
-                  {Boolean(item.phone) && (
-                    <TouchableOpacity
-                      style={styles.phoneActionBtn}
-                      onPress={() => handleCall(item.phone)}
-                      activeOpacity={0.7}
-                      hitSlop={{ top: 8, bottom: 8, left: 8, right: 8 }}
-                    >
-                      <Ionicons name="call" size={15} color="#059669" />
-                    </TouchableOpacity>
-                  )}
+                  <TouchableOpacity
+                    style={styles.chatActionBtn}
+                    onPress={() => {
+                      router.push({
+                        pathname: "/(tabs)/chat",
+                        params: { peerId: item.uid, name: item.displayName || item.email },
+                      } as any);
+                    }}
+                    activeOpacity={0.7}
+                    hitSlop={{ top: 8, bottom: 8, left: 8, right: 8 }}
+                  >
+                    <Ionicons name="chatbubble-ellipses" size={15} color="#0284c7" />
+                  </TouchableOpacity>
                   <View style={styles.chevronBox}>
                     <Ionicons name="chevron-forward" size={16} color="#cbd5e1" />
                   </View>
@@ -932,44 +948,20 @@ export default function Employees() {
 
                 {/* Quick Action Shortcuts in Hero */}
                 <View style={styles.heroActionRow}>
-                  {Boolean(selected?.phone) && (
-                    <TouchableOpacity
-                      style={styles.heroActionBtn}
-                      onPress={() => handleCall(selected?.phone)}
-                      activeOpacity={0.8}
-                    >
-                      <View style={[styles.heroActionIconBox, { backgroundColor: "#ecfdf5" }]}>
-                        <Ionicons name="call" size={18} color="#059669" />
-                      </View>
-                      <Text style={styles.heroActionLabel}>Gọi điện</Text>
-                    </TouchableOpacity>
-                  )}
-
-                  {Boolean(selected?.email) && (
-                    <TouchableOpacity
-                      style={styles.heroActionBtn}
-                      onPress={() => handleEmail(selected?.email)}
-                      activeOpacity={0.8}
-                    >
-                      <View style={[styles.heroActionIconBox, { backgroundColor: "#eff6ff" }]}>
-                        <Ionicons name="mail" size={18} color="#2563eb" />
-                      </View>
-                      <Text style={styles.heroActionLabel}>Email</Text>
-                    </TouchableOpacity>
-                  )}
-
                   <TouchableOpacity
-                    style={styles.heroActionBtn}
+                    style={styles.heroInternalChatBtn}
                     onPress={() => {
+                      const peer = selected;
                       setSelected(null);
-                      router.push("/(tabs)/chat" as any);
+                      router.push({
+                        pathname: "/(tabs)/chat",
+                        params: { peerId: peer?.uid, name: peer?.displayName || peer?.email },
+                      } as any);
                     }}
-                    activeOpacity={0.8}
+                    activeOpacity={0.85}
                   >
-                    <View style={[styles.heroActionIconBox, { backgroundColor: "#fdf2f8" }]}>
-                      <Ionicons name="chatbubble-ellipses" size={18} color="#ec4899" />
-                    </View>
-                    <Text style={styles.heroActionLabel}>Nhắn tin</Text>
+                    <Ionicons name="chatbubble-ellipses" size={18} color="#ffffff" />
+                    <Text style={styles.heroInternalChatLabel}>Nhắn tin nội bộ</Text>
                   </TouchableOpacity>
                 </View>
               </View>
@@ -1095,6 +1087,19 @@ export default function Employees() {
           )}
         </SafeAreaView>
       </Modal>
+
+      {/* Create New Employee Modal */}
+      <UserCreateModal
+        visible={createModalVisible}
+        onClose={() => setCreateModalVisible(false)}
+        onSubmit={handleCreateUser}
+        branches={branchList}
+        departments={deptList.map((d) => ({ id: (d as any).id || d._id, name: d.name, code: d.code }))}
+        defaultBranchId={selectedBranch?._id || user?.branchId}
+        companyCode={user?.companyCode}
+        companyName={user?.companyName}
+        managers={items}
+      />
     </>
   );
 }
@@ -1152,6 +1157,25 @@ const styles = StyleSheet.create({
     flexDirection: "row",
     alignItems: "center",
     gap: 8,
+  },
+  addEmployeeBtn: {
+    flexDirection: "row",
+    alignItems: "center",
+    backgroundColor: "#059669",
+    paddingHorizontal: 11,
+    paddingVertical: 8,
+    borderRadius: 12,
+    gap: 5,
+    shadowColor: "#059669",
+    shadowOffset: { width: 0, height: 1 },
+    shadowOpacity: 0.2,
+    shadowRadius: 2,
+    elevation: 2,
+  },
+  addEmployeeText: {
+    fontSize: 12,
+    fontWeight: "800",
+    color: "#ffffff",
   },
   refreshBtn: {
     width: 36,
@@ -1340,13 +1364,15 @@ const styles = StyleSheet.create({
     alignItems: "center",
     gap: 6,
   },
-  phoneActionBtn: {
+  chatActionBtn: {
     width: 32,
     height: 32,
     borderRadius: 16,
-    backgroundColor: "#ecfdf5",
+    backgroundColor: "#f0f9ff",
     alignItems: "center",
     justifyContent: "center",
+    borderWidth: 1,
+    borderColor: "#bae6fd",
   },
   chevronBox: {
     paddingLeft: 2,
@@ -1509,14 +1535,32 @@ const styles = StyleSheet.create({
     color: "#2563eb",
   },
   heroActionRow: {
-    flexDirection: "row",
-    gap: 20,
     marginTop: 14,
     paddingTop: 14,
     borderTopWidth: 1,
     borderTopColor: "#f1f5f9",
     width: "100%",
+  },
+  heroInternalChatBtn: {
+    flexDirection: "row",
+    alignItems: "center",
     justifyContent: "center",
+    backgroundColor: "#0284c7",
+    paddingVertical: 12,
+    paddingHorizontal: 20,
+    borderRadius: 12,
+    gap: 8,
+    shadowColor: "#0284c7",
+    shadowOffset: { width: 0, height: 2 },
+    shadowOpacity: 0.2,
+    shadowRadius: 4,
+    elevation: 2,
+    width: "100%",
+  },
+  heroInternalChatLabel: {
+    fontSize: 14,
+    fontWeight: "800",
+    color: "#ffffff",
   },
   heroActionBtn: {
     alignItems: "center",

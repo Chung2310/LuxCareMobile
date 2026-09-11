@@ -26,6 +26,9 @@ export interface CreateUserInput {
   department?: string;
   division?: string;
   birthDate?: string;
+  monthlySalary?: number;
+  parentId?: string;
+  jobDescriptionLink?: string;
   companyCode?: string;
   companyName?: string;
 }
@@ -40,6 +43,9 @@ export interface UpdateUserInput {
   jobTitle?: string;
   birthDate?: string;
   isLeader?: boolean;
+  monthlySalary?: number;
+  parentId?: string;
+  jobDescriptionLink?: string;
 }
 
 export interface UserListParams {
@@ -76,6 +82,9 @@ export const userManagementApi = {
 
   // 2. Tạo mới tài khoản thành viên
   async createUser(input: CreateUserInput): Promise<{ success: boolean; uid?: string; message?: string }> {
+    if (input.role === "admin" || (input.role as string) === "superadmin") {
+      throw new Error("Không được phép tạo tài khoản mới với vai trò Quản trị viên (Admin).");
+    }
     const res = await api.transport.fetch("/api/v1/auth/register-user", {
       method: "POST",
       headers: { "Content-Type": "application/json" },
@@ -84,9 +93,23 @@ export const userManagementApi = {
     const json = await res.json();
     if (!res.ok) throw new Error(json.message || "Không thể tạo tài khoản người dùng.");
 
+    const uid = json.uid || json.data?.uid || json.data?._id || json._id;
+    if (uid && (input.monthlySalary !== undefined || input.parentId || input.jobDescriptionLink || input.birthDate)) {
+      try {
+        await userManagementApi.updateUser(uid, {
+          birthDate: input.birthDate,
+          monthlySalary: input.monthlySalary,
+          parentId: input.parentId,
+          jobDescriptionLink: input.jobDescriptionLink,
+        });
+      } catch {
+        // bỏ qua nếu register-user đã lưu hoặc cập nhật riêng
+      }
+    }
+
     return {
       success: true,
-      uid: json.uid,
+      uid,
       message: json.message || "Đăng ký thành viên thành công!",
     };
   },

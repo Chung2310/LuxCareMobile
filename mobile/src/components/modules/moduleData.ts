@@ -1,8 +1,17 @@
 import type { ServiceItem, ServiceModule } from "./types";
+import type { UserProfile } from "../../../../src/types/common";
+import { canUseModule, hasPermission } from "../../auth/access";
+import { recruitmentAccess } from "../../features/recruitment/access";
+import { canReadContracts } from "../../features/contracts/model";
+import { canReadCredentials } from "../../features/credentials/model";
+import { canReadPayslips } from "../../features/payroll/model";
+import { canReadPayrollRuns } from "../../features/payroll/runModel";
+import { workflowAccess } from "../../features/workflow/access";
+import { trainingAccess } from "../../features/training/access";
 
 export const DEFAULT_PINNED_IDS = [
   "att-checkin",
-  "hr-calendar",
+  "hr-leave",
   "pay-slips",
   "op-inventory",
 ];
@@ -24,12 +33,12 @@ export const LUXCARE_MODULES: ServiceModule[] = [
         status: "active",
       },
       {
-        id: "pop-calendar",
-        title: "Lịch làm việc",
-        icon: "calendar",
+        id: "pop-leave",
+        title: "Đơn từ\n& Nghỉ phép",
+        icon: "receipt",
         color: "#0d9488",
         bgColor: "#f0fdfa",
-        route: "/(tabs)/calendar-events",
+        route: "/(tabs)/leave",
         moduleId: "popular",
         status: "active",
       },
@@ -114,32 +123,22 @@ export const LUXCARE_MODULES: ServiceModule[] = [
         status: "active",
       },
       {
-        id: "pop-projects",
-        title: "Dự án\nđang chạy",
-        icon: "folder-open",
-        color: "#7c3aed",
-        bgColor: "#f5f3ff",
-        route: "/(tabs)/projects",
-        moduleId: "popular",
-        status: "active",
-      },
-      {
-        id: "pop-calendar",
-        title: "Lịch nghỉ\n& Làm bù",
-        icon: "calendar",
-        color: "#0891b2",
-        bgColor: "#ecfeff",
-        route: "/(tabs)/work-calendar",
-        moduleId: "popular",
-        status: "active",
-      },
-      {
         id: "pop-blog",
         title: "Bảng tin\ndoanh nghiệp",
         icon: "newspaper",
         color: "#ea580c",
         bgColor: "#fff7ed",
         route: "/(tabs)/blog",
+        moduleId: "popular",
+        status: "active",
+      },
+      {
+        id: "pop-workflow",
+        title: "Quy trình\nlàm việc",
+        icon: "git-merge",
+        color: "#0284c7",
+        bgColor: "#f0f9ff",
+        route: "/(tabs)/workflow",
         moduleId: "popular",
         status: "active",
       },
@@ -161,16 +160,6 @@ export const LUXCARE_MODULES: ServiceModule[] = [
         status: "active",
       },
       {
-        id: "att-shifts",
-        title: "Quản lý\n& Phân ca",
-        icon: "swap-horizontal",
-        color: "#0d9488",
-        bgColor: "#f0fdfa",
-        route: "/(tabs)/shifts",
-        moduleId: "hr",
-        status: "active",
-      },
-      {
         id: "att-mgmt",
         title: "Quản lý\n& Duyệt công",
         icon: "calendar-clear",
@@ -181,11 +170,21 @@ export const LUXCARE_MODULES: ServiceModule[] = [
         status: "active",
       },
       {
+        id: "hr-leave",
+        title: "Đơn từ\n& Nghỉ phép",
+        icon: "receipt",
+        color: "#059669",
+        bgColor: "#ecfdf5",
+        route: "/(tabs)/leave",
+        moduleId: "hr",
+        status: "active",
+      },
+      {
         id: "hr-calendar",
         title: "Lịch làm việc",
         icon: "calendar",
-        color: "#059669",
-        bgColor: "#ecfdf5",
+        color: "#0891b2",
+        bgColor: "#ecfeff",
         route: "/(tabs)/calendar-events",
         moduleId: "hr",
         status: "active",
@@ -211,12 +210,22 @@ export const LUXCARE_MODULES: ServiceModule[] = [
         status: "active",
       },
       {
-        id: "hr-departments",
-        title: "Sơ đồ\nphòng ban",
-        icon: "business",
+        id: "hr-orgchart",
+        title: "Sơ đồ\ntổ chức",
+        icon: "git-network",
         color: "#6366f1",
         bgColor: "#eef2ff",
-        route: "/(tabs)/departments",
+        route: "/(tabs)/org-chart",
+        moduleId: "hr",
+        status: "active",
+      },
+      {
+        id: "hr-workflow",
+        title: "Quy trình\nlàm việc",
+        icon: "git-merge",
+        color: "#0284c7",
+        bgColor: "#f0f9ff",
+        route: "/(tabs)/workflow",
         moduleId: "hr",
         status: "active",
       },
@@ -371,8 +380,8 @@ export const LUXCARE_MODULES: ServiceModule[] = [
   },
   {
     id: "work",
-    title: "Công việc & Dự án",
-    shortTitle: "Công việc & Dự án",
+    title: "Công việc",
+    shortTitle: "Công việc",
     items: [
       {
         id: "work-my",
@@ -385,52 +394,12 @@ export const LUXCARE_MODULES: ServiceModule[] = [
         status: "active",
       },
       {
-        id: "work-projects",
-        title: "Dự án\nđang chạy",
-        icon: "folder-open",
-        color: "#7c3aed",
-        bgColor: "#f5f3ff",
-        route: "/(tabs)/projects",
-        moduleId: "work",
-        status: "active",
-      },
-      {
-        id: "work-kanban",
-        title: "Bảng Kanban\ntiến độ",
-        icon: "grid",
-        color: "#0891b2",
-        bgColor: "#ecfeff",
-        route: "/(tabs)/work",
-        moduleId: "work",
-        status: "active",
-      },
-      {
         id: "work-kpi",
         title: "Báo cáo\nKPI tháng",
         icon: "trending-up",
         color: "#16a34a",
         bgColor: "#f0fdf4",
         route: "/(tabs)/kpi",
-        moduleId: "work",
-        status: "active",
-      },
-      {
-        id: "work-calendar",
-        title: "Lịch công việc\n& Deadline",
-        icon: "calendar-number",
-        color: "#f59e0b",
-        bgColor: "#fffbeb",
-        route: "/(tabs)/work-calendar",
-        moduleId: "work",
-        status: "active",
-      },
-      {
-        id: "work-urgent",
-        title: "Việc khẩn cấp\nquá hạn",
-        icon: "alert-circle",
-        color: "#dc2626",
-        bgColor: "#fef2f2",
-        route: "/(tabs)/work",
         moduleId: "work",
         status: "active",
       },
@@ -525,12 +494,101 @@ export const LUXCARE_MODULES: ServiceModule[] = [
   },
 ];
 
-export function getAllServicesFlat(modulesList = LUXCARE_MODULES): ServiceItem[] {
+export function isServiceAccessible(item: ServiceItem, user: UserProfile | null): boolean {
+  if (!user) return false;
+
+  const isManager = ["admin", "superadmin", "branch_owner", "manager"].includes(user.role || "");
+
+  // Route-based permission checks
+  switch (item.route) {
+    case "/(tabs)/users":
+    case "/(tabs)/roles":
+    case "/(tabs)/settings":
+      return isManager || hasPermission(user, "user:read");
+
+    case "/(tabs)/recruitment":
+      return recruitmentAccess(user).read;
+
+    case "/(tabs)/contracts":
+      return isManager || canReadContracts(user);
+
+    case "/(tabs)/credentials":
+      return isManager || canReadCredentials(user);
+
+    case "/(tabs)/training":
+      return isManager || trainingAccess(user).read;
+
+    case "/(tabs)/workflow":
+      return isManager || workflowAccess(user).read;
+
+    case "/(tabs)/payroll-runs":
+      return isManager || canReadPayrollRuns(user);
+
+    case "/(tabs)/payslips":
+      return isManager || canReadPayslips(user) || canReadPayrollRuns(user);
+
+    case "/(tabs)/attendance-management":
+      return isManager || (canUseModule(user, "hr") && hasPermission(user, "timekeeping:manage"));
+
+    case "/(tabs)/kpi":
+      return isManager || hasPermission(user, "work:read");
+
+    case "/(tabs)/work":
+    case "/(tabs)/projects":
+    case "/(tabs)/shifts":
+    case "/(tabs)/calendar-events":
+      return isManager || canUseModule(user, "hr");
+
+    case "/(tabs)/inventory":
+    case "/(tabs)/inventory-stock":
+    case "/(tabs)/inventory-expiry":
+    case "/(tabs)/inventory-audit":
+      return isManager || canUseModule(user, "supply");
+
+    case "/(tabs)/equipment":
+    case "/(tabs)/equipment-maintenance":
+    case "/(tabs)/equipment-repair":
+      return isManager || canUseModule(user, "equipment");
+
+    case "/(tabs)/chat":
+      return isManager || canUseModule(user, "chat");
+
+    case "/(tabs)/resources":
+      return isManager || canUseModule(user, "resource");
+
+    case "/(tabs)/attendance":
+    case "/(tabs)/leave":
+    case "/(tabs)/departments":
+    case "/(tabs)/employees":
+    case "/(tabs)/org-chart":
+    case "/(tabs)/customers":
+    case "/(tabs)/crm-survey":
+    case "/(tabs)/blog":
+    case "/(tabs)/notifications":
+    case "/(tabs)/knowledge":
+      return true;
+
+    default:
+      return true;
+  }
+}
+
+export function getAccessibleModules(user: UserProfile | null, modulesList = LUXCARE_MODULES): ServiceModule[] {
+  if (!user) return [];
+  return modulesList
+    .map((mod) => ({
+      ...mod,
+      items: mod.items.filter((item) => isServiceAccessible(item, user)),
+    }))
+    .filter((mod) => mod.items.length > 0);
+}
+
+export function getAllServicesFlat(modulesList = LUXCARE_MODULES, user?: UserProfile | null): ServiceItem[] {
   const list: ServiceItem[] = [];
   const seen = new Set<string>();
   for (const mod of modulesList) {
     for (const item of mod.items) {
-      if (!seen.has(item.id)) {
+      if (!seen.has(item.id) && (!user || isServiceAccessible(item, user))) {
         seen.add(item.id);
         list.push(item);
       }
@@ -538,3 +596,4 @@ export function getAllServicesFlat(modulesList = LUXCARE_MODULES): ServiceItem[]
   }
   return list;
 }
+

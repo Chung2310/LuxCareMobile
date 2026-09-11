@@ -16,7 +16,7 @@ import { Ionicons } from "@expo/vector-icons";
 import { ShiftForm } from "../../src/features/shifts/ShiftForm";
 import { HolidayForm } from "../../src/features/calendar/HolidayForm";
 import type { CalendarItem, CalendarItemInput } from "../../../src/services/hrCalendarService";
-import type { AttendanceLog, WorkShift, ShiftEmployee } from "../../../src/services/attendanceService";
+import type { WorkShift, ShiftEmployee } from "../../../src/services/attendanceService";
 import type { WorkCalendarDay } from "../../../src/services/companyWorkCalendarService";
 import type { LeaveApplication } from "../../../src/types/leave";
 import type { UserProfile } from "../../../src/types/common";
@@ -33,7 +33,7 @@ import { canUseModule, hasPermission } from "../../src/auth/access";
 /* ==========================================================================
    1. TYPES & COLOR CONSTANTS (Chuẩn LuxCare Web)
    ========================================================================== */
-type SubTabType = "schedule" | "attendance" | "requests" | "shifts";
+type SubTabType = "schedule" | "requests" | "shifts";
 
 interface EventTypeMeta {
   label: string;
@@ -153,21 +153,7 @@ function parseIsoTimePart(isoString?: string): string {
   }
 }
 
-function calculateWorkedDuration(checkInTime?: string | Date, checkOutTime?: string | Date): string {
-  if (!checkInTime || !checkOutTime) return "--";
-  try {
-    const start = new Date(checkInTime).getTime();
-    const end = new Date(checkOutTime).getTime();
-    const diffMs = end - start;
-    if (diffMs <= 0) return "--";
-    const totalMinutes = Math.floor(diffMs / 60000);
-    const hours = Math.floor(totalMinutes / 60);
-    const minutes = totalMinutes % 60;
-    return `${hours}h ${minutes}m`;
-  } catch {
-    return "--";
-  }
-}
+
 
 /* ==========================================================================
    2. MAIN COMPONENT: WORK SCHEDULE (LỊCH LÀM VIỆC)
@@ -205,7 +191,6 @@ export default function CalendarEvents() {
 
   // Data States
   const [items, setItems] = useState<CalendarItem[]>([]);
-  const [attendanceLogs, setAttendanceLogs] = useState<AttendanceLog[]>([]);
   const [leaveApps, setLeaveApps] = useState<LeaveApplication[]>([]);
   const [shifts, setShifts] = useState<WorkShift[]>([]);
   const [shiftEmployees, setShiftEmployees] = useState<ShiftEmployee[]>([]);
@@ -282,9 +267,6 @@ export default function CalendarEvents() {
         hrCalendar.list(user.companyCode).then((data) => {
           if (active) setItems(data);
         }),
-        attendance.history(user.uid, user.companyCode, startDate, endDate).then((data) => {
-          if (active) setAttendanceLogs(data);
-        }).catch(() => {}),
         leave.listApplications(1, 40).then((res) => {
           if (active) setLeaveApps(res.data || []);
         }).catch(() => {}),
@@ -960,102 +942,7 @@ export default function CalendarEvents() {
     </ScrollView>
   );
 
-  /* ==========================================================================
-     8. RENDER SUB-TAB 2: CHẤM CÔNG (ATTENDANCE)
-     ========================================================================== */
-  const renderAttendanceTab = () => {
-    let totalPresent = 0;
-    let totalLate = 0;
-    let totalEarly = 0;
 
-    attendanceLogs.forEach((log) => {
-      const st = (log.status || "").toLowerCase();
-      if (st.includes("present") || st.includes("đúng giờ") || st.includes("có mặt")) totalPresent++;
-      if (st.includes("late") || st.includes("muộn")) totalLate++;
-      if (st.includes("early") || st.includes("sớm")) totalEarly++;
-    });
-
-    return (
-      <ScrollView style={{ flex: 1 }} contentContainerStyle={s.tabScroll} showsVerticalScrollIndicator={false}>
-        {/* Month Summary Bar */}
-        <View style={s.attendanceStatsRow}>
-          <View style={[s.kpiBox, { backgroundColor: "#ecfdf5", borderColor: "#a7f3d0" }]}>
-            <Text style={[s.kpiVal, { color: "#047857" }]}>{totalPresent}</Text>
-            <Text style={[s.kpiLbl, { color: "#047857" }]}>Có mặt</Text>
-          </View>
-          <View style={[s.kpiBox, { backgroundColor: "#fffbeb", borderColor: "#fde68a" }]}>
-            <Text style={[s.kpiVal, { color: "#b45309" }]}>{totalLate}</Text>
-            <Text style={[s.kpiLbl, { color: "#b45309" }]}>Đi muộn</Text>
-          </View>
-          <View style={[s.kpiBox, { backgroundColor: "#eff6ff", borderColor: "#bfdbfe" }]}>
-            <Text style={[s.kpiVal, { color: "#1d4ed8" }]}>{totalEarly}</Text>
-            <Text style={[s.kpiLbl, { color: "#1d4ed8" }]}>Về sớm</Text>
-          </View>
-          <View style={[s.kpiBox, { backgroundColor: "#f8fafc", borderColor: "#e2e8f0" }]}>
-            <Text style={[s.kpiVal, { color: "#0f172a" }]}>{attendanceLogs.length}</Text>
-            <Text style={[s.kpiLbl, { color: "#64748b" }]}>Tổng ngày</Text>
-          </View>
-        </View>
-
-        {/* Quick Check-in Button */}
-        <Pressable
-          style={s.quickCheckInBtn}
-          onPress={() => router.push("/(tabs)/attendance")}
-        >
-          <Text style={{ fontSize: 18, marginRight: 6 }}>⏱️</Text>
-          <Text style={s.quickCheckInTxt}>Mở máy chấm công trực tiếp</Text>
-          <Text style={{ color: "#ffffff", fontWeight: "700", marginLeft: 4 }}>›</Text>
-        </Pressable>
-
-        {/* Attendance Logs List */}
-        <View style={{ marginTop: 14 }}>
-          <Text style={s.sectionHeader}>Nhật ký chấm công tháng {month + 1}/{year}</Text>
-          {attendanceLogs.length === 0 ? (
-            <View style={s.emptyBox}>
-              <Text style={{ fontSize: 32, marginBottom: 8 }}>📝</Text>
-              <Text style={s.emptyTitle}>Chưa có bản ghi chấm công</Text>
-              <Text style={s.emptySub}>Bản ghi sẽ xuất hiện sau khi bạn thực hiện chấm công</Text>
-            </View>
-          ) : (
-            attendanceLogs.map((log, idx) => {
-              const inStr = log.checkIn?.time ? String(log.checkIn.time) : undefined;
-              const outStr = log.checkOut?.time ? String(log.checkOut.time) : undefined;
-              const duration = calculateWorkedDuration(inStr, outStr);
-
-              return (
-                <View key={log._id || `log-${idx}`} style={s.attendCard}>
-                  <View style={s.attendCardTop}>
-                    <Text style={s.attendDate}>{formatDateDisplay(log.date)}</Text>
-                    <View style={[s.statusBadge, { backgroundColor: "#ecfdf5", borderColor: "#a7f3d0" }]}>
-                      <Text style={[s.statusBadgeTxt, { color: "#047857" }]}>{log.status || "Đúng giờ"}</Text>
-                    </View>
-                  </View>
-                  <View style={s.attendTimesRow}>
-                    <View style={s.timeCol}>
-                      <Text style={s.timeColLbl}>Giờ vào</Text>
-                      <Text style={s.timeColVal}>{formatTimeOnly(inStr)}</Text>
-                    </View>
-                    <View style={s.timeDivider} />
-                    <View style={s.timeCol}>
-                      <Text style={s.timeColLbl}>Giờ ra</Text>
-                      <Text style={s.timeColVal}>{formatTimeOnly(outStr)}</Text>
-                    </View>
-                    <View style={s.timeDivider} />
-                    <View style={s.timeCol}>
-                      <Text style={s.timeColLbl}>Thời gian làm</Text>
-                      <Text style={s.timeColVal}>{duration}</Text>
-                    </View>
-                  </View>
-                </View>
-              );
-            })
-          )}
-        </View>
-
-        <View style={{ height: 80 }} />
-      </ScrollView>
-    );
-  };
 
   /* ==========================================================================
      9. RENDER SUB-TAB 3: ĐƠN TỪ (REQUESTS)
@@ -1723,14 +1610,7 @@ export default function CalendarEvents() {
             📅 Lịch trình
           </Text>
         </Pressable>
-        <Pressable
-          style={[s.subTabBtn, subTab === "attendance" && s.subTabBtnActive]}
-          onPress={() => setSubTab("attendance")}
-        >
-          <Text style={[s.subTabTxt, subTab === "attendance" && s.subTabTxtActive]}>
-            ⏱️ Chấm công
-          </Text>
-        </Pressable>
+
         <Pressable
           style={[s.subTabBtn, subTab === "requests" && s.subTabBtnActive]}
           onPress={() => setSubTab("requests")}
@@ -1765,7 +1645,6 @@ export default function CalendarEvents() {
       ) : (
         <>
           {subTab === "schedule" && renderScheduleTab()}
-          {subTab === "attendance" && renderAttendanceTab()}
           {subTab === "requests" && renderRequestsTab()}
           {subTab === "shifts" && renderShiftsHolidaysTab()}
         </>
