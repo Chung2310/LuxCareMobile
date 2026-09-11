@@ -863,10 +863,13 @@ export default function BlogScreen() {
                     );
                   })()}
 
-                  {/* Inline Images with tap-to-zoom + share button */}
+                  {/* Inline Images with tap-to-zoom + download/share buttons */}
                   {post.attachments?.filter((att: BlogAttachment) => att.type === "image" && att.url).map((att: BlogAttachment) => {
                     const shareImage = () => {
                       if (att.url) void shareMediaOrFile(att.url, att.name || "hinh_anh.jpg");
+                    };
+                    const downloadImage = () => {
+                      if (att.url) void handleDownloadFile(att.url, att.name || "hinh_anh.jpg");
                     };
                     return (
                       <Pressable key={att.id} style={styles.inlineImageWrap} onPress={() => setViewImageUrl(att.url || null)}>
@@ -879,20 +882,60 @@ export default function BlogScreen() {
                         <View style={styles.imageExpandBadge}>
                           <Ionicons name="expand-outline" size={13} color="#ffffff" />
                         </View>
-                        {/* Share overlay button — bottom right */}
-                        <Pressable
-                          style={styles.imageDownloadBtn}
-                          hitSlop={6}
-                          onPress={(e) => { e.stopPropagation?.(); void shareImage(); }}
-                        >
-                          <Ionicons name="share-social-outline" size={15} color="#ffffff" />
-                        </Pressable>
+                        {/* Action overlay buttons — bottom right */}
+                        <View style={styles.imageOverlayActions}>
+                          <Pressable
+                            style={styles.imageDownloadBtn}
+                            hitSlop={6}
+                            onPress={(e) => { e.stopPropagation?.(); void downloadImage(); }}
+                          >
+                            <Ionicons name="download-outline" size={15} color="#ffffff" />
+                          </Pressable>
+                          <Pressable
+                            style={styles.imageDownloadBtn}
+                            hitSlop={6}
+                            onPress={(e) => { e.stopPropagation?.(); void shareImage(); }}
+                          >
+                            <Ionicons name="share-social-outline" size={15} color="#ffffff" />
+                          </Pressable>
+                        </View>
                       </Pressable>
                     );
                   })}
 
-                  {/* File Attachments (non-image) */}
-                  {post.attachments?.filter((att: BlogAttachment) => att.type !== "image").map((att: BlogAttachment) => {
+                  {/* Video Attachments */}
+                  {post.attachments?.filter((att: BlogAttachment) => att.type === "video" && att.url).map((att: BlogAttachment) => (
+                    <View key={att.id} style={styles.webFileCard}>
+                      <View style={[styles.webFileIconWrap, { backgroundColor: "#dbeafe" }]}>
+                        <Ionicons name="videocam" size={20} color="#1d4ed8" />
+                      </View>
+                      <View style={styles.webFileMeta}>
+                        <Text style={styles.webFileName} numberOfLines={1}>{att.name || "Video"}</Text>
+                        <Text style={styles.webFileSize}>{att.size || "Video đính kèm"}</Text>
+                      </View>
+                      <View style={styles.webFileActions}>
+                        {att.url ? (
+                          <Pressable
+                            style={styles.webDownloadBtn}
+                            onPress={() => void handleDownloadFile(att.url!, att.name)}
+                          >
+                            <Ionicons name="download-outline" size={14} color="#000000" />
+                            <Text style={styles.webDownloadText}>Tải về</Text>
+                          </Pressable>
+                        ) : null}
+                        <Pressable
+                          style={styles.webDownloadBtn}
+                          onPress={() => void shareMediaOrFile(att.url || "", att.name)}
+                        >
+                          <Ionicons name="share-social-outline" size={14} color="#000000" />
+                          <Text style={styles.webDownloadText}>Chia sẻ</Text>
+                        </Pressable>
+                      </View>
+                    </View>
+                  ))}
+
+                  {/* File Attachments (non-image, non-video) */}
+                  {post.attachments?.filter((att: BlogAttachment) => att.type !== "image" && att.type !== "video").map((att: BlogAttachment) => {
                     const shareOrOpenFile = () => {
                       void shareMediaOrFile(att.url || "", att.name);
                     };
@@ -929,7 +972,6 @@ export default function BlogScreen() {
                         </View>
                       </View>
                     );
-
                   })}
 
                   {/* Footer Row: Tag + Actions (Like & Share) */}
@@ -1402,10 +1444,14 @@ const styles = StyleSheet.create({
     borderRadius: 12,
     backgroundColor: "#f1f5f9",
   },
-  imageDownloadBtn: {
+  imageOverlayActions: {
     position: "absolute",
     bottom: 8,
     right: 8,
+    flexDirection: "row",
+    gap: 6,
+  },
+  imageDownloadBtn: {
     backgroundColor: "rgba(0,0,0,0.45)",
     borderRadius: 20,
     width: 34,
