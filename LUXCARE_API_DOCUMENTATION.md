@@ -215,6 +215,39 @@ Tài liệu này tổng hợp toàn bộ các API Endpoints, phương thức HTT
 
 ---
 
+### 16. Quản lý Email chúc mừng & Cấu hình SMTP (Celebration Emails & Company SMTP)
+
+| Phương thức | Endpoint API | Mô tả chức năng | Body / Query Params |
+| :--- | :--- | :--- | :--- |
+| `GET` | `/api/v1/company-email/celebration` | Lấy cấu hình tự động gửi email chúc mừng (sinh nhật, lễ Tết) | Không có |
+| `PUT` | `/api/v1/company-email/celebration` | Cập nhật cấu hình & template email chúc mừng | `{ birthdayEnabled, holidayEnabled, sendTime, birthdayTemplate, holidayTemplate, holidayOverrides }` |
+| `GET` | `/api/v1/company-email/celebration/stats` | Thống kê nhân sự (tổng nhân viên, số người thiếu ngày sinh) | Không có |
+| `POST` | `/api/v1/company-email/celebration/preview` | Xem trước nội dung email sau khi thế biến động | `{ subject, html, holidayName }` |
+| `GET` | `/api/v1/company-email/celebration/history` | Lấy lịch sử 200 lượt gửi email chúc mừng gần nhất | Không có |
+| `GET` | `/api/v1/company-email/smtp` | Lấy cấu hình SMTP doanh nghiệp hiện tại | Không có |
+| `PUT` | `/api/v1/company-email/smtp` | Lưu cấu hình SMTP gửi thư riêng của doanh nghiệp | `{ host, port, secure, user, password, fromEmail, fromName }` |
+| `POST` | `/api/v1/company-email/smtp/verify` | Kiểm tra kết nối SMTP với máy chủ mail | Không có |
+| `POST` | `/api/v1/company-email/smtp/test` | Gửi email thử nghiệm đến địa chỉ của người dùng | Không có |
+
+---
+
+### 17. Kho tri thức & SOP Y tế (Assistant Knowledge Base & Medical SOPs)
+
+| Phương thức | Endpoint API | Mô tả chức năng | Body / Query Params |
+| :--- | :--- | :--- | :--- |
+| `GET` | `/api/v1/assistant/knowledge/documents` | Lấy danh sách toàn bộ tài liệu, phác đồ, quy chuẩn trong kho tri thức | Không có |
+| `GET` | `/api/v1/assistant/knowledge/documents/:id` | Lấy thông tin chi tiết một tài liệu tri thức | Không có |
+| `POST` | `/api/v1/assistant/knowledge/documents` | Tạo mới tài liệu tri thức (văn bản) | `{ title, text, documentType, category, ... }` |
+| `POST` | `/api/v1/assistant/knowledge/files` | Tải lên tệp tài liệu (PDF, Word, TXT...) để bóc tách & chunking AI | `FormData(files, documentType, category, ...)` |
+| `POST` | `/api/v1/assistant/knowledge/test-search` | Tìm kiếm ngữ nghĩa & đối soát AI trong kho tri thức | `{ query, category, documentType }` |
+| `PATCH` | `/api/v1/assistant/knowledge/documents/:id` | Cập nhật phân loại, phạm vi hoặc metadata tài liệu | `{ documentType, category, visibility, ... }` |
+| `DELETE` | `/api/v1/assistant/knowledge/documents/:id` | Xóa tài liệu khỏi kho tri thức | Không có |
+| `GET` | `/api/v1/assistant/knowledge/scopes` | Lấy danh sách phạm vi áp dụng (chi nhánh, phòng ban) | Không có |
+
+---
+
 ## 📝 Tóm tắt Tổng số lượng API Endpoints:
-- **Tổng cộng**: **65+ API Endpoints** được định nghĩa và sẵn sàng sử dụng trên toàn hệ thống **LuxCare**.
+- **Tổng cộng**: **82+ API Endpoints** được định nghĩa và sẵn sàng sử dụng trên toàn hệ thống **LuxCare**.
 - Tất cả đều tương thích với cơ chế tự động làm mới phiên làm việc (Refresh Token) và truyền giá trị Chi nhánh (`x-branch-id`) trên ứng dụng di động.
+
+

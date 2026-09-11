@@ -13,7 +13,7 @@ import {
   View,
 } from "react-native";
 import { SafeAreaView } from "react-native-safe-area-context";
-import { router, useFocusEffect } from "expo-router";
+import { router, useFocusEffect, useLocalSearchParams } from "expo-router";
 import { Ionicons } from "@expo/vector-icons";
 import * as Location from "expo-location";
 import { CheckInForm } from "../../src/features/attendance/CheckInForm";
@@ -84,6 +84,7 @@ export default function Attendance() {
   const [submittingStep, setSubmittingStep] = useState<string | null>(null);
   const actionLock = useRef(false);
   const { user, selectedBranch } = useSession();
+  const params = useLocalSearchParams<{ from?: string }>();
   const allowed = canUseModule(user, "hr");
   const manage = hasPermission(user, "timekeeping:manage");
 
@@ -356,11 +357,25 @@ export default function Attendance() {
         >
           {/* Header Bar */}
           <View style={styles.headerBar}>
+            <TouchableOpacity
+              style={styles.backBtn}
+              onPress={() => {
+                if (params.from === "modules") router.replace("/(tabs)/modules");
+                else if (router.canGoBack()) router.back();
+                else router.replace("/(tabs)/modules");
+              }}
+              activeOpacity={0.7}
+            >
+              <Ionicons name="arrow-back" size={20} color="#0f172a" />
+            </TouchableOpacity>
+
             <View style={styles.headerLeft}>
-              <Text style={styles.headerTitle}>Chấm công & Ca trực</Text>
+              <Text style={styles.headerTitle} numberOfLines={1}>
+                Chấm công & Ca trực
+              </Text>
               <View style={styles.branchRow}>
                 <View style={styles.branchDot} />
-                <Text style={styles.branchName}>
+                <Text style={styles.branchName} numberOfLines={1}>
                   {selectedBranch?.name || user?.branchName || "Chi nhánh chính LuxCare"}
                 </Text>
               </View>
@@ -368,24 +383,25 @@ export default function Attendance() {
 
             <View style={styles.headerRight}>
               <TouchableOpacity
+                style={styles.historyBtn}
+                onPress={() => router.push("/(tabs)/attendance-history" as any)}
+                activeOpacity={0.8}
+              >
+                <Ionicons name="time-outline" size={15} color="#0891b2" />
+                <Text style={styles.historyBtnText}>Lịch sử</Text>
+              </TouchableOpacity>
+
+              <TouchableOpacity
                 style={styles.refreshBtn}
-                onPress={() => setRevision((v) => v + 1)}
+                onPress={() => {
+                  void loadData(true);
+                  setRevision((v) => v + 1);
+                }}
                 disabled={loading}
                 activeOpacity={0.7}
               >
                 <Ionicons name="reload" size={16} color="#475569" />
               </TouchableOpacity>
-
-              {manage && (
-                <TouchableOpacity
-                  style={styles.manageBtn}
-                  onPress={() => router.push("/(tabs)/attendance-management" as any)}
-                  activeOpacity={0.8}
-                >
-                  <Ionicons name="calendar-clear-outline" size={15} color="#059669" />
-                  <Text style={styles.manageBtnText}>Duyệt công</Text>
-                </TouchableOpacity>
-              )}
             </View>
           </View>
 
@@ -637,6 +653,19 @@ export default function Attendance() {
               <Text style={styles.monthStatLabel}>Vắng mặt</Text>
             </View>
           </View>
+
+          {/* Quick link to Full History screen */}
+          <TouchableOpacity
+            style={styles.viewFullHistoryBtn}
+            onPress={() => router.push(`/(tabs)/attendance-history?period=${period}` as any)}
+            activeOpacity={0.8}
+          >
+            <View style={styles.viewFullHistoryLeft}>
+              <Ionicons name="time" size={16} color="#0891b2" />
+              <Text style={styles.viewFullHistoryText}>Xem đầy đủ Lịch sử chấm công & Đối soát</Text>
+            </View>
+            <Ionicons name="chevron-forward" size={16} color="#0891b2" />
+          </TouchableOpacity>
 
           {/* Navigation Tabs (History, Calendar, Shifts) */}
           <View style={styles.tabPillsRow}>
@@ -920,14 +949,26 @@ const styles = StyleSheet.create({
   headerBar: {
     flexDirection: "row",
     alignItems: "center",
-    justifyContent: "space-between",
-    marginBottom: 2,
+    marginBottom: 4,
+  },
+  backBtn: {
+    width: 36,
+    height: 36,
+    borderRadius: 18,
+    backgroundColor: "#ffffff",
+    borderWidth: 1,
+    borderColor: "#e2e8f0",
+    alignItems: "center",
+    justifyContent: "center",
   },
   headerLeft: {
     flex: 1,
+    justifyContent: "center",
+    marginLeft: 10,
+    marginRight: 6,
   },
   headerTitle: {
-    fontSize: 22,
+    fontSize: 18,
     fontWeight: "800",
     color: "#0f172a",
     letterSpacing: -0.3,
@@ -952,7 +993,24 @@ const styles = StyleSheet.create({
   headerRight: {
     flexDirection: "row",
     alignItems: "center",
-    gap: 8,
+    gap: 6,
+  },
+  historyBtn: {
+    flexDirection: "row",
+    alignItems: "center",
+    gap: 4,
+    backgroundColor: "#ecfeff",
+    borderColor: "#cffafe",
+    borderWidth: 1,
+    borderRadius: 18,
+    paddingHorizontal: 10,
+    height: 36,
+    justifyContent: "center",
+  },
+  historyBtnText: {
+    color: "#0891b2",
+    fontWeight: "700",
+    fontSize: 12,
   },
   refreshBtn: {
     width: 36,
@@ -964,21 +1022,31 @@ const styles = StyleSheet.create({
     alignItems: "center",
     justifyContent: "center",
   },
-  manageBtn: {
+  viewFullHistoryBtn: {
     flexDirection: "row",
     alignItems: "center",
-    gap: 5,
-    backgroundColor: "#ecfdf5",
-    borderColor: "#a7f3d0",
+    justifyContent: "space-between",
+    backgroundColor: "#ffffff",
     borderWidth: 1,
-    borderRadius: 12,
-    paddingHorizontal: 11,
-    paddingVertical: 8,
+    borderColor: "#cffafe",
+    borderRadius: 14,
+    paddingHorizontal: 14,
+    paddingVertical: 11,
+    shadowColor: "#0891b2",
+    shadowOffset: { width: 0, height: 1 },
+    shadowOpacity: 0.05,
+    shadowRadius: 3,
+    elevation: 1,
   },
-  manageBtnText: {
-    color: "#059669",
+  viewFullHistoryLeft: {
+    flexDirection: "row",
+    alignItems: "center",
+    gap: 8,
+  },
+  viewFullHistoryText: {
+    fontSize: 13,
     fontWeight: "700",
-    fontSize: 12,
+    color: "#0891b2",
   },
 
   // Hero Digital Clock Card

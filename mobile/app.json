@@ -35,6 +35,7 @@
       "favicon": "./assets/favicon.png"
     },
     "plugins": [
+      ["expo-notifications", { "defaultChannel": "default", "color": "#065f46" }],
       "expo-secure-store",
       "expo-router",
       "expo-sharing",

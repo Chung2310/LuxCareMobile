@@ -8,8 +8,10 @@ import {
   Text,
   TextInput,
   type TextInputProps,
+  View,
 } from "react-native";
-import { View } from "react-native";
+import { router } from "expo-router";
+import { Ionicons } from "@expo/vector-icons";
 
 export const colors = {
   primary: "#059669",
@@ -119,7 +121,26 @@ export const styles = StyleSheet.create({
   },
 });
 
-export function Page({ title, children }: React.PropsWithChildren<{ title: string }>) {
+export function Page({
+  title,
+  children,
+  onBack,
+  showBack = true,
+}: React.PropsWithChildren<{
+  title: string;
+  onBack?: () => void;
+  showBack?: boolean;
+}>) {
+  const handleBack = () => {
+    if (onBack) {
+      onBack();
+    } else if (router.canGoBack()) {
+      router.back();
+    } else {
+      router.replace("/(tabs)/modules");
+    }
+  };
+
   return (
     <ScrollView
       style={styles.page}
@@ -127,9 +148,34 @@ export function Page({ title, children }: React.PropsWithChildren<{ title: strin
       keyboardShouldPersistTaps="handled"
       showsVerticalScrollIndicator={false}
     >
-      <Text accessibilityRole="header" style={styles.title}>
-        {title}
-      </Text>
+      <View style={{ flexDirection: "row", alignItems: "center", gap: 12 }}>
+        {showBack && (
+          <Pressable
+            accessibilityRole="button"
+            accessibilityLabel="Quay lại"
+            onPress={handleBack}
+            style={({ pressed }) => [
+              {
+                width: 36,
+                height: 36,
+                borderRadius: 18,
+                backgroundColor: "#ffffff",
+                borderWidth: 1,
+                borderColor: "#e2e8f0",
+                alignItems: "center",
+                justifyContent: "center",
+              },
+              pressed && { opacity: 0.7 },
+            ]}
+            hitSlop={8}
+          >
+            <Ionicons name="arrow-back" size={20} color="#0f172a" />
+          </Pressable>
+        )}
+        <Text accessibilityRole="header" style={[styles.title, { flex: 1 }]}>
+          {title}
+        </Text>
+      </View>
       {children}
     </ScrollView>
   );

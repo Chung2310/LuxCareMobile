@@ -44,6 +44,7 @@ export function SessionProvider({ children }: React.PropsWithChildren) {
       socketService.configure({
         origin: api.getOrigin(),
         onSessionReplaced: () => {
+          void api.clear().catch(() => {});
           // Another device signed in with the same account.
           // Expire immediately – no need to call the HTTP logout endpoint.
           setUser(null);
@@ -57,8 +58,10 @@ export function SessionProvider({ children }: React.PropsWithChildren) {
       setSelectedBranch(null);
     };
     void retry();
+    api.onAccessTokenChanged = (token) => socketService.connect(token);
     return () => {
       api.onSessionExpired = () => {};
+      api.onAccessTokenChanged = () => {};
       socketService.disconnect();
     };
   }, []);

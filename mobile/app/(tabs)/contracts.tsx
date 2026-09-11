@@ -1,5 +1,6 @@
 import React, { useCallback, useRef, useState } from "react";
-import { useFocusEffect } from "expo-router";
+import { router, useFocusEffect, useLocalSearchParams } from "expo-router";
+import { Ionicons } from "@expo/vector-icons";
 import {
   ActivityIndicator,
   Modal,
@@ -55,6 +56,7 @@ function getDaysRemaining(endDateStr: string) {
 
 export default function Contracts() {
   const { user, selectedBranch } = useSession();
+  const params = useLocalSearchParams<{ from?: string }>();
   const allowed = canReadContracts(user);
   const manage = canManageContracts(user);
 
@@ -169,6 +171,18 @@ export default function Contracts() {
       >
         {/* Header bar */}
         <View style={styles.headerRow}>
+          <Pressable
+            style={styles.backBtn}
+            onPress={() => {
+              if (params.from === "modules") router.replace("/(tabs)/modules");
+              else if (router.canGoBack()) router.back();
+              else router.replace("/(tabs)/modules");
+            }}
+            hitSlop={8}
+          >
+            <Ionicons name="arrow-back" size={20} color="#0f172a" />
+          </Pressable>
+
           <View style={{ flex: 1 }}>
             <Text style={styles.pageTitle}>Hợp đồng nhân sự</Text>
             <Text style={styles.pageSubtitle}>
@@ -675,6 +689,16 @@ const styles = StyleSheet.create({
     alignItems: "center",
     justifyContent: "space-between",
     gap: 12,
+  },
+  backBtn: {
+    width: 36,
+    height: 36,
+    borderRadius: 18,
+    backgroundColor: "#ffffff",
+    borderWidth: 1,
+    borderColor: "#e2e8f0",
+    alignItems: "center",
+    justifyContent: "center",
   },
   pageTitle: {
     fontSize: 22,

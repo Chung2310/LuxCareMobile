@@ -802,7 +802,7 @@ export default function BlogScreen() {
                   {/* Inline Images with tap-to-zoom + share button */}
                   {post.attachments?.filter((att: BlogAttachment) => att.type === "image" && att.url).map((att: BlogAttachment) => {
                     const shareImage = () => {
-                      void shareMediaOrFile(att.url, att.name || "hinh_anh.jpg");
+                      if (att.url) void shareMediaOrFile(att.url, att.name || "hinh_anh.jpg");
                     };
                     return (
                       <Pressable key={att.id} style={styles.inlineImageWrap} onPress={() => setViewImageUrl(att.url || null)}>

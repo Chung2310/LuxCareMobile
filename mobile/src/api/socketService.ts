@@ -8,6 +8,14 @@ interface SocketServiceConfig {
 }
 
 class SocketService {
+  private listeners = new Map<string, Set<(data: any) => void>>();
+  subscribe(event: string, callback: (data: any) => void) {
+    const callbacks = this.listeners.get(event) || new Set();
+    callbacks.add(callback);
+    this.listeners.set(event, callbacks);
+    this.socket?.on(event, callback);
+    return () => { callbacks.delete(callback); this.socket?.off(event, callback); };
+  }
   private socket: any = null;
   private currentToken: string | null = null;
   private origin: string = "";
@@ -38,6 +46,7 @@ class SocketService {
       reconnectionDelayMax: 30000,
       upgrade: false,
     });
+    this.listeners.forEach((callbacks, event) => callbacks.forEach(callback => this.socket.on(event, callback)));
     this.socket.on("auth:session-replaced", (data: { code: string; message: string }) => {
       this.onSessionReplaced(data);
       // Forcefully disconnect – the session is no longer valid.
@@ -64,4 +73,3 @@ class SocketService {
 }
 
 export const socketService = new SocketService();
-

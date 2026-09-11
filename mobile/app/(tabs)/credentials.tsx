@@ -1,5 +1,6 @@
 import { useCallback, useRef, useState } from "react";
-import { useFocusEffect } from "expo-router";
+import { router, useFocusEffect, useLocalSearchParams } from "expo-router";
+import { Ionicons } from "@expo/vector-icons";
 import {
   Modal,
   Pressable,
@@ -27,6 +28,7 @@ import { EmployeeSelectModal } from "../../src/features/credentials/EmployeeSele
 
 export default function Credentials() {
   const { user, selectedBranch } = useSession();
+  const params = useLocalSearchParams<{ from?: string }>();
   const allowed = canReadCredentials(user);
   const manage = canManageCredentials(user);
 
@@ -149,6 +151,18 @@ export default function Credentials() {
       >
         {/* Header bar */}
         <View style={uiStyles.headerRow}>
+          <Pressable
+            style={uiStyles.backBtn}
+            onPress={() => {
+              if (params.from === "modules") router.replace("/(tabs)/modules");
+              else if (router.canGoBack()) router.back();
+              else router.replace("/(tabs)/modules");
+            }}
+            hitSlop={8}
+          >
+            <Ionicons name="arrow-back" size={20} color="#0f172a" />
+          </Pressable>
+
           <View style={{ flex: 1 }}>
             <Text style={uiStyles.pageTitle}>Văn bằng & chứng chỉ</Text>
             <Text style={uiStyles.pageSubtitle}>
@@ -662,6 +676,16 @@ const uiStyles = StyleSheet.create({
     alignItems: "center",
     justifyContent: "space-between",
     gap: 12,
+  },
+  backBtn: {
+    width: 36,
+    height: 36,
+    borderRadius: 18,
+    backgroundColor: "#ffffff",
+    borderWidth: 1,
+    borderColor: "#e2e8f0",
+    alignItems: "center",
+    justifyContent: "center",
   },
   pageTitle: {
     fontSize: 22,

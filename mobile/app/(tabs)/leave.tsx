@@ -11,7 +11,7 @@ import {
   View,
 } from "react-native";
 import { SafeAreaView } from "react-native-safe-area-context";
-import { useFocusEffect, useLocalSearchParams } from "expo-router";
+import { router, useFocusEffect, useLocalSearchParams } from "expo-router";
 import { Ionicons } from "@expo/vector-icons";
 import { emptyPagination, type PaginationMeta } from "../../../src/types/pagination";
 import {
@@ -42,7 +42,7 @@ const KIND_THEMES: Record<
 
 export default function LeaveScreen() {
   const { user } = useSession();
-  const params = useLocalSearchParams<{ create?: string }>();
+  const params = useLocalSearchParams<{ create?: string; from?: string }>();
   const allowed = canUseModule(user, "hr");
 
   const [items, setItems] = useState<LeaveApplication[]>([]);
@@ -176,6 +176,18 @@ export default function LeaveScreen() {
           <View style={s.headerWrap}>
             {/* Top Bar Header */}
             <View style={s.topRow}>
+              <Pressable
+                style={s.backBtn}
+                onPress={() => {
+                  if (params.from === "modules") router.replace("/(tabs)/modules");
+                  else if (router.canGoBack()) router.back();
+                  else router.replace("/(tabs)/modules");
+                }}
+                hitSlop={8}
+              >
+                <Ionicons name="arrow-back" size={20} color="#0f172a" />
+              </Pressable>
+
               <View style={{ flex: 1 }}>
                 <Text style={s.screenTitle}>Đơn từ & Phép</Text>
                 <Text style={s.screenSubtitle}>Quản lý nghỉ phép, WFH & giải trình công</Text>
@@ -395,8 +407,8 @@ export default function LeaveScreen() {
                   <View style={s.dateRangeRow}>
                     <Ionicons name="calendar-outline" size={13} color="#64748b" />
                     <Text style={s.dateRangeText}>
-                      {new Date(item.startDate).toLocaleDateString("vi-VN")} –{" "}
-                      {new Date(item.endDate).toLocaleDateString("vi-VN")}
+                      {new Date(item.startDate).toLocaleDateString("vi-VN", { timeZone: "Asia/Ho_Chi_Minh" })} –{" "}
+                      {new Date(item.endDate).toLocaleDateString("vi-VN", { timeZone: "Asia/Ho_Chi_Minh" })}
                     </Text>
                   </View>
                 </View>
@@ -751,6 +763,17 @@ const s = StyleSheet.create({
     flexDirection: "row",
     alignItems: "center",
     justifyContent: "space-between",
+  },
+  backBtn: {
+    width: 36,
+    height: 36,
+    borderRadius: 18,
+    backgroundColor: "#ffffff",
+    borderWidth: 1,
+    borderColor: "#e2e8f0",
+    alignItems: "center",
+    justifyContent: "center",
+    marginRight: 10,
   },
   screenTitle: {
     fontSize: 24,

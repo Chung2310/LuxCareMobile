@@ -29,6 +29,7 @@ export class MobileApi {
     }
   }
   onSessionExpired: () => void = () => {};
+  onAccessTokenChanged: (token: string) => void = () => {};
   /** Returns the current in-memory access token (null if not authenticated). */
   getAccessToken() {
     return this.accessToken;
@@ -156,6 +157,7 @@ export class MobileApi {
       if (typeof body?.accessToken !== "string" || !body.accessToken)
         throw new Error("API không trả access token hợp lệ.");
       this.accessToken = body.accessToken;
+      this.onAccessTokenChanged(body.accessToken);
     })();
     this.refreshing = pending;
     void pending
