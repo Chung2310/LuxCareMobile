@@ -578,6 +578,34 @@ export default function BlogScreen() {
     }
   };
 
+  const handleDownloadFile = async (url: string, fileName?: string) => {
+    if (!url) return;
+    try {
+      const ext = url.split("?")[0].split(".").pop() || "dat";
+      const safeName = fileName
+        ? fileName.replace(/[^a-zA-Z0-9._-]/g, "_")
+        : `luxcare_${Date.now()}.${ext}`;
+      const destPath = `${FileSystem.documentDirectory}${safeName}`;
+      showAlert("Đang tải xuống...", `Đang tải "${fileName || safeName}" về thiết bị...`);
+      const res = await FileSystem.downloadAsync(url, destPath);
+      if (res && res.status === 200) {
+        const canShare = await Sharing.isAvailableAsync();
+        if (canShare) {
+          await Sharing.shareAsync(res.uri, {
+            dialogTitle: `Lưu "${fileName || safeName}" vào thiết bị`,
+            UTI: "public.item",
+          });
+        } else {
+          showAlert("Tải xuống thành công", `Đã lưu "${fileName || safeName}" vào thiết bị.`);
+        }
+      } else {
+        showAlert("Tải xuống thất bại", "Không thể tải tệp. Vui lòng kiểm tra kết nối mạng.");
+      }
+    } catch (err: any) {
+      showAlert("Lỗi tải xuống", err?.message || "Có lỗi xảy ra khi tải tệp về thiết bị.");
+    }
+  };
+
   const filteredPosts = posts.filter((p) =>
     searchQuery
       ? p.content.toLowerCase().includes(searchQuery.toLowerCase()) ||
@@ -606,9 +634,14 @@ export default function BlogScreen() {
             onPress={() => setChannelModalVisible(true)}
           >
             <Ionicons name={selectedChannel.icon as any} size={15} color="#000000" />
-            <Text style={styles.channelTitleText} numberOfLines={1}>
-              {selectedChannel.name}
-            </Text>
+            <View style={{ flexDirection: "column" }}>
+              <Text style={styles.channelTitleText} numberOfLines={1}>
+                Kênh Bảng Tin & Blog Doanh Nghiệp
+              </Text>
+              <Text style={styles.channelSubtitleText} numberOfLines={1}>
+                {selectedChannel.name} · Nhấn để đổi kênh
+              </Text>
+            </View>
           </Pressable>
 
           {/* Right Action Controls: Search icon & Logout button to return to login screen */}
@@ -874,16 +907,29 @@ export default function BlogScreen() {
                           </Text>
                           <Text style={styles.webFileSize}>{att.size || ""}</Text>
                         </View>
-                        {/* Share / Open button */}
-                        <Pressable
-                          style={styles.webDownloadBtn}
-                          onPress={() => void shareOrOpenFile()}
-                        >
-                          <Ionicons name="share-social-outline" size={14} color="#000000" />
-                          <Text style={styles.webDownloadText}>Chia sẻ</Text>
-                        </Pressable>
+                        <View style={styles.webFileActions}>
+                          {/* Download button */}
+                          {att.url ? (
+                            <Pressable
+                              style={styles.webDownloadBtn}
+                              onPress={() => void handleDownloadFile(att.url!, att.name)}
+                            >
+                              <Ionicons name="download-outline" size={14} color="#000000" />
+                              <Text style={styles.webDownloadText}>Tải về</Text>
+                            </Pressable>
+                          ) : null}
+                          {/* Share / Open button */}
+                          <Pressable
+                            style={styles.webDownloadBtn}
+                            onPress={() => void shareOrOpenFile()}
+                          >
+                            <Ionicons name="share-social-outline" size={14} color="#000000" />
+                            <Text style={styles.webDownloadText}>Chia sẻ</Text>
+                          </Pressable>
+                        </View>
                       </View>
                     );
+
                   })}
 
                   {/* Footer Row: Tag + Actions (Like & Share) */}
@@ -1502,10 +1548,17 @@ const styles = StyleSheet.create({
     elevation: 2,
   },
   channelTitleText: {
-    fontSize: 14,
+    fontSize: 13,
     fontWeight: "800",
     color: "#0f172a",
     fontFamily: "Inter-Bold",
+  },
+  channelSubtitleText: {
+    fontSize: 10,
+    fontWeight: "500",
+    color: "#64748b",
+    fontFamily: "Inter-Regular",
+    marginTop: 1,
   },
   headerRightActions: {
     flexDirection: "row",
@@ -1768,6 +1821,11 @@ const styles = StyleSheet.create({
   webFileSize: {
     fontSize: 11,
     color: "#64748b",
+  },
+  webFileActions: {
+    flexDirection: "row",
+    alignItems: "center",
+    gap: 6,
   },
   webDownloadBtn: {
     flexDirection: "row",
