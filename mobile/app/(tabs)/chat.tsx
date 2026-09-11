@@ -815,6 +815,9 @@ function extractInitials(name?: string): string {
   return "";
 }
 
+const AI_AVATAR = require("../../public/lux-pfp.png");
+const CLOUD_AVATAR = require("../../public/cloud.png");
+
 /**
  * Avatar người dùng cá nhân (dùng cho danh sách chọn, thành viên phòng chat, người gửi tin nhắn)
  */
@@ -890,6 +893,7 @@ function RoomAvatar({
   avatarUrl,
   roomName,
   isBot,
+  isCloud,
   size = 50,
   fontSize = 18,
 }: {
@@ -897,6 +901,7 @@ function RoomAvatar({
   avatarUrl?: string | null;
   roomName?: string;
   isBot?: boolean;
+  isCloud?: boolean;
   size?: number;
   fontSize?: number;
 }) {
@@ -910,18 +915,24 @@ function RoomAvatar({
   // 1. Trợ lý AI
   if (isBot) {
     return (
-      <View
-        style={[
-          styles.avatarPlaceholder,
-          { width: size, height: size, borderRadius: size / 2, backgroundColor: "#6366f1" },
-        ]}
-      >
-        <Ionicons name="sparkles" size={Math.round(size * 0.44)} color="#ffffff" />
-      </View>
+      <Image
+        source={AI_AVATAR}
+        style={[styles.avatarImg, { width: size, height: size, borderRadius: size / 2 }]}
+      />
     );
   }
 
-  // 2. Nhóm trò chuyện
+  // 2. Cloud của tôi
+  if (isCloud) {
+    return (
+      <Image
+        source={CLOUD_AVATAR}
+        style={[styles.avatarImg, { width: size, height: size, borderRadius: size / 2 }]}
+      />
+    );
+  }
+
+  // 3. Nhóm trò chuyện
   if (room?.isGroup) {
     if (validUrl && !loadError) {
       return (
@@ -944,7 +955,7 @@ function RoomAvatar({
     );
   }
 
-  // 3. Trò chuyện 1-1: Có ảnh đại diện hợp lệ và tải thành công
+  // 4. Trò chuyện 1-1: Có ảnh đại diện hợp lệ và tải thành công
   if (validUrl && !loadError) {
     return (
       <Image
@@ -955,7 +966,7 @@ function RoomAvatar({
     );
   }
 
-  // 4. Avatar mặc định khi không có ảnh (hoặc ảnh lỗi 404): Vòng tròn màu với chữ viết tắt hoặc icon người
+  // 5. Avatar mặc định khi không có ảnh (hoặc ảnh lỗi 404): Vòng tròn màu với chữ viết tắt hoặc icon người
   const initials = extractInitials(roomName);
   const bgColor = getAvatarBgColor(roomName);
 
@@ -1123,14 +1134,20 @@ export default function ChatScreen() {
   // Helper nhận diện phòng Trợ lý AI
   const isChatbotRoom = useCallback((room?: ChatRoom | null) => {
     if (!room) return false;
-    return !!room.isChatbot || (room.name || "").toLowerCase() === "trợ lý ai";
+    const name = (room.name || "").trim().toLowerCase();
+    return !!room.isChatbot || name === "trợ lý ai" || name === "trợ lí ai";
+  }, []);
+
+  const isCloudRoom = useCallback((room?: ChatRoom | null) => {
+    const name = (room?.name || "").trim().toLowerCase();
+    return name === "cloud" || name === "cloud của tôi" || name.includes("cloud của tôi");
   }, []);
 
   // Helper kiểm tra phòng có được ghim lên đầu hay không
   const isRoomPinned = useCallback(
     (room?: ChatRoom | null) => {
       if (!room) return false;
-      if (isChatbotRoom(room)) return true;
+      if (isChatbotRoom(room) || isCloudRoom(room)) return true;
       if (room.isPinned !== undefined) return !!room.isPinned;
       const member = room.members?.find((m) => {
         const uId = typeof m.userId === "object" ? m.userId?._id || m.userId?.uid : m.userId;
@@ -1138,7 +1155,7 @@ export default function ChatScreen() {
       });
       return !!member?.isPinned;
     },
-    [currentUserId, isChatbotRoom]
+    [currentUserId, isChatbotRoom, isCloudRoom]
   );
 
   // Lấy ảnh đại diện của phòng chat (nhóm dùng avatar nhóm, 1-1 lấy ảnh profile của người đối diện)
@@ -1199,7 +1216,7 @@ export default function ChatScreen() {
           return {
             ...room,
             isChatbot: isBot,
-            isPinned: isBot ? true : isRoomPinned(room),
+            isPinned: isBot || isCloudRoom(room) ? true : isRoomPinned(room),
             avatarURL: computedAvatar || undefined,
           };
         });
@@ -1212,7 +1229,7 @@ export default function ChatScreen() {
         setRefreshing(false);
       }
     },
-    [isChatbotRoom, isRoomPinned, getRoomAvatarUrl]
+    [isChatbotRoom, isCloudRoom, isRoomPinned, getRoomAvatarUrl]
   );
 
   useEffect(() => {
@@ -2179,6 +2196,7 @@ export default function ChatScreen() {
   // 13. Helpers for Room Display
   const getRoomDisplayName = (room: ChatRoom) => {
     if (isChatbotRoom(room)) return "Trợ lý AI";
+    if (isCloudRoom(room)) return "Cloud của tôi";
     if (room.name) return room.name;
     if (!room.isGroup) {
       const otherMember = room.members?.find((m) => {
@@ -2218,6 +2236,7 @@ export default function ChatScreen() {
             avatarUrl={getRoomAvatarUrl(room)}
             roomName={roomName}
             isBot={isChatbotRoom(room)}
+            isCloud={isCloudRoom(room)}
             size={44}
             fontSize={16}
           />
@@ -2585,7 +2604,7 @@ export default function ChatScreen() {
   const filteredRooms = useMemo(() => {
     let list = [...rooms];
     if (activeTab === "other") {
-      list = list.filter((r) => isChatbotRoom(r) || r.isGroup);
+      list = list.filter((r) => isChatbotRoom(r) || isCloudRoom(r) || r.isGroup);
     }
     if (searchQuery.trim()) {
       const q = searchQuery.toLowerCase().trim();
@@ -2596,20 +2615,25 @@ export default function ChatScreen() {
       });
     }
     return list.sort((a, b) => {
-      // 1. Trợ lý AI luôn luôn được ghim lên vị trí đầu tiên tuyệt đối
+      // 1. Trợ lý AI luôn luôn đứng đầu
       const aIsBot = isChatbotRoom(a) ? 1 : 0;
       const bIsBot = isChatbotRoom(b) ? 1 : 0;
       if (aIsBot !== bIsBot) return bIsBot - aIsBot;
 
-      // 2. Các cuộc trò chuyện được ghim tiếp theo
+      // 2. Cloud của tôi luôn đứng ngay sau Trợ lý AI
+      const aIsCloud = isCloudRoom(a) ? 1 : 0;
+      const bIsCloud = isCloudRoom(b) ? 1 : 0;
+      if (aIsCloud !== bIsCloud) return bIsCloud - aIsCloud;
+
+      // 3. Các cuộc trò chuyện được ghim tiếp theo
       const aPinned = (a.isPinned || isRoomPinned(a)) ? 1 : 0;
       const bPinned = (b.isPinned || isRoomPinned(b)) ? 1 : 0;
       if (aPinned !== bPinned) return bPinned - aPinned;
 
-      // 3. Cuối cùng sắp xếp theo thời gian cập nhật mới nhất
+      // 4. Cuối cùng sắp xếp theo thời gian cập nhật mới nhất
       return new Date(b.updatedAt || 0).getTime() - new Date(a.updatedAt || 0).getTime();
     });
-  }, [rooms, activeTab, searchQuery, isChatbotRoom, isRoomPinned]);
+  }, [rooms, activeTab, searchQuery, isChatbotRoom, isCloudRoom, isRoomPinned]);
 
   // Messages filtered by in-chat search
   const displayedMessages = useMemo(() => {
@@ -2710,6 +2734,7 @@ export default function ChatScreen() {
                     avatarUrl={getRoomAvatarUrl(activeRoom)}
                     roomName={getRoomDisplayName(activeRoom)}
                     isBot={isChatbotRoom(activeRoom)}
+                    isCloud={isCloudRoom(activeRoom)}
                     size={38}
                     fontSize={14}
                   />
@@ -3983,6 +4008,7 @@ export default function ChatScreen() {
                     avatarUrl={getRoomAvatarUrl(item)}
                     roomName={roomName}
                     isBot={isChatbotRoom(item)}
+                    isCloud={isCloudRoom(item)}
                     size={50}
                     fontSize={18}
                   />
