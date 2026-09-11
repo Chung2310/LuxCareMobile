@@ -29,6 +29,7 @@ import { useRouter, useFocusEffect } from "expo-router";
 import { useCommunication } from "../../src/features/notifications/CommunicationProvider";
 import { saveDownloadedMedia } from "../../src/features/blog/saveDownloadedMedia";
 import { prepareLocalBlogFile } from "../../src/features/blog/prepareLocalBlogFile";
+import { selectBlogFeed } from "../../src/features/blog/blogFeed";
 import { Ionicons } from "@expo/vector-icons";
 import Svg, { Path } from "react-native-svg";
 import { useSession } from "../../src/auth/SessionProvider";
@@ -80,6 +81,8 @@ export default function BlogScreen() {
 
   const [posts, setPosts] = useState<BlogPost[]>([]);
   const [postsScope, setPostsScope] = useState("");
+  const [loadedChannel, setLoadedChannel] = useState("");
+  const feedScope = `${user?.companyCode}|${user?.uid}`;
   const [loading, setLoading] = useState(true);
   const [refreshing, setRefreshing] = useState(false);
 
@@ -98,23 +101,24 @@ export default function BlogScreen() {
 
   // Pinned Posts Modal & Layout Scrolling State
   const [pinnedModalVisible, setPinnedModalVisible] = useState(false);
-  const postLayouts = useRef<Record<string, number>>({});
+  const jumpRetry = useRef<ReturnType<typeof setTimeout> | null>(null);
+  const jumpAttempts = useRef(0);
   const isSharingRef = useRef(false);
   const [viewImageUrl, setViewImageUrl] = useState<string | null>(null);
 
   const pinnedPosts = useMemo(
-    () => posts.filter((p) => p.isPinned),
-    [posts],
+    () => postsScope === feedScope && loadedChannel === selectedChannel.id ? posts.filter((p) => p.isPinned) : [],
+    [posts, postsScope, feedScope, loadedChannel, selectedChannel.id],
   );
 
   const jumpToPost = (postId: string) => {
+    if (jumpRetry.current) clearTimeout(jumpRetry.current);
     setPinnedModalVisible(false);
-    setTimeout(() => {
-      const y = postLayouts.current[postId];
-      if (typeof y === "number") {
-        scrollViewRef.current?.scrollTo({ y: Math.max(0, y - 10), animated: true });
-      }
-    }, 200);
+    const index = filteredPosts.findIndex(post => post.id === postId);
+    if (index >= 0) {
+      jumpAttempts.current = 0;
+      scrollViewRef.current?.scrollToIndex({ index, animated: true });
+    }
   };
 
   const handleLongPressPost = (post: BlogPost) => {
@@ -165,37 +169,38 @@ export default function BlogScreen() {
     setAlertState((prev) => ({ ...prev, visible: false }));
   };
 
-  const scrollViewRef = useRef<ScrollView>(null);
+  const scrollViewRef = useRef<FlatList<BlogPost>>(null);
+  useEffect(() => () => { if (jumpRetry.current) clearTimeout(jumpRetry.current); }, [focused, selectedChannel.id, feedScope, searchQuery, posts]);
 
   useEffect(() => {
-    if (focused) void loadBlogData();
-  }, [selectedChannel, focused, blogRevision, user?.uid, user?.companyCode]);
+    if (!focused) return;
+    let active = true;
+    void blog.getChannels().then(items => {
+      if (active) setChannels(items.length ? items : DEFAULT_BLOG_CHANNELS);
+    }).catch(() => {});
+    return () => { active = false; };
+  }, [focused, feedScope]);
+
+  useEffect(() => {
+    if (!focused) return;
+    // Coalesce reaction bursts without replacing the visible feed with a spinner.
+    const timer = setTimeout(() => void loadBlogData(), loadedChannel === selectedChannel.id && postsScope === feedScope ? 150 : 0);
+    return () => { clearTimeout(timer); requestVersion.current++; };
+  }, [selectedChannel.id, focused, blogRevision, feedScope]);
 
   useEffect(() => {
     if (focused && !loading && AppState.currentState === "active" && postsScope === `${user?.companyCode}|${user?.uid}`)
       markBlogSeen(posts.map(post => post.id));
   }, [focused, loading, posts, postsScope, user?.uid, user?.companyCode, markBlogSeen]);
 
-  // Auto-scroll to bottom (newest post) after data loads
-  useEffect(() => {
-    if (!loading && posts.length > 0) {
-      setTimeout(() => {
-        scrollViewRef.current?.scrollToEnd({ animated: false });
-      }, 100);
-    }
-  }, [loading, posts]);
-
   const loadBlogData = async () => {
     const version = ++requestVersion.current;
-    setLoading(true);
+    setLoading(loadedChannel !== selectedChannel.id || postsScope !== feedScope);
     try {
-      const fetchedChannels = await blog.getChannels();
-      if (version !== requestVersion.current) return;
-      if (fetchedChannels.length > 0) setChannels(fetchedChannels);
-
       const fetchedPosts = await blog.getPosts(selectedChannel.id, true);
       if (version !== requestVersion.current) return;
       setPosts(fetchedPosts);
+      setLoadedChannel(selectedChannel.id);
       setPostsScope(`${user?.companyCode}|${user?.uid}`);
     } catch {
       // Handled in service fallback
@@ -436,7 +441,7 @@ export default function BlogScreen() {
       await loadBlogData();
       // Scroll to bottom to show the newly posted item
       setTimeout(() => {
-        scrollViewRef.current?.scrollToEnd({ animated: true });
+        scrollViewRef.current?.scrollToOffset({ offset: 0, animated: true });
       }, 300);
     } catch (error: any) {
       showAlert("Lỗi", error?.message || "Không thể đăng bài viết. Vui lòng thử lại.");
@@ -497,7 +502,7 @@ export default function BlogScreen() {
 
   const handleInputFocus = () => {
     setTimeout(() => {
-      scrollViewRef.current?.scrollToEnd({ animated: true });
+      scrollViewRef.current?.scrollToOffset({ offset: 0, animated: true });
     }, 120);
   };
 
@@ -732,13 +737,9 @@ export default function BlogScreen() {
     }
   };
 
-  const filteredPosts = posts.filter((p) =>
-    searchQuery
-      ? p.content.toLowerCase().includes(searchQuery.toLowerCase()) ||
-        (p.title && p.title.toLowerCase().includes(searchQuery.toLowerCase())) ||
-        p.authorName.toLowerCase().includes(searchQuery.toLowerCase())
-      : true,
-  );
+  const filteredPosts = useMemo(() => selectBlogFeed(
+    postsScope === feedScope && loadedChannel === selectedChannel.id ? posts : [], searchQuery,
+  ), [posts, postsScope, feedScope, loadedChannel, selectedChannel.id, searchQuery]);
 
   return (
     <ImageBackground
@@ -843,9 +844,23 @@ export default function BlogScreen() {
           </Pressable>
         )}
 
-        {/* Timeline Feed ScrollView */}
-        <ScrollView
+        {/* Virtualized timeline: newest item starts at the bottom. */}
+        <FlatList
           ref={scrollViewRef}
+          key={feedScope + "|" + selectedChannel.id}
+          inverted
+          maintainVisibleContentPosition={{ minIndexForVisible: 0 }}
+          data={filteredPosts}
+          keyExtractor={post => post.id}
+          initialNumToRender={6}
+          maxToRenderPerBatch={5}
+          windowSize={7}
+          onScrollToIndexFailed={({ index, averageItemLength }) => {
+            if (jumpRetry.current) clearTimeout(jumpRetry.current);
+            if (jumpAttempts.current++ >= 5) return;
+            scrollViewRef.current?.scrollToOffset({ offset: averageItemLength * index, animated: false });
+            jumpRetry.current = setTimeout(() => scrollViewRef.current?.scrollToIndex({ index, animated: true }), 150);
+          }}
           style={styles.feedScrollView}
           contentContainerStyle={styles.feedContentContainer}
           showsVerticalScrollIndicator={false}
@@ -859,14 +874,12 @@ export default function BlogScreen() {
               tintColor="#008852"
             />
           }
-        >
-          {/* Loading Indicator */}
-          {loading ? (
+          ListEmptyComponent={loading ? (
             <View style={styles.loadingContainer}>
               <ActivityIndicator size="small" color="#008852" />
               <Text style={styles.loadingText}>Đang tải bản tin thực tế từ server...</Text>
             </View>
-          ) : filteredPosts.length === 0 ? (
+          ) : (
             /* Empty State */
             <View style={styles.emptyContainer}>
               <Ionicons name="newspaper-outline" size={44} color="#000000" />
@@ -875,18 +888,12 @@ export default function BlogScreen() {
                 Hiện chưa có bản tin hoặc thông báo nào trong chuyên mục "{selectedChannel.name}".
               </Text>
             </View>
-          ) : (
-            /* Posts Feed List */
-            filteredPosts.map((post) => {
-              const isUrl = post.content.startsWith("http://") || post.content.startsWith("https://");
-
+          )}
+          renderItem={({ item: post }) => {
               return (
                 <Pressable
                   key={post.id}
                   style={styles.postCard}
-                  onLayout={(e) => {
-                    postLayouts.current[post.id] = e.nativeEvent.layout.y;
-                  }}
                   delayLongPress={280}
                   onLongPress={() => handleLongPressPost(post)}
                 >
@@ -1132,9 +1139,8 @@ export default function BlogScreen() {
                   </View>
                 </Pressable>
               );
-            })
-          )}
-        </ScrollView>
+          }}
+        />
 
         {/* BOTTOM COMPOSER OR READ-ONLY BANNER */}
         {isEditor ? (
