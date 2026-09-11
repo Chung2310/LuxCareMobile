@@ -174,6 +174,15 @@ export default function BlogScreen() {
       markBlogSeen(posts.map(post => post.id));
   }, [focused, loading, posts, postsScope, user?.uid, user?.companyCode, markBlogSeen]);
 
+  // Auto-scroll to bottom (newest post) after data loads
+  useEffect(() => {
+    if (!loading && posts.length > 0) {
+      setTimeout(() => {
+        scrollViewRef.current?.scrollToEnd({ animated: false });
+      }, 100);
+    }
+  }, [loading, posts]);
+
   const loadBlogData = async () => {
     const version = ++requestVersion.current;
     setLoading(true);
@@ -569,22 +578,13 @@ export default function BlogScreen() {
     }
   };
 
-  const filteredPosts = posts
-    .filter((p) =>
-      searchQuery
-        ? p.content.toLowerCase().includes(searchQuery.toLowerCase()) ||
-          (p.title && p.title.toLowerCase().includes(searchQuery.toLowerCase())) ||
-          p.authorName.toLowerCase().includes(searchQuery.toLowerCase())
-        : true,
-    )
-    .sort((a, b) => {
-      // Pinned posts always appear first
-      if (a.isPinned && !b.isPinned) return -1;
-      if (!a.isPinned && b.isPinned) return 1;
-      // Within same group, sort newest first using raw timestamp
-      return (b.createdAtTs ?? 0) - (a.createdAtTs ?? 0);
-    });
-
+  const filteredPosts = posts.filter((p) =>
+    searchQuery
+      ? p.content.toLowerCase().includes(searchQuery.toLowerCase()) ||
+        (p.title && p.title.toLowerCase().includes(searchQuery.toLowerCase())) ||
+        p.authorName.toLowerCase().includes(searchQuery.toLowerCase())
+      : true,
+  );
 
   return (
     <ImageBackground
