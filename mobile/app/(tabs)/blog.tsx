@@ -1006,25 +1006,7 @@ export default function BlogScreen() {
               </Pressable>
             </View>
           </View>
-        ) : (
-          /* Soft Sky Blue Read-Only Footer Banner for Non-Editors */
-          <View style={styles.readOnlyBlueFooter}>
-            <View style={styles.readOnlyLeftCol}>
-              <View style={styles.readOnlyTitleRow}>
-                <Ionicons name="lock-closed" size={14} color="#000000" />
-                <Text style={styles.readOnlyTitle}>Chế độ chỉ xem (Read-only Channel)</Text>
-              </View>
-              <Text style={styles.readOnlySubText}>
-                Chỉ tài khoản Ban biên tập / Tác giả đặc biệt mới có quyền gửi bài viết & tin nhắn trong kênh này.
-              </Text>
-            </View>
-
-            <View style={styles.readOnlyLockTag}>
-              <Ionicons name="lock-closed-outline" size={13} color="#000000" />
-              <Text style={styles.readOnlyLockTagText}>Quyền gửi bị khóa</Text>
-            </View>
-          </View>
-        )}
+        ) : null}
 
         {/* Channel Selector Modal */}
         <Modal
