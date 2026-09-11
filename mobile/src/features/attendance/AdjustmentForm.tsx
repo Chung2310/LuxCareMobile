@@ -1,4 +1,4 @@
-﻿import { useEffect, useRef, useState } from "react";
+import { useEffect, useRef, useState } from "react";
 import { Alert, Text } from "react-native";
 import type { AttendanceLog, AttendanceAdjustment } from "../../../../src/services/attendanceService";
 import { attendance } from "../../api/services";
