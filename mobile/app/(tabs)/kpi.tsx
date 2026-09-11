@@ -46,22 +46,22 @@ function formatTaskDueDate(dueDateString?: string, isCompleted = false) {
 
     if (!isCompleted && diffDays < 0) {
       return {
-        text: `Quá hạn ${Math.abs(diffDays)} ngày (${dateFormatted})`,
+        text: `Quá hạn ${Math.abs(diffDays)} ngày`,
         isOverdue: true,
         isToday: false,
       };
     }
     if (!isCompleted && diffDays === 0) {
       return {
-        text: `Hạn chót hôm nay (${String(due.getHours()).padStart(2, "0")}:${String(due.getMinutes()).padStart(2, "0")})`,
+        text: "Hạn hôm nay",
         isOverdue: false,
         isToday: true,
       };
     }
     if (diffDays === 1) {
-      return { text: `Ngày mai (${dateFormatted})`, isOverdue: false, isToday: false };
+      return { text: "Hạn ngày mai", isOverdue: false, isToday: false };
     }
-    return { text: `Hạn: ${dateFormatted}`, isOverdue: false, isToday: false };
+    return { text: `Hạn ${dateFormatted}`, isOverdue: false, isToday: false };
   } catch {
     return { text: dueDateString, isOverdue: false, isToday: false };
   }

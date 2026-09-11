@@ -1,6 +1,7 @@
-import React, { useState, useEffect, useRef, useMemo } from "react";
+import React, { useState, useEffect, useRef, useMemo, useCallback } from "react";
 import {
   StyleSheet,
+  AppState,
   View,
   Text,
   ScrollView,
@@ -24,7 +25,10 @@ import * as Sharing from "expo-sharing";
 import * as FileSystem from "expo-file-system/legacy";
 import { File } from "expo-file-system";
 import { SafeAreaView } from "react-native-safe-area-context";
-import { useRouter } from "expo-router";
+import { useRouter, useFocusEffect } from "expo-router";
+import { useCommunication } from "../../src/features/notifications/CommunicationProvider";
+import { saveDownloadedMedia } from "../../src/features/blog/saveDownloadedMedia";
+import { prepareLocalBlogFile } from "../../src/features/blog/prepareLocalBlogFile";
 import { Ionicons } from "@expo/vector-icons";
 import Svg, { Path } from "react-native-svg";
 import { useSession } from "../../src/auth/SessionProvider";
@@ -59,6 +63,13 @@ function PinIcon({ size = 15, color = "#92400e", style }: { size?: number; color
 }
 
 export default function BlogScreen() {
+  const { blogRevision, markBlogSeen } = useCommunication();
+  const [focused, setFocused] = useState(false);
+  const requestVersion = useRef(0);
+  useFocusEffect(useCallback(() => {
+    setFocused(true);
+    return () => { setFocused(false); requestVersion.current++; };
+  }, []));
   const router = useRouter();
   const { user, logout } = useSession();
   const isEditor = isBlogEditorUser(user);
@@ -68,6 +79,7 @@ export default function BlogScreen() {
   const [channelModalVisible, setChannelModalVisible] = useState(false);
 
   const [posts, setPosts] = useState<BlogPost[]>([]);
+  const [postsScope, setPostsScope] = useState("");
   const [loading, setLoading] = useState(true);
   const [refreshing, setRefreshing] = useState(false);
 
@@ -156,20 +168,39 @@ export default function BlogScreen() {
   const scrollViewRef = useRef<ScrollView>(null);
 
   useEffect(() => {
-    void loadBlogData();
-  }, [selectedChannel]);
+    if (focused) void loadBlogData();
+  }, [selectedChannel, focused, blogRevision, user?.uid, user?.companyCode]);
+
+  useEffect(() => {
+    if (focused && !loading && AppState.currentState === "active" && postsScope === `${user?.companyCode}|${user?.uid}`)
+      markBlogSeen(posts.map(post => post.id));
+  }, [focused, loading, posts, postsScope, user?.uid, user?.companyCode, markBlogSeen]);
+
+  // Auto-scroll to bottom (newest post) after data loads
+  useEffect(() => {
+    if (!loading && posts.length > 0) {
+      setTimeout(() => {
+        scrollViewRef.current?.scrollToEnd({ animated: false });
+      }, 100);
+    }
+  }, [loading, posts]);
 
   const loadBlogData = async () => {
+    const version = ++requestVersion.current;
     setLoading(true);
     try {
       const fetchedChannels = await blog.getChannels();
+      if (version !== requestVersion.current) return;
       if (fetchedChannels.length > 0) setChannels(fetchedChannels);
 
-      const fetchedPosts = await blog.getPosts(selectedChannel.id);
+      const fetchedPosts = await blog.getPosts(selectedChannel.id, true);
+      if (version !== requestVersion.current) return;
       setPosts(fetchedPosts);
+      setPostsScope(`${user?.companyCode}|${user?.uid}`);
     } catch {
       // Handled in service fallback
     } finally {
+      if (version !== requestVersion.current) return;
       setLoading(false);
       setRefreshing(false);
     }
@@ -333,10 +364,7 @@ export default function BlogScreen() {
       const file = new File(uri);
       base64 = await file.base64();
     } catch {
-      const fs = await import("expo-file-system");
-      if (fs.readAsStringAsync) {
-        base64 = await fs.readAsStringAsync(uri, { encoding: "base64" as any });
-      }
+      base64 = await FileSystem.readAsStringAsync(uri, { encoding: "base64" });
     }
 
     if (base64) {
@@ -382,9 +410,11 @@ export default function BlogScreen() {
                 url: att.localUri,
                 size: att.sizeBytes ?? 0,
               });
+            } else {
+              throw new Error("Tệp chưa được tải lên máy chủ.");
             }
           } catch (uploadErr) {
-            console.warn("[BlogScreen] Tải tệp lên Cloudinary thất bại:", uploadErr);
+            throw new Error(`Không thể tải lên tệp "${att.name}". Vui lòng chọn lại tệp hoặc thử lại. Bài viết chưa được đăng.`);
           }
         }
       }
@@ -549,6 +579,159 @@ export default function BlogScreen() {
     }
   };
 
+  const isDownloadingRef = useRef(false);
+
+  const getMimeType = (ext: string): string => {
+    const map: Record<string, string> = {
+      jpg: "image/jpeg",
+      jpeg: "image/jpeg",
+      png: "image/png",
+      gif: "image/gif",
+      webp: "image/webp",
+      bmp: "image/bmp",
+      mp4: "video/mp4",
+      mov: "video/quicktime",
+      avi: "video/x-msvideo",
+      mkv: "video/x-matroska",
+      webm: "video/webm",
+      pdf: "application/pdf",
+      doc: "application/msword",
+      docx: "application/vnd.openxmlformats-officedocument.wordprocessingml.document",
+      xls: "application/vnd.ms-excel",
+      xlsx: "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet",
+      ppt: "application/vnd.ms-powerpoint",
+      pptx: "application/vnd.openxmlformats-officedocument.presentationml.presentation",
+      zip: "application/zip",
+      txt: "text/plain",
+    };
+    return map[ext.toLowerCase()] || "application/octet-stream";
+  };
+
+  const handleDownloadFile = async (
+    url: string,
+    fileName?: string,
+    fileType: "image" | "video" | "file" = "file"
+  ) => {
+    if (!url || isDownloadingRef.current) return;
+    isDownloadingRef.current = true;
+    try {
+      const ext = (url.split("?")[0].split(".").pop() || "dat").toLowerCase();
+      const safeName = fileName
+        ? fileName.replace(/[^a-zA-Z0-9._-]/g, "_")
+        : `luxcare_${Date.now()}.${ext}`;
+
+      const isImg = fileType === "image" || ["jpg", "jpeg", "png", "gif", "webp", "bmp", "heic"].includes(ext);
+      const isVid = fileType === "video" || ["mp4", "mov", "avi", "mkv", "webm", "m4v", "3gp"].includes(ext);
+
+      if (Platform.OS === "web") {
+        try {
+          const a = document.createElement("a");
+          a.href = url;
+          a.download = fileName || safeName;
+          document.body.appendChild(a);
+          a.click();
+          document.body.removeChild(a);
+          showAlert("Tải xuống thành công", `Đã bắt đầu tải "${fileName || safeName}".`);
+          return;
+        } catch {
+          await Linking.openURL(url);
+          return;
+        }
+      }
+
+      const targetDir = FileSystem.documentDirectory || FileSystem.cacheDirectory;
+      if (!targetDir) throw new Error("Bộ nhớ ứng dụng chưa sẵn sàng. Vui lòng thử lại.");
+      const destPath = `${targetDir}${safeName}`;
+
+      let localUri = url;
+
+      if (url.startsWith("http://") || url.startsWith("https://")) {
+        showAlert("Đang tải xuống...", `Đang tải "${fileName || safeName}" về thiết bị...`);
+        const res = await FileSystem.downloadAsync(url, destPath);
+        if (!res || res.status !== 200) {
+          showAlert("Tải xuống thất bại", "Không thể tải tệp. Vui lòng kiểm tra kết nối mạng.");
+          return;
+        }
+        localUri = res.uri;
+      } else if (url.startsWith("file://") || url.startsWith("content://")) {
+        localUri = await prepareLocalBlogFile(url, destPath, FileSystem);
+      } else if (url.startsWith("data:")) {
+        try {
+          const base64Data = url.includes(",") ? url.split(",")[1] : url;
+          await FileSystem.writeAsStringAsync(destPath, base64Data, {
+            encoding: "base64",
+          });
+          localUri = destPath;
+        } catch (b64Err) {
+          throw new Error("Không thể tạo tệp từ dữ liệu đính kèm. Vui lòng thử lại.");
+        }
+      }
+
+      if (isImg || isVid) {
+        try {
+          const result = await saveDownloadedMedia(localUri, isVid ? "video" : "image");
+          if (result === "saved") {
+              showAlert(
+                "Tải xuống thành công",
+                `Đã lưu ${isVid ? "video" : "hình ảnh"} vào Thư viện của thiết bị.`
+              );
+              return;
+          } else if (result === "denied") {
+              showAlert(
+                "Quyền truy cập",
+                "Cần cấp quyền truy cập Thư viện ảnh để lưu tệp vào thiết bị."
+              );
+              return;
+          }
+        } catch (mediaErr) {
+          console.warn("Lỗi MediaLibrary:", mediaErr);
+        }
+      }
+
+      // Android fallback: nếu không có MediaLibrary (như Expo Go) hoặc là tệp tài liệu,
+      // cho phép chọn thư mục lưu (Downloads, Pictures, ...) qua StorageAccessFramework
+      if (Platform.OS === "android" && (FileSystem as any).StorageAccessFramework) {
+        try {
+          const saf = (FileSystem as any).StorageAccessFramework;
+          const perm = await saf.requestDirectoryPermissionsAsync();
+          if (!perm.granted || !perm.directoryUri) return; // User cancelled; do not report a successful save.
+          if (perm.granted && perm.directoryUri) {
+            const base64 = await FileSystem.readAsStringAsync(localUri, {
+              encoding: "base64",
+            });
+            const mime = getMimeType(ext);
+            const nameWithoutExt = (fileName || safeName).replace(/\.[^/.]+$/, "");
+            const createdFileUri = await saf.createFileAsync(perm.directoryUri, nameWithoutExt, mime);
+            await FileSystem.writeAsStringAsync(createdFileUri, base64, {
+              encoding: "base64",
+            });
+            showAlert(
+              "Tải xuống thành công",
+              `Đã lưu "${fileName || safeName}" vào thư mục bạn chọn.`
+            );
+            return;
+          }
+        } catch (safErr) {
+          console.warn("Lỗi SAF lưu tệp:", safErr);
+        }
+      }
+
+      if (await Sharing.isAvailableAsync()) {
+        await Sharing.shareAsync(localUri, { mimeType: getMimeType(ext), dialogTitle: "Lưu tệp đã tải" });
+        return;
+      }
+      // The sandbox copy is not necessarily accessible in Photos/Downloads.
+      showAlert(
+        "Tệp đã tải vào ứng dụng",
+        `"${fileName || safeName}" mới được lưu trong bộ nhớ ứng dụng, chưa lưu vào Thư viện ảnh hoặc thư mục Tải xuống.`
+      );
+    } catch (err: any) {
+      showAlert("Lỗi tải xuống", err?.message || "Có lỗi xảy ra khi tải tệp về thiết bị.");
+    } finally {
+      isDownloadingRef.current = false;
+    }
+  };
+
   const filteredPosts = posts.filter((p) =>
     searchQuery
       ? p.content.toLowerCase().includes(searchQuery.toLowerCase()) ||
@@ -577,9 +760,14 @@ export default function BlogScreen() {
             onPress={() => setChannelModalVisible(true)}
           >
             <Ionicons name={selectedChannel.icon as any} size={15} color="#000000" />
-            <Text style={styles.channelTitleText} numberOfLines={1}>
-              {selectedChannel.name}
-            </Text>
+            <View style={{ flexDirection: "column" }}>
+              <Text style={styles.channelTitleText} numberOfLines={1}>
+                Kênh Bảng Tin & Blog Doanh Nghiệp
+              </Text>
+              <Text style={styles.channelSubtitleText} numberOfLines={1}>
+                {selectedChannel.name} · Nhấn để đổi kênh
+              </Text>
+            </View>
           </Pressable>
 
           {/* Right Action Controls: Search icon & Logout button to return to login screen */}
@@ -592,14 +780,16 @@ export default function BlogScreen() {
               <Ionicons name="search-outline" size={20} color="#000000" />
             </Pressable>
 
-            {/* Logout icon button */}
-            <Pressable
-              style={({ pressed }) => [styles.logoutHeaderBtn, pressed && { opacity: 0.7 }]}
-              onPress={handleLogout}
-              hitSlop={6}
-            >
-              <Ionicons name="log-out-outline" size={20} color="#000000" />
-            </Pressable>
+            {/* Logout icon button — only visible for editor role */}
+            {isEditor && (
+              <Pressable
+                style={({ pressed }) => [styles.logoutHeaderBtn, pressed && { opacity: 0.7 }]}
+                onPress={handleLogout}
+                hitSlop={6}
+              >
+                <Ionicons name="log-out-outline" size={20} color="#000000" />
+              </Pressable>
+            )}
           </View>
         </View>
 
@@ -799,10 +989,13 @@ export default function BlogScreen() {
                     );
                   })()}
 
-                  {/* Inline Images with tap-to-zoom + share button */}
+                  {/* Inline Images with tap-to-zoom + download/share buttons */}
                   {post.attachments?.filter((att: BlogAttachment) => att.type === "image" && att.url).map((att: BlogAttachment) => {
                     const shareImage = () => {
-                      void shareMediaOrFile(att.url, att.name || "hinh_anh.jpg");
+                      if (att.url) void shareMediaOrFile(att.url, att.name || "hinh_anh.jpg");
+                    };
+                    const downloadImage = () => {
+                      if (att.url) void handleDownloadFile(att.url, att.name || "hinh_anh.jpg", "image");
                     };
                     return (
                       <Pressable key={att.id} style={styles.inlineImageWrap} onPress={() => setViewImageUrl(att.url || null)}>
@@ -815,20 +1008,60 @@ export default function BlogScreen() {
                         <View style={styles.imageExpandBadge}>
                           <Ionicons name="expand-outline" size={13} color="#ffffff" />
                         </View>
-                        {/* Share overlay button — bottom right */}
-                        <Pressable
-                          style={styles.imageDownloadBtn}
-                          hitSlop={6}
-                          onPress={(e) => { e.stopPropagation?.(); void shareImage(); }}
-                        >
-                          <Ionicons name="share-social-outline" size={15} color="#ffffff" />
-                        </Pressable>
+                        {/* Action overlay buttons — bottom right */}
+                        <View style={styles.imageOverlayActions}>
+                          <Pressable
+                            style={styles.imageDownloadBtn}
+                            hitSlop={6}
+                            onPress={(e) => { e.stopPropagation?.(); void downloadImage(); }}
+                          >
+                            <Ionicons name="download-outline" size={15} color="#ffffff" />
+                          </Pressable>
+                          <Pressable
+                            style={styles.imageDownloadBtn}
+                            hitSlop={6}
+                            onPress={(e) => { e.stopPropagation?.(); void shareImage(); }}
+                          >
+                            <Ionicons name="share-social-outline" size={15} color="#ffffff" />
+                          </Pressable>
+                        </View>
                       </Pressable>
                     );
                   })}
 
-                  {/* File Attachments (non-image) */}
-                  {post.attachments?.filter((att: BlogAttachment) => att.type !== "image").map((att: BlogAttachment) => {
+                  {/* Video Attachments */}
+                  {post.attachments?.filter((att: BlogAttachment) => att.type === "video" && att.url).map((att: BlogAttachment) => (
+                    <View key={att.id} style={styles.webFileCard}>
+                      <View style={[styles.webFileIconWrap, { backgroundColor: "#dbeafe" }]}>
+                        <Ionicons name="videocam" size={20} color="#1d4ed8" />
+                      </View>
+                      <View style={styles.webFileMeta}>
+                        <Text style={styles.webFileName} numberOfLines={1}>{att.name || "Video"}</Text>
+                        <Text style={styles.webFileSize}>{att.size || "Video đính kèm"}</Text>
+                      </View>
+                      <View style={styles.webFileActions}>
+                        {att.url ? (
+                          <Pressable
+                            style={styles.webDownloadBtn}
+                            onPress={() => void handleDownloadFile(att.url!, att.name, "video")}
+                          >
+                            <Ionicons name="download-outline" size={14} color="#000000" />
+                            <Text style={styles.webDownloadText}>Tải về</Text>
+                          </Pressable>
+                        ) : null}
+                        <Pressable
+                          style={styles.webDownloadBtn}
+                          onPress={() => void shareMediaOrFile(att.url || "", att.name)}
+                        >
+                          <Ionicons name="share-social-outline" size={14} color="#000000" />
+                          <Text style={styles.webDownloadText}>Chia sẻ</Text>
+                        </Pressable>
+                      </View>
+                    </View>
+                  ))}
+
+                  {/* File Attachments (non-image, non-video) */}
+                  {post.attachments?.filter((att: BlogAttachment) => att.type !== "image" && att.type !== "video").map((att: BlogAttachment) => {
                     const shareOrOpenFile = () => {
                       void shareMediaOrFile(att.url || "", att.name);
                     };
@@ -843,14 +1076,26 @@ export default function BlogScreen() {
                           </Text>
                           <Text style={styles.webFileSize}>{att.size || ""}</Text>
                         </View>
-                        {/* Share / Open button */}
-                        <Pressable
-                          style={styles.webDownloadBtn}
-                          onPress={() => void shareOrOpenFile()}
-                        >
-                          <Ionicons name="share-social-outline" size={14} color="#000000" />
-                          <Text style={styles.webDownloadText}>Chia sẻ</Text>
-                        </Pressable>
+                        <View style={styles.webFileActions}>
+                          {/* Download button */}
+                          {att.url ? (
+                            <Pressable
+                              style={styles.webDownloadBtn}
+                              onPress={() => void handleDownloadFile(att.url!, att.name, "file")}
+                            >
+                              <Ionicons name="download-outline" size={14} color="#000000" />
+                              <Text style={styles.webDownloadText}>Tải về</Text>
+                            </Pressable>
+                          ) : null}
+                          {/* Share / Open button */}
+                          <Pressable
+                            style={styles.webDownloadBtn}
+                            onPress={() => void shareOrOpenFile()}
+                          >
+                            <Ionicons name="share-social-outline" size={14} color="#000000" />
+                            <Text style={styles.webDownloadText}>Chia sẻ</Text>
+                          </Pressable>
+                        </View>
                       </View>
                     );
                   })}
@@ -1006,25 +1251,7 @@ export default function BlogScreen() {
               </Pressable>
             </View>
           </View>
-        ) : (
-          /* Soft Sky Blue Read-Only Footer Banner for Non-Editors */
-          <View style={styles.readOnlyBlueFooter}>
-            <View style={styles.readOnlyLeftCol}>
-              <View style={styles.readOnlyTitleRow}>
-                <Ionicons name="lock-closed" size={14} color="#000000" />
-                <Text style={styles.readOnlyTitle}>Chế độ chỉ xem (Read-only Channel)</Text>
-              </View>
-              <Text style={styles.readOnlySubText}>
-                Chỉ tài khoản Ban biên tập / Tác giả đặc biệt mới có quyền gửi bài viết & tin nhắn trong kênh này.
-              </Text>
-            </View>
-
-            <View style={styles.readOnlyLockTag}>
-              <Ionicons name="lock-closed-outline" size={13} color="#000000" />
-              <Text style={styles.readOnlyLockTagText}>Quyền gửi bị khóa</Text>
-            </View>
-          </View>
-        )}
+        ) : null}
 
         {/* Channel Selector Modal */}
         <Modal
@@ -1225,6 +1452,15 @@ export default function BlogScreen() {
             >
               <Ionicons name="close" size={24} color="#ffffff" />
             </Pressable>
+            {/* Download button */}
+            <Pressable
+              style={styles.imageViewerDownload}
+              onPress={() => {
+                if (viewImageUrl) void handleDownloadFile(viewImageUrl, "hinh_anh.jpg", "image");
+              }}
+            >
+              <Ionicons name="download-outline" size={22} color="#ffffff" />
+            </Pressable>
             {/* Share button */}
             <Pressable
               style={styles.imageViewerShare}
@@ -1343,10 +1579,14 @@ const styles = StyleSheet.create({
     borderRadius: 12,
     backgroundColor: "#f1f5f9",
   },
-  imageDownloadBtn: {
+  imageOverlayActions: {
     position: "absolute",
     bottom: 8,
     right: 8,
+    flexDirection: "row",
+    gap: 6,
+  },
+  imageDownloadBtn: {
     backgroundColor: "rgba(0,0,0,0.45)",
     borderRadius: 20,
     width: 34,
@@ -1385,6 +1625,17 @@ const styles = StyleSheet.create({
     borderRadius: 22,
     width: 44,
     height: 44,
+    alignItems: "center",
+    justifyContent: "center",
+  },
+  imageViewerDownload: {
+    position: "absolute",
+    bottom: 48,
+    right: 84,
+    backgroundColor: "rgba(255,255,255,0.15)",
+    borderRadius: 22,
+    width: 48,
+    height: 48,
     alignItems: "center",
     justifyContent: "center",
   },
@@ -1489,10 +1740,17 @@ const styles = StyleSheet.create({
     elevation: 2,
   },
   channelTitleText: {
-    fontSize: 14,
+    fontSize: 13,
     fontWeight: "800",
     color: "#0f172a",
     fontFamily: "Inter-Bold",
+  },
+  channelSubtitleText: {
+    fontSize: 10,
+    fontWeight: "500",
+    color: "#64748b",
+    fontFamily: "Inter-Regular",
+    marginTop: 1,
   },
   headerRightActions: {
     flexDirection: "row",
@@ -1755,6 +2013,11 @@ const styles = StyleSheet.create({
   webFileSize: {
     fontSize: 11,
     color: "#64748b",
+  },
+  webFileActions: {
+    flexDirection: "row",
+    alignItems: "center",
+    gap: 6,
   },
   webDownloadBtn: {
     flexDirection: "row",
@@ -2185,4 +2448,3 @@ const styles = StyleSheet.create({
     fontWeight: "600",
   },
 });
-

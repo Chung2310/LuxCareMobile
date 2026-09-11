@@ -160,12 +160,12 @@ export const LUXCARE_MODULES: ServiceModule[] = [
         status: "active",
       },
       {
-        id: "att-mgmt",
-        title: "Quản lý\n& Duyệt công",
-        icon: "calendar-clear",
-        color: "#0284c7",
-        bgColor: "#f0f9ff",
-        route: "/(tabs)/attendance-management",
+        id: "att-history",
+        title: "Lịch sử\nchấm công",
+        icon: "time",
+        color: "#0891b2",
+        bgColor: "#ecfeff",
+        route: "/(tabs)/attendance-history",
         moduleId: "hr",
         status: "active",
       },
@@ -266,6 +266,16 @@ export const LUXCARE_MODULES: ServiceModule[] = [
         color: "#ea580c",
         bgColor: "#fff7ed",
         route: "/(tabs)/recruitment",
+        moduleId: "hr",
+        status: "active",
+      },
+      {
+        id: "hr-celebration",
+        title: "Email\nchúc mừng",
+        icon: "mail",
+        color: "#db2777",
+        bgColor: "#fdf2f8",
+        route: "/(tabs)/celebration-email",
         moduleId: "hr",
         status: "active",
       },
@@ -458,7 +468,7 @@ export const LUXCARE_MODULES: ServiceModule[] = [
         bgColor: "#f5f3ff",
         route: "/(tabs)/knowledge",
         moduleId: "communication",
-        status: "coming_soon",
+        status: "active",
       },
       {
         id: "sys-users",
@@ -518,6 +528,9 @@ export function isServiceAccessible(item: ServiceItem, user: UserProfile | null)
     case "/(tabs)/training":
       return isManager || trainingAccess(user).read;
 
+    case "/(tabs)/celebration-email":
+      return isManager || hasPermission(user, "company-email:manage");
+
     case "/(tabs)/workflow":
       return isManager || workflowAccess(user).read;
 
@@ -565,8 +578,10 @@ export function isServiceAccessible(item: ServiceItem, user: UserProfile | null)
     case "/(tabs)/crm-survey":
     case "/(tabs)/blog":
     case "/(tabs)/notifications":
-    case "/(tabs)/knowledge":
       return true;
+
+    case "/(tabs)/knowledge":
+      return isManager || hasPermission(user, "knowledge:read") || hasPermission(user, "knowledge:manage");
 
     default:
       return true;

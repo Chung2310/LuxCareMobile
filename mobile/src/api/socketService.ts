@@ -26,6 +26,13 @@ class SocketService {
   private onSessionReplaced: SocketEventHandler = () => {};
   private listeners: Map<string, Set<Function>> = new Map();
 
+  subscribe(event: string, callback: (data: any) => void) {
+    this.on(event, callback);
+    return () => {
+      this.off(event, callback);
+    };
+  }
+
   configure(config: SocketServiceConfig) {
     this.origin = config.origin;
     this.onSessionReplaced = config.onSessionReplaced;
@@ -130,4 +137,3 @@ class SocketService {
 }
 
 export const socketService = new SocketService();
-

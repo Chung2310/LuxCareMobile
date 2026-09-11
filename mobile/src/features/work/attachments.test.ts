@@ -12,6 +12,16 @@ vi.mock("expo-file-system", () => ({
     delete = mocks.remove;
   },
 }));
+vi.mock("react-native", () => ({
+  Platform: { OS: "android", Version: 33 },
+  Alert: { alert: vi.fn() },
+  Linking: { openSettings: vi.fn() },
+  PermissionsAndroid: { request: vi.fn(), PERMISSIONS: {}, RESULTS: {} },
+}));
+(globalThis as any).__DEV__ = false;
+vi.mock("expo-image-picker", () => ({
+  requestMediaLibraryPermissionsAsync: vi.fn(async () => ({ status: "granted" })),
+}));
 vi.mock("expo-crypto", () => ({ randomUUID: () => "id" }));
 vi.mock("../../api/services", () => ({ kanbanMedia: { upload: mocks.upload } }));
 import { pickWorkAttachment } from "./attachments";

@@ -15,7 +15,9 @@ import {
   Pressable,
   RefreshControl,
   ScrollView,
+  AppState,
   StyleSheet,
+  Switch,
   Text,
   TextInput,
   ToastAndroid,
@@ -39,7 +41,9 @@ import { File } from "expo-file-system";
 import * as MediaLibrary from "expo-media-library/legacy";
 import * as Sharing from "expo-sharing";
 import { useVideoPlayer, VideoView } from "expo-video";
-import { useFocusEffect } from "expo-router";
+import { useFocusEffect, useLocalSearchParams, useRouter } from "expo-router";
+import { useCommunication } from "../../src/features/notifications/CommunicationProvider";
+import { chatNotificationsMuted } from "../../src/features/notifications/chatNotificationState";
 import { useSession } from "../../src/auth/SessionProvider";
 import { useChatUnread } from "../../src/context/ChatUnreadContext";
 import { api, chat, kanbanMedia } from "../../src/api/services";
@@ -1018,11 +1022,33 @@ function RoomAvatar({
   );
 }
 
+
+
 export default function ChatScreen() {
   const insets = useSafeAreaInsets();
   const { user } = useSession();
   const { markRoomRead, refreshUnread } = useChatUnread();
   const currentUserId = (user as any)?._id || user?.uid || "";
+  const router = useRouter();
+  const [focused, setFocused] = useState(true);
+  const focusedRef = useRef(true);
+  useFocusEffect(
+    useCallback(() => {
+      focusedRef.current = true;
+      setFocused(true);
+      return () => {
+        focusedRef.current = false;
+        setFocused(false);
+        messageVersion.current++;
+      };
+    }, [])
+  );
+  const activeIdRef = useRef<string | null>(null);
+  const messageVersion = useRef(0);
+  const roomsVersion = useRef(0);
+  const { refreshChat, chatRevision, setActiveChatRoom } = useCommunication();
+  const { roomId: requestedRoom } = useLocalSearchParams<{ roomId?: string }>();
+
 
   // Chat Rooms State
   const [rooms, setRooms] = useState<ChatRoom[]>([]);
@@ -1033,6 +1059,20 @@ export default function ChatScreen() {
 
   // Active Chat Room State
   const [activeRoom, setActiveRoom] = useState<ChatRoom | null>(null);
+  activeIdRef.current = activeRoom?._id || null;
+  useEffect(() => {
+    setActiveChatRoom(focused ? activeRoom?._id || null : null);
+    return () => setActiveChatRoom(null);
+  }, [focused, activeRoom?._id, setActiveChatRoom]);
+  useEffect(() => {
+    if (!requestedRoom || !focused) return;
+    const room = rooms.find((item) => item._id === requestedRoom);
+    if (room) {
+      setActiveRoom(room);
+      router.setParams({ roomId: undefined });
+    }
+  }, [requestedRoom, rooms, focused, router]);
+
   const [messages, setMessages] = useState<ChatMessage[]>([]);
   const [loadingMessages, setLoadingMessages] = useState(false);
   const [inputText, setInputText] = useState("");
@@ -1060,6 +1100,7 @@ export default function ChatScreen() {
 
   // Room Info / Manage Modal
   const [roomInfoModalVisible, setRoomInfoModalVisible] = useState(false);
+  const [savingNotifications, setSavingNotifications] = useState(false);
   const [roomActionBusy, setRoomActionBusy] = useState(false);
   const [showAddMembers, setShowAddMembers] = useState(false);
   const [selectedAddMemberIds, setSelectedAddMemberIds] = useState<string[]>([]);
@@ -1533,6 +1574,16 @@ export default function ChatScreen() {
           prev.map((r) => (r._id === payload.roomId ? { ...r, unreadCount: 0 } : r))
         );
       }
+      void loadRooms(true);
+      if (payload.roomId === activeRoomRef.current?._id && typeof payload.userId === "string") {
+        setMessages((current) =>
+          current.map((message) =>
+            message.readBy?.includes(payload.userId)
+              ? message
+              : { ...message, readBy: [...(message.readBy || []), payload.userId] }
+          )
+        );
+      }
     };
 
     const handleMessageEdited = (payload: { roomId: string; messageId: string; message: ChatMessage }) => {
@@ -1702,21 +1753,21 @@ export default function ChatScreen() {
     ]);
   };
 
-  // Polling for real-time messages when a room is active
+  // Polling for real-time messages when a room is active (fallback when socket disconnected)
   useEffect(() => {
-    if (activeRoom?._id) {
-      void loadMessages(activeRoom._id);
+    if (focused && activeRoom?._id) {
+      void loadMessages(activeRoom._id, initialScrollDoneRef.current);
       if (pollingRef.current) clearInterval(pollingRef.current);
       pollingRef.current = setInterval(() => {
-        void loadMessages(activeRoom._id, true);
-      }, 3500);
+        if (!socketService.isConnected && AppState.currentState === "active") void loadMessages(activeRoom._id, true);
+      }, 15000);
     } else {
       if (pollingRef.current) clearInterval(pollingRef.current);
     }
     return () => {
       if (pollingRef.current) clearInterval(pollingRef.current);
     };
-  }, [activeRoom?._id, loadMessages]);
+  }, [focused, activeRoom?._id, loadMessages, chatRevision]);
 
   // Polling danh sách phòng chat khi đang đứng ở màn hình danh sách (activeRoom === null)
   // để luôn cập nhật tin nhắn mới nhất và số tin chưa đọc (real-time 3.5s fallback)
@@ -4318,6 +4369,41 @@ export default function ChatScreen() {
                     </TouchableOpacity>
                   </View>
                 )}
+              </View>
+
+              {/* Cài đặt thông báo cuộc trò chuyện */}
+              <View style={{ padding: 16, marginTop: 16, borderRadius: 12, backgroundColor: "#ecfdf5", flexDirection: "row", alignItems: "center", gap: 12 }}>
+                <View style={{ flex: 1 }}>
+                  <Text style={{ color: "#065f46", fontWeight: "700" }}>Thông báo cuộc trò chuyện</Text>
+                  <Text style={{ color: "#475569", marginTop: 4 }}>
+                    {savingNotifications ? "Đang lưu…" : (activeRoom && chatNotificationsMuted(activeRoom, currentUserId)) ? "Đã tắt thông báo" : "Đang bật thông báo"}
+                  </Text>
+                  <Text style={{ color: "#475569", marginTop: 4 }}>Tin nhắn và số chưa đọc vẫn được cập nhật.</Text>
+                </View>
+                <Switch
+                  accessibilityLabel="Thông báo cuộc trò chuyện"
+                  accessibilityState={{ busy: savingNotifications }}
+                  value={Boolean(activeRoom && !chatNotificationsMuted(activeRoom, currentUserId))}
+                  trackColor={{ false: "#cbd5e1", true: "#059669" }}
+                  thumbColor="#ffffff"
+                  ios_backgroundColor="#cbd5e1"
+                  disabled={savingNotifications}
+                  onValueChange={async (enabled) => {
+                    if (savingNotifications) return;
+                    const roomId = activeRoom._id;
+                    setSavingNotifications(true);
+                    try {
+                      const updated = await chat.setNotificationsMuted(roomId, !enabled);
+                      setRooms((previous) => previous.map((room) => (room._id === roomId ? { ...room, members: updated.members } : room)));
+                      setActiveRoom((previous) => (previous?._id === roomId ? { ...previous, members: updated.members } : previous));
+                      refreshChat();
+                    } catch (error: any) {
+                      showCustomAlert("Lỗi", error?.message || "Không thể cập nhật thông báo.");
+                    } finally {
+                      setSavingNotifications(false);
+                    }
+                  }}
+                />
               </View>
 
               {activeRoom.isGroup && (

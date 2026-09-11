@@ -12,7 +12,7 @@ export interface BlogChannel {
 
 export interface BlogAttachment {
   id: string;
-  type: "file" | "image" | "milestone";
+  type: "file" | "image" | "video" | "milestone";
   name: string;
   size?: string;
   url?: string;
@@ -32,6 +32,8 @@ export interface BlogPost {
   authorAvatar?: string;
   authorRoleBadge?: string;
   createdAt: string;
+  /** Unix timestamp (ms) of creation — use this for sorting, not createdAt which is a formatted display string */
+  createdAtTs: number;
   dateGroup?: string;
   title?: string;
   content: string;
@@ -100,6 +102,8 @@ export function createBlogService({ fetch, getAccessToken }: ServiceTransport) {
     const tagList = Array.isArray(raw.tags) ? raw.tags : [raw.category || raw.channelName || "Thông báo"];
     const mainTag = tagList[0] || "Thông báo";
 
+    const createdAtTs = createdAtStr ? (new Date(createdAtStr).getTime() || Date.now()) : Date.now();
+
     return {
       id: String(raw.id || raw._id || `post-${Math.random().toString(36).substring(2, 9)}`),
       channelId: String(raw.channelId || mainTag),
@@ -115,6 +119,7 @@ export function createBlogService({ fetch, getAccessToken }: ServiceTransport) {
       authorAvatar: raw.authorAvatar || raw.author?.avatar,
       authorRoleBadge: raw.authorRole || raw.authorRoleBadge || "Ban Biên Tập",
       createdAt: formattedDate,
+      createdAtTs,
       dateGroup: formattedGroup,
       title: raw.title?.trim() || undefined,
       content: rawContent,
@@ -123,16 +128,22 @@ export function createBlogService({ fetch, getAccessToken }: ServiceTransport) {
         ? rawAttachments.map((att: any, idx: number) => {
             const rawUrl = att.url || att.uri || att.path || "";
             const rawName = att.name || att.filename || "";
+            const isVideo =
+              att.type === "video" ||
+              att.type?.startsWith("video/") ||
+              rawName.match(/\.(mp4|mov|avi|mkv|webm|m4v|3gp)$/i) ||
+              rawUrl.match(/\.(mp4|mov|avi|mkv|webm|m4v|3gp)($|\?[^\s]*)/i);
             const isImg =
+              !isVideo && (
               att.type === "image" ||
               att.type?.startsWith("image/") ||
               rawName.match(/\.(jpeg|jpg|gif|png|webp|bmp|svg)$/i) ||
               rawUrl.match(/\.(jpeg|jpg|gif|png|webp|bmp|svg)($|\?[^\s]*)/i) ||
-              rawUrl.includes("/image/upload/");
+              rawUrl.includes("/image/upload/"));
 
             return {
               id: String(att._id || att.id || `att-${idx}`),
-              type: (isImg ? "image" : "file") as "image" | "file",
+              type: (isVideo ? "video" : isImg ? "image" : "file") as "image" | "video" | "file",
               name: rawName || (isImg ? "Hình ảnh đính kèm.jpg" : "Tài liệu đính kèm.pdf"),
               size: typeof att.size === "number" ? `${(att.size / 1024).toFixed(1)} KB` : att.size || "",
               url: rawUrl,
@@ -164,7 +175,7 @@ export function createBlogService({ fetch, getAccessToken }: ServiceTransport) {
       return DEFAULT_BLOG_CHANNELS;
     },
 
-    getPosts: async (channelId = "all"): Promise<BlogPost[]> => {
+    getPosts: async (channelId = "all", strict = false): Promise<BlogPost[]> => {
       try {
         const queryParams = new URLSearchParams();
         if (channelId && channelId !== "all" && channelId !== "tat-ca") {
@@ -192,7 +203,8 @@ export function createBlogService({ fetch, getAccessToken }: ServiceTransport) {
           return list.map(normalizePost);
         }
       } catch {
-        // Return empty array if request fails
+        // Preserve the previous snapshot when realtime refresh fails.
+        if (strict) throw new Error("Không thể tải bài viết Blog.");
       }
       return [];
     },

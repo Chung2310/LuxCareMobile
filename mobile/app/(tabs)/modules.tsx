@@ -118,7 +118,11 @@ export default function ModulesScreen() {
       );
       return;
     }
-    navigateWithLoading(item.route, {
+    const targetRoute = item.route.includes("?")
+      ? `${item.route}&from=modules`
+      : `${item.route}?from=modules`;
+
+    navigateWithLoading(targetRoute, {
       title: item.title.replace(/\n/g, " "),
       subtitle: `Đang kết nối và nạp dữ liệu ${item.title.replace(/\n/g, " ")}...`,
       icon: item.icon,
@@ -152,7 +156,6 @@ export default function ModulesScreen() {
         contentContainerStyle={styles.scrollContent}
         showsVerticalScrollIndicator={false}
         keyboardShouldPersistTaps="handled"
-        stickyHeaderIndices={!searchQuery.trim() ? [1] : undefined}
       >
         {/* Branch Selector for Business Owners */}
         {isOwner && !searchQuery.trim() && (

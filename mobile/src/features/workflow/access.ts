@@ -13,12 +13,11 @@ export function workflowAccess(user: UserProfile | null) {
     hasPermission(user, "hr:read") ||
     hasPermission(user, "user:read") ||
     hasPermission(user, "workflow:read") ||
-    hasPermission(user, "workflow:manage") ||
-    !!user?.companyCode;
+    hasPermission(user, "workflow:manage");
   const managePermission = isSuper || manager || hasPermission(user, "hr:manage") || hasPermission(user, "workflow:manage");
 
   return {
-    read: isSuper || (enabled && readPermission) || (!!user?.companyCode && readPermission),
-    manage: isSuper || (enabled && managePermission) || (manager && !!user?.companyCode),
+    read: isSuper || (enabled && readPermission),
+    manage: isSuper || (enabled && managePermission),
   };
 }

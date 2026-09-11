@@ -29,6 +29,7 @@ export class MobileApi {
     }
   }
   onSessionExpired: () => void = () => {};
+  onAccessTokenChanged: (token: string) => void = () => {};
   /** Returns the current in-memory access token (null if not authenticated). */
   getAccessToken() {
     return this.accessToken;
@@ -122,7 +123,10 @@ export class MobileApi {
   }
 
   async restore() {
-    this.refreshToken = await this.storage.read();
+    const generation = this.generation;
+    const stored = await this.storage.read();
+    if (generation !== this.generation) throw new Error("Phiên đăng nhập đã thay đổi.");
+    this.refreshToken = stored;
     if (!this.refreshToken) return false;
     await this.refresh();
     return true;
@@ -156,6 +160,7 @@ export class MobileApi {
       if (typeof body?.accessToken !== "string" || !body.accessToken)
         throw new Error("API không trả access token hợp lệ.");
       this.accessToken = body.accessToken;
+      this.onAccessTokenChanged(body.accessToken);
     })();
     this.refreshing = pending;
     void pending

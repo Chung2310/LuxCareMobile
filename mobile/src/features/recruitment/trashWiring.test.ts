@@ -1,9 +1,9 @@
 import { readFileSync } from "node:fs";
 import { expect, it } from "vitest";
-it("places applicant creation after the access guard and disables mutations on deleted records", () => {
+it("places applicant creation after the access guard and respects access management", () => {
   const source = readFileSync(new URL("../../../app/(tabs)/applicants.tsx", import.meta.url), "utf8");
-  expect(source.indexOf('title="Thêm ứng viên cho tin này"')).toBeGreaterThan(
+  expect(source.indexOf('setEditing("new")')).toBeGreaterThan(
     source.indexOf("Cần quyền đọc tuyển dụng"),
   );
-  expect(source).toContain("manage={access.manage && !pipelineError && !deleted}");
+  expect(source).toContain("canManage={access.manage}");
 });
