@@ -43,6 +43,17 @@ Triển khai backend trước, bảo đảm MongoDB tạo index unique của `Mo
 
 Build lại native sau khi thêm plugin; cập nhật JavaScript đơn thuần không bổ sung native module. Dùng development/release build để kiểm thử push, không dùng Expo Go Android.
 
+## Thông báo chat và tắt thông báo
+
+- Mobile: mở cuộc trò chuyện → Thông tin cuộc trò chuyện → Tắt/Bật thông báo tin nhắn. Áp dụng riêng cho mỗi người trong chat cá nhân hoặc nhóm, lưu trên backend và đồng bộ qua socket. Không chặn gửi tin, không ẩn nội dung và không giảm badge chưa đọc.
+- API mới: `PATCH /api/v1/chat/rooms/:roomId/notifications`, body `{"muted":true}`. Cần quyền chat và là thành viên đúng công ty; chỉ cập nhật cài đặt của người đang đăng nhập.
+- Tin nhắn mới có hàng đợi Expo Push bền vững; kiểm tra lại thành viên, công ty, đã đọc, tắt thông báo và phiên thiết bị trước gửi. Không gửi lại tin cũ khi bật thông báo. Web Push hiện có cũng kiểm tra mute.
+- Foreground dùng chung khóa messageId để tránh banner trùng socket/push. Chạm push mở phòng sau khi xác minh tài khoản và quyền truy cập, kể cả khi khởi động ứng dụng từ trạng thái đóng.
+- Triển khai backend LuxCare cùng thay đổi mobile; tạo index `ChatMessage { mobilePushQueued: 1, createdAt: 1 }` nếu autoIndex bị tắt. Không backfill cờ cho tin nhắn lịch sử. Push chat hết hạn sau một giờ.
+- Push đã chuyển sang nhà cung cấp trước thời điểm tắt có thể vẫn xuất hiện; không thể thu hồi bằng cài đặt này. Tắt thông báo cần kết nối mạng để lưu thành công.
+
+Kiểm thử thiết bị: dùng hai tài khoản, thử chat cá nhân và nhóm ở foreground/background/khóa màn hình; tắt thông báo và kiểm tra không có banner/push nhưng badge vẫn tăng; bật lại và chỉ nhận tin mới; thử đã đọc trước lúc worker gửi, chạm push khi app đóng, đổi tài khoản và rời nhóm.
+
 ## Xác minh
 
 Kiểm thử tự động: `npm test -- mobile/src/features/notifications/payload.test.ts mobile/src/api/socketService.test.ts mobile/src/api/client.test.ts mobile/src/features/navigation/notificationTarget.test.ts`; backend chạy `npx vitest run server/service/mobile-push.service.test.ts`. Chạy typecheck ở hai dự án và export Android/iOS.

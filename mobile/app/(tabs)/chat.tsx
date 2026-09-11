@@ -17,6 +17,7 @@ import {
   RefreshControl,
   ScrollView,
   StyleSheet,
+  Switch,
   Text,
   TextInput,
   TouchableOpacity,
@@ -40,6 +41,7 @@ import * as Sharing from "expo-sharing";
 import { useSession } from "../../src/auth/SessionProvider";
 import { useFocusEffect, useLocalSearchParams, router } from "expo-router";
 import { useCommunication } from "../../src/features/notifications/CommunicationProvider";
+import { chatNotificationsMuted } from "../../src/features/notifications/chatNotificationState";
 import { socketService } from "../../src/api/socketService";
 import { api, chat, kanbanMedia } from "../../src/api/services";
 import { userManagementApi } from "../../src/api/userManagementApi";
@@ -570,6 +572,7 @@ export default function ChatScreen() {
 
   // Room Info / Manage Modal
   const [roomInfoModalVisible, setRoomInfoModalVisible] = useState(false);
+  const [savingNotifications, setSavingNotifications] = useState(false);
 
   // Selected Message Actions Modal
   const [selectedMessage, setSelectedMessage] = useState<ChatMessage | null>(null);
@@ -2899,6 +2902,37 @@ export default function ChatScreen() {
                 </Text>
               </View>
 
+              <View style={{ padding: 16, marginTop: 16, borderRadius: 12, backgroundColor: "#ecfdf5", flexDirection: "row", alignItems: "center", gap: 12 }}>
+                <View style={{ flex: 1 }}>
+                  <Text style={{ color: "#065f46", fontWeight: "700" }}>Thông báo cuộc trò chuyện</Text>
+                  <Text style={{ color: "#475569", marginTop: 4 }}>
+                    {savingNotifications ? "Đang lưu…" : chatNotificationsMuted(activeRoom, currentUserId) ? "Đã tắt thông báo" : "Đang bật thông báo"}
+                  </Text>
+                  <Text style={{ color: "#475569", marginTop: 4 }}>Tin nhắn và số chưa đọc vẫn được cập nhật.</Text>
+                </View>
+                <Switch
+                accessibilityLabel="Thông báo cuộc trò chuyện"
+                accessibilityState={{ busy: savingNotifications }}
+                value={!chatNotificationsMuted(activeRoom, currentUserId)}
+                trackColor={{ false: "#cbd5e1", true: "#059669" }}
+                thumbColor="#ffffff"
+                ios_backgroundColor="#cbd5e1"
+                disabled={savingNotifications}
+                onValueChange={async (enabled) => {
+                  if (savingNotifications) return;
+                  const roomId = activeRoom._id;
+                  setSavingNotifications(true);
+                  try {
+                    const updated = await chat.setNotificationsMuted(roomId, !enabled);
+                    setRooms(previous => previous.map(room => room._id === roomId ? { ...room, members: updated.members } : room));
+                    setActiveRoom(previous => previous?._id === roomId ? { ...previous, members: updated.members } : previous);
+                    refreshChat();
+                  } catch (error: any) {
+                    showCustomAlert("Lỗi", error?.message || "Không thể cập nhật thông báo.");
+                  } finally { setSavingNotifications(false); }
+                }}
+                />
+              </View>
               {activeRoom.isGroup && (
                 <View style={{ marginTop: 24 }}>
                   <Text style={styles.sectionHeader}>Danh sách thành viên</Text>

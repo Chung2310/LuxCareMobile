@@ -1,6 +1,8 @@
 import React, { createContext, useCallback, useContext, useEffect, useRef, useState } from "react";
 import { AppState, Platform, Pressable, Text, View } from "react-native";
-import { router, usePathname } from "expo-router";
+import { router, usePathname, useRootNavigationState } from "expo-router";
+import { nativeNotifications as Notifications } from "./nativeNotifications";
+import { chatNotificationsMuted, parseChatPush, type ChatPush } from "./chatNotificationState";
 import * as SecureStore from "expo-secure-store";
 import { useSafeAreaInsets } from "react-native-safe-area-context";
 import { api, blog, chat } from "../../api/services";
@@ -18,7 +20,9 @@ const Context = createContext<State>({ blogUnread: 0, chatUnread: 0, blogRevisio
 export const useCommunication = () => useContext(Context);
 
 export function CommunicationProvider({ children }: React.PropsWithChildren) {
-  const { user } = useSession();
+  const { user, loading } = useSession();
+  const navigation = useRootNavigationState();
+  const [pendingChat, setPendingChat] = useState<ChatPush | null>(null);
   const pathname = usePathname();
   const insets = useSafeAreaInsets();
   const scope = user ? `${api.getOrigin()}|${user.companyCode}|${user.uid}` : "";
@@ -91,6 +95,16 @@ export function CommunicationProvider({ children }: React.PropsWithChildren) {
 
   useEffect(() => {
     if (!user) return;
+    let active = true;
+    const showChat = async (messageId: string, roomId: string, title: string, body: string) => {
+      try {
+        const room = await chat.getRoomById(roomId);
+        if (!active || room.companyCode !== user.companyCode || chatNotificationsMuted(room, user.uid) ||
+            activeRoom.current === roomId) return;
+        if (room.lastMessage?._id === messageId && room.lastMessage.readBy?.includes(user.uid)) return;
+        show(`chat:${messageId}`, room.isGroup ? room.name || title : title, body, roomId);
+      } catch { /* Missing membership or offline: never expose an unverified alert. */ }
+    };
     const show = (id: string, title: string, body: string, roomId?: string) => {
       if (delivered.current.has(id)) return;
       delivered.current.add(id);
@@ -104,7 +118,7 @@ export function CommunicationProvider({ children }: React.PropsWithChildren) {
       const sender = typeof message?.senderId === "string" ? message.senderId : message?.senderId?._id;
       if (!message?._id || sender === user.uid || activeRoom.current === event.roomId) return;
       if (event.roomUpdate?.companyCode && event.roomUpdate.companyCode !== user.companyCode) return;
-      show(`chat:${message._id}`, message.senderName || "Tin nhắn mới", message.content || "Đã gửi tệp đính kèm", event.roomId);
+      void showChat(message._id, event.roomId, message.senderName || "Tin nhắn mới", message.content || "Đã gửi tệp đính kèm");
     }), socketService.subscribe("blog_post_created", post => {
       if (post?.companyCode !== user.companyCode && post?.companyCode !== "SYSTEM") return;
       setBlogRevision(v => v + 1);
@@ -115,11 +129,50 @@ export function CommunicationProvider({ children }: React.PropsWithChildren) {
     for (const event of ["internal_room_updated", "internal_room_deleted", "internal_message_deleted", "internal_message_edited", "internal_message_reaction"])
       removers.push(socketService.subscribe(event, () => { refreshChat(); setChatRevision(v => v + 1); }));
     removers.push(socketService.subscribe("internal_messages_read", refreshChat));
+    removers.push(socketService.subscribe("internal_room_updated", room => {
+      if (room?.members && chatNotificationsMuted(room, user.uid))
+        setBanner(previous => previous?.roomId === room._id ? null : previous);
+    }));
+    const nativeReceived = Notifications?.addNotificationReceivedListener(notification => {
+      const content = notification.request.content;
+      const data = parseChatPush(content.data);
+      if (!data || data.recipientUid !== user.uid || data.companyCode !== user.companyCode || !canUseModule(user, "chat")) return;
+      refreshChat(); setChatRevision(v => v + 1);
+      void showChat(data.messageId, data.roomId, content.title || "Tin nhắn mới", content.body || "");
+    });
     const sync = () => { refreshChat(); setChatRevision(v => v + 1); setBlogRevision(v => v + 1); };
     removers.push(socketService.subscribe("connect", sync));
     const state = AppState.addEventListener("change", value => { if (value === "active") sync(); });
-    return () => { removers.forEach(off => off()); state.remove(); };
+    return () => { active = false; nativeReceived?.remove(); removers.forEach(off => off()); state.remove(); };
   }, [scope, user?.enabledModules, refreshChat]);
+  useEffect(() => {
+    if (!Notifications) return;
+    const response = Notifications.getLastNotificationResponse();
+    if (response) setPendingChat(parseChatPush(response.notification.request.content.data));
+    const listener = Notifications.addNotificationResponseReceivedListener(event => {
+      const data = parseChatPush(event.notification.request.content.data);
+      if (data) setPendingChat(data);
+    });
+    return () => listener.remove();
+  }, []);
+  useEffect(() => {
+    if (!pendingChat || loading || !user || !navigation?.key) return;
+    let active = true;
+    if (pendingChat.recipientUid !== user.uid || pendingChat.companyCode !== user.companyCode || !canUseModule(user, "chat")) {
+      setPendingChat(null);
+      return;
+    }
+    void chat.getRoomById(pendingChat.roomId).then(room => {
+      if (active && room.companyCode === user.companyCode)
+        router.push({ pathname: "/(tabs)/chat", params: { roomId: room._id } });
+    }).catch(() => {}).finally(() => {
+      if (active) {
+        setPendingChat(null);
+        void Notifications?.clearLastNotificationResponseAsync().catch(() => {});
+      }
+    });
+    return () => { active = false; };
+  }, [pendingChat, loading, scope, navigation?.key, user?.enabledModules]);
   useEffect(() => {
     if (!banner) return;
     const timer = setTimeout(() => setBanner(null), 5000);
