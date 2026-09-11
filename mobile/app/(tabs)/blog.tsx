@@ -18,6 +18,7 @@ import {
   Image,
   Share,
   ImageBackground,
+  NativeModules,
 } from "react-native";
 import * as DocumentPicker from "expo-document-picker";
 import * as ImagePicker from "expo-image-picker";
@@ -580,6 +581,32 @@ export default function BlogScreen() {
 
   const isDownloadingRef = useRef(false);
 
+  const getMimeType = (ext: string): string => {
+    const map: Record<string, string> = {
+      jpg: "image/jpeg",
+      jpeg: "image/jpeg",
+      png: "image/png",
+      gif: "image/gif",
+      webp: "image/webp",
+      bmp: "image/bmp",
+      mp4: "video/mp4",
+      mov: "video/quicktime",
+      avi: "video/x-msvideo",
+      mkv: "video/x-matroska",
+      webm: "video/webm",
+      pdf: "application/pdf",
+      doc: "application/msword",
+      docx: "application/vnd.openxmlformats-officedocument.wordprocessingml.document",
+      xls: "application/vnd.ms-excel",
+      xlsx: "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet",
+      ppt: "application/vnd.ms-powerpoint",
+      pptx: "application/vnd.openxmlformats-officedocument.presentationml.presentation",
+      zip: "application/zip",
+      txt: "text/plain",
+    };
+    return map[ext.toLowerCase()] || "application/octet-stream";
+  };
+
   const handleDownloadFile = async (
     url: string,
     fileName?: string,
@@ -622,30 +649,67 @@ export default function BlogScreen() {
         return;
       }
 
-      if (isImg || isVid) {
+      // Kiểm tra native module MediaLibrary có thực sự tồn tại trong bản build này không
+      const hasNativeMediaLibrary = Boolean(
+        (globalThis as any)?.expo?.modules?.ExpoMediaLibraryNext ||
+        (globalThis as any)?.expo?.modules?.ExpoMediaLibrary ||
+        (NativeModules as any)?.ExpoMediaLibrary ||
+        (NativeModules as any)?.ExpoMediaLibraryNext
+      );
+
+      if ((isImg || isVid) && hasNativeMediaLibrary) {
         try {
           const MediaLibrary = require("expo-media-library");
-          const perm = await MediaLibrary.requestPermissionsAsync();
-          if (perm.status === "granted" || perm.granted) {
-            await MediaLibrary.saveToLibraryAsync(res.uri);
-            showAlert(
-              "Tải xuống thành công",
-              `Đã lưu ${isVid ? "video" : "hình ảnh"} vào Thư viện của thiết bị.`
-            );
-            return;
-          } else {
-            showAlert(
-              "Quyền truy cập",
-              "Cần cấp quyền truy cập Thư viện ảnh để lưu tệp vào thiết bị."
-            );
-            return;
+          if (MediaLibrary?.requestPermissionsAsync && MediaLibrary?.saveToLibraryAsync) {
+            const perm = await MediaLibrary.requestPermissionsAsync();
+            if (perm.status === "granted" || perm.granted) {
+              await MediaLibrary.saveToLibraryAsync(res.uri);
+              showAlert(
+                "Tải xuống thành công",
+                `Đã lưu ${isVid ? "video" : "hình ảnh"} vào Thư viện của thiết bị.`
+              );
+              return;
+            } else {
+              showAlert(
+                "Quyền truy cập",
+                "Cần cấp quyền truy cập Thư viện ảnh để lưu tệp vào thiết bị."
+              );
+              return;
+            }
           }
         } catch (mediaErr) {
           console.warn("Lỗi MediaLibrary:", mediaErr);
         }
       }
 
-      // Tệp tài liệu hoặc định dạng khác
+      // Android fallback: nếu không có MediaLibrary (như Expo Go) hoặc là tệp tài liệu,
+      // cho phép chọn thư mục lưu (Downloads, Pictures, ...) qua StorageAccessFramework
+      if (Platform.OS === "android" && (FileSystem as any).StorageAccessFramework) {
+        try {
+          const saf = (FileSystem as any).StorageAccessFramework;
+          const perm = await saf.requestDirectoryPermissionsAsync();
+          if (perm.granted && perm.directoryUri) {
+            const base64 = await FileSystem.readAsStringAsync(res.uri, {
+              encoding: "base64",
+            });
+            const mime = getMimeType(ext);
+            const nameWithoutExt = (fileName || safeName).replace(/\.[^/.]+$/, "");
+            const createdFileUri = await saf.createFileAsync(perm.directoryUri, nameWithoutExt, mime);
+            await FileSystem.writeAsStringAsync(createdFileUri, base64, {
+              encoding: "base64",
+            });
+            showAlert(
+              "Tải xuống thành công",
+              `Đã lưu "${fileName || safeName}" vào thư mục bạn chọn.`
+            );
+            return;
+          }
+        } catch (safErr) {
+          console.warn("Lỗi SAF lưu tệp:", safErr);
+        }
+      }
+
+      // Đã tải về bộ nhớ ứng dụng
       showAlert(
         "Tải xuống thành công",
         `Đã lưu "${fileName || safeName}" vào bộ nhớ thiết bị.`
