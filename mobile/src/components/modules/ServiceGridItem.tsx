@@ -7,6 +7,7 @@ import {
 } from "react-native";
 import { Ionicons } from "@expo/vector-icons";
 import type { ServiceItem } from "./types";
+import { useNotifications } from "../../features/notifications/NotificationProvider";
 import { useCommunication, communicationBadge } from "../../features/notifications/CommunicationProvider";
 
 interface ServiceGridItemProps {
@@ -23,7 +24,8 @@ export const ServiceGridItem: React.FC<ServiceGridItemProps> = ({
   iconSize = 25,
 }) => {
   const { blogUnread, chatUnread } = useCommunication();
-  const badge = communicationBadge(item.route, blogUnread, chatUnread, item.badge);
+  const { workUnread } = useNotifications();
+  const badge = communicationBadge(item.route, blogUnread, chatUnread, item.badge, workUnread);
   return (
     <TouchableOpacity
       style={[styles.container, { width: widthPercentage }]}

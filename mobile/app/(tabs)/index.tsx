@@ -48,9 +48,9 @@ interface LuxCareFeature {
 
 export default function Home() {
   const { blogUnread, chatUnread } = useCommunication();
-  const badgeFor = (item: { route: string; badge?: string }) => communicationBadge(item.route, blogUnread, chatUnread, item.badge);
+  const badgeFor = (item: { route: string; badge?: string }) => communicationBadge(item.route, blogUnread, chatUnread, item.badge, workUnread);
   const { user, selectedBranch } = useSession();
-  const { unreadCount, refresh: refreshNotifications } = useNotifications();
+  const { unreadCount, workUnread, refresh: refreshNotifications } = useNotifications();
   const { navigateWithLoading } = useAppLoading();
   const isOwner = ["admin", "superadmin", "branch_owner"].includes(user?.role || "");
   const isEditor = isBlogEditorUser(user);

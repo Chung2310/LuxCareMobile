@@ -1,6 +1,6 @@
-export function communicationBadge(route: string, blogUnread: number, chatUnread: number, fallback?: string) {
+export function communicationBadge(route: string, blogUnread: number, chatUnread: number, fallback?: string, workUnread?: number) {
   const base = route.split("?")[0];
-  const count = base === "/(tabs)/blog" ? blogUnread : base === "/(tabs)/chat" ? chatUnread : -1;
+  const count = base === "/(tabs)/blog" ? blogUnread : base === "/(tabs)/chat" ? chatUnread : base === "/(tabs)/work" ? workUnread ?? -1 : -1;
   return count < 0 ? fallback : count > 99 ? "99+" : count > 0 ? String(count) : undefined;
 }
 export function countBlogUnread(posts: { id: string; authorId: string }[], seen: string[] | null, uid: string) {

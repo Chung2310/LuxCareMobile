@@ -1,6 +1,7 @@
 import React, { useState, useEffect, useRef, useMemo, useCallback } from "react";
 import {
   StyleSheet,
+  AppState,
   View,
   Text,
   ScrollView,
@@ -76,6 +77,7 @@ export default function BlogScreen() {
   const [channelModalVisible, setChannelModalVisible] = useState(false);
 
   const [posts, setPosts] = useState<BlogPost[]>([]);
+  const [postsScope, setPostsScope] = useState("");
   const [loading, setLoading] = useState(true);
   const [refreshing, setRefreshing] = useState(false);
 
@@ -168,8 +170,9 @@ export default function BlogScreen() {
   }, [selectedChannel, focused, blogRevision, user?.uid, user?.companyCode]);
 
   useEffect(() => {
-    if (focused && !loading) markBlogSeen(posts.map(post => post.id));
-  }, [focused, loading, posts, markBlogSeen]);
+    if (focused && !loading && AppState.currentState === "active" && postsScope === `${user?.companyCode}|${user?.uid}`)
+      markBlogSeen(posts.map(post => post.id));
+  }, [focused, loading, posts, postsScope, user?.uid, user?.companyCode, markBlogSeen]);
 
   const loadBlogData = async () => {
     const version = ++requestVersion.current;
@@ -182,6 +185,7 @@ export default function BlogScreen() {
       const fetchedPosts = await blog.getPosts(selectedChannel.id, true);
       if (version !== requestVersion.current) return;
       setPosts(fetchedPosts);
+      setPostsScope(`${user?.companyCode}|${user?.uid}`);
     } catch {
       // Handled in service fallback
     } finally {

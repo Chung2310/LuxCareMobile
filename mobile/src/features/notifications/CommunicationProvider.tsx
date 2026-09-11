@@ -46,10 +46,13 @@ export function CommunicationProvider({ children }: React.PropsWithChildren) {
     }).catch(() => {});
   }, [scope, key]);
   const markBlogSeen = useCallback((ids: string[]) => {
-    if (seen?.scope !== scope) return;
-    if (ids.every(id => seen.ids?.includes(id))) return;
-    save([...(seen.ids || []), ...ids]);
-  }, [seen, scope, save]);
+    if (seen?.scope !== scope || snapshot?.scope !== scope || ids.length === 0) return;
+    // Retain the read state of the badge's current feed, even when viewing an older channel.
+    const feedIds = new Set(snapshot.posts.map(post => post.id));
+    const next = [...new Set([...(seen.ids || []), ...ids])].filter(id => feedIds.has(id));
+    if (next.length === seen.ids?.length && next.every(id => seen.ids!.includes(id))) return;
+    save(next);
+  }, [seen, snapshot, scope, save]);
 
   useEffect(() => {
     let active = true;
@@ -57,6 +60,7 @@ export function CommunicationProvider({ children }: React.PropsWithChildren) {
     if (!scope) return;
     void (async () => {
       try {
+        await writes.current;
         const raw = Platform.OS === "web" ? globalThis.localStorage?.getItem(key) : await SecureStore.getItemAsync(key);
         const parsed = raw ? JSON.parse(raw) : null;
         if (active) setSeen({ scope, ids: Array.isArray(parsed) ? parsed.filter(id => typeof id === "string").slice(-50) : null });
