@@ -621,14 +621,16 @@ export default function BlogScreen() {
               <Ionicons name="search-outline" size={20} color="#000000" />
             </Pressable>
 
-            {/* Logout icon button */}
-            <Pressable
-              style={({ pressed }) => [styles.logoutHeaderBtn, pressed && { opacity: 0.7 }]}
-              onPress={handleLogout}
-              hitSlop={6}
-            >
-              <Ionicons name="log-out-outline" size={20} color="#000000" />
-            </Pressable>
+            {/* Logout icon button — only visible for editor role */}
+            {isEditor && (
+              <Pressable
+                style={({ pressed }) => [styles.logoutHeaderBtn, pressed && { opacity: 0.7 }]}
+                onPress={handleLogout}
+                hitSlop={6}
+              >
+                <Ionicons name="log-out-outline" size={20} color="#000000" />
+              </Pressable>
+            )}
           </View>
         </View>
 
