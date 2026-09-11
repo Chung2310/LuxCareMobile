@@ -474,24 +474,16 @@ export default function BlogScreen() {
       >
         {/* Header Bar */}
         <View style={styles.header}>
-          <Pressable
-            onPress={() => router.back()}
-            style={({ pressed }) => [styles.backBtn, pressed && { opacity: 0.6 }]}
-            hitSlop={8}
-          >
-            <Ionicons name="arrow-back" size={20} color="#0f172a" />
-          </Pressable>
-
           {/* Channel Selector Trigger */}
           <Pressable
             style={({ pressed }) => [styles.channelTitleBtn, pressed && { opacity: 0.8 }]}
             onPress={() => setChannelModalVisible(true)}
           >
-            <Ionicons name={selectedChannel.icon as any} size={15} color="#008852" />
+            <Ionicons name={selectedChannel.icon as any} size={15} color="#000000" />
             <Text style={styles.channelTitleText} numberOfLines={1}>
               {selectedChannel.name}
             </Text>
-            <Ionicons name="chevron-down" size={15} color="#64748b" />
+            <Ionicons name="chevron-down" size={15} color="#000000" />
           </Pressable>
 
           {/* Right Action Controls: Search icon & Logout button to return to login screen */}
@@ -501,7 +493,7 @@ export default function BlogScreen() {
               onPress={() => setSearchBarVisible(!searchBarVisible)}
               hitSlop={6}
             >
-              <Ionicons name="search-outline" size={20} color="#0f172a" />
+              <Ionicons name="search-outline" size={20} color="#000000" />
             </Pressable>
 
             {/* Logout icon button */}
@@ -510,7 +502,7 @@ export default function BlogScreen() {
               onPress={handleLogout}
               hitSlop={6}
             >
-              <Ionicons name="log-out-outline" size={20} color="#dc2626" />
+              <Ionicons name="log-out-outline" size={20} color="#000000" />
             </Pressable>
           </View>
         </View>
@@ -518,7 +510,7 @@ export default function BlogScreen() {
         {/* Search Bar Input (Toggleable) */}
         {searchBarVisible && (
           <View style={styles.searchContainer}>
-            <Ionicons name="search" size={16} color="#64748b" style={{ marginRight: 8 }} />
+            <Ionicons name="search" size={16} color="#000000" style={{ marginRight: 8 }} />
             <TextInput
               value={searchQuery}
               onChangeText={setSearchQuery}
@@ -529,7 +521,7 @@ export default function BlogScreen() {
             />
             {searchQuery ? (
               <Pressable onPress={() => setSearchQuery("")}>
-                <Ionicons name="close-circle" size={16} color="#94a3b8" />
+                <Ionicons name="close-circle" size={16} color="#000000" />
               </Pressable>
             ) : null}
           </View>
@@ -561,7 +553,7 @@ export default function BlogScreen() {
                   : "Chưa có tin ghim. BTV ấn giữ bài viết bất kỳ để ghim bài."}
               </Text>
             </View>
-            <Ionicons name="chevron-forward" size={16} color="#c2410c" />
+            <Ionicons name="chevron-forward" size={16} color="#000000" />
           </Pressable>
         )}
 
@@ -591,7 +583,7 @@ export default function BlogScreen() {
           ) : filteredPosts.length === 0 ? (
             /* Empty State */
             <View style={styles.emptyContainer}>
-              <Ionicons name="newspaper-outline" size={44} color="#94a3b8" />
+              <Ionicons name="newspaper-outline" size={44} color="#000000" />
               <Text style={styles.emptyTitle}>Chưa có bài viết nào</Text>
               <Text style={styles.emptySub}>
                 Hiện chưa có bản tin hoặc thông báo nào trong chuyên mục "{selectedChannel.name}".
@@ -649,7 +641,7 @@ export default function BlogScreen() {
                           <Ionicons
                             name={post.isPinned ? "push" : "push-outline"}
                             size={16}
-                            color="#ea580c"
+                            color="#000000"
                           />
                         </Pressable>
                         <Pressable
@@ -657,7 +649,7 @@ export default function BlogScreen() {
                           onPress={() => handleDeletePost(post.id)}
                           hitSlop={6}
                         >
-                          <Ionicons name="trash-outline" size={16} color="#dc2626" />
+                          <Ionicons name="trash-outline" size={16} color="#000000" />
                         </Pressable>
                       </View>
                     )}
@@ -680,7 +672,7 @@ export default function BlogScreen() {
                           style={styles.urlBox}
                           onPress={() => handleOpenLink(trimmed)}
                         >
-                          <Ionicons name="link-outline" size={16} color="#2563eb" />
+                          <Ionicons name="link-outline" size={16} color="#000000" />
                           <Text style={styles.urlText} numberOfLines={2}>
                             {trimmed}
                           </Text>
@@ -778,7 +770,7 @@ export default function BlogScreen() {
                     return (
                       <View key={att.id} style={styles.webFileCard}>
                         <View style={styles.webFileIconWrap}>
-                          <Ionicons name="document-text" size={20} color="#008852" />
+                          <Ionicons name="document-text" size={20} color="#000000" />
                         </View>
                         <View style={styles.webFileMeta}>
                           <Text style={styles.webFileName} numberOfLines={1}>
@@ -791,7 +783,7 @@ export default function BlogScreen() {
                           style={styles.webDownloadBtn}
                           onPress={() => void shareOrOpenFile()}
                         >
-                          <Ionicons name="share-social-outline" size={14} color="#008852" />
+                          <Ionicons name="share-social-outline" size={14} color="#000000" />
                           <Text style={styles.webDownloadText}>Chia sẻ</Text>
                         </Pressable>
                       </View>
@@ -811,7 +803,7 @@ export default function BlogScreen() {
                       <Ionicons
                         name={post.reactions?.[0]?.userReacted ? "heart" : "heart-outline"}
                         size={16}
-                        color={post.reactions?.[0]?.userReacted ? "#dc2626" : "#64748b"}
+                        color="#000000"
                       />
                       <Text style={[styles.likeBtnText, post.reactions?.[0]?.userReacted && { color: "#dc2626" }]}>
                         Thích {post.reactions?.[0]?.count ? `(${post.reactions[0].count})` : ""}
@@ -842,7 +834,7 @@ export default function BlogScreen() {
                 <Ionicons
                   name={showTitleInput ? "checkmark-circle" : "add-circle"}
                   size={15}
-                  color={showTitleInput ? "#008852" : "#059669"}
+                  color="#000000"
                 />
                 <Text style={[styles.lightToolBtnText, showTitleInput && { color: "#008852", fontWeight: "700" }]}>
                   {showTitleInput ? "Đã mở tiêu đề" : "Thêm tiêu đề"}
@@ -851,13 +843,13 @@ export default function BlogScreen() {
 
               {/* Attach File */}
               <Pressable style={styles.lightToolBtn} onPress={handlePickDocument}>
-                <Ionicons name="attach" size={16} color="#0284c7" />
+                <Ionicons name="attach" size={16} color="#000000" />
                 <Text style={styles.lightToolBtnText}>Đính kèm</Text>
               </Pressable>
 
               {/* Attach Image */}
               <Pressable style={styles.lightToolBtn} onPress={handlePickImage}>
-                <Ionicons name="image-outline" size={16} color="#0284c7" />
+                <Ionicons name="image-outline" size={16} color="#000000" />
                 <Text style={styles.lightToolBtnText}>Hình ảnh</Text>
               </Pressable>
             </ScrollView>
@@ -898,12 +890,12 @@ export default function BlogScreen() {
                 {/* File pills */}
                 {attachments.filter((att) => att.type !== "image").map((att) => (
                   <View key={att.id} style={styles.attachedPillLight}>
-                    <Ionicons name="document-text" size={13} color="#0284c7" />
+                    <Ionicons name="document-text" size={13} color="#000000" />
                     <Text style={styles.attachedPillTextLight} numberOfLines={1}>
                       {att.name}
                     </Text>
                     <Pressable onPress={() => removeAttachment(att.id)}>
-                      <Ionicons name="close-circle" size={14} color="#94a3b8" />
+                      <Ionicons name="close-circle" size={14} color="#000000" />
                     </Pressable>
                   </View>
                 ))}
@@ -944,7 +936,7 @@ export default function BlogScreen() {
           <View style={styles.readOnlyBlueFooter}>
             <View style={styles.readOnlyLeftCol}>
               <View style={styles.readOnlyTitleRow}>
-                <Ionicons name="lock-closed" size={14} color="#0284c7" />
+                <Ionicons name="lock-closed" size={14} color="#000000" />
                 <Text style={styles.readOnlyTitle}>Chế độ chỉ xem (Read-only Channel)</Text>
               </View>
               <Text style={styles.readOnlySubText}>
@@ -953,7 +945,7 @@ export default function BlogScreen() {
             </View>
 
             <View style={styles.readOnlyLockTag}>
-              <Ionicons name="lock-closed-outline" size={13} color="#0284c7" />
+              <Ionicons name="lock-closed-outline" size={13} color="#000000" />
               <Text style={styles.readOnlyLockTagText}>Quyền gửi bị khóa</Text>
             </View>
           </View>
@@ -971,7 +963,7 @@ export default function BlogScreen() {
               <View style={styles.channelModalHeader}>
                 <Text style={styles.channelModalTitle}>Chuyên mục tin tức</Text>
                 <Pressable onPress={() => setChannelModalVisible(false)}>
-                  <Ionicons name="close" size={20} color="#64748b" />
+                  <Ionicons name="close" size={20} color="#000000" />
                 </Pressable>
               </View>
 
@@ -992,7 +984,7 @@ export default function BlogScreen() {
                         <Ionicons
                           name={item.icon as any}
                           size={18}
-                          color={isSelected ? "#008852" : "#64748b"}
+                          color="#000000"
                         />
                       </View>
                       <View style={{ flex: 1 }}>
@@ -1028,13 +1020,13 @@ export default function BlogScreen() {
                   </Text>
                 </View>
                 <Pressable onPress={() => setPinnedModalVisible(false)} hitSlop={8}>
-                  <Ionicons name="close" size={20} color="#64748b" />
+                  <Ionicons name="close" size={20} color="#000000" />
                 </Pressable>
               </View>
 
               {pinnedPosts.length === 0 ? (
                 <View style={styles.pinnedEmptyWrap}>
-                  <Ionicons name="notifications-off-outline" size={36} color="#94a3b8" />
+                  <Ionicons name="notifications-off-outline" size={36} color="#000000" />
                   <Text style={styles.pinnedEmptyText}>Chưa có bài viết nào được ghim.</Text>
                 </View>
               ) : (
@@ -1060,7 +1052,7 @@ export default function BlogScreen() {
 
                       <View style={styles.pinnedItemJumpRow}>
                         <Text style={styles.pinnedItemJumpText}>Bấm để nhảy đến bài viết</Text>
-                        <Ionicons name="arrow-forward-circle" size={16} color="#008852" />
+                        <Ionicons name="arrow-forward-circle" size={16} color="#000000" />
                       </View>
                     </Pressable>
                   )}
@@ -1087,7 +1079,7 @@ export default function BlogScreen() {
                   hitSlop={8}
                   style={({ pressed }) => [styles.alertCloseBtn, pressed && { opacity: 0.6 }]}
                 >
-                  <Ionicons name="close" size={20} color="#64748b" />
+                  <Ionicons name="close" size={20} color="#000000" />
                 </Pressable>
               </View>
 
@@ -1126,7 +1118,7 @@ export default function BlogScreen() {
                       >
                         {btn.text}
                       </Text>
-                      <Ionicons name="chevron-forward" size={16} color={isDestructive ? "#dc2626" : "#94a3b8"} />
+                      <Ionicons name="chevron-forward" size={16} color="#000000" />
                     </Pressable>
                   );
                 })}
@@ -1384,17 +1376,17 @@ const styles = StyleSheet.create({
 
   container: {
     flex: 1,
-    backgroundColor: "#f8fafc",
+    backgroundColor: "#ecfdf5",
   },
   header: {
     flexDirection: "row",
     alignItems: "center",
     justifyContent: "space-between",
-    backgroundColor: "#ffffff",
+    backgroundColor: "#d1fae5",
     paddingHorizontal: 14,
     paddingVertical: 10,
     borderBottomWidth: 1,
-    borderBottomColor: "#e2e8f0",
+    borderBottomColor: "#a7f3d0",
   },
   backBtn: {
     padding: 4,
@@ -1403,10 +1395,12 @@ const styles = StyleSheet.create({
     flexDirection: "row",
     alignItems: "center",
     gap: 6,
-    backgroundColor: "#f1f5f9",
+    backgroundColor: "#ffffff",
     paddingHorizontal: 12,
     paddingVertical: 6,
     borderRadius: 20,
+    borderWidth: 1,
+    borderColor: "#a7f3d0",
   },
   channelTitleText: {
     fontSize: 14,

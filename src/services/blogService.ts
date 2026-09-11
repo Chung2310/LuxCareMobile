@@ -41,7 +41,7 @@ export interface BlogPost {
 }
 
 export const DEFAULT_BLOG_CHANNELS: BlogChannel[] = [
-  { id: "all", name: "tất-cả-bản-tin", slug: "tat-ca", description: "Tất cả thông báo & tin tức phát hành toàn hệ thống", icon: "newspaper-outline" },
+  { id: "all", name: "Bản tin", slug: "tat-ca", description: "Tất cả thông báo & tin tức phát hành toàn hệ thống", icon: "newspaper-outline" },
   { id: "thong-bao", name: "thông-báo-chung", slug: "thong-bao", description: "Thông báo & chỉ đạo chính thức từ Ban Giám Đốc", icon: "megaphone-outline" },
   { id: "quy-dinh", name: "quy-định-quy-trình", slug: "quy-dinh", description: "Quy trình vận hành, an toàn phòng khám & nhân sự", icon: "shield-checkmark-outline" },
   { id: "y-khoa", name: "kiến-thức-y-khoa", slug: "y-khoa", description: "Chia sẻ chuyên môn, ca lâm sàng & nghiên cứu y học", icon: "medical-outline" },
