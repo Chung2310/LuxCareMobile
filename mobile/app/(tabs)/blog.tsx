@@ -20,6 +20,7 @@ import {
 import * as DocumentPicker from "expo-document-picker";
 import * as ImagePicker from "expo-image-picker";
 import * as Sharing from "expo-sharing";
+import * as FileSystem from "expo-file-system/legacy";
 import { File } from "expo-file-system";
 import { SafeAreaView } from "react-native-safe-area-context";
 import { useRouter } from "expo-router";
@@ -457,6 +458,76 @@ export default function BlogScreen() {
     }
   };
 
+  const handleSharePost = async (post: BlogPost) => {
+    try {
+      const title = post.title ? `📢 [${post.title}]\n\n` : "📢 [Bản tin LuxCare]\n\n";
+      const author = post.authorName ? `\n\n👤 Tác giả: ${post.authorName}` : "";
+      const channel = post.channelName ? `\n🏷️ Kênh: ${post.channelName}` : "";
+      const atts = (post.attachments || [])
+        .map((a) => (a.url ? `📎 ${a.name}: ${a.url}` : `📎 ${a.name}`))
+        .join("\n");
+      const attSection = atts ? `\n\n${atts}` : "";
+      const message = `${title}${post.content}${attSection}${author}${channel}\n🏥 LuxCare Medical System`;
+
+      await Share.share(
+        {
+          title: post.title || "Bản tin LuxCare",
+          message,
+        },
+        {
+          dialogTitle: "Chia sẻ bản tin LuxCare",
+        }
+      );
+    } catch (err: any) {
+      console.warn("Lỗi khi chia sẻ bài viết:", err?.message || err);
+    }
+  };
+
+  const shareMediaOrFile = async (url: string, fileName?: string) => {
+    if (!url || isSharingRef.current) return;
+    isSharingRef.current = true;
+    try {
+      let shareUri = url;
+      // If remote, download to cache directory so Sharing.shareAsync can open the system file share sheet
+      if (url.startsWith("http://") || url.startsWith("https://")) {
+        try {
+          const ext = url.split("?")[0].split(".").pop() || "dat";
+          const safeName = fileName
+            ? fileName.replace(/[^a-zA-Z0-9._-]/g, "_")
+            : `shared_${Date.now()}.${ext}`;
+          const localPath = `${FileSystem.cacheDirectory}${safeName}`;
+          const res = await FileSystem.downloadAsync(url, localPath);
+          if (res && res.status === 200) {
+            shareUri = res.uri;
+          }
+        } catch (dlErr) {
+          console.warn("Download cache failed, falling back to URL share:", dlErr);
+        }
+      }
+
+      const canShare = await Sharing.isAvailableAsync();
+      if (canShare && shareUri.startsWith("file://")) {
+        await Sharing.shareAsync(shareUri, {
+          dialogTitle: fileName ? `Chia sẻ ${fileName}` : "Chia sẻ tệp",
+        });
+      } else {
+        await Share.share(
+          {
+            title: fileName || "Chia sẻ tệp",
+            message: fileName ? `${fileName}\n${url}` : url,
+          },
+          {
+            dialogTitle: "Chia sẻ tệp sang ứng dụng khác",
+          }
+        );
+      }
+    } catch (err: any) {
+      console.warn("Lỗi chia sẻ tệp:", err?.message || err);
+    } finally {
+      isSharingRef.current = false;
+    }
+  };
+
   const filteredPosts = posts.filter((p) =>
     searchQuery
       ? p.content.toLowerCase().includes(searchQuery.toLowerCase()) ||
@@ -705,16 +776,8 @@ export default function BlogScreen() {
 
                   {/* Inline Images with tap-to-zoom + share button */}
                   {post.attachments?.filter((att: BlogAttachment) => att.type === "image" && att.url).map((att: BlogAttachment) => {
-                    const shareImage = async () => {
-                      if (!att.url || isSharingRef.current) return;
-                      try {
-                        isSharingRef.current = true;
-                        const canShare = await Sharing.isAvailableAsync();
-                        if (canShare) await Sharing.shareAsync(att.url);
-                        else handleOpenLink(att.url);
-                      } catch { /* ignore */ } finally {
-                        isSharingRef.current = false;
-                      }
+                    const shareImage = () => {
+                      void shareMediaOrFile(att.url, att.name || "hinh_anh.jpg");
                     };
                     return (
                       <Pressable key={att.id} style={styles.inlineImageWrap} onPress={() => setViewImageUrl(att.url || null)}>
@@ -741,31 +804,8 @@ export default function BlogScreen() {
 
                   {/* File Attachments (non-image) */}
                   {post.attachments?.filter((att: BlogAttachment) => att.type !== "image").map((att: BlogAttachment) => {
-                    const shareOrOpenFile = async () => {
-                      const url = att.url || "";
-                      if (!url) return;
-                      if (url.startsWith("file://") || url.startsWith("content://")) {
-                        // Local file: share via native share sheet (Zalo, Messenger, Drive, ...)
-                        if (!isSharingRef.current) {
-                          try {
-                            isSharingRef.current = true;
-                            const canShare = await Sharing.isAvailableAsync();
-                            if (canShare) await Sharing.shareAsync(url, { mimeType: "application/octet-stream" });
-                            else handleOpenLink(url);
-                          } catch { /* ignore */ } finally {
-                            isSharingRef.current = false;
-                          }
-                        }
-                      } else {
-                        // Remote URL: share the link via native RN Share (Zalo, Messenger, copy link, ...)
-                        try {
-                          await Share.share({
-                            message: `${att.name}\n${url}`,
-                            url,           // iOS only
-                            title: att.name,
-                          });
-                        } catch { /* ignore */ }
-                      }
+                    const shareOrOpenFile = () => {
+                      void shareMediaOrFile(att.url || "", att.name);
                     };
                     return (
                       <View key={att.id} style={styles.webFileCard}>
@@ -790,25 +830,35 @@ export default function BlogScreen() {
                     );
                   })}
 
-                  {/* Footer Row: Tag + Like Action */}
+                  {/* Footer Row: Tag + Actions (Like & Share) */}
                   <View style={styles.postCardFooter}>
                     <View style={styles.tagBadge}>
                       <Text style={styles.tagBadgeText}>#{post.channelName || "Thông báo"}</Text>
                     </View>
 
-                    <Pressable
-                      style={styles.likeBtn}
-                      onPress={() => void handleToggleReaction(post.id, "❤️")}
-                    >
-                      <Ionicons
-                        name={post.reactions?.[0]?.userReacted ? "heart" : "heart-outline"}
-                        size={16}
-                        color="#000000"
-                      />
-                      <Text style={[styles.likeBtnText, post.reactions?.[0]?.userReacted && { color: "#dc2626" }]}>
-                        Thích {post.reactions?.[0]?.count ? `(${post.reactions[0].count})` : ""}
-                      </Text>
-                    </Pressable>
+                    <View style={styles.footerActionsRight}>
+                      <Pressable
+                        style={styles.likeBtn}
+                        onPress={() => void handleToggleReaction(post.id, "❤️")}
+                      >
+                        <Ionicons
+                          name={post.reactions?.[0]?.userReacted ? "heart" : "heart-outline"}
+                          size={16}
+                          color="#000000"
+                        />
+                        <Text style={[styles.likeBtnText, post.reactions?.[0]?.userReacted && { color: "#dc2626" }]}>
+                          Thích {post.reactions?.[0]?.count ? `(${post.reactions[0].count})` : ""}
+                        </Text>
+                      </Pressable>
+
+                      <Pressable
+                        style={styles.sharePostBtn}
+                        onPress={() => void handleSharePost(post)}
+                      >
+                        <Ionicons name="share-social-outline" size={16} color="#000000" />
+                        <Text style={styles.sharePostBtnText}>Chia sẻ</Text>
+                      </Pressable>
+                    </View>
                   </View>
                 </Pressable>
               );
@@ -1153,15 +1203,8 @@ export default function BlogScreen() {
             {/* Share button */}
             <Pressable
               style={styles.imageViewerShare}
-              onPress={async () => {
-                if (!viewImageUrl || isSharingRef.current) return;
-                try {
-                  isSharingRef.current = true;
-                  const canShare = await Sharing.isAvailableAsync();
-                  if (canShare) await Sharing.shareAsync(viewImageUrl);
-                } catch { /* ignore */ } finally {
-                  isSharingRef.current = false;
-                }
+              onPress={() => {
+                if (viewImageUrl) void shareMediaOrFile(viewImageUrl, "hinh_anh.jpg");
               }}
             >
               <Ionicons name="share-social-outline" size={22} color="#ffffff" />
@@ -1682,6 +1725,11 @@ const styles = StyleSheet.create({
     color: "#64748b",
     fontFamily: "Inter-Medium",
   },
+  footerActionsRight: {
+    flexDirection: "row",
+    alignItems: "center",
+    gap: 6,
+  },
   likeBtn: {
     flexDirection: "row",
     alignItems: "center",
@@ -1692,6 +1740,18 @@ const styles = StyleSheet.create({
   likeBtnText: {
     fontSize: 12,
     color: "#64748b",
+    fontFamily: "Inter-Medium",
+  },
+  sharePostBtn: {
+    flexDirection: "row",
+    alignItems: "center",
+    gap: 4,
+    paddingHorizontal: 8,
+    paddingVertical: 4,
+  },
+  sharePostBtnText: {
+    fontSize: 12,
+    color: "#000000",
     fontFamily: "Inter-Medium",
   },
 
