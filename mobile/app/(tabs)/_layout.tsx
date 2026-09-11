@@ -4,6 +4,7 @@ import { Redirect, Tabs } from "expo-router";
 import { useSafeAreaInsets } from "react-native-safe-area-context";
 import { Ionicons } from "@expo/vector-icons";
 import { useSession } from "../../src/auth/SessionProvider";
+import { useNotifications } from "../../src/features/notifications/NotificationProvider";
 import { colors } from "../../src/ui";
 import { canUseModule } from "../../src/auth/access";
 import { isBlogEditorUser } from "../../../src/utils/permissionUtils";
@@ -159,6 +160,7 @@ function MomoTabButton(props: any) {
 }
 
 export default function TabLayout() {
+  const { unreadCount } = useNotifications();
   const { user, selectedBranch } = useSession();
   const insets = useSafeAreaInsets();
   if (!user) return <Redirect href="/login" />;
@@ -170,6 +172,7 @@ export default function TabLayout() {
   return (
     <Tabs
       key={`${user.uid}:${user.companyCode || ""}:${selectedBranch?._id || "default"}`}
+      backBehavior="history"
       screenOptions={{
         tabBarActiveTintColor: colors.primary,
         tabBarInactiveTintColor: "#94a3b8",
@@ -241,6 +244,7 @@ export default function TabLayout() {
         name="notifications"
         options={{
           title: "Thông báo",
+          tabBarBadge: unreadCount > 0 ? (unreadCount > 99 ? "99+" : unreadCount) : undefined,
           headerShown: true,
           href: isEditor ? null : undefined,
           tabBarIcon: ({ focused }) => (
@@ -285,10 +289,13 @@ export default function TabLayout() {
       <Tabs.Screen name="interviews" options={{ title: "Phỏng vấn", href: null }} />
       <Tabs.Screen name="calendar-events" options={{ title: "Lịch làm việc", href: null }} />
       <Tabs.Screen name="attendance-management" options={{ title: "Quản lý công", href: null }} />
+      <Tabs.Screen name="attendance-history" options={{ title: "Lịch sử chấm công", href: null }} />
       <Tabs.Screen name="kpi" options={{ title: "KPI tháng", href: null }} />
       <Tabs.Screen name="org-chart" options={{ title: "Sơ đồ tổ chức", href: null }} />
       <Tabs.Screen name="blog" options={{ title: "Blog nội bộ & Thảo luận", href: isEditor ? undefined : null }} />
       <Tabs.Screen name="training" options={{ title: "Đào tạo", href: null }} />
+      <Tabs.Screen name="celebration-email" options={{ title: "Email chúc mừng", href: null }} />
+      <Tabs.Screen name="knowledge" options={{ title: "Kho tri thức & SOP", href: null }} />
     </Tabs>
   );
 }
@@ -309,4 +316,3 @@ const momoStyles = StyleSheet.create({
     backgroundColor: "#059669",
   },
 });
-

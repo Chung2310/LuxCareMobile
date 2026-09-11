@@ -3,6 +3,7 @@ import {
   Alert,
   Animated,
   Dimensions,
+  Image,
   ImageBackground,
   Platform,
   Pressable,
@@ -29,6 +30,7 @@ import { DashboardOverviewSection } from "../../src/components/dashboard";
 import { getAllServicesFlat, isServiceAccessible, LUXCARE_MODULES } from "../../src/components";
 import { isBlogEditorUser } from "../../../src/utils/permissionUtils";
 import { BranchSelector } from "../../src/features/branches/BranchSelector";
+import { useNotifications } from "../../src/features/notifications/NotificationProvider";
 
 const { width: SCREEN_WIDTH } = Dimensions.get("window");
 
@@ -45,9 +47,25 @@ interface LuxCareFeature {
 
 export default function Home() {
   const { user, selectedBranch } = useSession();
+  const { unreadCount, refresh: refreshNotifications } = useNotifications();
   const { navigateWithLoading } = useAppLoading();
   const isOwner = ["admin", "superadmin", "branch_owner"].includes(user?.role || "");
   const isEditor = isBlogEditorUser(user);
+
+  const [avatarError, setAvatarError] = useState(false);
+
+  useEffect(() => {
+    setAvatarError(false);
+  }, [user?.photoURL]);
+
+  const avatarInitials = useMemo(() => {
+    if (!user?.displayName?.trim()) return "LC";
+    const parts = user.displayName.trim().split(/\s+/);
+    if (parts.length >= 2) {
+      return `${parts[0][0]}${parts[parts.length - 1][0]}`.toUpperCase();
+    }
+    return parts[0].slice(0, 2).toUpperCase();
+  }, [user?.displayName]);
 
   if (isEditor) {
     return <Redirect href="/(tabs)/blog" />;
@@ -126,7 +144,8 @@ export default function Home() {
   useFocusEffect(
     useCallback(() => {
       void loadDashboardData();
-    }, [loadDashboardData]),
+      refreshNotifications();
+    }, [loadDashboardData, refreshNotifications]),
   );
 
   // 8 Chức năng cốt lõi (2 hàng x 4 cột) - Phong cách Super App tinh gọn, đầy đủ các mảng thiết yếu
@@ -298,22 +317,37 @@ export default function Home() {
                   onPress={() => router.push("/(tabs)/notifications")}
                   accessibilityLabel="Thông báo"
                 >
-                  <Ionicons name="notifications" size={20} color="#065f46" />
-                  {pendingCount > 0 && (
+                  <Ionicons
+                    name={unreadCount > 0 ? "notifications" : "notifications-outline"}
+                    size={20}
+                    color="#065f46"
+                  />
+                  {unreadCount > 0 && (
                     <View style={uiStyles.redBadge}>
-                      <Text style={uiStyles.redBadgeText}>{pendingCount > 99 ? "99+" : pendingCount}</Text>
+                      <Text style={uiStyles.redBadgeText}>
+                        {unreadCount > 99 ? "99+" : unreadCount}
+                      </Text>
                     </View>
                   )}
                 </Pressable>
 
                 <Pressable
-                  style={[uiStyles.headerCircleBtn, uiStyles.avatarCircle]}
+                  style={uiStyles.avatarBtnWrapper}
                   onPress={() => router.push("/(tabs)/profile")}
                   accessibilityLabel="Tài khoản cá nhân"
                 >
-                  <Text style={uiStyles.avatarInitials}>
-                    {(user?.displayName || "LC").slice(0, 2).toUpperCase()}
-                  </Text>
+                  <View style={[uiStyles.headerCircleBtn, uiStyles.avatarCircle]}>
+                    {user?.photoURL && !avatarError ? (
+                      <Image
+                        source={{ uri: user.photoURL }}
+                        style={uiStyles.avatarImg}
+                        resizeMode="cover"
+                        onError={() => setAvatarError(true)}
+                      />
+                    ) : (
+                      <Text style={uiStyles.avatarInitials}>{avatarInitials}</Text>
+                    )}
+                  </View>
                   <View style={uiStyles.onlineDot} />
                 </Pressable>
               </View>
@@ -884,10 +918,18 @@ const uiStyles = StyleSheet.create({
     shadowRadius: 3,
     elevation: 2,
   },
+  avatarBtnWrapper: {
+    position: "relative",
+  },
   avatarCircle: {
     backgroundColor: "#059669",
     borderWidth: 1.5,
     borderColor: "#ffffff",
+    overflow: "hidden",
+  },
+  avatarImg: {
+    width: "100%",
+    height: "100%",
   },
   avatarInitials: {
     color: "#ffffff",
@@ -896,14 +938,15 @@ const uiStyles = StyleSheet.create({
   },
   onlineDot: {
     position: "absolute",
-    bottom: 0,
-    right: 0,
-    width: 9,
-    height: 9,
-    borderRadius: 4.5,
+    bottom: -1,
+    right: -1,
+    width: 10,
+    height: 10,
+    borderRadius: 5,
     backgroundColor: "#10b981",
-    borderWidth: 1.5,
+    borderWidth: 1.8,
     borderColor: "#ffffff",
+    zIndex: 3,
   },
   redBadge: {
     position: "absolute",

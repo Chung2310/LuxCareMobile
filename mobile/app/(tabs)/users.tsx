@@ -11,7 +11,7 @@ import {
   TouchableOpacity,
   View,
 } from "react-native";
-import { router } from "expo-router";
+import { router, useLocalSearchParams } from "expo-router";
 import { SafeAreaView } from "react-native-safe-area-context";
 import { Ionicons } from "@expo/vector-icons";
 
@@ -147,12 +147,16 @@ export default function UsersScreen() {
     void loadUsers();
   }, [loadUsers]);
 
+  const params = useLocalSearchParams<{ from?: string }>();
+
   // 3. Xử lý quay lại
   const handleBack = () => {
-    if (router.canGoBack()) {
+    if (params.from === "modules") {
+      router.replace("/(tabs)/modules");
+    } else if (router.canGoBack()) {
       router.back();
     } else {
-      router.replace("/(tabs)");
+      router.replace("/(tabs)/modules");
     }
   };
 

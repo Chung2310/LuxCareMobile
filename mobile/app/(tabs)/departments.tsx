@@ -11,7 +11,7 @@ import {
 } from "react-native";
 import { SafeAreaView } from "react-native-safe-area-context";
 import { Ionicons } from "@expo/vector-icons";
-import { useFocusEffect } from "expo-router";
+import { router, useFocusEffect, useLocalSearchParams } from "expo-router";
 
 import {
   DepartmentCard,
@@ -38,8 +38,8 @@ import {
 } from "../../src/api/services";
 import { useSession } from "../../src/auth/SessionProvider";
 import { useAppLoading } from "../../src/context/LoadingContext";
-import type { UserProfile } from "../../../../src/types/common";
-import type { BranchRecord } from "../../../../src/services/branchService";
+import type { UserProfile } from "../../../src/types/common";
+import type { BranchRecord } from "../../../src/services/branchService";
 
 const ROOM_TYPE_FILTER_OPTIONS: Array<{ id: string; label: string }> = [
   { id: "all", label: "Tất cả loại" },
@@ -53,6 +53,7 @@ const ROOM_TYPE_FILTER_OPTIONS: Array<{ id: string; label: string }> = [
 
 export default function DepartmentsScreen() {
   const { user, selectedBranch } = useSession();
+  const params = useLocalSearchParams<{ from?: string }>();
   const { navigateWithLoading } = useAppLoading();
 
   // Quyền quản lý (admin, superadmin, branch_owner, manager)
@@ -268,6 +269,18 @@ export default function DepartmentsScreen() {
     <SafeAreaView edges={["top"]} style={styles.container}>
       {/* 1. TOP HEADER BAR */}
       <View style={styles.headerBar}>
+        <TouchableOpacity
+          style={styles.backBtn}
+          onPress={() => {
+            if (params.from === "modules") router.replace("/(tabs)/modules");
+            else if (router.canGoBack()) router.back();
+            else router.replace("/(tabs)/modules");
+          }}
+          activeOpacity={0.7}
+        >
+          <Ionicons name="arrow-back" size={20} color="#0f172a" />
+        </TouchableOpacity>
+
         <View style={styles.headerLeft}>
           <Text style={styles.screenTitle}>Phòng ban & Cơ sở</Text>
           <Text style={styles.screenSubtitle}>
@@ -681,6 +694,17 @@ const styles = StyleSheet.create({
     backgroundColor: "#ffffff",
     borderBottomWidth: 1,
     borderBottomColor: "#f1f5f9",
+  },
+  backBtn: {
+    width: 36,
+    height: 36,
+    borderRadius: 18,
+    backgroundColor: "#ffffff",
+    borderWidth: 1,
+    borderColor: "#e2e8f0",
+    alignItems: "center",
+    justifyContent: "center",
+    marginRight: 10,
   },
   headerLeft: {
     flex: 1,

@@ -11,7 +11,7 @@ import {
   TouchableOpacity,
   View,
 } from "react-native";
-import { router } from "expo-router";
+import { router, useLocalSearchParams } from "expo-router";
 import { SafeAreaView } from "react-native-safe-area-context";
 import { Ionicons } from "@expo/vector-icons";
 
@@ -410,11 +410,15 @@ export default function InventoryScreen() {
     setBarcodeInput("");
   };
 
+  const params = useLocalSearchParams<{ from?: string }>();
+
   const handleBack = () => {
-    if (router.canGoBack()) {
+    if (params.from === "modules") {
+      router.replace("/(tabs)/modules");
+    } else if (router.canGoBack()) {
       router.back();
     } else {
-      router.push("/(tabs)");
+      router.replace("/(tabs)/modules");
     }
   };
 

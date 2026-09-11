@@ -5,6 +5,7 @@ import { StatusBar } from "expo-status-bar";
 import { useFonts } from "expo-font";
 import { SafeAreaProvider } from "react-native-safe-area-context";
 import { SessionProvider, useSession } from "../src/auth/SessionProvider";
+import { NotificationProvider } from "../src/features/notifications/NotificationProvider";
 import { LoadingProvider } from "../src/context/LoadingContext";
 import { Button, ErrorText, Page } from "../src/ui";
 
@@ -105,10 +106,12 @@ export default function RootLayout() {
   return (
     <SafeAreaProvider>
       <SessionProvider>
+        <NotificationProvider>
         <LoadingProvider>
           <StatusBar style="dark" />
           <Routes />
         </LoadingProvider>
+        </NotificationProvider>
       </SessionProvider>
     </SafeAreaProvider>
   );

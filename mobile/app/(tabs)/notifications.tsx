@@ -20,6 +20,7 @@ import type {
 import { notifications } from "../../src/api/services";
 import { messageOf, useSession } from "../../src/auth/SessionProvider";
 import { notificationTarget } from "../../src/features/navigation/notificationTarget";
+import { useNotifications, NotificationPermissionNotice } from "../../src/features/notifications/NotificationProvider";
 
 function formatNotificationTime(isoString: string): string {
   try {
@@ -66,6 +67,7 @@ function getNotificationTypeInfo(type: string) {
 }
 
 export default function Notifications() {
+  const notificationState = useNotifications();
   const { user } = useSession();
   const lock = useRef(false);
 
@@ -104,7 +106,7 @@ export default function Notifications() {
       return () => {
         active = false;
       };
-    }, [page, unreadOnly, type, revision, user?.uid]),
+    }, [page, unreadOnly, type, revision, user?.uid, notificationState.revision]),
   );
 
   const mutate = async (action: () => Promise<unknown>) => {
@@ -114,6 +116,7 @@ export default function Notifications() {
     setError(null);
     try {
       await action();
+      notificationState.refresh();
       setRevision((v) => v + 1);
     } catch (err) {
       setError(messageOf(err));
@@ -136,6 +139,7 @@ export default function Notifications() {
     try {
       if (!item.read) {
         await notifications.markAsRead(item._id);
+        notificationState.refresh();
         setRevision((v) => v + 1);
       }
       router.push(destination.target.href);
@@ -287,6 +291,7 @@ export default function Notifications() {
 
   return (
     <SafeAreaView edges={["top"]} style={styles.container}>
+      <NotificationPermissionNotice />
       {/* Screen Header Bar */}
       <View style={styles.header}>
         <View style={styles.headerTitleCol}>

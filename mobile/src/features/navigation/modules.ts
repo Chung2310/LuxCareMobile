@@ -13,8 +13,24 @@ export function availableModules(user: UserProfile | null) {
   const recruitment = recruitmentAccess(user).read;
   const workflow = workflowAccess(user);
   const training = trainingAccess(user);
+  const isManager = ["admin", "superadmin", "branch_owner", "manager"].includes(user?.role || "");
+  const canManageCelebration = isManager || hasPermission(user, "company-email:manage");
+  const canReadKnowledge =
+    isManager || hasPermission(user, "knowledge:read") || hasPermission(user, "knowledge:manage");
 
   return [
+    {
+      title: "Kho tri thức & SOP",
+      description: "Phác đồ điều trị, quy chuẩn chuyên môn và chính sách y tế",
+      href: "/(tabs)/knowledge" as const,
+      visible: canReadKnowledge,
+    },
+    {
+      title: "Email chúc mừng",
+      description: "Cấu hình mẫu, tự động gửi lời chúc sinh nhật và ngày lễ",
+      href: "/(tabs)/celebration-email" as const,
+      visible: canManageCelebration,
+    },
     {
       title: "Bảng lương",
       description: "Tính và hiển thị bảng lương, phiếu lương cá nhân",
@@ -61,6 +77,12 @@ export function availableModules(user: UserProfile | null) {
       title: "Lịch & chấm công",
       description: "Trạng thái hôm nay, lịch sử cá nhân và lịch làm việc",
       href: "/(tabs)/attendance" as const,
+      visible: hr,
+    },
+    {
+      title: "Lịch sử chấm công",
+      description: "Chi tiết nhật ký vào/ra ca, tổng giờ công và đối soát theo tháng",
+      href: "/(tabs)/attendance-history" as const,
       visible: hr,
     },
     {
