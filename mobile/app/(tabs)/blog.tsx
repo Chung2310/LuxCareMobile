@@ -16,15 +16,19 @@ import {
   Linking,
   Image,
   Share,
+  ImageBackground,
 } from "react-native";
 import * as DocumentPicker from "expo-document-picker";
 import * as ImagePicker from "expo-image-picker";
 import * as Sharing from "expo-sharing";
+import * as FileSystem from "expo-file-system/legacy";
+import { File } from "expo-file-system";
 import { SafeAreaView } from "react-native-safe-area-context";
 import { useRouter } from "expo-router";
 import { Ionicons } from "@expo/vector-icons";
+import Svg, { Path } from "react-native-svg";
 import { useSession } from "../../src/auth/SessionProvider";
-import { blog } from "../../src/api/services";
+import { blog, kanbanMedia } from "../../src/api/services";
 import { isBlogEditorUser } from "../../../src/utils/permissionUtils";
 import {
   DEFAULT_BLOG_CHANNELS,
@@ -34,6 +38,25 @@ import {
 } from "../../../src/services/blogService";
 
 const CATEGORY_TAGS = ["Thông báo", "Tin tức", "Sự kiện", "Quy trình", "Chuyên môn", "Vinh danh"];
+
+function PinIcon({ size = 15, color = "#92400e", style }: { size?: number; color?: string; style?: any }) {
+  return (
+    <Svg
+      width={size}
+      height={size}
+      viewBox="0 0 24 24"
+      fill="none"
+      stroke={color}
+      strokeWidth={2}
+      strokeLinecap="round"
+      strokeLinejoin="round"
+      style={style}
+    >
+      <Path d="M12 17v5" />
+      <Path d="M9 10.76a2 2 0 0 1-1.11 1.79l-1.78.9A2 2 0 0 0 5 15.24V16a1 1 0 0 0 1 1h12a1 1 0 0 0 1-1v-.76a2 2 0 0 0-1.11-1.79l-1.78-.9A2 2 0 0 1 15 10.76V7a1 1 0 0 1 1-1 2 2 0 0 0 0-4H8a2 2 0 0 0 0 4 1 1 0 0 1 1 1z" />
+    </Svg>
+  );
+}
 
 export default function BlogScreen() {
   const router = useRouter();
@@ -294,25 +317,87 @@ export default function BlogScreen() {
     setAttachments((prev) => prev.filter((a) => a.id !== id));
   };
 
+  const uploadAttachmentToCloudinary = async (att: {
+    name: string;
+    type: "file" | "image";
+    sizeBytes?: number;
+    localUri?: string;
+  }) => {
+    if (!att.localUri) return null;
+    const uri = att.localUri;
+    const fileName = att.name || (att.type === "image" ? `image_${Date.now()}.jpg` : `file_${Date.now()}`);
+    const mimeType = att.type === "image" ? "image/jpeg" : "application/octet-stream";
+
+    let base64 = "";
+    try {
+      const file = new File(uri);
+      base64 = await file.base64();
+    } catch {
+      const fs = await import("expo-file-system");
+      if (fs.readAsStringAsync) {
+        base64 = await fs.readAsStringAsync(uri, { encoding: "base64" as any });
+      }
+    }
+
+    if (base64) {
+      const dataUri = base64.startsWith("data:") ? base64 : `data:${mimeType};base64,${base64}`;
+      const uploadRes = await kanbanMedia.upload({
+        file: dataUri,
+        fileName,
+        mimeType,
+        size: att.sizeBytes || Math.round((base64.length * 3) / 4),
+      });
+      if (uploadRes.url) {
+        return {
+          name: fileName,
+          type: att.type,
+          url: uploadRes.url,
+          size: att.sizeBytes ?? 0,
+        };
+      }
+    }
+    return null;
+  };
+
   const handleCreatePost = async () => {
-    if (!newContent.trim()) {
-      showAlert("Thông báo", "Vui lòng nhập nội dung bài viết.");
+    if (!newContent.trim() && attachments.length === 0) {
+      showAlert("Thông báo", "Vui lòng nhập nội dung bài viết hoặc chọn tệp đính kèm.");
       return;
     }
     setPosting(true);
     try {
+      const uploadedAttachments: { name: string; type: string; url: string; size: number }[] = [];
+
+      // 1. Tải toàn bộ tệp và ảnh lên Cloudinary để mọi thiết bị và Website đều xem được
+      if (attachments.length > 0) {
+        for (const att of attachments) {
+          try {
+            const uploaded = await uploadAttachmentToCloudinary(att);
+            if (uploaded) {
+              uploadedAttachments.push(uploaded);
+            } else if (att.localUri && (att.localUri.startsWith("http://") || att.localUri.startsWith("https://"))) {
+              uploadedAttachments.push({
+                name: att.name,
+                type: att.type,
+                url: att.localUri,
+                size: att.sizeBytes ?? 0,
+              });
+            }
+          } catch (uploadErr) {
+            console.warn("[BlogScreen] Tải tệp lên Cloudinary thất bại:", uploadErr);
+          }
+        }
+      }
+
+      // 2. Tạo bài viết với các đường dẫn đám mây công khai
       await blog.createPost({
         title: newTitle.trim() || undefined,
         content: newContent.trim(),
         tags: [selectedTag],
-        attachments: attachments.map((a) => ({
-          name: a.name,
-          type: a.type,
-          url: a.localUri || "",
-          size: a.sizeBytes ?? 0,
-        })),
+        attachments: uploadedAttachments,
       });
-      showAlert("Thành công", "Đã đăng bài viết mới lên Kênh Blog!");
+
+      showAlert("Thành công", "Đã đăng bài viết mới lên Kênh Blog cho toàn hệ thống!");
       setNewTitle("");
       setNewContent("");
       setAttachments([]);
@@ -394,6 +479,76 @@ export default function BlogScreen() {
     }
   };
 
+  const handleSharePost = async (post: BlogPost) => {
+    try {
+      const title = post.title ? `📢 [${post.title}]\n\n` : "📢 [Bản tin LuxCare]\n\n";
+      const author = post.authorName ? `\n\n👤 Tác giả: ${post.authorName}` : "";
+      const channel = post.channelName ? `\n🏷️ Kênh: ${post.channelName}` : "";
+      const atts = (post.attachments || [])
+        .map((a) => (a.url ? `📎 ${a.name}: ${a.url}` : `📎 ${a.name}`))
+        .join("\n");
+      const attSection = atts ? `\n\n${atts}` : "";
+      const message = `${title}${post.content}${attSection}${author}${channel}\n🏥 LuxCare Medical System`;
+
+      await Share.share(
+        {
+          title: post.title || "Bản tin LuxCare",
+          message,
+        },
+        {
+          dialogTitle: "Chia sẻ bản tin LuxCare",
+        }
+      );
+    } catch (err: any) {
+      console.warn("Lỗi khi chia sẻ bài viết:", err?.message || err);
+    }
+  };
+
+  const shareMediaOrFile = async (url: string, fileName?: string) => {
+    if (!url || isSharingRef.current) return;
+    isSharingRef.current = true;
+    try {
+      let shareUri = url;
+      // If remote, download to cache directory so Sharing.shareAsync can open the system file share sheet
+      if (url.startsWith("http://") || url.startsWith("https://")) {
+        try {
+          const ext = url.split("?")[0].split(".").pop() || "dat";
+          const safeName = fileName
+            ? fileName.replace(/[^a-zA-Z0-9._-]/g, "_")
+            : `shared_${Date.now()}.${ext}`;
+          const localPath = `${FileSystem.cacheDirectory}${safeName}`;
+          const res = await FileSystem.downloadAsync(url, localPath);
+          if (res && res.status === 200) {
+            shareUri = res.uri;
+          }
+        } catch (dlErr) {
+          console.warn("Download cache failed, falling back to URL share:", dlErr);
+        }
+      }
+
+      const canShare = await Sharing.isAvailableAsync();
+      if (canShare && shareUri.startsWith("file://")) {
+        await Sharing.shareAsync(shareUri, {
+          dialogTitle: fileName ? `Chia sẻ ${fileName}` : "Chia sẻ tệp",
+        });
+      } else {
+        await Share.share(
+          {
+            title: fileName || "Chia sẻ tệp",
+            message: fileName ? `${fileName}\n${url}` : url,
+          },
+          {
+            dialogTitle: "Chia sẻ tệp sang ứng dụng khác",
+          }
+        );
+      }
+    } catch (err: any) {
+      console.warn("Lỗi chia sẻ tệp:", err?.message || err);
+    } finally {
+      isSharingRef.current = false;
+    }
+  };
+
   const filteredPosts = posts.filter((p) =>
     searchQuery
       ? p.content.toLowerCase().includes(searchQuery.toLowerCase()) ||
@@ -403,7 +558,12 @@ export default function BlogScreen() {
   );
 
   return (
-    <SafeAreaView edges={["top", "bottom"]} style={styles.container}>
+    <ImageBackground
+      source={require("../../public/blog-bg.png")}
+      style={styles.backgroundImageContainer}
+      resizeMode="cover"
+    >
+      <SafeAreaView edges={["top", "bottom"]} style={styles.safeArea}>
       <KeyboardAvoidingView
         style={{ flex: 1 }}
         behavior={Platform.OS === "ios" ? "padding" : "height"}
@@ -411,24 +571,15 @@ export default function BlogScreen() {
       >
         {/* Header Bar */}
         <View style={styles.header}>
-          <Pressable
-            onPress={() => router.back()}
-            style={({ pressed }) => [styles.backBtn, pressed && { opacity: 0.6 }]}
-            hitSlop={8}
-          >
-            <Ionicons name="arrow-back" size={20} color="#0f172a" />
-          </Pressable>
-
           {/* Channel Selector Trigger */}
           <Pressable
             style={({ pressed }) => [styles.channelTitleBtn, pressed && { opacity: 0.8 }]}
             onPress={() => setChannelModalVisible(true)}
           >
-            <Ionicons name={selectedChannel.icon as any} size={15} color="#008852" />
+            <Ionicons name={selectedChannel.icon as any} size={15} color="#000000" />
             <Text style={styles.channelTitleText} numberOfLines={1}>
               {selectedChannel.name}
             </Text>
-            <Ionicons name="chevron-down" size={15} color="#64748b" />
           </Pressable>
 
           {/* Right Action Controls: Search icon & Logout button to return to login screen */}
@@ -438,7 +589,7 @@ export default function BlogScreen() {
               onPress={() => setSearchBarVisible(!searchBarVisible)}
               hitSlop={6}
             >
-              <Ionicons name="search-outline" size={20} color="#0f172a" />
+              <Ionicons name="search-outline" size={20} color="#000000" />
             </Pressable>
 
             {/* Logout icon button */}
@@ -447,7 +598,7 @@ export default function BlogScreen() {
               onPress={handleLogout}
               hitSlop={6}
             >
-              <Ionicons name="log-out-outline" size={20} color="#dc2626" />
+              <Ionicons name="log-out-outline" size={20} color="#000000" />
             </Pressable>
           </View>
         </View>
@@ -455,7 +606,7 @@ export default function BlogScreen() {
         {/* Search Bar Input (Toggleable) */}
         {searchBarVisible && (
           <View style={styles.searchContainer}>
-            <Ionicons name="search" size={16} color="#64748b" style={{ marginRight: 8 }} />
+            <Ionicons name="search" size={16} color="#000000" style={{ marginRight: 8 }} />
             <TextInput
               value={searchQuery}
               onChangeText={setSearchQuery}
@@ -466,7 +617,7 @@ export default function BlogScreen() {
             />
             {searchQuery ? (
               <Pressable onPress={() => setSearchQuery("")}>
-                <Ionicons name="close-circle" size={16} color="#94a3b8" />
+                <Ionicons name="close-circle" size={16} color="#000000" />
               </Pressable>
             ) : null}
           </View>
@@ -488,9 +639,9 @@ export default function BlogScreen() {
             }}
           >
             <View style={styles.pinnedLeft}>
-              <Text style={styles.pinnedIcon}>📌</Text>
+              <PinIcon size={15} color="#92400e" style={styles.pinnedIcon} />
               <Text style={styles.pinnedText} numberOfLines={1}>
-                <Text style={{ fontWeight: "800", color: "#ea580c" }}>
+                <Text style={{ fontWeight: "800", color: "#92400e" }}>
                   Tin ghim {pinnedPosts.length > 0 ? `(${pinnedPosts.length}): ` : ": "}
                 </Text>
                 {pinnedPosts.length > 0
@@ -498,7 +649,7 @@ export default function BlogScreen() {
                   : "Chưa có tin ghim. BTV ấn giữ bài viết bất kỳ để ghim bài."}
               </Text>
             </View>
-            <Ionicons name="chevron-forward" size={16} color="#c2410c" />
+            <Ionicons name="chevron-forward" size={16} color="#92400e" />
           </Pressable>
         )}
 
@@ -528,7 +679,7 @@ export default function BlogScreen() {
           ) : filteredPosts.length === 0 ? (
             /* Empty State */
             <View style={styles.emptyContainer}>
-              <Ionicons name="newspaper-outline" size={44} color="#94a3b8" />
+              <Ionicons name="newspaper-outline" size={44} color="#000000" />
               <Text style={styles.emptyTitle}>Chưa có bài viết nào</Text>
               <Text style={styles.emptySub}>
                 Hiện chưa có bản tin hoặc thông báo nào trong chuyên mục "{selectedChannel.name}".
@@ -567,7 +718,7 @@ export default function BlogScreen() {
                         </View>
                         {post.isPinned && (
                           <View style={styles.pinnedBadgeRow}>
-                            <Text style={{ fontSize: 11 }}>📌</Text>
+                            <PinIcon size={11} color="#92400e" />
                             <Text style={styles.pinnedBadgeText}>Tin ghim</Text>
                           </View>
                         )}
@@ -586,7 +737,7 @@ export default function BlogScreen() {
                           <Ionicons
                             name={post.isPinned ? "push" : "push-outline"}
                             size={16}
-                            color="#ea580c"
+                            color="#000000"
                           />
                         </Pressable>
                         <Pressable
@@ -594,7 +745,7 @@ export default function BlogScreen() {
                           onPress={() => handleDeletePost(post.id)}
                           hitSlop={6}
                         >
-                          <Ionicons name="trash-outline" size={16} color="#dc2626" />
+                          <Ionicons name="trash-outline" size={16} color="#000000" />
                         </Pressable>
                       </View>
                     )}
@@ -603,33 +754,55 @@ export default function BlogScreen() {
                   {/* Optional Title */}
                   {post.title && <Text style={styles.articleTitle}>{post.title}</Text>}
 
-                  {/* Post Content */}
-                  {isUrl ? (
-                    <Pressable
-                      style={styles.urlBox}
-                      onPress={() => handleOpenLink(post.content)}
-                    >
-                      <Ionicons name="link-outline" size={16} color="#2563eb" />
-                      <Text style={styles.urlText} numberOfLines={2}>
-                        {post.content}
+                  {/* Post Content with clickable links */}
+                  {(() => {
+                    const trimmed = (post.content || "").trim();
+                    const isPureUrl =
+                      (trimmed.startsWith("http://") || trimmed.startsWith("https://")) &&
+                      !trimmed.includes(" ") &&
+                      !trimmed.includes("\n");
+
+                    if (isPureUrl) {
+                      return (
+                        <Pressable
+                          style={styles.urlBox}
+                          onPress={() => handleOpenLink(trimmed)}
+                        >
+                          <Ionicons name="link-outline" size={16} color="#000000" />
+                          <Text style={styles.urlText} numberOfLines={2}>
+                            {trimmed}
+                          </Text>
+                        </Pressable>
+                      );
+                    }
+
+                    const urlRegex = /(https?:\/\/[^\s]+)/g;
+                    const parts = post.content.split(urlRegex);
+
+                    return (
+                      <Text style={styles.postContentText}>
+                        {parts.map((part, index) => {
+                          if (part.match(/^https?:\/\//i)) {
+                            return (
+                              <Text
+                                key={index}
+                                style={styles.inlineLinkText}
+                                onPress={() => handleOpenLink(part)}
+                              >
+                                {part}
+                              </Text>
+                            );
+                          }
+                          return part;
+                        })}
                       </Text>
-                    </Pressable>
-                  ) : (
-                    <Text style={styles.postContentText}>{post.content}</Text>
-                  )}
+                    );
+                  })()}
 
                   {/* Inline Images with tap-to-zoom + share button */}
                   {post.attachments?.filter((att: BlogAttachment) => att.type === "image" && att.url).map((att: BlogAttachment) => {
-                    const shareImage = async () => {
-                      if (!att.url || isSharingRef.current) return;
-                      try {
-                        isSharingRef.current = true;
-                        const canShare = await Sharing.isAvailableAsync();
-                        if (canShare) await Sharing.shareAsync(att.url);
-                        else handleOpenLink(att.url);
-                      } catch { /* ignore */ } finally {
-                        isSharingRef.current = false;
-                      }
+                    const shareImage = () => {
+                      void shareMediaOrFile(att.url, att.name || "hinh_anh.jpg");
                     };
                     return (
                       <Pressable key={att.id} style={styles.inlineImageWrap} onPress={() => setViewImageUrl(att.url || null)}>
@@ -656,36 +829,13 @@ export default function BlogScreen() {
 
                   {/* File Attachments (non-image) */}
                   {post.attachments?.filter((att: BlogAttachment) => att.type !== "image").map((att: BlogAttachment) => {
-                    const shareOrOpenFile = async () => {
-                      const url = att.url || "";
-                      if (!url) return;
-                      if (url.startsWith("file://") || url.startsWith("content://")) {
-                        // Local file: share via native share sheet (Zalo, Messenger, Drive, ...)
-                        if (!isSharingRef.current) {
-                          try {
-                            isSharingRef.current = true;
-                            const canShare = await Sharing.isAvailableAsync();
-                            if (canShare) await Sharing.shareAsync(url, { mimeType: "application/octet-stream" });
-                            else handleOpenLink(url);
-                          } catch { /* ignore */ } finally {
-                            isSharingRef.current = false;
-                          }
-                        }
-                      } else {
-                        // Remote URL: share the link via native RN Share (Zalo, Messenger, copy link, ...)
-                        try {
-                          await Share.share({
-                            message: `${att.name}\n${url}`,
-                            url,           // iOS only
-                            title: att.name,
-                          });
-                        } catch { /* ignore */ }
-                      }
+                    const shareOrOpenFile = () => {
+                      void shareMediaOrFile(att.url || "", att.name);
                     };
                     return (
                       <View key={att.id} style={styles.webFileCard}>
                         <View style={styles.webFileIconWrap}>
-                          <Ionicons name="document-text" size={20} color="#008852" />
+                          <Ionicons name="document-text" size={20} color="#000000" />
                         </View>
                         <View style={styles.webFileMeta}>
                           <Text style={styles.webFileName} numberOfLines={1}>
@@ -698,32 +848,42 @@ export default function BlogScreen() {
                           style={styles.webDownloadBtn}
                           onPress={() => void shareOrOpenFile()}
                         >
-                          <Ionicons name="share-social-outline" size={14} color="#008852" />
+                          <Ionicons name="share-social-outline" size={14} color="#000000" />
                           <Text style={styles.webDownloadText}>Chia sẻ</Text>
                         </Pressable>
                       </View>
                     );
                   })}
 
-                  {/* Footer Row: Tag + Like Action */}
+                  {/* Footer Row: Tag + Actions (Like & Share) */}
                   <View style={styles.postCardFooter}>
                     <View style={styles.tagBadge}>
                       <Text style={styles.tagBadgeText}>#{post.channelName || "Thông báo"}</Text>
                     </View>
 
-                    <Pressable
-                      style={styles.likeBtn}
-                      onPress={() => void handleToggleReaction(post.id, "❤️")}
-                    >
-                      <Ionicons
-                        name={post.reactions?.[0]?.userReacted ? "heart" : "heart-outline"}
-                        size={16}
-                        color={post.reactions?.[0]?.userReacted ? "#dc2626" : "#64748b"}
-                      />
-                      <Text style={[styles.likeBtnText, post.reactions?.[0]?.userReacted && { color: "#dc2626" }]}>
-                        Thích {post.reactions?.[0]?.count ? `(${post.reactions[0].count})` : ""}
-                      </Text>
-                    </Pressable>
+                    <View style={styles.footerActionsRight}>
+                      <Pressable
+                        style={styles.likeBtn}
+                        onPress={() => void handleToggleReaction(post.id, "❤️")}
+                      >
+                        <Ionicons
+                          name={post.reactions?.[0]?.userReacted ? "heart" : "heart-outline"}
+                          size={16}
+                          color={post.reactions?.[0]?.userReacted ? "#dc2626" : "#000000"}
+                        />
+                        <Text style={[styles.likeBtnText, post.reactions?.[0]?.userReacted && { color: "#dc2626" }]}>
+                          Thích {post.reactions?.[0]?.count ? `(${post.reactions[0].count})` : ""}
+                        </Text>
+                      </Pressable>
+
+                      <Pressable
+                        style={styles.sharePostBtn}
+                        onPress={() => void handleSharePost(post)}
+                      >
+                        <Ionicons name="share-social-outline" size={16} color="#000000" />
+                        <Text style={styles.sharePostBtnText}>Chia sẻ</Text>
+                      </Pressable>
+                    </View>
                   </View>
                 </Pressable>
               );
@@ -747,24 +907,24 @@ export default function BlogScreen() {
                 onPress={() => setShowTitleInput(!showTitleInput)}
               >
                 <Ionicons
-                  name={showTitleInput ? "checkmark-circle" : "add-circle"}
+                  name={showTitleInput ? "checkmark-circle" : "add-circle-outline"}
                   size={15}
-                  color={showTitleInput ? "#008852" : "#059669"}
+                  color="#000000"
                 />
-                <Text style={[styles.lightToolBtnText, showTitleInput && { color: "#008852", fontWeight: "700" }]}>
+                <Text style={styles.lightToolBtnText}>
                   {showTitleInput ? "Đã mở tiêu đề" : "Thêm tiêu đề"}
                 </Text>
               </Pressable>
 
               {/* Attach File */}
               <Pressable style={styles.lightToolBtn} onPress={handlePickDocument}>
-                <Ionicons name="attach" size={16} color="#0284c7" />
+                <Ionicons name="attach" size={16} color="#000000" />
                 <Text style={styles.lightToolBtnText}>Đính kèm</Text>
               </Pressable>
 
               {/* Attach Image */}
               <Pressable style={styles.lightToolBtn} onPress={handlePickImage}>
-                <Ionicons name="image-outline" size={16} color="#0284c7" />
+                <Ionicons name="image-outline" size={16} color="#000000" />
                 <Text style={styles.lightToolBtnText}>Hình ảnh</Text>
               </Pressable>
             </ScrollView>
@@ -805,12 +965,12 @@ export default function BlogScreen() {
                 {/* File pills */}
                 {attachments.filter((att) => att.type !== "image").map((att) => (
                   <View key={att.id} style={styles.attachedPillLight}>
-                    <Ionicons name="document-text" size={13} color="#0284c7" />
+                    <Ionicons name="document-text" size={13} color="#000000" />
                     <Text style={styles.attachedPillTextLight} numberOfLines={1}>
                       {att.name}
                     </Text>
                     <Pressable onPress={() => removeAttachment(att.id)}>
-                      <Ionicons name="close-circle" size={14} color="#94a3b8" />
+                      <Ionicons name="close-circle" size={14} color="#000000" />
                     </Pressable>
                   </View>
                 ))}
@@ -851,7 +1011,7 @@ export default function BlogScreen() {
           <View style={styles.readOnlyBlueFooter}>
             <View style={styles.readOnlyLeftCol}>
               <View style={styles.readOnlyTitleRow}>
-                <Ionicons name="lock-closed" size={14} color="#0284c7" />
+                <Ionicons name="lock-closed" size={14} color="#000000" />
                 <Text style={styles.readOnlyTitle}>Chế độ chỉ xem (Read-only Channel)</Text>
               </View>
               <Text style={styles.readOnlySubText}>
@@ -860,7 +1020,7 @@ export default function BlogScreen() {
             </View>
 
             <View style={styles.readOnlyLockTag}>
-              <Ionicons name="lock-closed-outline" size={13} color="#0284c7" />
+              <Ionicons name="lock-closed-outline" size={13} color="#000000" />
               <Text style={styles.readOnlyLockTagText}>Quyền gửi bị khóa</Text>
             </View>
           </View>
@@ -878,7 +1038,7 @@ export default function BlogScreen() {
               <View style={styles.channelModalHeader}>
                 <Text style={styles.channelModalTitle}>Chuyên mục tin tức</Text>
                 <Pressable onPress={() => setChannelModalVisible(false)}>
-                  <Ionicons name="close" size={20} color="#64748b" />
+                  <Ionicons name="close" size={20} color="#000000" />
                 </Pressable>
               </View>
 
@@ -899,7 +1059,7 @@ export default function BlogScreen() {
                         <Ionicons
                           name={item.icon as any}
                           size={18}
-                          color={isSelected ? "#008852" : "#64748b"}
+                          color="#000000"
                         />
                       </View>
                       <View style={{ flex: 1 }}>
@@ -929,19 +1089,19 @@ export default function BlogScreen() {
             <Pressable style={styles.pinnedModalCard} onPress={(e) => e.stopPropagation()}>
               <View style={styles.pinnedModalHeader}>
                 <View style={{ flexDirection: "row", alignItems: "center", gap: 6 }}>
-                  <Text style={{ fontSize: 18 }}>📌</Text>
+                  <PinIcon size={18} color="#92400e" />
                   <Text style={styles.pinnedModalTitle}>
                     Danh sách tin ghim ({pinnedPosts.length})
                   </Text>
                 </View>
                 <Pressable onPress={() => setPinnedModalVisible(false)} hitSlop={8}>
-                  <Ionicons name="close" size={20} color="#64748b" />
+                  <Ionicons name="close" size={20} color="#000000" />
                 </Pressable>
               </View>
 
               {pinnedPosts.length === 0 ? (
                 <View style={styles.pinnedEmptyWrap}>
-                  <Ionicons name="notifications-off-outline" size={36} color="#94a3b8" />
+                  <Ionicons name="notifications-off-outline" size={36} color="#000000" />
                   <Text style={styles.pinnedEmptyText}>Chưa có bài viết nào được ghim.</Text>
                 </View>
               ) : (
@@ -967,7 +1127,7 @@ export default function BlogScreen() {
 
                       <View style={styles.pinnedItemJumpRow}>
                         <Text style={styles.pinnedItemJumpText}>Bấm để nhảy đến bài viết</Text>
-                        <Ionicons name="arrow-forward-circle" size={16} color="#008852" />
+                        <Ionicons name="arrow-forward-circle" size={16} color="#000000" />
                       </View>
                     </Pressable>
                   )}
@@ -994,7 +1154,7 @@ export default function BlogScreen() {
                   hitSlop={8}
                   style={({ pressed }) => [styles.alertCloseBtn, pressed && { opacity: 0.6 }]}
                 >
-                  <Ionicons name="close" size={20} color="#64748b" />
+                  <Ionicons name="close" size={20} color="#000000" />
                 </Pressable>
               </View>
 
@@ -1033,7 +1193,7 @@ export default function BlogScreen() {
                       >
                         {btn.text}
                       </Text>
-                      <Ionicons name="chevron-forward" size={16} color={isDestructive ? "#dc2626" : "#94a3b8"} />
+                      <Ionicons name="chevron-forward" size={16} color="#000000" />
                     </Pressable>
                   );
                 })}
@@ -1068,15 +1228,8 @@ export default function BlogScreen() {
             {/* Share button */}
             <Pressable
               style={styles.imageViewerShare}
-              onPress={async () => {
-                if (!viewImageUrl || isSharingRef.current) return;
-                try {
-                  isSharingRef.current = true;
-                  const canShare = await Sharing.isAvailableAsync();
-                  if (canShare) await Sharing.shareAsync(viewImageUrl);
-                } catch { /* ignore */ } finally {
-                  isSharingRef.current = false;
-                }
+              onPress={() => {
+                if (viewImageUrl) void shareMediaOrFile(viewImageUrl, "hinh_anh.jpg");
               }}
             >
               <Ionicons name="share-social-outline" size={22} color="#ffffff" />
@@ -1084,7 +1237,8 @@ export default function BlogScreen() {
           </View>
         </Modal>
       </KeyboardAvoidingView>
-    </SafeAreaView>
+      </SafeAreaView>
+    </ImageBackground>
   );
 }
 
@@ -1289,19 +1443,31 @@ const styles = StyleSheet.create({
     flex: 1,
   },
 
+  backgroundImageContainer: {
+    flex: 1,
+    width: "100%",
+    height: "100%",
+    backgroundColor: "#ecfdf5",
+  },
+  safeArea: {
+    flex: 1,
+    backgroundColor: "transparent",
+  },
   container: {
     flex: 1,
-    backgroundColor: "#f8fafc",
+    backgroundColor: "transparent",
   },
   header: {
     flexDirection: "row",
     alignItems: "center",
     justifyContent: "space-between",
-    backgroundColor: "#ffffff",
-    paddingHorizontal: 14,
-    paddingVertical: 10,
-    borderBottomWidth: 1,
-    borderBottomColor: "#e2e8f0",
+    backgroundColor: "transparent",
+    paddingHorizontal: 4,
+    paddingVertical: 6,
+    marginHorizontal: 12,
+    marginTop: 4,
+    borderRadius: 18,
+    borderWidth: 0,
   },
   backBtn: {
     padding: 4,
@@ -1310,10 +1476,17 @@ const styles = StyleSheet.create({
     flexDirection: "row",
     alignItems: "center",
     gap: 6,
-    backgroundColor: "#f1f5f9",
-    paddingHorizontal: 12,
-    paddingVertical: 6,
-    borderRadius: 20,
+    backgroundColor: "rgba(255, 255, 255, 0.8)",
+    paddingHorizontal: 14,
+    paddingVertical: 7,
+    borderRadius: 22,
+    borderWidth: 1,
+    borderColor: "rgba(255, 255, 255, 0.6)",
+    shadowColor: "#000",
+    shadowOffset: { width: 0, height: 1 },
+    shadowOpacity: 0.05,
+    shadowRadius: 3,
+    elevation: 2,
   },
   channelTitleText: {
     fontSize: 14,
@@ -1327,10 +1500,28 @@ const styles = StyleSheet.create({
     gap: 8,
   },
   headerIconBtn: {
-    padding: 4,
+    padding: 7,
+    borderRadius: 20,
+    backgroundColor: "rgba(255, 255, 255, 0.8)",
+    borderWidth: 1,
+    borderColor: "rgba(255, 255, 255, 0.6)",
+    shadowColor: "#000",
+    shadowOffset: { width: 0, height: 1 },
+    shadowOpacity: 0.05,
+    shadowRadius: 3,
+    elevation: 2,
   },
   logoutHeaderBtn: {
-    padding: 4,
+    padding: 7,
+    borderRadius: 20,
+    backgroundColor: "rgba(255, 255, 255, 0.8)",
+    borderWidth: 1,
+    borderColor: "rgba(255, 255, 255, 0.6)",
+    shadowColor: "#000",
+    shadowOffset: { width: 0, height: 1 },
+    shadowOpacity: 0.05,
+    shadowRadius: 3,
+    elevation: 2,
   },
   searchContainer: {
     flexDirection: "row",
@@ -1354,14 +1545,19 @@ const styles = StyleSheet.create({
     flexDirection: "row",
     alignItems: "center",
     justifyContent: "space-between",
-    backgroundColor: "#fff7ed",
+    backgroundColor: "#fef3c7", // Vàng hổ phách mật ong sang trọng, ấm áp, khác biệt hoàn toàn với xanh/trắng/cam
     marginHorizontal: 12,
     marginTop: 8,
     paddingHorizontal: 14,
     paddingVertical: 9,
     borderRadius: 14,
     borderWidth: 1,
-    borderColor: "#ffedd5",
+    borderColor: "#fde68a",
+    shadowColor: "#92400e",
+    shadowOffset: { width: 0, height: 2 },
+    shadowOpacity: 0.06,
+    shadowRadius: 4,
+    elevation: 2,
   },
   pinnedLeft: {
     flexDirection: "row",
@@ -1370,11 +1566,11 @@ const styles = StyleSheet.create({
     flex: 1,
   },
   pinnedIcon: {
-    fontSize: 14,
+    marginRight: 2,
   },
   pinnedText: {
     fontSize: 12,
-    color: "#c2410c",
+    color: "#78350f",
     fontFamily: "Inter-Medium",
     flex: 1,
   },
@@ -1418,17 +1614,17 @@ const styles = StyleSheet.create({
     fontFamily: "Inter-Regular",
   },
   postCard: {
-    backgroundColor: "#ffffff",
-    borderRadius: 14,
+    backgroundColor: "#ecfdf5", // Xanh lá mint nhạt chuẩn LuxCare, đục 100% không bị xuyên background giúp chữ đen nét và dễ đọc
+    borderRadius: 18,
     padding: 14,
     marginBottom: 12,
-    borderWidth: 1,
-    borderColor: "#e2e8f0",
-    shadowColor: "#000",
-    shadowOffset: { width: 0, height: 1 },
-    shadowOpacity: 0.03,
-    shadowRadius: 3,
-    elevation: 1,
+    borderWidth: 1.5,
+    borderColor: "#059669", // Tô màu viền xanh ngọc bắt mắt
+    shadowColor: "#059669",
+    shadowOffset: { width: 0, height: 2 },
+    shadowOpacity: 0.08,
+    shadowRadius: 6,
+    elevation: 3,
   },
   postHeaderRow: {
     flexDirection: "row",
@@ -1440,7 +1636,7 @@ const styles = StyleSheet.create({
     width: 36,
     height: 36,
     borderRadius: 18,
-    backgroundColor: "#eab308",
+    backgroundColor: "#059669",
     alignItems: "center",
     justifyContent: "center",
   },
@@ -1461,26 +1657,26 @@ const styles = StyleSheet.create({
   authorName: {
     fontSize: 14,
     fontWeight: "800",
-    color: "#0f172a",
+    color: "#0f172a", // Chữ đen
     fontFamily: "Inter-Bold",
   },
   editorRoleBadge: {
-    backgroundColor: "#fff7ed",
+    backgroundColor: "#d1fae5",
     paddingHorizontal: 6,
     paddingVertical: 2,
     borderRadius: 6,
     borderWidth: 1,
-    borderColor: "#ffedd5",
+    borderColor: "#a7f3d0",
   },
   editorRoleBadgeText: {
     fontSize: 10.5,
     fontWeight: "800",
-    color: "#c2410c",
+    color: "#065f46",
     fontFamily: "Inter-Bold",
   },
   postTime: {
     fontSize: 11,
-    color: "#94a3b8",
+    color: "#047857",
     fontFamily: "Inter-Regular",
     marginTop: 2,
   },
@@ -1491,58 +1687,58 @@ const styles = StyleSheet.create({
   },
   editorActionBtn: {
     padding: 4,
-    backgroundColor: "#f8fafc",
+    backgroundColor: "#ffffff",
     borderRadius: 6,
     borderWidth: 1,
-    borderColor: "#e2e8f0",
+    borderColor: "#a7f3d0",
   },
   articleTitle: {
     fontSize: 14.5,
     fontWeight: "800",
-    color: "#0f172a",
+    color: "#0f172a", // Chữ đen
     fontFamily: "Inter-Bold",
     marginBottom: 6,
     lineHeight: 20,
   },
   postContentText: {
     fontSize: 13,
-    color: "#1e293b",
-    lineHeight: 19,
+    color: "#0f172a", // Chữ đen
+    lineHeight: 20,
     fontFamily: "Inter-Regular",
     marginBottom: 10,
   },
   urlBox: {
     flexDirection: "row",
     alignItems: "center",
-    backgroundColor: "#eff6ff",
+    backgroundColor: "#ffffff",
     padding: 10,
     borderRadius: 8,
     gap: 6,
     marginBottom: 10,
     borderWidth: 1,
-    borderColor: "#bfdbfe",
+    borderColor: "#a7f3d0",
   },
   urlText: {
     flex: 1,
     fontSize: 12.5,
-    color: "#2563eb",
+    color: "#047857",
     fontFamily: "Inter-Medium",
   },
   webFileCard: {
     flexDirection: "row",
     alignItems: "center",
-    backgroundColor: "#f8fafc",
+    backgroundColor: "#ffffff",
     borderRadius: 10,
     padding: 10,
     marginBottom: 8,
     borderWidth: 1,
-    borderColor: "#e2e8f0",
+    borderColor: "#a7f3d0",
   },
   webFileIconWrap: {
     width: 30,
     height: 30,
     borderRadius: 8,
-    backgroundColor: "#e6f4ea",
+    backgroundColor: "#d1fae5",
     alignItems: "center",
     justifyContent: "center",
     marginRight: 10,
@@ -1564,7 +1760,7 @@ const styles = StyleSheet.create({
     flexDirection: "row",
     alignItems: "center",
     gap: 4,
-    backgroundColor: "#e6f4ea",
+    backgroundColor: "#d1fae5",
     paddingHorizontal: 8,
     paddingVertical: 4,
     borderRadius: 8,
@@ -1572,7 +1768,7 @@ const styles = StyleSheet.create({
   webDownloadText: {
     fontSize: 11.5,
     fontWeight: "700",
-    color: "#008852",
+    color: "#065f46",
     fontFamily: "Inter-Bold",
   },
   postCardFooter: {
@@ -1582,18 +1778,26 @@ const styles = StyleSheet.create({
     marginTop: 6,
     paddingTop: 8,
     borderTopWidth: 1,
-    borderTopColor: "#f1f5f9",
+    borderTopColor: "#a7f3d0",
   },
   tagBadge: {
-    backgroundColor: "#f1f5f9",
+    backgroundColor: "#d1fae5",
     paddingHorizontal: 8,
     paddingVertical: 3,
     borderRadius: 8,
+    borderWidth: 1,
+    borderColor: "#a7f3d0",
   },
   tagBadgeText: {
     fontSize: 11,
-    color: "#64748b",
+    color: "#065f46",
     fontFamily: "Inter-Medium",
+    fontWeight: "700",
+  },
+  footerActionsRight: {
+    flexDirection: "row",
+    alignItems: "center",
+    gap: 6,
   },
   likeBtn: {
     flexDirection: "row",
@@ -1604,24 +1808,36 @@ const styles = StyleSheet.create({
   },
   likeBtnText: {
     fontSize: 12,
-    color: "#64748b",
+    color: "#0f172a", // Chữ đen
+    fontFamily: "Inter-Medium",
+  },
+  sharePostBtn: {
+    flexDirection: "row",
+    alignItems: "center",
+    gap: 4,
+    paddingHorizontal: 8,
+    paddingVertical: 4,
+  },
+  sharePostBtnText: {
+    fontSize: 12,
+    color: "#0f172a", // Chữ đen
     fontFamily: "Inter-Medium",
   },
 
   /* LIGHT BRIGHT WHITE EDITOR COMPOSER BAR */
   lightComposerContainer: {
-    backgroundColor: "#ffffff",
+    backgroundColor: "#ecfdf5",
     marginHorizontal: 10,
     marginBottom: 8,
     paddingHorizontal: 12,
     paddingTop: 8,
     paddingBottom: 10,
-    borderRadius: 16,
-    borderWidth: 1,
-    borderColor: "#cbd5e1",
-    shadowColor: "#000",
+    borderRadius: 18,
+    borderWidth: 1.5,
+    borderColor: "#059669", // Tô màu viền bắt mắt
+    shadowColor: "#059669",
     shadowOffset: { width: 0, height: 2 },
-    shadowOpacity: 0.06,
+    shadowOpacity: 0.08,
     shadowRadius: 6,
     elevation: 4,
   },
@@ -1635,20 +1851,20 @@ const styles = StyleSheet.create({
     flexDirection: "row",
     alignItems: "center",
     gap: 5,
-    backgroundColor: "#f1f5f9",
+    backgroundColor: "transparent", // Không tô nền
     paddingHorizontal: 10,
     paddingVertical: 6,
     borderRadius: 8,
-    borderWidth: 1,
-    borderColor: "#e2e8f0",
+    borderWidth: 1.5,
+    borderColor: "#059669", // Chỉ tô màu viền bắt mắt
   },
   lightToolBtnActive: {
-    backgroundColor: "#ecfdf5",
-    borderColor: "#a7f3d0",
+    backgroundColor: "transparent",
+    borderColor: "#047857",
   },
   lightToolBtnText: {
     fontSize: 12,
-    color: "#334155",
+    color: "#0f172a", // Chữ đen, không tô màu
     fontFamily: "Inter-Medium",
   },
   lightTopicDivider: {
@@ -1668,24 +1884,24 @@ const styles = StyleSheet.create({
     fontFamily: "Inter-Medium",
   },
   lightTagPill: {
-    backgroundColor: "#f1f5f9",
+    backgroundColor: "transparent",
     paddingHorizontal: 8,
     paddingVertical: 4,
     borderRadius: 6,
-    borderWidth: 1,
-    borderColor: "#e2e8f0",
+    borderWidth: 1.5,
+    borderColor: "#cbd5e1",
   },
   lightTagPillActive: {
-    backgroundColor: "#008852",
-    borderColor: "#008852",
+    backgroundColor: "transparent",
+    borderColor: "#059669",
   },
   lightTagPillText: {
     fontSize: 11.5,
-    color: "#64748b",
+    color: "#0f172a",
     fontFamily: "Inter-Medium",
   },
   lightTagPillTextActive: {
-    color: "#ffffff",
+    color: "#0f172a",
     fontWeight: "700",
     fontFamily: "Inter-Bold",
   },
@@ -1693,23 +1909,23 @@ const styles = StyleSheet.create({
     marginBottom: 8,
   },
   lightTitleInput: {
-    backgroundColor: "#f8fafc",
+    backgroundColor: "transparent", // Không tô nền
     borderRadius: 8,
-    borderWidth: 1,
-    borderColor: "#cbd5e1",
+    borderWidth: 1.5,
+    borderColor: "#059669", // Chỉ tô màu viền bắt mắt
     paddingHorizontal: 12,
     paddingVertical: 7,
     fontSize: 13,
-    color: "#0f172a",
+    color: "#0f172a", // Chữ đen
     fontFamily: "Inter-Medium",
   },
   lightInputRow: {
     flexDirection: "row",
     alignItems: "center",
-    backgroundColor: "#f8fafc",
+    backgroundColor: "transparent", // Không tô nền
     borderRadius: 12,
-    borderWidth: 1,
-    borderColor: "#cbd5e1",
+    borderWidth: 1.5,
+    borderColor: "#059669", // Chỉ tô màu viền bắt mắt
     paddingHorizontal: 12,
     paddingVertical: 4,
     gap: 8,
@@ -1896,12 +2112,12 @@ const styles = StyleSheet.create({
     fontFamily: "Inter-Medium",
   },
   pinnedItemCard: {
-    backgroundColor: "#fff7ed",
+    backgroundColor: "#fef3c7",
     borderRadius: 12,
     padding: 12,
     marginBottom: 10,
     borderWidth: 1,
-    borderColor: "#ffedd5",
+    borderColor: "#fde68a",
   },
   pinnedItemHeader: {
     flexDirection: "row",
@@ -1912,7 +2128,7 @@ const styles = StyleSheet.create({
   pinnedItemAuthor: {
     fontSize: 12.5,
     fontWeight: "700",
-    color: "#c2410c",
+    color: "#92400e",
     fontFamily: "Inter-Bold",
   },
   pinnedItemTime: {
@@ -1949,18 +2165,24 @@ const styles = StyleSheet.create({
   pinnedBadgeRow: {
     flexDirection: "row",
     alignItems: "center",
-    gap: 3,
-    backgroundColor: "#fff7ed",
+    gap: 4,
+    backgroundColor: "#fef3c7",
     paddingHorizontal: 6,
     paddingVertical: 2,
     borderRadius: 6,
     borderWidth: 1,
-    borderColor: "#ffedd5",
+    borderColor: "#fde68a",
   },
   pinnedBadgeText: {
     fontSize: 10.5,
     fontWeight: "800",
-    color: "#ea580c",
+    color: "#92400e",
     fontFamily: "Inter-Bold",
   },
+  inlineLinkText: {
+    color: "#0284c7",
+    textDecorationLine: "underline",
+    fontWeight: "600",
+  },
 });
+
