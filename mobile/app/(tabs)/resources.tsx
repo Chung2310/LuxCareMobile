@@ -984,7 +984,10 @@ export default function ResourcesScreen() {
     setShareEmail("");
   };
 
-  const getFileIcon = (type: ResourceItem["type"]) => {
+  const getFileIcon = (type: ResourceItem["type"], name?: string) => {
+    if (type === "folder" && (name === "Trò chuyện" || name?.toLowerCase() === "trò chuyện")) {
+      return { icon: "chatbubbles", bg: "#e0f2fe", iconColor: "#0284c7" };
+    }
     switch (type) {
       case "folder":
         return { icon: "folder", bg: "#ecfdf5", iconColor: "#008852" };
@@ -1007,7 +1010,7 @@ export default function ResourcesScreen() {
   };
 
   const renderItem = ({ item }: { item: ResourceItem }) => {
-    const iconMeta = getFileIcon(item.type);
+    const iconMeta = getFileIcon(item.type, item.name);
     const isMine = item.permission === "owner" || item.owner === user?.displayName;
 
     if (viewMode === "grid") {
@@ -1021,7 +1024,13 @@ export default function ResourcesScreen() {
               {item.name}
             </Text>
             <Text style={styles.gridSubtitle} numberOfLines={1}>
-              {item.type === "folder" ? "Thư mục" : isMine ? "Của bạn" : `Từ ${item.owner}`}
+              {item.type === "folder"
+                ? item.name === "Trò chuyện"
+                  ? "Tin nhắn & media"
+                  : "Thư mục"
+                : isMine
+                ? "Của bạn"
+                : `Từ ${item.owner}`}
             </Text>
           </View>
         </TouchableOpacity>
@@ -1044,7 +1053,11 @@ export default function ResourcesScreen() {
           </View>
           <Text style={styles.itemSubtitle} numberOfLines={1}>
             {item.type === "folder"
-              ? `📁 Thư mục • ${item.updatedAt}`
+              ? item.name === "Trò chuyện"
+                ? `💬 Tin nhắn & phương tiện • ${item.updatedAt}`
+                : `📁 Thư mục • ${item.updatedAt}`
+              : item.subtitle
+              ? item.subtitle
               : isMine
               ? `👥 Của bạn • ${item.updatedAt}`
               : `👥 Được chia sẻ bởi ${item.owner} • ${item.updatedAt}`}
@@ -1487,17 +1500,19 @@ export default function ResourcesScreen() {
               <Text style={styles.sheetOptionText}>{selectedItem?.isStarred ? "Bỏ gắn dấu sao" : "Gắn dấu sao"}</Text>
             </TouchableOpacity>
 
-            <TouchableOpacity
-              style={styles.sheetOptionRow}
-              onPress={() => {
-                setMenuVisible(false);
-                setFormName(selectedItem?.name || "");
-                setActiveDialog("rename");
-              }}
-            >
-              <Ionicons name="pencil-outline" size={20} color="#2563eb" />
-              <Text style={styles.sheetOptionText}>Đổi tên</Text>
-            </TouchableOpacity>
+            {!selectedItem?.isFixed && selectedItem?.name !== "Trò chuyện" && (
+              <TouchableOpacity
+                style={styles.sheetOptionRow}
+                onPress={() => {
+                  setMenuVisible(false);
+                  setFormName(selectedItem?.name || "");
+                  setActiveDialog("rename");
+                }}
+              >
+                <Ionicons name="pencil-outline" size={20} color="#2563eb" />
+                <Text style={styles.sheetOptionText}>Đổi tên</Text>
+              </TouchableOpacity>
+            )}
 
             <TouchableOpacity
               style={styles.sheetOptionRow}
@@ -1522,10 +1537,12 @@ export default function ResourcesScreen() {
               <Text style={styles.sheetOptionText}>Xem / Nghe tệp trên app</Text>
             </TouchableOpacity>
 
-            <TouchableOpacity style={styles.sheetOptionRow} onPress={() => selectedItem && handleMoveToTrash(selectedItem)}>
-              <Ionicons name="trash-outline" size={20} color="#dc2626" />
-              <Text style={[styles.sheetOptionText, { color: "#dc2626" }]}>Chuyển vào thùng rác</Text>
-            </TouchableOpacity>
+            {!selectedItem?.isFixed && selectedItem?.name !== "Trò chuyện" && (
+              <TouchableOpacity style={styles.sheetOptionRow} onPress={() => selectedItem && handleMoveToTrash(selectedItem)}>
+                <Ionicons name="trash-outline" size={20} color="#dc2626" />
+                <Text style={[styles.sheetOptionText, { color: "#dc2626" }]}>Chuyển vào thùng rác</Text>
+              </TouchableOpacity>
+            )}
           </View>
         </TouchableOpacity>
       </Modal>

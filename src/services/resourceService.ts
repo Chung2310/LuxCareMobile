@@ -18,6 +18,7 @@ export interface ResourceItem {
   sharedBy?: string;
   sharedWithCount?: number;
   permission?: "owner" | "shared";
+  isFixed?: boolean;
   isDeleted?: boolean;
   deletedAt?: string;
 }
@@ -79,15 +80,27 @@ export function mapResourceItem(item: any, currentUserName?: string): ResourceIt
 
   const fileUrl = item.fileUrl || item.url || item.driveLink || "";
 
+  let itemSubtitle = "";
+  if (isFolder) {
+    itemSubtitle =
+      item.name === "Trò chuyện"
+        ? "Tệp & phương tiện từ các cuộc trò chuyện"
+        : `Thư mục ${isMine ? "của bạn" : `của ${itemOwner}`} • ${formatTimeAgo(item.updatedAt || item.createdAt)}`;
+  } else if (item.sourceType === "chat.attachment" || item.roomId) {
+    itemSubtitle = isMine
+      ? `Của bạn (Gửi từ Chat) • ${formatTimeAgo(item.createdAt || item.updatedAt)}`
+      : `Gửi bởi ${itemOwner} • ${formatTimeAgo(item.createdAt || item.updatedAt)}`;
+  } else {
+    itemSubtitle = isMine
+      ? `Của bạn • ${formatTimeAgo(item.updatedAt || item.createdAt)}`
+      : `Được chia sẻ bởi ${itemOwner} • ${formatTimeAgo(item.updatedAt || item.createdAt)}`;
+  }
+
   return {
     id: String(item._id || item.id),
     name: item.name || item.title || item.filename || "Tài nguyên",
     type: mappedType,
-    subtitle: isFolder
-      ? `Thư mục ${isMine ? "của bạn" : `của ${itemOwner}`} • ${formatTimeAgo(item.updatedAt || item.createdAt)}`
-      : isMine
-      ? `Của bạn • ${formatTimeAgo(item.updatedAt || item.createdAt)}`
-      : `Được chia sẻ bởi ${itemOwner} • ${formatTimeAgo(item.updatedAt || item.createdAt)}`,
+    subtitle: itemSubtitle,
     owner: itemOwner,
     updatedAt: formatTimeAgo(item.updatedAt || item.createdAt),
     size: sizeStr,
@@ -99,6 +112,7 @@ export function mapResourceItem(item: any, currentUserName?: string): ResourceIt
     isShared: Boolean(item.isShared || item.shared || (item.shares && item.shares.length > 0)),
     sharedBy: isMine ? undefined : itemOwner,
     permission: isMine ? "owner" : "shared",
+    isFixed: Boolean(item.isFixed),
     isDeleted: Boolean(item.isDeleted),
     deletedAt: item.deletedAt ? formatTimeAgo(item.deletedAt) : undefined,
   };
