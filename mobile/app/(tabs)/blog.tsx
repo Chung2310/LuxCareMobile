@@ -569,13 +569,21 @@ export default function BlogScreen() {
     }
   };
 
-  const filteredPosts = posts.filter((p) =>
-    searchQuery
-      ? p.content.toLowerCase().includes(searchQuery.toLowerCase()) ||
-        (p.title && p.title.toLowerCase().includes(searchQuery.toLowerCase())) ||
-        p.authorName.toLowerCase().includes(searchQuery.toLowerCase())
-      : true,
-  );
+  const filteredPosts = posts
+    .filter((p) =>
+      searchQuery
+        ? p.content.toLowerCase().includes(searchQuery.toLowerCase()) ||
+          (p.title && p.title.toLowerCase().includes(searchQuery.toLowerCase())) ||
+          p.authorName.toLowerCase().includes(searchQuery.toLowerCase())
+        : true,
+    )
+    .sort((a, b) => {
+      // Pinned posts always appear first
+      if (a.isPinned && !b.isPinned) return -1;
+      if (!a.isPinned && b.isPinned) return 1;
+      // Within same pinned group, sort newest first
+      return new Date(b.createdAt).getTime() - new Date(a.createdAt).getTime();
+    });
 
   return (
     <ImageBackground
