@@ -1185,23 +1185,47 @@ export default function ChatScreen() {
       if (isValidHttpUrl(item.senderPhoto)) {
         return item.senderPhoto!.trim();
       }
-      if (typeof item.senderId === "object" && isValidHttpUrl(item.senderId?.photoURL)) {
-        return item.senderId.photoURL!.trim();
+
+      const sender = typeof item.senderId === "object" ? (item.senderId as any) : null;
+      const directPhoto = sender?.photoURL || sender?.avatarURL || sender?.avatarUrl || sender?.profilePhoto;
+      if (isValidHttpUrl(directPhoto)) {
+        return directPhoto.trim();
       }
+
       // Tra cứu từ activeRoom.members
-      const senderIdStr = typeof item.senderId === "object" ? item.senderId?._id : item.senderId;
-      if (senderIdStr && activeRoom?.members) {
+      const senderIdStr = String(sender?._id || sender?.uid || item.senderId || "");
+      const senderName = (item.senderName || "").trim().toLowerCase();
+      if (activeRoom?.members) {
         const member = activeRoom.members.find((m) => {
-          const uId = typeof m.userId === "object" ? m.userId?._id || m.userId?.uid : m.userId;
-          return uId === senderIdStr;
+          const memberUser = typeof m.userId === "object" ? (m.userId as any) : null;
+          const memberId = String(memberUser?._id || memberUser?.uid || m.userId || "");
+          return (
+            (senderIdStr && memberId === senderIdStr) ||
+            (!!senderName && [memberUser?.displayName, memberUser?.email].some((value) =>
+              String(value || "").trim().toLowerCase() === senderName,
+            ))
+          );
         });
-        if (typeof member?.userId === "object" && isValidHttpUrl(member.userId?.photoURL)) {
-          return member.userId.photoURL!.trim();
+        const memberUser = typeof member?.userId === "object" ? (member.userId as any) : null;
+        const memberPhoto = memberUser?.photoURL || memberUser?.avatarURL || memberUser?.avatarUrl || memberUser?.profilePhoto;
+        if (isValidHttpUrl(memberPhoto)) {
+          return memberPhoto.trim();
+        }
+
+        if (!activeRoom.isGroup) {
+          const otherMember = activeRoom.members.find((m) => {
+            const memberUser = typeof m.userId === "object" ? (m.userId as any) : null;
+            const memberId = String(memberUser?._id || memberUser?.uid || m.userId || "");
+            return memberId && memberId !== currentUserId;
+          });
+          const otherUser = typeof otherMember?.userId === "object" ? (otherMember.userId as any) : null;
+          const otherPhoto = otherUser?.photoURL || otherUser?.avatarURL || otherUser?.avatarUrl || otherUser?.profilePhoto;
+          if (isValidHttpUrl(otherPhoto)) return otherPhoto.trim();
         }
       }
       return null;
     },
-    [activeRoom?.members]
+    [activeRoom, currentUserId]
   );
 
   // 1. Fetch Rooms from API
