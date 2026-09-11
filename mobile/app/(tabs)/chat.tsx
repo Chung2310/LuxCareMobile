@@ -218,6 +218,9 @@ function extractDownloadableAttachments(msg?: ChatMessage | null): ChatAttachmen
   return list;
 }
 
+// Handler thông báo hệ thống toàn cục (dùng được cho cả các hàm tiện ích ngoài component)
+let globalCustomAlert: ((title: string, message?: string) => void) | null = null;
+
 // Helper chuẩn bị dữ liệu media (tự động upload lên Cloudinary để lưu trữ vĩnh viễn qua chat.attachment API)
 async function prepareAttachment(
   uri: string,
@@ -227,6 +230,39 @@ async function prepareAttachment(
   base64Provided?: string | null,
 ): Promise<ChatAttachment> {
   try {
+    // Cách 0: Thử upload trực tiếp qua FormData (Native streaming siêu nhanh, không tốn RAM đọc Base64)
+    try {
+      const formData = new FormData();
+      formData.append("file", {
+        uri,
+        name: fileName,
+        type: mimeType || "image/jpeg",
+      } as any);
+      formData.append("sourceType", "chat.attachment");
+      formData.append("fileName", fileName);
+      formData.append("mimeType", mimeType);
+
+      const formResponse = await api.transport.fetch("/api/v1/media/upload", {
+        method: "POST",
+        body: formData,
+      });
+
+      if (formResponse.ok) {
+        const formRes = await formResponse.json();
+        if (formRes?.url) {
+          return {
+            url: formRes.url,
+            name: fileName,
+            type: mimeType,
+            size: fileSize || formRes.size,
+            uploadToken: formRes.uploadToken,
+          };
+        }
+      }
+    } catch {
+      // Fallback silently to base64 upload
+    }
+
     let base64Data = "";
     if (base64Provided) {
       base64Data = base64Provided.replace(/\s/g, "");
@@ -323,14 +359,20 @@ async function prepareAttachment(
         } else {
           const errBody = await uploadResponse.json().catch(() => ({}));
           console.warn("Upload chat.attachment thất bại:", uploadResponse.status, errBody);
-          showCustomAlert("Lỗi tải lên", errBody?.message || `Máy chủ từ chối tải tệp (Mã lỗi ${uploadResponse.status}).`);
+          if (globalCustomAlert) {
+            globalCustomAlert("Lỗi tải lên", errBody?.message || `Máy chủ từ chối tải tệp (Mã lỗi ${uploadResponse.status}).`);
+          }
         }
       } catch (uploadErr: any) {
         console.warn("Lỗi kết nối upload Cloudinary:", uploadErr);
-        showCustomAlert("Lỗi mạng", uploadErr?.message || "Không thể kết nối máy chủ để tải tệp lên.");
+        if (globalCustomAlert) {
+          globalCustomAlert("Lỗi mạng", uploadErr?.message || "Không thể kết nối máy chủ để tải tệp lên.");
+        }
       }
     } else {
-      showCustomAlert("Lỗi tệp", "Không thể đọc nội dung tệp tin này từ thiết bị. Vui lòng thử chọn tệp từ thư mục khác (như Tải về/Bộ nhớ máy).");
+      if (globalCustomAlert) {
+        globalCustomAlert("Lỗi tệp", "Không thể đọc nội dung tệp tin này từ thiết bị. Vui lòng thử chọn tệp từ thư mục khác (như Tải về/Bộ nhớ máy).");
+      }
     }
   } catch (err) {
     console.warn("Lỗi prepareAttachment:", err);
@@ -578,7 +620,7 @@ export default function ChatScreen() {
     visible: boolean;
     title: string;
     message?: string;
-    buttons: { text: string; style?: "default" | "cancel" | "destructive"; onPress?: () => void }[];
+    buttons: { text: string; style?: "default" | "cancel" | "destructive" | "secondary"; onPress?: () => void }[];
   }>({
     visible: false,
     title: "",
@@ -589,7 +631,7 @@ export default function ChatScreen() {
   const showCustomAlert = (
     title: string,
     message?: string,
-    buttons?: { text: string; style?: "default" | "cancel" | "destructive"; onPress?: () => void }[]
+    buttons?: { text: string; style?: "default" | "cancel" | "destructive" | "secondary"; onPress?: () => void }[]
   ) => {
     setCustomAlert({
       visible: true,
@@ -602,6 +644,15 @@ export default function ChatScreen() {
   const hideCustomAlert = () => {
     setCustomAlert((prev) => ({ ...prev, visible: false }));
   };
+
+  useEffect(() => {
+    globalCustomAlert = (title, message) => {
+      showCustomAlert(title, message);
+    };
+    return () => {
+      globalCustomAlert = null;
+    };
+  }, []);
 
   const flatListRef = useRef<FlatList>(null);
   const pollingRef = useRef<any>(null);
@@ -666,7 +717,14 @@ export default function ChatScreen() {
       const sorted = [...data].sort(
         (a, b) => new Date(a.createdAt).getTime() - new Date(b.createdAt).getTime(),
       );
-      setMessages(sorted);
+      // Giữ lại các tin nhắn đang gửi (optimistic status: sending) chưa được lưu trên server, tránh bị polling xóa mất
+      setMessages((prev) => {
+        const pending = prev.filter((m) => m.status === "sending");
+        if (pending.length === 0) return sorted;
+        const serverIds = new Set(sorted.map((m) => m._id));
+        const stillPending = pending.filter((m) => !serverIds.has(m._id));
+        return [...sorted, ...stillPending];
+      });
       void chat.markAsRead(roomId);
 
       // Nếu mới vào phòng lần đầu, cuộn xuống dưới cùng
@@ -864,51 +922,140 @@ export default function ChatScreen() {
     }
 
     const replyId = replyingMessage?._id;
+    const currentRoomId = activeRoom._id;
+    const tempId = `temp_txt_${Date.now()}`;
+
+    // Optimistic UI: Hiển thị ngay lập tức trong khung chat không cần chờ mạng (chuẩn Zalo)
+    const optimisticMessage: any = {
+      _id: tempId,
+      roomId: currentRoomId,
+      senderId: user?.id || "me",
+      senderName: user?.fullName || "Tôi",
+      content: textToSend,
+      attachments: finalAttachments.length > 0 ? finalAttachments : undefined,
+      replyTo: replyingMessage || undefined,
+      createdAt: new Date().toISOString(),
+      status: "sending",
+    };
+
+    setMessages((prev) => [...prev, optimisticMessage]);
+    setInputText("");
+    setReplyingMessage(null);
+    isAtBottomRef.current = true;
+    isNavigatingToRepliedRef.current = false;
+    setTimeout(() => {
+      flatListRef.current?.scrollToEnd({ animated: true });
+    }, 60);
+
     setSending(true);
     try {
       const sentMsg = await chat.sendMessage(
-        activeRoom._id,
+        currentRoomId,
         textToSend,
         finalAttachments.length > 0 ? finalAttachments : undefined,
         replyId
       );
-      setMessages((prev) => [...prev, sentMsg]);
-      setInputText("");
-      setReplyingMessage(null);
-      isAtBottomRef.current = true;
-      isNavigatingToRepliedRef.current = false;
-      setTimeout(() => {
-        flatListRef.current?.scrollToEnd({ animated: true });
-      }, 100);
+      setMessages((prev) => prev.map((m) => (m._id === tempId ? sentMsg : m)));
       void loadRooms(true);
     } catch (err: any) {
-      showCustomAlert("Lỗi", err?.message || "Không thể gửi tin nhắn.");
+      setMessages((prev) => prev.map((m) => (m._id === tempId ? { ...m, status: "failed" } : m)));
+      showToast("Không thể gửi tin nhắn");
     } finally {
       setSending(false);
     }
   };
 
-  // 5. Send Image Attachment (Chọn từ thư viện)
+  // 5. Send Image Attachment (Hiện ảnh tức thì trong chat & Tải ngầm như Zalo)
   const handlePickImage = async () => {
     try {
+      // Đặt quality: 1.0 để Android dùng RawImageExporter (không giải mã/nén bitmap hàng loạt gây đơ 2-3s)
       const result = await ImagePicker.launchImageLibraryAsync({
         mediaTypes: ['images'],
         allowsEditing: false,
-        quality: 0.7,
-        base64: true,
+        quality: 1,
+        allowsMultipleSelection: true,
+        selectionLimit: 30,
       });
 
-      if (!result.canceled && result.assets[0]?.uri) {
-        const asset = result.assets[0];
-        const fileName = asset.fileName || `IMG_${Date.now()}.jpg`;
-        const mimeType = asset.mimeType || "image/jpeg";
-        const att = await prepareAttachment(asset.uri, fileName, mimeType, asset.fileSize, asset.base64);
-        void handleSendMessage([att]);
+      if (!result.canceled && result.assets && result.assets.length > 0) {
+        if (!activeRoom?._id) return;
+        const currentRoomId = activeRoom._id;
+        const tempId = `temp_img_${Date.now()}_${Math.random().toString(36).substring(2, 6)}`;
+
+        // 1. TẠO NGAY TIN NHẮN TẠM (OPTIMISTIC) HIỂN THỊ TRỰC TIẾP TRÊN MÀN HÌNH CHAT (0ms)
+        const localAttachments: ChatAttachment[] = result.assets.map((asset, i) => ({
+          url: asset.uri,
+          type: asset.mimeType || "image/jpeg",
+          name: asset.fileName || `IMG_${Date.now()}_${i + 1}.jpg`,
+          size: asset.fileSize,
+        }));
+
+        const optimisticMessage: any = {
+          _id: tempId,
+          roomId: currentRoomId,
+          senderId: currentUserId || (user as any)?._id || user?.uid || (user as any)?.id || "me",
+          senderName: user?.fullName || "Tôi",
+          content: "",
+          attachments: localAttachments,
+          createdAt: new Date().toISOString(),
+          status: "sending",
+        };
+
+        setMessages((prev) => [...prev, optimisticMessage]);
+        isAtBottomRef.current = true;
+        flatListRef.current?.scrollToEnd({ animated: true });
+        setTimeout(() => {
+          flatListRef.current?.scrollToEnd({ animated: true });
+        }, 60);
+
+        // 2. CHỜ 250ms ĐỂ REACT NATIVE VẼ XONG ẢNH & XOAY SPINNER LÊN MÀN HÌNH RỒI MỚI UPLOAD NGẦM
+        setTimeout(() => {
+          void (async () => {
+            try {
+              const uploadTasks = result.assets.map(async (asset, i) => {
+                if (!asset.uri) return null;
+                const fileName = asset.fileName || `IMG_${Date.now()}_${i + 1}.jpg`;
+                const mimeType = asset.mimeType || "image/jpeg";
+                try {
+                  const att = await prepareAttachment(asset.uri, fileName, mimeType, asset.fileSize, asset.base64);
+                  if (att.url && !att.url.startsWith("file://")) {
+                    return att;
+                  }
+                } catch (err) {
+                  console.warn("Lỗi upload ảnh:", err);
+                }
+                return null;
+              });
+
+              const uploadResults = await Promise.all(uploadTasks);
+              const uploadedList = uploadResults.filter(Boolean) as ChatAttachment[];
+
+              if (uploadedList.length > 0) {
+                const sentMsg = await chat.sendMessage(currentRoomId, "", uploadedList);
+                setMessages((prev) =>
+                  prev.map((m) => (m._id === tempId ? sentMsg : m))
+                );
+                void loadRooms(true);
+              } else {
+                setMessages((prev) =>
+                  prev.map((m) => (m._id === tempId ? { ...m, status: "failed" } : m))
+                );
+              }
+            } catch (err) {
+              console.warn("Lỗi gửi ảnh ngầm:", err);
+              setMessages((prev) =>
+                prev.map((m) => (m._id === tempId ? { ...m, status: "failed" } : m))
+              );
+            }
+          })();
+        }, 250);
       }
-    } catch {}
+    } catch (err) {
+      console.warn("Lỗi chọn ảnh:", err);
+    }
   };
 
-  // 5b. Chụp ảnh trực tiếp từ Camera và gửi (giống Zalo)
+  // 5b. Chụp ảnh trực tiếp từ Camera và gửi (Hiện tức thì & Upload ngầm)
   const handleTakePhoto = async () => {
     try {
       const permission = await ImagePicker.requestCameraPermissionsAsync();
@@ -919,16 +1066,47 @@ export default function ChatScreen() {
 
       const result = await ImagePicker.launchCameraAsync({
         allowsEditing: false,
-        quality: 0.7,
-        base64: true,
+        quality: 1,
       });
 
-      if (!result.canceled && result.assets[0]?.uri) {
+      if (!result.canceled && result.assets[0]?.uri && activeRoom?._id) {
         const asset = result.assets[0];
+        const currentRoomId = activeRoom._id;
+        const tempId = `temp_photo_${Date.now()}`;
         const fileName = asset.fileName || `PHOTO_${Date.now()}.jpg`;
         const mimeType = asset.mimeType || "image/jpeg";
-        const att = await prepareAttachment(asset.uri, fileName, mimeType, asset.fileSize, asset.base64);
-        void handleSendMessage([att]);
+
+        const optimisticMessage: any = {
+          _id: tempId,
+          roomId: currentRoomId,
+          senderId: currentUserId || (user as any)?._id || user?.uid || (user as any)?.id || "me",
+          senderName: user?.fullName || "Tôi",
+          content: "",
+          attachments: [{ url: asset.uri, name: fileName, type: mimeType, size: asset.fileSize }],
+          createdAt: new Date().toISOString(),
+          status: "sending",
+        };
+
+        setMessages((prev) => [...prev, optimisticMessage]);
+        isAtBottomRef.current = true;
+        setTimeout(() => {
+          flatListRef.current?.scrollToEnd({ animated: true });
+        }, 50);
+
+        (async () => {
+          try {
+            const att = await prepareAttachment(asset.uri, fileName, mimeType, asset.fileSize, asset.base64);
+            if (att.url && !att.url.startsWith("file://")) {
+              const sentMsg = await chat.sendMessage(currentRoomId, "", [att]);
+              setMessages((prev) => prev.map((m) => (m._id === tempId ? sentMsg : m)));
+              void loadRooms(true);
+            } else {
+              setMessages((prev) => prev.map((m) => (m._id === tempId ? { ...m, status: "failed" } : m)));
+            }
+          } catch (err) {
+            setMessages((prev) => prev.map((m) => (m._id === tempId ? { ...m, status: "failed" } : m)));
+          }
+        })();
       }
     } catch {}
   };
@@ -1011,32 +1189,100 @@ export default function ChatScreen() {
     } catch {}
   };
 
-  // 6. Send File Attachment
+  // 6. Send File Attachment (Hiện tài liệu tức thì trong chat & Tải ngầm như Zalo)
   const handlePickDocument = async () => {
     try {
       const result = await DocumentPicker.getDocumentAsync({
         type: "*/*",
         copyToCacheDirectory: true,
+        multiple: true,
       });
 
-      if (!result.canceled && result.assets && result.assets[0]) {
-        const file = result.assets[0];
-        let fileName = file.name;
-        if (!fileName || !fileName.trim()) {
-          const uriParts = file.uri.split("/");
-          fileName = decodeURIComponent(uriParts[uriParts.length - 1]) || `File_${Date.now()}`;
-        }
-        const mimeType = file.mimeType || "application/octet-stream";
-        showToast("Đang tải tệp lên...");
-        const att = await prepareAttachment(file.uri, fileName, mimeType, file.size);
-        if (!att.url || att.url.startsWith("file://")) {
-          // Đã có alert thông báo lỗi từ prepareAttachment, không gửi tin nhắn với link hỏng
-          return;
-        }
-        void handleSendMessage([att]);
+      if (!result.canceled && result.assets && result.assets.length > 0) {
+        if (!activeRoom?._id) return;
+        const currentRoomId = activeRoom._id;
+        const tempId = `temp_doc_${Date.now()}_${Math.random().toString(36).substring(2, 6)}`;
+
+        // 1. TẠO NGAY TIN NHẮN TẠM HIỆN LÊN KHUNG CHAT (0ms)
+        const localAttachments: ChatAttachment[] = result.assets.map((file, i) => {
+          let fileName = file.name;
+          if (!fileName || !fileName.trim()) {
+            const uriParts = file.uri.split("/");
+            fileName = decodeURIComponent(uriParts[uriParts.length - 1]) || `File_${Date.now()}_${i + 1}`;
+          }
+          return {
+            url: file.uri,
+            type: file.mimeType || "application/octet-stream",
+            name: fileName,
+            size: file.size,
+          };
+        });
+
+        const optimisticMessage: any = {
+          _id: tempId,
+          roomId: currentRoomId,
+          senderId: currentUserId || (user as any)?._id || user?.uid || (user as any)?.id || "me",
+          senderName: user?.fullName || "Tôi",
+          content: "",
+          attachments: localAttachments,
+          createdAt: new Date().toISOString(),
+          status: "sending",
+        };
+
+        setMessages((prev) => [...prev, optimisticMessage]);
+        isAtBottomRef.current = true;
+        flatListRef.current?.scrollToEnd({ animated: true });
+        setTimeout(() => {
+          flatListRef.current?.scrollToEnd({ animated: true });
+        }, 60);
+
+        // 2. CHỜ 250ms ĐỂ REACT NATIVE VẼ TÀI LIỆU LÊN MÀN HÌNH RỒI MỚI UPLOAD NGẦM
+        setTimeout(() => {
+          void (async () => {
+            try {
+              const uploadTasks = result.assets.map(async (file, i) => {
+                if (!file.uri) return null;
+                let fileName = file.name;
+                if (!fileName || !fileName.trim()) {
+                  const uriParts = file.uri.split("/");
+                  fileName = decodeURIComponent(uriParts[uriParts.length - 1]) || `File_${Date.now()}_${i + 1}`;
+                }
+                const mimeType = file.mimeType || "application/octet-stream";
+                try {
+                  const att = await prepareAttachment(file.uri, fileName, mimeType, file.size);
+                  if (att.url && !att.url.startsWith("file://")) {
+                    return att;
+                  }
+                } catch (err) {
+                  console.warn("Lỗi upload tài liệu:", err);
+                }
+                return null;
+              });
+
+              const uploadResults = await Promise.all(uploadTasks);
+              const uploadedList = uploadResults.filter(Boolean) as ChatAttachment[];
+
+              if (uploadedList.length > 0) {
+                const sentMsg = await chat.sendMessage(currentRoomId, "", uploadedList);
+                setMessages((prev) =>
+                  prev.map((m) => (m._id === tempId ? sentMsg : m))
+                );
+                void loadRooms(true);
+              } else {
+                setMessages((prev) =>
+                  prev.map((m) => (m._id === tempId ? { ...m, status: "failed" } : m))
+                );
+              }
+            } catch (err: any) {
+              setMessages((prev) =>
+                prev.map((m) => (m._id === tempId ? { ...m, status: "failed" } : m))
+              );
+            }
+          })();
+        }, 250);
       }
     } catch (err: any) {
-      console.warn("Lỗi chọn tài liệu:", err);
+      console.warn("Lỗi chọn nhiều tài liệu:", err);
       showCustomAlert("Lỗi", "Không thể chọn tệp tin từ thiết bị.");
     }
   };
@@ -1195,13 +1441,14 @@ export default function ChatScreen() {
           showToast("Đã lưu tệp vào thư mục ứng dụng");
         }
       } else {
-        // Tài liệu (Word, Excel, PDF,...)
-        Alert.alert(
+        // Tài liệu (Word, Excel, PDF,...) - Popup bo góc hiện đại không dùng emoji
+        showCustomAlert(
           fileName,
           "Bạn muốn tải tệp về thư mục Tải về (Download) của máy hay mở qua ứng dụng?",
           [
             {
-              text: "📥 Tải về máy (Download)",
+              text: "Tải về máy (Download)",
+              style: "default",
               onPress: async () => {
                 showToast("Đang bắt đầu tải tệp về máy...");
                 if (resolvedUrl.startsWith("http://") || resolvedUrl.startsWith("https://")) {
@@ -1218,7 +1465,8 @@ export default function ChatScreen() {
               },
             },
             {
-              text: "↗️ Mở / Chia sẻ",
+              text: "Mở / Chia sẻ",
+              style: "secondary",
               onPress: async () => {
                 try {
                   const canShare = await Sharing.isAvailableAsync();
@@ -1710,7 +1958,8 @@ export default function ChatScreen() {
               {customAlert.buttons.map((btn, idx) => {
                 const isDestructive = btn.style === "destructive";
                 const isCancel = btn.style === "cancel";
-                const isPrimary = !isDestructive && !isCancel;
+                const isSecondary = btn.style === "secondary";
+                const isPrimary = !isDestructive && !isCancel && !isSecondary;
 
                 return (
                   <TouchableOpacity
@@ -1720,6 +1969,7 @@ export default function ChatScreen() {
                       isTwoButtons && { flex: 1 },
                       isDestructive && styles.customAlertBtnDestructive,
                       isCancel && styles.customAlertBtnCancel,
+                      isSecondary && styles.customAlertBtnSecondary,
                       isPrimary && styles.customAlertBtnPrimary,
                     ]}
                     onPress={() => {
@@ -1733,6 +1983,7 @@ export default function ChatScreen() {
                         styles.customAlertBtnText,
                         isDestructive && styles.customAlertBtnTextDestructive,
                         isCancel && styles.customAlertBtnTextCancel,
+                        isSecondary && styles.customAlertBtnTextSecondary,
                         isPrimary && styles.customAlertBtnTextPrimary,
                       ]}
                       numberOfLines={2}
@@ -1840,7 +2091,7 @@ export default function ChatScreen() {
         setHighlightedMessageId((curr) => (curr === targetMsgId ? null : curr));
       }, 2000);
     } else {
-      Alert.alert("Thông báo", "Tin nhắn gốc không nằm trong các tin nhắn được tải gần đây.");
+      showCustomAlert("Thông báo", "Tin nhắn gốc không nằm trong các tin nhắn được tải gần đây.");
     }
   };
 
@@ -2012,12 +2263,13 @@ export default function ChatScreen() {
                     <TouchableOpacity
                       style={styles.pinnedDropdownActionBtn}
                       onPress={() => {
-                        Alert.alert(
+                        showCustomAlert(
                           "Quản lý tin nhắn ghim",
                           "Chọn tin nhắn bạn muốn bỏ ghim:",
                           [
                             ...pinnedMessages.map((p, idx) => ({
                               text: `Bỏ ghim #${idx + 1}: ${(p.content || "[Đính kèm]").slice(0, 24)}...`,
+                              style: "destructive" as const,
                               onPress: () => void handleUnpinMessage(p._id),
                             })),
                             { text: "Đóng", style: "cancel" as const },
@@ -2245,6 +2497,13 @@ export default function ChatScreen() {
                                           style={styles.attImage}
                                           resizeMode="cover"
                                         />
+                                        {item.status === "sending" && (
+                                          <View style={styles.attSpinnerCenterWrap}>
+                                            <View style={styles.attSpinnerBadge}>
+                                              <ActivityIndicator size="small" color="#ffffff" />
+                                            </View>
+                                          </View>
+                                        )}
                                       </TouchableOpacity>
                                     );
                                   }
@@ -2262,7 +2521,9 @@ export default function ChatScreen() {
                                       key={`file-${idx}-${att.url}`}
                                       style={styles.attFileCard}
                                       onPress={() => {
-                                        void handleDownloadAttachment(att);
+                                        if (item.status !== "sending") {
+                                          void handleDownloadAttachment(att);
+                                        }
                                       }}
                                       activeOpacity={0.75}
                                     >
@@ -2274,11 +2535,15 @@ export default function ChatScreen() {
                                           {getCleanFileName(att)}
                                         </Text>
                                         <Text style={styles.attFileSize}>
-                                          {formatFileSize(att.size)}
+                                          {item.status === "sending" ? "Đang tải lên..." : formatFileSize(att.size)}
                                         </Text>
                                       </View>
                                       <View style={styles.attFileDownloadWrap}>
-                                        <Ionicons name="arrow-down-outline" size={17} color="#475569" />
+                                        {item.status === "sending" ? (
+                                          <ActivityIndicator size="small" color={LUXCARE_PRIMARY} />
+                                        ) : (
+                                          <Ionicons name="arrow-down-outline" size={17} color="#475569" />
+                                        )}
                                       </View>
                                     </TouchableOpacity>
                                   );
@@ -2334,8 +2599,20 @@ export default function ChatScreen() {
                       <View style={[styles.msgMetaRow, isMe && { justifyContent: "flex-end" }]}>
                         <Text style={styles.msgTimeText}>{formatMessageTime(item.createdAt)}</Text>
                         {isMe && (
-                          <Text style={styles.msgStatusText}>
-                            {item.readBy && item.readBy.length > 1 ? "✓✓ Đã xem" : "✓ Đã gửi"}
+                          <Text
+                            style={[
+                              styles.msgStatusText,
+                              item.status === "sending" && { color: "#d97706" },
+                              item.status === "failed" && { color: "#ef4444" },
+                            ]}
+                          >
+                            {item.status === "sending"
+                              ? "Đang tải lên..."
+                              : item.status === "failed"
+                              ? "Lỗi gửi"
+                              : item.readBy && item.readBy.length > 1
+                              ? "✓✓ Đã xem"
+                              : "✓ Đã gửi"}
                           </Text>
                         )}
                       </View>
@@ -3811,11 +4088,32 @@ const styles = StyleSheet.create({
     borderRadius: 8,
     overflow: "hidden",
     marginVertical: 2,
+    position: "relative",
+    width: 200,
+    height: 150,
   },
   attImage: {
     width: 200,
     height: 150,
     borderRadius: 8,
+  },
+  attSpinnerCenterWrap: {
+    position: "absolute",
+    top: 0,
+    left: 0,
+    right: 0,
+    bottom: 0,
+    alignItems: "center",
+    justifyContent: "center",
+    zIndex: 10,
+  },
+  attSpinnerBadge: {
+    width: 38,
+    height: 38,
+    borderRadius: 19,
+    backgroundColor: "rgba(0, 0, 0, 0.45)",
+    alignItems: "center",
+    justifyContent: "center",
   },
   attFileCard: {
     flexDirection: "row",
@@ -4805,7 +5103,7 @@ const styles = StyleSheet.create({
     flexDirection: "column",
   },
   customAlertBtn: {
-    paddingVertical: 12,
+    paddingVertical: 13,
     paddingHorizontal: 16,
     borderRadius: 14,
     alignItems: "center",
@@ -4814,8 +5112,15 @@ const styles = StyleSheet.create({
   customAlertBtnPrimary: {
     backgroundColor: "#059669",
   },
+  customAlertBtnSecondary: {
+    backgroundColor: "#ecfdf5",
+    borderWidth: 1,
+    borderColor: "#a7f3d0",
+  },
   customAlertBtnCancel: {
-    backgroundColor: "#f1f5f9",
+    backgroundColor: "#f8fafc",
+    borderWidth: 1,
+    borderColor: "#e2e8f0",
   },
   customAlertBtnDestructive: {
     backgroundColor: "#fef2f2",
@@ -4824,14 +5129,17 @@ const styles = StyleSheet.create({
   },
   customAlertBtnText: {
     fontSize: 15,
-    fontWeight: "600",
+    fontWeight: "700",
     textAlign: "center",
   },
   customAlertBtnTextPrimary: {
     color: "#ffffff",
   },
+  customAlertBtnTextSecondary: {
+    color: "#065f46",
+  },
   customAlertBtnTextCancel: {
-    color: "#475569",
+    color: "#64748b",
   },
   customAlertBtnTextDestructive: {
     color: "#dc2626",

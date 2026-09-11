@@ -1,4 +1,16 @@
-import { io } from "socket.io-client";
+// Safe import for React Native Metro bundler
+let io: any;
+try {
+  const socketModule = require("socket.io-client");
+  io = typeof socketModule === "function" ? socketModule : socketModule?.io || socketModule?.default || socketModule;
+} catch {
+  try {
+    const socketDist = require("socket.io-client/dist/socket.io.js");
+    io = typeof socketDist === "function" ? socketDist : socketDist?.io || socketDist;
+  } catch {
+    io = () => ({ on: () => {}, connect: () => {}, disconnect: () => {}, removeAllListeners: () => {} });
+  }
+}
 
 export type SocketEventHandler = (data: { code: string; message: string }) => void;
 
