@@ -26,7 +26,7 @@ import { File } from "expo-file-system";
 import { SafeAreaView } from "react-native-safe-area-context";
 import { useRouter } from "expo-router";
 import { Ionicons } from "@expo/vector-icons";
-import { Pin } from "lucide-react-native";
+import Svg, { Path } from "react-native-svg";
 import { useSession } from "../../src/auth/SessionProvider";
 import { blog, kanbanMedia } from "../../src/api/services";
 import { isBlogEditorUser } from "../../../src/utils/permissionUtils";
@@ -38,6 +38,25 @@ import {
 } from "../../../src/services/blogService";
 
 const CATEGORY_TAGS = ["Thông báo", "Tin tức", "Sự kiện", "Quy trình", "Chuyên môn", "Vinh danh"];
+
+function PinIcon({ size = 15, color = "#92400e", style }: { size?: number; color?: string; style?: any }) {
+  return (
+    <Svg
+      width={size}
+      height={size}
+      viewBox="0 0 24 24"
+      fill="none"
+      stroke={color}
+      strokeWidth={2}
+      strokeLinecap="round"
+      strokeLinejoin="round"
+      style={style}
+    >
+      <Path d="M12 17v5" />
+      <Path d="M9 10.76a2 2 0 0 1-1.11 1.79l-1.78.9A2 2 0 0 0 5 15.24V16a1 1 0 0 0 1 1h12a1 1 0 0 0 1-1v-.76a2 2 0 0 0-1.11-1.79l-1.78-.9A2 2 0 0 1 15 10.76V7a1 1 0 0 1 1-1 2 2 0 0 0 0-4H8a2 2 0 0 0 0 4 1 1 0 0 1 1 1z" />
+    </Svg>
+  );
+}
 
 export default function BlogScreen() {
   const router = useRouter();
@@ -620,7 +639,7 @@ export default function BlogScreen() {
             }}
           >
             <View style={styles.pinnedLeft}>
-              <Pin size={15} color="#92400e" style={styles.pinnedIcon} />
+              <PinIcon size={15} color="#92400e" style={styles.pinnedIcon} />
               <Text style={styles.pinnedText} numberOfLines={1}>
                 <Text style={{ fontWeight: "800", color: "#92400e" }}>
                   Tin ghim {pinnedPosts.length > 0 ? `(${pinnedPosts.length}): ` : ": "}
@@ -699,7 +718,7 @@ export default function BlogScreen() {
                         </View>
                         {post.isPinned && (
                           <View style={styles.pinnedBadgeRow}>
-                            <Pin size={11} color="#92400e" />
+                            <PinIcon size={11} color="#92400e" />
                             <Text style={styles.pinnedBadgeText}>Tin ghim</Text>
                           </View>
                         )}
@@ -888,11 +907,11 @@ export default function BlogScreen() {
                 onPress={() => setShowTitleInput(!showTitleInput)}
               >
                 <Ionicons
-                  name={showTitleInput ? "checkmark-circle" : "add-circle"}
+                  name={showTitleInput ? "checkmark-circle" : "add-circle-outline"}
                   size={15}
                   color="#000000"
                 />
-                <Text style={[styles.lightToolBtnText, showTitleInput && { color: "#008852", fontWeight: "700" }]}>
+                <Text style={styles.lightToolBtnText}>
                   {showTitleInput ? "Đã mở tiêu đề" : "Thêm tiêu đề"}
                 </Text>
               </Pressable>
@@ -1070,7 +1089,7 @@ export default function BlogScreen() {
             <Pressable style={styles.pinnedModalCard} onPress={(e) => e.stopPropagation()}>
               <View style={styles.pinnedModalHeader}>
                 <View style={{ flexDirection: "row", alignItems: "center", gap: 6 }}>
-                  <Pin size={18} color="#92400e" />
+                  <PinIcon size={18} color="#92400e" />
                   <Text style={styles.pinnedModalTitle}>
                     Danh sách tin ghim ({pinnedPosts.length})
                   </Text>
@@ -1599,8 +1618,8 @@ const styles = StyleSheet.create({
     borderRadius: 18,
     padding: 14,
     marginBottom: 12,
-    borderWidth: 1,
-    borderColor: "#a7f3d0",
+    borderWidth: 1.5,
+    borderColor: "#059669", // Tô màu viền xanh ngọc bắt mắt
     shadowColor: "#059669",
     shadowOffset: { width: 0, height: 2 },
     shadowOpacity: 0.08,
@@ -1814,8 +1833,8 @@ const styles = StyleSheet.create({
     paddingTop: 8,
     paddingBottom: 10,
     borderRadius: 18,
-    borderWidth: 1,
-    borderColor: "#a7f3d0",
+    borderWidth: 1.5,
+    borderColor: "#059669", // Tô màu viền bắt mắt
     shadowColor: "#059669",
     shadowOffset: { width: 0, height: 2 },
     shadowOpacity: 0.08,
@@ -1832,20 +1851,20 @@ const styles = StyleSheet.create({
     flexDirection: "row",
     alignItems: "center",
     gap: 5,
-    backgroundColor: "#f1f5f9",
+    backgroundColor: "transparent", // Không tô nền
     paddingHorizontal: 10,
     paddingVertical: 6,
     borderRadius: 8,
-    borderWidth: 1,
-    borderColor: "#e2e8f0",
+    borderWidth: 1.5,
+    borderColor: "#059669", // Chỉ tô màu viền bắt mắt
   },
   lightToolBtnActive: {
-    backgroundColor: "#ecfdf5",
-    borderColor: "#a7f3d0",
+    backgroundColor: "transparent",
+    borderColor: "#047857",
   },
   lightToolBtnText: {
     fontSize: 12,
-    color: "#334155",
+    color: "#0f172a", // Chữ đen, không tô màu
     fontFamily: "Inter-Medium",
   },
   lightTopicDivider: {
@@ -1865,24 +1884,24 @@ const styles = StyleSheet.create({
     fontFamily: "Inter-Medium",
   },
   lightTagPill: {
-    backgroundColor: "#f1f5f9",
+    backgroundColor: "transparent",
     paddingHorizontal: 8,
     paddingVertical: 4,
     borderRadius: 6,
-    borderWidth: 1,
-    borderColor: "#e2e8f0",
+    borderWidth: 1.5,
+    borderColor: "#cbd5e1",
   },
   lightTagPillActive: {
-    backgroundColor: "#008852",
-    borderColor: "#008852",
+    backgroundColor: "transparent",
+    borderColor: "#059669",
   },
   lightTagPillText: {
     fontSize: 11.5,
-    color: "#64748b",
+    color: "#0f172a",
     fontFamily: "Inter-Medium",
   },
   lightTagPillTextActive: {
-    color: "#ffffff",
+    color: "#0f172a",
     fontWeight: "700",
     fontFamily: "Inter-Bold",
   },
@@ -1890,23 +1909,23 @@ const styles = StyleSheet.create({
     marginBottom: 8,
   },
   lightTitleInput: {
-    backgroundColor: "#f8fafc",
+    backgroundColor: "transparent", // Không tô nền
     borderRadius: 8,
-    borderWidth: 1,
-    borderColor: "#cbd5e1",
+    borderWidth: 1.5,
+    borderColor: "#059669", // Chỉ tô màu viền bắt mắt
     paddingHorizontal: 12,
     paddingVertical: 7,
     fontSize: 13,
-    color: "#0f172a",
+    color: "#0f172a", // Chữ đen
     fontFamily: "Inter-Medium",
   },
   lightInputRow: {
     flexDirection: "row",
     alignItems: "center",
-    backgroundColor: "#f8fafc",
+    backgroundColor: "transparent", // Không tô nền
     borderRadius: 12,
-    borderWidth: 1,
-    borderColor: "#cbd5e1",
+    borderWidth: 1.5,
+    borderColor: "#059669", // Chỉ tô màu viền bắt mắt
     paddingHorizontal: 12,
     paddingVertical: 4,
     gap: 8,
