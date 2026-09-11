@@ -12,6 +12,7 @@ import { canUseModule } from "../../auth/access";
 import type { BlogPost } from "../../../../src/services/blogService";
 import { countBlogUnread, mergeBlogSeen } from "./communicationState";
 import { RealtimeNotificationToast } from "./RealtimeNotificationToast";
+import { playNotificationSound } from "./notificationSound";
 export { communicationBadge } from "./communicationState";
 
 type State = { blogUnread: number; chatUnread: number; blogRevision: number; chatRevision: number;
@@ -110,7 +111,10 @@ export function CommunicationProvider({ children }: React.PropsWithChildren) {
       if (delivered.current.has(id)) return;
       delivered.current.add(id);
       if (delivered.current.size > 200) delivered.current.delete(delivered.current.values().next().value!);
-      if (AppState.currentState === "active") setBanner({ scope, title, body, roomId });
+      if (AppState.currentState === "active") {
+        setBanner({ scope, title, body, roomId });
+        playNotificationSound();
+      }
     };
     const removers = [socketService.subscribe("internal_new_message", event => {
       if (!canUseModule(user, "chat")) return;

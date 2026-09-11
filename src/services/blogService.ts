@@ -12,7 +12,7 @@ export interface BlogChannel {
 
 export interface BlogAttachment {
   id: string;
-  type: "file" | "image" | "milestone";
+  type: "file" | "image" | "video" | "milestone";
   name: string;
   size?: string;
   url?: string;
@@ -128,16 +128,22 @@ export function createBlogService({ fetch, getAccessToken }: ServiceTransport) {
         ? rawAttachments.map((att: any, idx: number) => {
             const rawUrl = att.url || att.uri || att.path || "";
             const rawName = att.name || att.filename || "";
+            const isVideo =
+              att.type === "video" ||
+              att.type?.startsWith("video/") ||
+              rawName.match(/\.(mp4|mov|avi|mkv|webm|m4v|3gp)$/i) ||
+              rawUrl.match(/\.(mp4|mov|avi|mkv|webm|m4v|3gp)($|\?[^\s]*)/i);
             const isImg =
+              !isVideo && (
               att.type === "image" ||
               att.type?.startsWith("image/") ||
               rawName.match(/\.(jpeg|jpg|gif|png|webp|bmp|svg)$/i) ||
               rawUrl.match(/\.(jpeg|jpg|gif|png|webp|bmp|svg)($|\?[^\s]*)/i) ||
-              rawUrl.includes("/image/upload/");
+              rawUrl.includes("/image/upload/"));
 
             return {
               id: String(att._id || att.id || `att-${idx}`),
-              type: (isImg ? "image" : "file") as "image" | "file",
+              type: (isVideo ? "video" : isImg ? "image" : "file") as "image" | "video" | "file",
               name: rawName || (isImg ? "Hình ảnh đính kèm.jpg" : "Tài liệu đính kèm.pdf"),
               size: typeof att.size === "number" ? `${(att.size / 1024).toFixed(1)} KB` : att.size || "",
               url: rawUrl,
