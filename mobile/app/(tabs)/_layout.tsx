@@ -1,9 +1,12 @@
 import React, { useEffect, useRef } from "react";
-import { Animated, Platform, Pressable, StyleSheet, View } from "react-native";
+import { Animated, Platform, Pressable, StyleSheet, Text, View } from "react-native";
 import { Redirect, Tabs } from "expo-router";
 import { useSafeAreaInsets } from "react-native-safe-area-context";
 import { Ionicons } from "@expo/vector-icons";
 import { useSession } from "../../src/auth/SessionProvider";
+import { useChatUnread } from "../../src/context/ChatUnreadContext";
+import { useCommunication } from "../../src/features/notifications/CommunicationProvider";
+import { useNotifications } from "../../src/features/notifications/NotificationProvider";
 import { colors } from "../../src/ui";
 import { canUseModule } from "../../src/auth/access";
 import { isBlogEditorUser } from "../../../src/utils/permissionUtils";
@@ -12,9 +15,10 @@ interface MomoTabIconProps {
   name: keyof typeof Ionicons.glyphMap;
   outlineName: keyof typeof Ionicons.glyphMap;
   focused: boolean;
+  badge?: string | number;
 }
 
-function MomoTabIcon({ name, outlineName, focused }: MomoTabIconProps) {
+function MomoTabIcon({ name, outlineName, focused, badge }: MomoTabIconProps) {
   const scale = useRef(new Animated.Value(1)).current;
   const translateY = useRef(new Animated.Value(0)).current;
   const dotScale = useRef(new Animated.Value(focused ? 1 : 0)).current;
@@ -96,6 +100,13 @@ function MomoTabIcon({ name, outlineName, focused }: MomoTabIconProps) {
         />
       </Animated.View>
 
+      {/* Huy hiệu số tin nhắn chưa đọc đỏ nổi bật (chuẩn Zalo/MoMo) */}
+      {Boolean(badge) && (
+        <View style={momoStyles.badge}>
+          <Text style={momoStyles.badgeText}>{badge}</Text>
+        </View>
+      )}
+
       {/* Chấm chỉ báo nhỏ tinh tế bên dưới */}
       <Animated.View
         style={[
@@ -159,7 +170,10 @@ function MomoTabButton(props: any) {
 }
 
 export default function TabLayout() {
+  const { chatUnread, blogUnread } = useCommunication();
+  const { unreadCount, workUnread } = useNotifications();
   const { user, selectedBranch } = useSession();
+  const { totalUnread } = useChatUnread();
   const insets = useSafeAreaInsets();
   if (!user) return <Redirect href="/login" />;
 
@@ -170,6 +184,7 @@ export default function TabLayout() {
   return (
     <Tabs
       key={`${user.uid}:${user.companyCode || ""}:${selectedBranch?._id || "default"}`}
+      backBehavior="history"
       screenOptions={{
         tabBarActiveTintColor: colors.primary,
         tabBarInactiveTintColor: "#94a3b8",
@@ -219,6 +234,7 @@ export default function TabLayout() {
         name="work"
         options={{
           title: "Công việc",
+          tabBarBadge: workUnread > 0 ? (workUnread > 99 ? "99+" : workUnread) : undefined,
           headerShown: false,
           href: isEditor ? null : canUseModule(user, "hr") ? undefined : null,
           tabBarIcon: ({ focused }) => (
@@ -230,10 +246,16 @@ export default function TabLayout() {
         name="chat"
         options={{
           title: "Trò chuyện",
+          tabBarBadge: chatUnread > 0 ? (chatUnread > 99 ? "99+" : chatUnread) : undefined,
           headerShown: false,
           href: isEditor ? null : undefined,
           tabBarIcon: ({ focused }) => (
-            <MomoTabIcon name="chatbubble-ellipses" outlineName="chatbubble-ellipses-outline" focused={focused} />
+            <MomoTabIcon
+              name="chatbubble-ellipses"
+              outlineName="chatbubble-ellipses-outline"
+              focused={focused}
+              badge={totalUnread > 0 ? (totalUnread > 99 ? "99+" : totalUnread) : undefined}
+            />
           ),
         }}
       />
@@ -241,7 +263,8 @@ export default function TabLayout() {
         name="notifications"
         options={{
           title: "Thông báo",
-          headerShown: true,
+          tabBarBadge: unreadCount > 0 ? (unreadCount > 99 ? "99+" : unreadCount) : undefined,
+          headerShown: false,
           href: isEditor ? null : undefined,
           tabBarIcon: ({ focused }) => (
             <MomoTabIcon name="notifications" outlineName="notifications-outline" focused={focused} />
@@ -252,7 +275,7 @@ export default function TabLayout() {
         name="profile"
         options={{
           title: "Tài khoản",
-          headerShown: true,
+          headerShown: false,
           href: isEditor ? null : undefined,
           tabBarIcon: ({ focused }) => (
             <MomoTabIcon name="person" outlineName="person-outline" focused={focused} />
@@ -285,10 +308,14 @@ export default function TabLayout() {
       <Tabs.Screen name="interviews" options={{ title: "Phỏng vấn", href: null }} />
       <Tabs.Screen name="calendar-events" options={{ title: "Lịch làm việc", href: null }} />
       <Tabs.Screen name="attendance-management" options={{ title: "Quản lý công", href: null }} />
+      <Tabs.Screen name="attendance-history" options={{ title: "Lịch sử chấm công", href: null }} />
       <Tabs.Screen name="kpi" options={{ title: "KPI tháng", href: null }} />
       <Tabs.Screen name="org-chart" options={{ title: "Sơ đồ tổ chức", href: null }} />
-      <Tabs.Screen name="blog" options={{ title: "Blog nội bộ & Thảo luận", href: isEditor ? undefined : null }} />
+      <Tabs.Screen name="blog" options={{ title: "Blog nội bộ & Thảo luận", href: isEditor ? undefined : null,
+        tabBarBadge: blogUnread > 0 ? (blogUnread > 99 ? "99+" : blogUnread) : undefined }} />
       <Tabs.Screen name="training" options={{ title: "Đào tạo", href: null }} />
+      <Tabs.Screen name="celebration-email" options={{ title: "Email chúc mừng", href: null }} />
+      <Tabs.Screen name="knowledge" options={{ title: "Kho tri thức & SOP", href: null }} />
     </Tabs>
   );
 }
@@ -300,6 +327,28 @@ const momoStyles = StyleSheet.create({
     alignItems: "center",
     justifyContent: "center",
   },
+  badge: {
+    position: "absolute",
+    top: -4,
+    right: 0,
+    backgroundColor: "#ef4444",
+    borderRadius: 9,
+    minWidth: 17,
+    height: 17,
+    paddingHorizontal: 4,
+    alignItems: "center",
+    justifyContent: "center",
+    borderWidth: 1.5,
+    borderColor: "#ffffff",
+    zIndex: 10,
+  },
+  badgeText: {
+    color: "#ffffff",
+    fontSize: 9.5,
+    fontWeight: "800",
+    textAlign: "center",
+    lineHeight: 12,
+  },
   accentDot: {
     position: "absolute",
     bottom: -3,
@@ -309,4 +358,3 @@ const momoStyles = StyleSheet.create({
     backgroundColor: "#059669",
   },
 });
-

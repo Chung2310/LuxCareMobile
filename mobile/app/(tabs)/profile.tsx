@@ -62,19 +62,17 @@ export default function Profile() {
 
   return (
     <SafeAreaView edges={["top"]} style={styles.container}>
-      {/* Header Bar */}
-      <View style={styles.headerRow}>
-        <View>
-          <Text style={styles.pageTitle}>Tài khoản</Text>
-          <Text style={styles.pageSubtitle}>Hồ sơ cá nhân & cài đặt hệ thống</Text>
-        </View>
-      </View>
-
       <ScrollView
         style={styles.scrollView}
         contentContainerStyle={styles.scrollContent}
         showsVerticalScrollIndicator={false}
       >
+        {/* Header Bar */}
+        <View style={styles.headerRow}>
+          <Text style={styles.pageTitle}>Tài khoản</Text>
+          <Text style={styles.pageSubtitle}>Hồ sơ cá nhân & cài đặt hệ thống</Text>
+        </View>
+
         {!!error && (
           <View style={styles.errorBanner}>
             <Text style={styles.errorBannerText}>⚠️ {error}</Text>
@@ -204,19 +202,6 @@ export default function Profile() {
               <Text style={styles.arrowIcon}>›</Text>
             </Pressable>
 
-            {/* App Version Info */}
-            <View style={styles.actionRow}>
-              <View style={[styles.actionIconBox, { backgroundColor: "#f1f5f9" }]}>
-                <Text style={styles.actionIcon}>ℹ️</Text>
-              </View>
-              <View style={{ flex: 1 }}>
-                <Text style={styles.actionTitle}>Phiên bản ứng dụng</Text>
-                <Text style={styles.actionSub}>LuxCare Mobile v1.0.0 (Expo React Native)</Text>
-              </View>
-              <View style={styles.versionBadge}>
-                <Text style={styles.versionBadgeText}>MỚI NHẤT</Text>
-              </View>
-            </View>
           </View>
         </View>
 
@@ -271,12 +256,11 @@ const styles = StyleSheet.create({
     backgroundColor: "#f8fafc",
   },
   headerRow: {
-    paddingHorizontal: 16,
-    paddingTop: 14,
-    paddingBottom: 8,
+    paddingTop: 8,
+    paddingBottom: 2,
   },
   pageTitle: {
-    fontSize: 22,
+    fontSize: 24,
     fontWeight: "800",
     color: "#0f172a",
     letterSpacing: -0.3,
@@ -292,7 +276,7 @@ const styles = StyleSheet.create({
   },
   scrollContent: {
     paddingHorizontal: 16,
-    paddingTop: 10,
+    paddingTop: 6,
     paddingBottom: 70,
     gap: 14,
   },

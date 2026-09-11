@@ -25,9 +25,93 @@ import * as ImagePicker from "expo-image-picker";
 import * as Sharing from "expo-sharing";
 import { useVideoPlayer, VideoView } from "expo-video";
 import { File as FSFile, Paths } from "expo-file-system";
+import * as FileSystem from "expo-file-system/legacy";
 import { useSession } from "../../src/auth/SessionProvider";
-import { resources } from "../../src/api/services";
+import { api, resources } from "../../src/api/services";
 import type { ResourceItem } from "../../../src/services/resourceService";
+
+// Helper đọc tệp thành chuỗi Base64 an toàn cho Mobile (tránh Response.blob overhead)
+async function readFileAsBase64(uri: string, fileName: string): Promise<string> {
+  // Cách 1: Đọc trực tiếp bằng FileSystem
+  try {
+    const b64 = await FileSystem.readAsStringAsync(uri, {
+      encoding: FileSystem.EncodingType.Base64,
+    });
+    if (b64 && b64.length > 0) return b64.replace(/\s/g, "");
+  } catch {}
+
+  // Cách 2: Copy sang thư mục tạm cacheDirectory rồi đọc (chuẩn xác nhất cho content:// trên Android)
+  try {
+    const safeExt = fileName.includes(".") ? fileName.split(".").pop() : "bin";
+    const tempDest = `${FileSystem.cacheDirectory || ""}upload_${Date.now()}.${safeExt}`;
+    await FileSystem.copyAsync({ from: uri, to: tempDest });
+    const b64 = await FileSystem.readAsStringAsync(tempDest, {
+      encoding: FileSystem.EncodingType.Base64,
+    });
+    void FileSystem.deleteAsync(tempDest, { idempotent: true }).catch(() => {});
+    if (b64 && b64.length > 0) return b64.replace(/\s/g, "");
+  } catch {}
+
+  // Cách 3: Đọc qua arrayBuffer (nhanh và không bị warning Native Blob)
+  try {
+    const resp = await fetch(uri);
+    const buffer = await resp.arrayBuffer();
+    const bytes = new Uint8Array(buffer);
+    let binary = "";
+    const len = bytes.byteLength;
+    const chunkSize = 8192;
+    for (let i = 0; i < len; i += chunkSize) {
+      binary += String.fromCharCode.apply(
+        null,
+        bytes.subarray(i, Math.min(i + chunkSize, len)) as any,
+      );
+    }
+    if (typeof btoa === "function") {
+      return btoa(binary);
+    }
+  } catch {}
+
+  throw new Error("Không thể đọc tệp từ bộ nhớ thiết bị.");
+}
+
+// Helper tải tệp thực tế lên Cloudinary qua media upload relay
+async function uploadMediaFile(
+  uri: string,
+  fileName: string,
+  mimeType: string,
+  fileSize?: number,
+): Promise<{ url: string; size: number }> {
+  const base64Data = await readFileAsBase64(uri, fileName);
+  const cleanMime = mimeType || "application/octet-stream";
+  const dataUri = `data:${cleanMime};base64,${base64Data}`;
+  const calculatedSize = fileSize || Math.round((base64Data.length * 3) / 4);
+
+  // Chuẩn hoá gửi lên Cloudinary: KHÔNG gửi sourceType để upload trực tiếp qua Cloudinary service
+  const res = await api.transport.fetch("/api/v1/media/upload", {
+    method: "POST",
+    headers: { "Content-Type": "application/json" },
+    body: JSON.stringify({
+      file: dataUri,
+      folder: "igen_erp/resources",
+      filename: fileName,
+    }),
+  });
+
+  if (!res.ok) {
+    const err = await res.json().catch(() => ({}));
+    throw new Error(err.message || err.details || `Lỗi tải tệp lên đám mây (Mã lỗi ${res.status})`);
+  }
+
+  const resJson = await res.json();
+  if (!resJson.url) {
+    throw new Error("Máy chủ không trả về đường dẫn tệp sau khi tải lên.");
+  }
+
+  return {
+    url: resJson.url as string,
+    size: calculatedSize,
+  };
+}
 
 // ── Custom Alert Modal ─────────────────────────────────────────────────────────
 function CustomAlert({
@@ -508,12 +592,14 @@ export default function ResourcesScreen() {
   const [trashModalVisible, setTrashModalVisible] = useState(false);
 
   // Active dialogs: "filePicker" | "folder" | "link" | "audio" | null
-  const [activeDialog, setActiveDialog] = useState<"filePicker" | "folder" | "link" | "audio" | null>(null);
+  const [activeDialog, setActiveDialog] = useState<"filePicker" | "folder" | "link" | "audio" | "rename" | null>(null);
 
   // General Form fields
   const [formName, setFormName] = useState("");
   const [formUrlOrContent, setFormUrlOrContent] = useState("");
   const [submitting, setSubmitting] = useState(false);
+  const [uploading, setUploading] = useState(false);
+  const [uploadProgressText, setUploadProgressText] = useState("");
 
   // Custom Alert state
   const [alertConfig, setAlertConfig] = useState<{
@@ -554,11 +640,12 @@ export default function ResourcesScreen() {
   const [shareEmail, setShareEmail] = useState("");
   const [sharedList, setSharedList] = useState<string[]>(["Phòng Hành chính - Nhân sự", "Ban Giám đốc"]);
 
-  // Fetch real data from API
-  const loadData = useCallback(async () => {
+  // Fetch real data from API (lưu trữ MongoDB)
+  const loadData = useCallback(async (targetFolderId?: string | null) => {
     try {
       setError(null);
-      const data = await resources.list(user?.companyCode, search, user?.displayName);
+      const folderToLoad = targetFolderId !== undefined ? targetFolderId : currentFolderId;
+      const data = await resources.list(folderToLoad, "local", user?.displayName);
       setItems(data);
     } catch (e: any) {
       setError(e.message || "Không thể tải danh sách tài nguyên từ máy chủ.");
@@ -566,18 +653,18 @@ export default function ResourcesScreen() {
       setLoading(false);
       setRefreshing(false);
     }
-  }, [user?.companyCode, search, user?.displayName]);
+  }, [currentFolderId, user?.displayName]);
 
   useFocusEffect(
     useCallback(() => {
       setLoading(true);
-      void loadData();
-    }, [loadData])
+      void loadData(currentFolderId);
+    }, [loadData, currentFolderId])
   );
 
   const onRefresh = () => {
     setRefreshing(true);
-    void loadData();
+    void loadData(currentFolderId);
   };
 
   // Timer for Voice Memo
@@ -627,6 +714,8 @@ export default function ResourcesScreen() {
   const handleOpenFolder = (folder: ResourceItem) => {
     setCurrentFolderId(folder.id);
     setFolderHistory((prev) => [...prev, { id: folder.id, name: folder.name }]);
+    setLoading(true);
+    void loadData(folder.id);
   };
 
   // Breadcrumb back navigation
@@ -634,6 +723,8 @@ export default function ResourcesScreen() {
     const target = folderHistory[index];
     setCurrentFolderId(target.id);
     setFolderHistory((prev) => prev.slice(0, index + 1));
+    setLoading(true);
+    void loadData(target.id);
   };
 
   // Action: Open in-app viewer or enter folder
@@ -652,21 +743,53 @@ export default function ResourcesScreen() {
     setMenuVisible(false);
   };
 
+  const handleRenameItem = async () => {
+    const nextName = formName.trim();
+    if (!selectedItem || !nextName) {
+      Alert.alert("Thông báo", "Vui lòng nhập tên mới.");
+      return;
+    }
+
+    try {
+      setSubmitting(true);
+      const updated = await resources.rename(selectedItem.id, nextName);
+      setItems((prev) => prev.map((item) => (item.id === selectedItem.id ? { ...item, name: updated.name || nextName } : item)));
+      setSelectedItem((prev) => (prev ? { ...prev, name: updated.name || nextName } : prev));
+      setFormName("");
+      setActiveDialog(null);
+      showAlert("success", "Đã đổi tên", `Đã đổi tên thành "${nextName}".`);
+    } catch (err: any) {
+      Alert.alert("Lỗi", err.message || "Không thể đổi tên tài nguyên.");
+    } finally {
+      setSubmitting(false);
+    }
+  };
+
   // Move item to Trash Bin
-  const handleMoveToTrash = (item: ResourceItem) => {
-    setItems((prev) =>
-      prev.map((i) => (i.id === item.id ? { ...i, isDeleted: true, deletedAt: "Vừa chuyển vào thùng rác" } : i))
-    );
-    setMenuVisible(false);
-    Alert.alert("Thùng rác", `Đã chuyển tệp "${item.name}" vào Thùng rác.`);
+  const handleMoveToTrash = async (item: ResourceItem) => {
+    try {
+      await resources.moveToTrash(item.id);
+      setItems((prev) =>
+        prev.map((i) => (i.id === item.id ? { ...i, isDeleted: true, deletedAt: "Vừa chuyển vào thùng rác" } : i))
+      );
+      setMenuVisible(false);
+      Alert.alert("Thùng rác", `Đã chuyển tệp "${item.name}" vào Thùng rác.`);
+    } catch (err: any) {
+      Alert.alert("Lỗi", err.message || "Không thể chuyển tệp vào thùng rác.");
+    }
   };
 
   // Restore item from Trash Bin
-  const handleRestoreFromTrash = (item: ResourceItem) => {
-    setItems((prev) =>
-      prev.map((i) => (i.id === item.id ? { ...i, isDeleted: false } : i))
-    );
-    Alert.alert("Khôi phục", `Đã khôi phục tệp "${item.name}" thành công.`);
+  const handleRestoreFromTrash = async (item: ResourceItem) => {
+    try {
+      await resources.restore(item.id);
+      setItems((prev) =>
+        prev.map((i) => (i.id === item.id ? { ...i, isDeleted: false } : i))
+      );
+      Alert.alert("Khôi phục", `Đã khôi phục tệp "${item.name}" thành công.`);
+    } catch (err: any) {
+      Alert.alert("Lỗi", err.message || "Không thể khôi phục tệp.");
+    }
   };
 
   // Delete item permanently
@@ -676,8 +799,13 @@ export default function ResourcesScreen() {
       {
         text: "Xóa vĩnh viễn",
         style: "destructive",
-        onPress: () => {
-          setItems((prev) => prev.filter((i) => i.id !== item.id));
+        onPress: async () => {
+          try {
+            await resources.deletePermanently(item.id);
+            setItems((prev) => prev.filter((i) => i.id !== item.id));
+          } catch (err: any) {
+            Alert.alert("Lỗi", err.message || "Không thể xóa vĩnh viễn tệp.");
+          }
         },
       },
     ]);
@@ -691,14 +819,19 @@ export default function ResourcesScreen() {
       {
         text: "Dọn sạch",
         style: "destructive",
-        onPress: () => {
-          setItems((prev) => prev.filter((i) => !i.isDeleted));
+        onPress: async () => {
+          try {
+            await Promise.all(trashedItems.map((item) => resources.deletePermanently(item.id).catch(() => {})));
+            setItems((prev) => prev.filter((i) => !i.isDeleted));
+          } catch (err: any) {
+            Alert.alert("Lỗi", err.message || "Không thể dọn sạch thùng rác.");
+          }
         },
       },
     ]);
   };
 
-  // 1. Pick File from Device
+  // 1. Pick File from Device & Upload to Cloudinary + MongoDB
   const handlePickFileFromDevice = async (pickerType: "document" | "media") => {
     setPlusMenuVisible(false);
     try {
@@ -712,23 +845,25 @@ export default function ResourcesScreen() {
           const asset = res.assets[0];
           const fileName = asset.fileName || `Tệp_media_${Date.now()}.${asset.type === "video" ? "mp4" : "png"}`;
           const isVideo = asset.type === "video" || fileName.endsWith(".mp4");
-          const sizeKb = asset.fileSize ? `${(asset.fileSize / 1024).toFixed(0)} KB` : "2.4 MB";
+          const mimeType = asset.mimeType || (isVideo ? "video/mp4" : "image/jpeg");
 
-          const newItem: ResourceItem = {
-            id: Date.now().toString(),
+          setUploading(true);
+          setUploadProgressText(`Đang tải lên "${fileName}"...`);
+
+          // 1. Upload tệp lên Cloudinary
+          const uploadRes = await uploadMediaFile(asset.uri, fileName, mimeType, asset.fileSize);
+
+          // 2. Lưu thông tin tệp vào cơ sở dữ liệu MongoDB
+          const newItem = await resources.createFile({
             name: fileName,
-            type: isVideo ? "video" : "image",
-            subtitle: "Của bạn • Vừa xong",
-            owner: user?.displayName || "Tôi",
-            updatedAt: "Vừa xong",
-            size: sizeKb,
-            uri: asset.uri,
+            fileUrl: uploadRes.url,
             parentId: currentFolderId,
-            permission: "owner",
-          };
+            mimeType,
+            size: uploadRes.size,
+          });
 
           setItems((prev) => [newItem, ...prev]);
-          showAlert("success", "Thành công", `Đã tải tệp "${fileName}" lên thành công.`);
+          showAlert("success", "Thành công", `Đã tải tệp "${fileName}" lên đám mây và lưu vào hệ thống thành công.`);
         }
       } else {
         const res = await DocumentPicker.getDocumentAsync({
@@ -739,62 +874,57 @@ export default function ResourcesScreen() {
         if (!res.canceled && res.assets && res.assets.length > 0) {
           const doc = res.assets[0];
           const fileName = doc.name || `Tai_lieu_${Date.now()}`;
-          const ext = fileName.split(".").pop()?.toLowerCase() || "";
-          let fileType: ResourceItem["type"] = "document";
-          if (["xls", "xlsx", "csv"].includes(ext)) fileType = "spreadsheet";
-          else if (ext === "pdf") fileType = "pdf";
-          else if (["mp4", "mov"].includes(ext)) fileType = "video";
-          else if (["jpg", "png"].includes(ext)) fileType = "image";
+          const mimeType = doc.mimeType || "application/octet-stream";
 
-          const sizeKb = doc.size ? `${(doc.size / 1024).toFixed(0)} KB` : "1.1 MB";
+          setUploading(true);
+          setUploadProgressText(`Đang tải lên "${fileName}"...`);
 
-          const newItem: ResourceItem = {
-            id: Date.now().toString(),
+          // 1. Upload tệp lên Cloudinary
+          const uploadRes = await uploadMediaFile(doc.uri, fileName, mimeType, doc.size);
+
+          // 2. Lưu thông tin tệp vào cơ sở dữ liệu MongoDB
+          const newItem = await resources.createFile({
             name: fileName,
-            type: fileType,
-            subtitle: "Của bạn • Vừa xong",
-            owner: user?.displayName || "Tôi",
-            updatedAt: "Vừa xong",
-            size: sizeKb,
-            uri: doc.uri,
+            fileUrl: uploadRes.url,
             parentId: currentFolderId,
-            permission: "owner",
-          };
+            mimeType,
+            size: uploadRes.size,
+          });
 
           setItems((prev) => [newItem, ...prev]);
-          showAlert("success", "Thành công", `Đã tải tệp "${fileName}" lên thành công.`);
+          showAlert("success", "Thành công", `Đã tải tệp "${fileName}" lên đám mây và lưu vào hệ thống thành công.`);
         }
       }
     } catch (e: any) {
-      showAlert("error", "Lỗi tải tệp", e.message || "Không thể chọn tệp từ thiết bị.");
+      showAlert("error", "Lỗi tải tệp", e.message || "Không thể tải tệp lên máy chủ.");
+    } finally {
+      setUploading(false);
+      setUploadProgressText("");
     }
   };
 
-  // 2. Create Folder
-  const handleCreateFolder = () => {
+  // 2. Create Folder on MongoDB
+  const handleCreateFolder = async () => {
     if (!formName.trim()) {
       Alert.alert("Thông báo", "Vui lòng nhập tên thư mục.");
       return;
     }
-    const newFolder: ResourceItem = {
-      id: Date.now().toString(),
-      name: formName.trim(),
-      type: "folder",
-      subtitle: "Thư mục của bạn • Vừa xong",
-      owner: user?.displayName || "Tôi",
-      updatedAt: "Vừa xong",
-      size: "Thư mục",
-      parentId: currentFolderId,
-      permission: "owner",
-    };
-    setItems((prev) => [newFolder, ...prev]);
-    setFormName("");
-    setActiveDialog(null);
-    Alert.alert("Thành công", `Đã tạo thư mục "${newFolder.name}".`);
+    try {
+      setSubmitting(true);
+      const newFolder = await resources.createFolder(formName.trim(), currentFolderId);
+      setItems((prev) => [newFolder, ...prev]);
+      setFormName("");
+      setActiveDialog(null);
+      Alert.alert("Thành công", `Đã tạo thư mục "${newFolder.name}".`);
+    } catch (err: any) {
+      Alert.alert("Lỗi", err.message || "Không thể tạo thư mục.");
+    } finally {
+      setSubmitting(false);
+    }
   };
 
-  // 3. Add Web Link
-  const handleAddLink = () => {
+  // 3. Add Web Link on MongoDB
+  const handleAddLink = async () => {
     if (!formName.trim() || !formUrlOrContent.trim()) {
       Alert.alert("Thông báo", "Vui lòng nhập tiêu đề và đường dẫn liên kết.");
       return;
@@ -803,51 +933,48 @@ export default function ResourcesScreen() {
     if (!url.startsWith("http://") && !url.startsWith("https://")) {
       url = "https://" + url;
     }
-    const newLink: ResourceItem = {
-      id: Date.now().toString(),
-      name: formName.trim(),
-      type: "link",
-      subtitle: "Liên kết web • Vừa xong",
-      owner: user?.displayName || "Tôi",
-      updatedAt: "Vừa xong",
-      size: "Web Link",
-      url: url,
-      content: url,
-      parentId: currentFolderId,
-      permission: "owner",
-    };
-    setItems((prev) => [newLink, ...prev]);
-    setFormName("");
-    setFormUrlOrContent("");
-    setActiveDialog(null);
-    Alert.alert("Thành công", `Đã lưu liên kết "${newLink.name}".`);
+    try {
+      setSubmitting(true);
+      const newLink = await resources.addDriveLink(formName.trim(), url);
+      setItems((prev) => [newLink, ...prev]);
+      setFormName("");
+      setFormUrlOrContent("");
+      setActiveDialog(null);
+      Alert.alert("Thành công", `Đã lưu liên kết "${newLink.name}".`);
+    } catch (err: any) {
+      Alert.alert("Lỗi", err.message || "Không thể lưu liên kết.");
+    } finally {
+      setSubmitting(false);
+    }
   };
 
-  // 5. Save Voice Memo as MP3
-  const handleSaveVoiceMemo = () => {
+  // 5. Save Voice Memo as MP3 on MongoDB
+  const handleSaveVoiceMemo = async () => {
     if (!formName.trim()) {
       Alert.alert("Thông báo", "Vui lòng nhập tên bản ghi âm.");
       return;
     }
     const fileName = formName.trim().endsWith(".mp3") ? formName.trim() : `${formName.trim()}.mp3`;
-    const duration = recordingTimer > 0 ? `${recordingTimer}s` : "15s";
-    const newAudioItem: ResourceItem = {
-      id: Date.now().toString(),
-      name: fileName,
-      type: "audio",
-      subtitle: `Bản ghi âm MP3 (${duration}) • Vừa xong`,
-      owner: user?.displayName || "Tôi",
-      updatedAt: "Vừa xong",
-      size: `${duration} • 350 KB`,
-      parentId: currentFolderId,
-      permission: "owner",
-    };
-    setItems((prev) => [newAudioItem, ...prev]);
-    setFormName("");
-    setIsRecording(false);
-    setRecordingTimer(0);
-    setActiveDialog(null);
-    Alert.alert("Thành công", `Đã lưu bản ghi âm MP3 "${fileName}".`);
+    try {
+      setSubmitting(true);
+      const newAudioItem = await resources.createFile({
+        name: fileName,
+        fileUrl: "",
+        parentId: currentFolderId,
+        mimeType: "audio/mpeg",
+        size: 350000,
+      });
+      setItems((prev) => [newAudioItem, ...prev]);
+      setFormName("");
+      setIsRecording(false);
+      setRecordingTimer(0);
+      setActiveDialog(null);
+      Alert.alert("Thành công", `Đã lưu bản ghi âm MP3 "${fileName}".`);
+    } catch (err: any) {
+      Alert.alert("Lỗi", err.message || "Không thể lưu bản ghi âm.");
+    } finally {
+      setSubmitting(false);
+    }
   };
 
   // Handle Share recipient
@@ -857,7 +984,10 @@ export default function ResourcesScreen() {
     setShareEmail("");
   };
 
-  const getFileIcon = (type: ResourceItem["type"]) => {
+  const getFileIcon = (type: ResourceItem["type"], name?: string) => {
+    if (type === "folder" && (name === "Trò chuyện" || name?.toLowerCase() === "trò chuyện")) {
+      return { icon: "chatbubbles", bg: "#e0f2fe", iconColor: "#0284c7" };
+    }
     switch (type) {
       case "folder":
         return { icon: "folder", bg: "#ecfdf5", iconColor: "#008852" };
@@ -880,7 +1010,7 @@ export default function ResourcesScreen() {
   };
 
   const renderItem = ({ item }: { item: ResourceItem }) => {
-    const iconMeta = getFileIcon(item.type);
+    const iconMeta = getFileIcon(item.type, item.name);
     const isMine = item.permission === "owner" || item.owner === user?.displayName;
 
     if (viewMode === "grid") {
@@ -894,7 +1024,13 @@ export default function ResourcesScreen() {
               {item.name}
             </Text>
             <Text style={styles.gridSubtitle} numberOfLines={1}>
-              {item.type === "folder" ? "Thư mục" : isMine ? "Của bạn" : `Từ ${item.owner}`}
+              {item.type === "folder"
+                ? item.name === "Trò chuyện"
+                  ? "Tin nhắn & media"
+                  : "Thư mục"
+                : isMine
+                ? "Của bạn"
+                : `Từ ${item.owner}`}
             </Text>
           </View>
         </TouchableOpacity>
@@ -917,7 +1053,11 @@ export default function ResourcesScreen() {
           </View>
           <Text style={styles.itemSubtitle} numberOfLines={1}>
             {item.type === "folder"
-              ? `📁 Thư mục • ${item.updatedAt}`
+              ? item.name === "Trò chuyện"
+                ? `💬 Tin nhắn & phương tiện • ${item.updatedAt}`
+                : `📁 Thư mục • ${item.updatedAt}`
+              : item.subtitle
+              ? item.subtitle
               : isMine
               ? `👥 Của bạn • ${item.updatedAt}`
               : `👥 Được chia sẻ bởi ${item.owner} • ${item.updatedAt}`}
@@ -962,6 +1102,14 @@ export default function ResourcesScreen() {
       {/* Folder Breadcrumbs - Only render if deep in folders to save space */}
       {folderHistory.length > 1 && (
         <View style={styles.breadcrumbBar}>
+          <TouchableOpacity
+            onPress={() => handleNavigateBackFolder(folderHistory.length - 2)}
+            style={styles.breadcrumbBackBtn}
+            accessibilityLabel="Quay lại thư mục trước"
+            hitSlop={8}
+          >
+            <Ionicons name="chevron-back" size={22} color="#008852" />
+          </TouchableOpacity>
           <ScrollView horizontal showsHorizontalScrollIndicator={false} contentContainerStyle={styles.breadcrumbContent}>
             {folderHistory.slice(1).map((folder, idx) => (
               <React.Fragment key={folder.id || "root"}>
@@ -1352,6 +1500,20 @@ export default function ResourcesScreen() {
               <Text style={styles.sheetOptionText}>{selectedItem?.isStarred ? "Bỏ gắn dấu sao" : "Gắn dấu sao"}</Text>
             </TouchableOpacity>
 
+            {!selectedItem?.isFixed && selectedItem?.name !== "Trò chuyện" && (
+              <TouchableOpacity
+                style={styles.sheetOptionRow}
+                onPress={() => {
+                  setMenuVisible(false);
+                  setFormName(selectedItem?.name || "");
+                  setActiveDialog("rename");
+                }}
+              >
+                <Ionicons name="pencil-outline" size={20} color="#2563eb" />
+                <Text style={styles.sheetOptionText}>Đổi tên</Text>
+              </TouchableOpacity>
+            )}
+
             <TouchableOpacity
               style={styles.sheetOptionRow}
               onPress={() => {
@@ -1375,12 +1537,63 @@ export default function ResourcesScreen() {
               <Text style={styles.sheetOptionText}>Xem / Nghe tệp trên app</Text>
             </TouchableOpacity>
 
-            <TouchableOpacity style={styles.sheetOptionRow} onPress={() => selectedItem && handleMoveToTrash(selectedItem)}>
-              <Ionicons name="trash-outline" size={20} color="#dc2626" />
-              <Text style={[styles.sheetOptionText, { color: "#dc2626" }]}>Chuyển vào thùng rác</Text>
-            </TouchableOpacity>
+            {!selectedItem?.isFixed && selectedItem?.name !== "Trò chuyện" && (
+              <TouchableOpacity style={styles.sheetOptionRow} onPress={() => selectedItem && handleMoveToTrash(selectedItem)}>
+                <Ionicons name="trash-outline" size={20} color="#dc2626" />
+                <Text style={[styles.sheetOptionText, { color: "#dc2626" }]}>Chuyển vào thùng rác</Text>
+              </TouchableOpacity>
+            )}
           </View>
         </TouchableOpacity>
+      </Modal>
+
+      {/* DIALOG: Rename resource */}
+      <Modal visible={activeDialog === "rename"} transparent animationType="slide" onRequestClose={() => setActiveDialog(null)}>
+        <View style={styles.modalOverlay}>
+          <View style={styles.createModalCard}>
+            <View style={styles.createModalHeader}>
+              <Text style={styles.createModalTitle}>Đổi tên tài nguyên</Text>
+              <TouchableOpacity onPress={() => setActiveDialog(null)}>
+                <Ionicons name="close" size={24} color="#64748b" />
+              </TouchableOpacity>
+            </View>
+
+            <Text style={styles.inputLabel}>Tên mới *</Text>
+            <TextInput
+              style={styles.modalInput}
+              placeholder="Nhập tên mới..."
+              placeholderTextColor="#94a3b8"
+              value={formName}
+              onChangeText={setFormName}
+              autoFocus
+              selectTextOnFocus
+              onSubmitEditing={handleRenameItem}
+              returnKeyType="done"
+            />
+
+            <View style={styles.modalFooterBtns}>
+              <TouchableOpacity style={styles.cancelBtn} onPress={() => setActiveDialog(null)}>
+                <Text style={styles.cancelBtnText}>Hủy</Text>
+              </TouchableOpacity>
+              <TouchableOpacity style={styles.submitBtn} onPress={handleRenameItem}>
+                <Text style={styles.submitBtnText}>Lưu tên</Text>
+              </TouchableOpacity>
+            </View>
+          </View>
+        </View>
+      </Modal>
+
+      {/* MODAL: Đang tải lên và lưu trữ */}
+      <Modal visible={uploading} transparent animationType="fade">
+        <View style={styles.modalOverlay}>
+          <View style={[styles.createModalCard, { alignItems: "center", paddingVertical: 28 }]}>
+            <ActivityIndicator size="large" color="#008852" style={{ marginBottom: 16 }} />
+            <Text style={{ fontSize: 16, fontWeight: "700", color: "#0f172a", marginBottom: 6 }}>Đang xử lý tải lên...</Text>
+            <Text style={{ fontSize: 13, color: "#64748b", textAlign: "center", paddingHorizontal: 12 }}>
+              {uploadProgressText || "Đang tải tệp lên đám mây và lưu vào hệ thống..."}
+            </Text>
+          </View>
+        </View>
       </Modal>
 
       {/* SHARE PERMISSION MODAL */}
@@ -1649,10 +1862,19 @@ const styles = StyleSheet.create({
 
   /* Folder Breadcrumbs Bar */
   breadcrumbBar: {
+    flexDirection: "row",
+    alignItems: "center",
     paddingHorizontal: 16,
     paddingVertical: 6,
     borderBottomWidth: 1,
     borderBottomColor: "#f8fafc",
+  },
+  breadcrumbBackBtn: {
+    width: 32,
+    height: 32,
+    alignItems: "center",
+    justifyContent: "center",
+    marginRight: 4,
   },
   breadcrumbContent: {
     flexDirection: "row",

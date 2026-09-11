@@ -6,6 +6,9 @@ node_modules/
 # Expo
 .expo/
 dist/
+dist-notifications-check/
+dist-performance-check/
+google-services.json
 web-build/
 expo-env.d.ts
 

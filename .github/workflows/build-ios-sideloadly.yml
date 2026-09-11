@@ -1,0 +1,107 @@
+name: Build iOS IPA for Sideloadly
+
+on:
+  push:
+    branches:
+      - develop
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+concurrency:
+  group: ios-sideloadly-${{ github.ref }}
+  cancel-in-progress: false
+
+jobs:
+  build:
+    runs-on: macos-26
+    timeout-minutes: 90
+    defaults:
+      run:
+        working-directory: mobile
+        shell: bash
+    env:
+      CI: "1"
+      EXPO_NO_TELEMETRY: "1"
+      DEVELOPER_DIR: /Applications/Xcode_26.4.1.app/Contents/Developer
+      EXPO_PUBLIC_API_URL: ${{ vars.EXPO_PUBLIC_API_URL }}
+      LUXCARE_IOS_BUNDLE_IDENTIFIER: ${{ vars.LUXCARE_IOS_BUNDLE_IDENTIFIER }}
+      EXPO_PUBLIC_EAS_PROJECT_ID: ${{ vars.EXPO_PUBLIC_EAS_PROJECT_ID }}
+
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          persist-credentials: false
+
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22
+          cache: npm
+          cache-dependency-path: |
+            package-lock.json
+            mobile/package-lock.json
+
+      - name: Validate public app settings
+        run: |
+          node <<'NODE'
+          const env = process.env;
+          if (!env.EXPO_PUBLIC_API_URL) throw Error("Missing repository variable EXPO_PUBLIC_API_URL");
+          const url = new URL(env.EXPO_PUBLIC_API_URL);
+          if (url.protocol !== "https:" || url.username || url.password ||
+              ["localhost", "127.0.0.1", "[::1]"].includes(url.hostname)) {
+            throw Error("Backend must use HTTPS and be reachable from the iPhone, without URL credentials");
+          }
+          if (!/^[A-Za-z0-9-]+(\.[A-Za-z0-9-]+)+$/.test(env.LUXCARE_IOS_BUNDLE_IDENTIFIER || "")) {
+            throw Error("Set repository variable LUXCARE_IOS_BUNDLE_IDENTIFIER, e.g. com.yourcompany.luxcare");
+          }
+          NODE
+          test -d "$DEVELOPER_DIR"
+          xcodebuild -version
+
+      - name: Install root dependencies
+        working-directory: .
+        run: npm ci
+
+      - name: Install mobile dependencies
+        run: npm ci
+
+      - name: Typecheck
+        run: npm run typecheck
+
+      - name: Unit tests
+        working-directory: .
+        run: npm test
+
+      - name: Generate native iOS project
+        run: npx --no-install expo prebuild --platform ios --no-install
+
+      - name: Install CocoaPods
+        working-directory: mobile/ios
+        run: pod install
+
+      - name: Build and package unsigned device IPA
+        run: bash scripts/build-unsigned-ios.sh
+
+      - name: Upload IPA
+        uses: actions/upload-artifact@v4
+        with:
+          name: LuxCare-ios-sideloadly-${{ github.run_number }}
+          path: ${{ runner.temp }}/luxcare-unsigned-artifacts/LuxCare-unsigned.ipa
+          if-no-files-found: error
+          retention-days: 7
+
+      - name: Upload native build log
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: LuxCare-ios-build-log-${{ github.run_number }}
+          path: ${{ runner.temp }}/luxcare-xcodebuild.log
+          if-no-files-found: ignore
+          retention-days: 7
+
+      - name: Installation note
+        run: |
+          echo '### IPA for Sideloadly' >> "$GITHUB_STEP_SUMMARY"
+          echo 'Download LuxCare-unsigned.ipa from Artifacts and sign/install it with Sideloadly on your computer. Apple credentials are not used by this workflow.' >> "$GITHUB_STEP_SUMMARY"
+          echo 'Release build for physical iPhone (not Simulator); Metro is not required. Remote push is not guaranteed with personal/free signing.' >> "$GITHUB_STEP_SUMMARY"

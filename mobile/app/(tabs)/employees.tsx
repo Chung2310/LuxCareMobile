@@ -16,7 +16,7 @@ import {
   View,
 } from "react-native";
 import { SafeAreaView } from "react-native-safe-area-context";
-import { router, useFocusEffect } from "expo-router";
+import { router, useFocusEffect, useLocalSearchParams } from "expo-router";
 import { Ionicons } from "@expo/vector-icons";
 import type { UserProfile } from "../../../src/types/common";
 import type { EmployeeProfileInput } from "../../../src/services/rosterService";
@@ -72,6 +72,7 @@ function formatSalary(amount?: number | null): string {
 
 export default function Employees() {
   const { user, selectedBranch } = useSession();
+  const params = useLocalSearchParams<{ from?: string }>();
   const allowed = canUseModule(user, "hr") && (hasPermission(user, "hr:read") || hasPermission(user, "user:read"));
   const canManageUsers = hasPermission(user, "user:manage") || user?.role === "admin" || user?.role === "superadmin";
 
@@ -288,6 +289,18 @@ export default function Employees() {
             <View style={styles.headerWrapper}>
               {/* Header bar */}
               <View style={styles.headerBar}>
+                <TouchableOpacity
+                  style={styles.backBtn}
+                  onPress={() => {
+                    if (params.from === "modules") router.replace("/(tabs)/modules");
+                    else if (router.canGoBack()) router.back();
+                    else router.replace("/(tabs)/modules");
+                  }}
+                  activeOpacity={0.7}
+                >
+                  <Ionicons name="arrow-back" size={20} color="#0f172a" />
+                </TouchableOpacity>
+
                 <View style={styles.headerLeft}>
                   <Text style={styles.headerTitle}>Danh bạ nhân sự</Text>
                   <View style={styles.branchRow}>
@@ -1126,6 +1139,17 @@ const styles = StyleSheet.create({
     flexDirection: "row",
     alignItems: "center",
     justifyContent: "space-between",
+  },
+  backBtn: {
+    width: 36,
+    height: 36,
+    borderRadius: 18,
+    backgroundColor: "#ffffff",
+    borderWidth: 1,
+    borderColor: "#e2e8f0",
+    alignItems: "center",
+    justifyContent: "center",
+    marginRight: 10,
   },
   headerLeft: {
     flex: 1,

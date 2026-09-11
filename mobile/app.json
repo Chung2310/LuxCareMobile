@@ -11,6 +11,9 @@
       "supportsTablet": true,
       "infoPlist": {
         "NSPhotoLibraryUsageDescription": "LuxCare cần quyền truy cập thư viện ảnh để đính kèm tệp và tải lên ảnh đại diện.",
+        "NSPhotoLibraryAddUsageDescription": "LuxCare cần quyền lưu ảnh và video vào Thư viện thiết bị.",
+        "UIFileSharingEnabled": true,
+        "LSSupportsOpeningDocumentsInPlace": true,
         "NSCameraUsageDescription": "LuxCare cần quyền truy cập máy ảnh để chụp ảnh chấm công và ảnh đại diện."
       }
     },
@@ -35,6 +38,7 @@
       "favicon": "./assets/favicon.png"
     },
     "plugins": [
+      ["expo-notifications", { "defaultChannel": "default", "color": "#065f46" }],
       "expo-secure-store",
       "expo-router",
       "expo-sharing",
@@ -60,7 +64,15 @@
         }
       ],
       "expo-font",
-      "expo-video"
+      "expo-video",
+      "expo-audio",
+      [
+        "expo-media-library",
+        {
+          "photosPermission": "LuxCare cần quyền truy cập thư viện ảnh để tải lên hoặc lưu ảnh.",
+          "savePhotosPermission": "LuxCare cần quyền lưu ảnh và video vào Thư viện của máy."
+        }
+      ]
     ]
   }
 }

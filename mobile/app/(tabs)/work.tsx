@@ -15,6 +15,7 @@ import {
 } from "react-native";
 import { SafeAreaView } from "react-native-safe-area-context";
 import { router, useFocusEffect } from "expo-router";
+import { Ionicons } from "@expo/vector-icons";
 import type { HRTask, Project } from "../../../src/types/hr";
 import { kanban } from "../../src/api/services";
 import { messageOf, useSession } from "../../src/auth/SessionProvider";
@@ -67,22 +68,22 @@ function formatTaskDueDate(dueDateString: string, isCompleted: boolean) {
 
     if (!isCompleted && diffDays < 0) {
       return {
-        text: `Quá hạn ${Math.abs(diffDays)} ngày (${dateFormatted})`,
+        text: `Quá hạn ${Math.abs(diffDays)} ngày`,
         isOverdue: true,
         isToday: false,
       };
     }
     if (!isCompleted && diffDays === 0) {
       return {
-        text: `Hạn chót hôm nay (${String(due.getHours()).padStart(2, "0")}:${String(due.getMinutes()).padStart(2, "0")})`,
+        text: "Hạn hôm nay",
         isOverdue: false,
         isToday: true,
       };
     }
     if (diffDays === 1) {
-      return { text: `Ngày mai (${dateFormatted})`, isOverdue: false, isToday: false };
+      return { text: "Hạn ngày mai", isOverdue: false, isToday: false };
     }
-    return { text: `Hạn: ${dateFormatted}`, isOverdue: false, isToday: false };
+    return { text: `Hạn ${dateFormatted}`, isOverdue: false, isToday: false };
   } catch {
     return { text: dueDateString, isOverdue: false, isToday: false };
   }
@@ -568,12 +569,19 @@ export default function Work() {
                     dueInfo.isToday && styles.dueBadgeToday,
                   ]}
                 >
+                  <Ionicons
+                    name={dueInfo.isOverdue ? "alert-circle" : dueInfo.isToday ? "time" : "calendar-outline"}
+                    size={12}
+                    color={dueInfo.isOverdue ? "#dc2626" : dueInfo.isToday ? "#d97706" : "#64748b"}
+                  />
                   <Text
                     style={[
                       styles.dueBadgeText,
                       dueInfo.isOverdue && styles.dueBadgeTextOverdue,
                       dueInfo.isToday && styles.dueBadgeTextToday,
                     ]}
+                    numberOfLines={1}
+                    ellipsizeMode="tail"
                   >
                     {dueInfo.text}
                   </Text>
@@ -1310,11 +1318,15 @@ const styles = StyleSheet.create({
     flexDirection: "row",
     alignItems: "center",
     justifyContent: "space-between",
+    flexWrap: "wrap",
+    gap: 6,
   },
   badgesGroup: {
     flexDirection: "row",
     alignItems: "center",
+    flexWrap: "wrap",
     gap: 6,
+    flexShrink: 1,
   },
   statusBadge: {
     paddingHorizontal: 8,
@@ -1345,10 +1357,15 @@ const styles = StyleSheet.create({
     fontWeight: "700",
   },
   dueBadge: {
+    flexDirection: "row",
+    alignItems: "center",
+    gap: 4,
     backgroundColor: "#f1f5f9",
     paddingHorizontal: 8,
     paddingVertical: 3,
     borderRadius: 8,
+    alignSelf: "flex-start",
+    maxWidth: "100%",
   },
   dueBadgeOverdue: {
     backgroundColor: "#fef2f2",

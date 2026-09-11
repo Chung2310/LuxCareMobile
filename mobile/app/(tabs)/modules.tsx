@@ -29,9 +29,11 @@ import {
 import { useSession } from "../../src/auth/SessionProvider";
 import { useAppLoading } from "../../src/context/LoadingContext";
 import { BranchSelector } from "../../src/features/branches/BranchSelector";
+import { useChatUnread } from "../../src/context/ChatUnreadContext";
 
 export default function ModulesScreen() {
   const { user, selectedBranch } = useSession();
+  const { totalUnread: unreadChatCount } = useChatUnread();
   const isOwner = ["admin", "superadmin", "branch_owner"].includes(user?.role || "");
   const { navigateWithLoading } = useAppLoading();
   const [searchQuery, setSearchQuery] = useState("");
@@ -41,8 +43,16 @@ export default function ModulesScreen() {
 
   // Danh sách phân hệ đã lọc theo quyền người dùng
   const accessibleModules = useMemo(() => {
-    return getAccessibleModules(user, LUXCARE_MODULES);
-  }, [user]);
+    const rawModules = getAccessibleModules(user, LUXCARE_MODULES);
+    if (!unreadChatCount) return rawModules;
+    const badgeText = unreadChatCount > 99 ? "99+" : `${unreadChatCount}`;
+    return rawModules.map((mod) => ({
+      ...mod,
+      items: mod.items.map((item) =>
+        item.route === "/(tabs)/chat" ? { ...item, badge: badgeText } : item
+      ),
+    }));
+  }, [user, unreadChatCount]);
 
   // Danh sách phẳng tất cả dịch vụ người dùng có quyền
   const allServicesList = useMemo(() => getAllServicesFlat(accessibleModules, user), [accessibleModules, user]);
@@ -108,7 +118,11 @@ export default function ModulesScreen() {
       );
       return;
     }
-    navigateWithLoading(item.route, {
+    const targetRoute = item.route.includes("?")
+      ? `${item.route}&from=modules`
+      : `${item.route}?from=modules`;
+
+    navigateWithLoading(targetRoute, {
       title: item.title.replace(/\n/g, " "),
       subtitle: `Đang kết nối và nạp dữ liệu ${item.title.replace(/\n/g, " ")}...`,
       icon: item.icon,
@@ -142,7 +156,6 @@ export default function ModulesScreen() {
         contentContainerStyle={styles.scrollContent}
         showsVerticalScrollIndicator={false}
         keyboardShouldPersistTaps="handled"
-        stickyHeaderIndices={!searchQuery.trim() ? [1] : undefined}
       >
         {/* Branch Selector for Business Owners */}
         {isOwner && !searchQuery.trim() && (

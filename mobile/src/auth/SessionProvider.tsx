@@ -1,4 +1,4 @@
-import React, { createContext, useContext, useEffect, useState } from "react";
+import React, { createContext, useContext, useEffect, useRef, useState } from "react";
 import { AppState } from "react-native";
 import { api, configurationError, getMe } from "../api/services";
 import { socketService } from "../api/socketService";
@@ -26,16 +26,31 @@ export function SessionProvider({ children }: React.PropsWithChildren) {
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
   const [selectedBranch, setSelectedBranch] = useState<BranchRecord | null>(null);
+  const operation = useRef(0);
+  const endSession = () => {
+    operation.current++;
+    socketService.disconnect();
+    api.setBranchId(null);
+    setUser(null);
+    setSelectedBranch(null);
+    setError(null);
+    setLoading(false);
+  };
   const retry = async () => {
+    const attempt = ++operation.current;
     setLoading(true);
     setError(null);
     try {
       if (configurationError) throw new Error(configurationError);
-      if (await api.restore()) setUser(await getMe());
+      const restored = await api.restore();
+      if (attempt !== operation.current) return;
+      const profile = restored ? await getMe() : null;
+      if (attempt === operation.current) setUser(profile);
     } catch (error) {
-      setError(messageOf(error));
+      // Expiry already ended the session. Its rejected request must not replace login with an error page.
+      if (attempt === operation.current) setError(messageOf(error));
     } finally {
-      setLoading(false);
+      if (attempt === operation.current) setLoading(false);
     }
   };
   useEffect(() => {
@@ -44,21 +59,20 @@ export function SessionProvider({ children }: React.PropsWithChildren) {
       socketService.configure({
         origin: api.getOrigin(),
         onSessionReplaced: () => {
+          void api.clear().catch(() => {});
           // Another device signed in with the same account.
           // Expire immediately – no need to call the HTTP logout endpoint.
-          setUser(null);
-          setSelectedBranch(null);
+          endSession();
         },
       });
     }
-    api.onSessionExpired = () => {
-      socketService.disconnect();
-      setUser(null);
-      setSelectedBranch(null);
-    };
+    api.onSessionExpired = endSession;
     void retry();
+    api.onAccessTokenChanged = (token) => socketService.connect(token);
     return () => {
+      operation.current++;
       api.onSessionExpired = () => {};
+      api.onAccessTokenChanged = () => {};
       socketService.disconnect();
     };
   }, []);
@@ -77,10 +91,11 @@ export function SessionProvider({ children }: React.PropsWithChildren) {
     if (!user) return;
     let active = true;
     const subscription = AppState.addEventListener("change", (state) => {
-      if (state === "active")
+      if (state === "active") {
+        const attempt = operation.current;
         void getMe()
           .then((profile) => {
-            if (active) {
+            if (active && attempt === operation.current) {
               const isOwnerRole = ["admin", "superadmin", "branch_owner"].includes(profile.role || "");
               if (!isOwnerRole || profile.companyCode !== user.companyCode) {
                 api.setBranchId(null);
@@ -90,6 +105,7 @@ export function SessionProvider({ children }: React.PropsWithChildren) {
             }
           })
           .catch(() => {});
+      }
     });
     return () => {
       active = false;
@@ -117,27 +133,30 @@ export function SessionProvider({ children }: React.PropsWithChildren) {
           setSelectedBranch(branch);
         },
         login: async (email, password) => {
+          const attempt = ++operation.current;
           await api.login(email.trim(), password);
+          if (attempt !== operation.current) return;
           setSelectedBranch(null);
           try {
-            setUser(await getMe());
+            const profile = await getMe();
+            if (attempt !== operation.current) return;
+            setUser(profile);
             setError(null);
+            setLoading(false);
             // Connect socket with the new access token.
             const token = api.getAccessToken();
             if (token) socketService.connect(token);
           } catch (error) {
-            await api.clear();
+            if (attempt === operation.current) await api.clear();
             throw error;
           }
         },
         logout: async () => {
+          operation.current++;
           try {
             await api.logout();
           } finally {
-            socketService.disconnect();
-            setUser(null);
-            setSelectedBranch(null);
-            setError(null);
+            endSession();
           }
         },
       }}

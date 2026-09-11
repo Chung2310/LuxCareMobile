@@ -1,5 +1,6 @@
 import { useCallback, useState } from "react";
-import { useFocusEffect } from "expo-router";
+import { router, useFocusEffect, useLocalSearchParams } from "expo-router";
+import { Ionicons } from "@expo/vector-icons";
 import {
   Modal,
   Pressable,
@@ -116,6 +117,7 @@ const PERSONAL_MONTH_OPTIONS = [
 
 export default function PayrollRuns({ initialTab }: PayrollRunsProps = {}) {
   const { user, selectedBranch } = useSession();
+  const params = useLocalSearchParams<{ from?: string }>();
   const canCompany = canReadPayrollRuns(user);
   const canPersonal = canReadPayslips(user);
   const branchId = selectedBranch?._id || user?.branchId;
@@ -412,6 +414,18 @@ export default function PayrollRuns({ initialTab }: PayrollRunsProps = {}) {
       >
         {/* Header hàng đầu */}
         <View style={payrollStyles.headerRow}>
+          <Pressable
+            style={payrollStyles.backBtn}
+            onPress={() => {
+              if (params.from === "modules") router.replace("/(tabs)/modules");
+              else if (router.canGoBack()) router.back();
+              else router.replace("/(tabs)/modules");
+            }}
+            hitSlop={8}
+          >
+            <Ionicons name="arrow-back" size={20} color="#0f172a" />
+          </Pressable>
+
           <View style={{ flex: 1 }}>
             <Text style={payrollStyles.pageTitle}>
               {canCompany ? "Bảng lương" : "Phiếu lương của tôi"}
@@ -1655,6 +1669,16 @@ const payrollStyles = StyleSheet.create({
     alignItems: "center",
     justifyContent: "space-between",
     gap: 12,
+  },
+  backBtn: {
+    width: 36,
+    height: 36,
+    borderRadius: 18,
+    backgroundColor: "#ffffff",
+    borderWidth: 1,
+    borderColor: "#e2e8f0",
+    alignItems: "center",
+    justifyContent: "center",
   },
   pageTitle: {
     fontSize: 22,

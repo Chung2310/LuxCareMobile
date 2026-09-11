@@ -46,8 +46,6 @@ export function parseDateTime(value: string, label: string): string {
   // Match YYYY-MM-DD HH:mm
   const match = trimmed.match(/^(\d{4})-(\d{2})-(\d{2})[ T](\d{2}):(\d{2})$/);
   if (!match) {
-    const d = new Date(trimmed);
-    if (Number.isFinite(d.getTime())) return d.toISOString();
     throw new Error(`${label}: dùng định dạng YYYY-MM-DD HH:mm.`);
   }
 

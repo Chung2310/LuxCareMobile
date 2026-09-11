@@ -3,8 +3,8 @@ import { browserTransport } from "./serviceTransport";
 
 export interface ChatAttachment {
   url: string;
-  name: string;
-  type: string;
+  name?: string;
+  type?: string;
   size?: number;
   uploadToken?: string;
 }
@@ -30,6 +30,7 @@ export interface ChatMessage {
   replyTo?: any;
   isDeleted?: boolean;
   editedAt?: string | null;
+  status?: "sending" | "sent" | "failed";
   createdAt: string;
 }
 
@@ -46,6 +47,8 @@ export interface ChatRoomMember {
   role: "admin" | "deputy" | "member";
   joinedAt: string;
   isPinned?: boolean;
+  notificationsMuted?: boolean;
+  notificationsChangedAt?: string;
 }
 
 export interface ChatRoom {
@@ -68,6 +71,14 @@ export interface ChatRoom {
 
 export function createChatService(transport: ServiceTransport = browserTransport) {
   return {
+    async setNotificationsMuted(roomId: string, muted: boolean): Promise<ChatRoom> {
+      const res = await transport.fetch(`/api/v1/chat/rooms/${encodeURIComponent(roomId)}/notifications`, {
+        method: "PATCH", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ muted }),
+      });
+      const json = await res.json();
+      if (!res.ok) throw new Error(json.message || "Không thể cập nhật thông báo.");
+      return json.data;
+    },
     /**
      * Lấy danh sách các phòng chat của user
      */

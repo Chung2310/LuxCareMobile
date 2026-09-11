@@ -5,6 +5,8 @@ import { StatusBar } from "expo-status-bar";
 import { useFonts } from "expo-font";
 import { SafeAreaProvider } from "react-native-safe-area-context";
 import { SessionProvider, useSession } from "../src/auth/SessionProvider";
+import { NotificationProvider } from "../src/features/notifications/NotificationProvider";
+import { CommunicationProvider } from "../src/features/notifications/CommunicationProvider";
 import { LoadingProvider } from "../src/context/LoadingContext";
 import { Button, ErrorText, Page } from "../src/ui";
 
@@ -41,7 +43,7 @@ function Routes() {
     });
   }, [minTimeElapsed, loading, fontsLoaded, fadeAnim]);
 
-  if ((!splashFinished && loading) || !fontsLoaded) {
+  if (loading || !fontsLoaded) {
     return (
       <View style={splashStyles.container}>
         <StatusBar style="dark" />
@@ -101,14 +103,22 @@ const splashStyles = StyleSheet.create({
   },
 });
 
+import { ChatUnreadProvider } from "../src/context/ChatUnreadContext";
+
 export default function RootLayout() {
   return (
     <SafeAreaProvider>
       <SessionProvider>
-        <LoadingProvider>
-          <StatusBar style="dark" />
-          <Routes />
-        </LoadingProvider>
+        <NotificationProvider>
+          <CommunicationProvider>
+            <ChatUnreadProvider>
+              <LoadingProvider>
+                <StatusBar style="dark" />
+                <Routes />
+              </LoadingProvider>
+            </ChatUnreadProvider>
+          </CommunicationProvider>
+        </NotificationProvider>
       </SessionProvider>
     </SafeAreaProvider>
   );

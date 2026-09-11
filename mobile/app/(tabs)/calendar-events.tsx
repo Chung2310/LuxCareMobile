@@ -18,12 +18,10 @@ import { HolidayForm } from "../../src/features/calendar/HolidayForm";
 import type { CalendarItem, CalendarItemInput } from "../../../src/services/hrCalendarService";
 import type { WorkShift, ShiftEmployee } from "../../../src/services/attendanceService";
 import type { WorkCalendarDay } from "../../../src/services/companyWorkCalendarService";
-import type { LeaveApplication } from "../../../src/types/leave";
 import type { UserProfile } from "../../../src/types/common";
 import {
   attendance,
   hrCalendar,
-  leave,
   roster,
   workCalendar,
 } from "../../src/api/services";
@@ -33,7 +31,7 @@ import { canUseModule, hasPermission } from "../../src/auth/access";
 /* ==========================================================================
    1. TYPES & COLOR CONSTANTS (Chuẩn LuxCare Web)
    ========================================================================== */
-type SubTabType = "schedule" | "requests" | "shifts";
+type SubTabType = "schedule" | "shifts";
 
 interface EventTypeMeta {
   label: string;
@@ -83,14 +81,51 @@ const EVENT_TYPE_MAP: Record<string, EventTypeMeta> = {
 
 const WEEKDAY_NAMES = ["CN", "T2", "T3", "T4", "T5", "T6", "T7"];
 
+function parseToVietnamDate(isoString?: string): Date | null {
+  if (!isoString) return null;
+  if (/^\d{4}-\d{2}-\d{2}$/.test(isoString)) {
+    return new Date(`${isoString}T00:00:00+07:00`);
+  }
+  if (/^\d{4}-\d{2}-\d{2}T\d{2}:\d{2}(:\d{2})?$/.test(isoString)) {
+    return new Date(`${isoString}+07:00`);
+  }
+  const d = new Date(isoString);
+  return isNaN(d.getTime()) ? null : d;
+}
+
+function toLocalDateStr(isoString?: string): string {
+  if (!isoString) return "";
+  if (/^\d{4}-\d{2}-\d{2}$/.test(isoString)) return isoString;
+  const d = parseToVietnamDate(isoString);
+  if (!d) return isoString.slice(0, 10);
+  try {
+    return new Intl.DateTimeFormat("en-CA", {
+      timeZone: "Asia/Ho_Chi_Minh",
+      year: "numeric",
+      month: "2-digit",
+      day: "2-digit",
+    }).format(d);
+  } catch {
+    const utc = d.getTime() + d.getTimezoneOffset() * 60000;
+    const vn = new Date(utc + 7 * 3600000);
+    const y = vn.getFullYear();
+    const m = String(vn.getMonth() + 1).padStart(2, "0");
+    const day = String(vn.getDate()).padStart(2, "0");
+    return `${y}-${m}-${day}`;
+  }
+}
+
 function formatTimeOnly(isoString?: string): string {
   if (!isoString) return "--:--";
   try {
-    const d = new Date(isoString);
-    if (isNaN(d.getTime())) return "--:--";
-    const h = String(d.getHours()).padStart(2, "0");
-    const m = String(d.getMinutes()).padStart(2, "0");
-    return `${h}:${m}`;
+    const d = parseToVietnamDate(isoString);
+    if (!d) return "--:--";
+    return d.toLocaleTimeString("vi-VN", {
+      hour: "2-digit",
+      minute: "2-digit",
+      hour12: false,
+      timeZone: "Asia/Ho_Chi_Minh",
+    });
   } catch {
     return "--:--";
   }
@@ -99,12 +134,14 @@ function formatTimeOnly(isoString?: string): string {
 function formatDateDisplay(isoString?: string): string {
   if (!isoString) return "--/--/----";
   try {
-    const d = new Date(isoString);
-    if (isNaN(d.getTime())) return "--/--/----";
-    const day = String(d.getDate()).padStart(2, "0");
-    const month = String(d.getMonth() + 1).padStart(2, "0");
-    const year = d.getFullYear();
-    return `${day}/${month}/${year}`;
+    const d = parseToVietnamDate(isoString);
+    if (!d) return "--/--/----";
+    return d.toLocaleDateString("vi-VN", {
+      day: "2-digit",
+      month: "2-digit",
+      year: "numeric",
+      timeZone: "Asia/Ho_Chi_Minh",
+    });
   } catch {
     return "--/--/----";
   }
@@ -113,41 +150,41 @@ function formatDateDisplay(isoString?: string): string {
 function formatFullDateTime(isoString?: string): string {
   if (!isoString) return "--";
   try {
-    const d = new Date(isoString);
-    if (isNaN(d.getTime())) return "--";
-    const day = String(d.getDate()).padStart(2, "0");
-    const month = String(d.getMonth() + 1).padStart(2, "0");
-    const year = d.getFullYear();
-    const h = String(d.getHours()).padStart(2, "0");
-    const m = String(d.getMinutes()).padStart(2, "0");
-    return `${day}/${month}/${year} lúc ${h}:${m}`;
+    const d = parseToVietnamDate(isoString);
+    if (!d) return "--";
+    const dateStr = d.toLocaleDateString("vi-VN", {
+      day: "2-digit",
+      month: "2-digit",
+      year: "numeric",
+      timeZone: "Asia/Ho_Chi_Minh",
+    });
+    const timeStr = d.toLocaleTimeString("vi-VN", {
+      hour: "2-digit",
+      minute: "2-digit",
+      hour12: false,
+      timeZone: "Asia/Ho_Chi_Minh",
+    });
+    return `${dateStr} lúc ${timeStr}`;
   } catch {
     return "--";
   }
 }
 
 function parseIsoDatePart(isoString?: string): string {
-  if (!isoString) return "";
-  try {
-    const d = new Date(isoString);
-    if (isNaN(d.getTime())) return "";
-    const y = d.getFullYear();
-    const m = String(d.getMonth() + 1).padStart(2, "0");
-    const day = String(d.getDate()).padStart(2, "0");
-    return `${y}-${m}-${day}`;
-  } catch {
-    return "";
-  }
+  return toLocalDateStr(isoString);
 }
 
 function parseIsoTimePart(isoString?: string): string {
   if (!isoString) return "09:00";
   try {
-    const d = new Date(isoString);
-    if (isNaN(d.getTime())) return "09:00";
-    const h = String(d.getHours()).padStart(2, "0");
-    const m = String(d.getMinutes()).padStart(2, "0");
-    return `${h}:${m}`;
+    const d = parseToVietnamDate(isoString);
+    if (!d) return "09:00";
+    return d.toLocaleTimeString("vi-VN", {
+      hour: "2-digit",
+      minute: "2-digit",
+      hour12: false,
+      timeZone: "Asia/Ho_Chi_Minh",
+    });
   } catch {
     return "09:00";
   }
@@ -173,11 +210,7 @@ export default function CalendarEvents() {
 
   // Selected Day in Calendar Grid (YYYY-MM-DD)
   const todayStr = useMemo(() => {
-    const now = new Date();
-    const y = now.getFullYear();
-    const m = String(now.getMonth() + 1).padStart(2, "0");
-    const d = String(now.getDate()).padStart(2, "0");
-    return `${y}-${m}-${d}`;
+    return toLocalDateStr(new Date().toISOString());
   }, []);
   const [selectedDateStr, setSelectedDateStr] = useState<string>(todayStr);
 
@@ -191,7 +224,6 @@ export default function CalendarEvents() {
 
   // Data States
   const [items, setItems] = useState<CalendarItem[]>([]);
-  const [leaveApps, setLeaveApps] = useState<LeaveApplication[]>([]);
   const [shifts, setShifts] = useState<WorkShift[]>([]);
   const [shiftEmployees, setShiftEmployees] = useState<ShiftEmployee[]>([]);
   const [holidays, setHolidays] = useState<WorkCalendarDay[]>([]);
@@ -267,9 +299,6 @@ export default function CalendarEvents() {
         hrCalendar.list(user.companyCode).then((data) => {
           if (active) setItems(data);
         }),
-        leave.listApplications(1, 40).then((res) => {
-          if (active) setLeaveApps(res.data || []);
-        }).catch(() => {}),
         attendance.shifts().then((res) => {
           if (active) setShifts(res || []);
         }).catch(() => {}),
@@ -354,10 +383,34 @@ export default function CalendarEvents() {
     const map = new Map<string, CalendarItem[]>();
     items.forEach((item) => {
       if (!item.startDate) return;
-      const dKey = item.startDate.slice(0, 10);
-      const cur = map.get(dKey) || [];
-      cur.push(item);
-      map.set(dKey, cur);
+      const startKey = toLocalDateStr(item.startDate);
+      if (!startKey) return;
+      const endKey = item.endDate ? toLocalDateStr(item.endDate) : startKey;
+
+      if (!endKey || endKey <= startKey) {
+        const cur = map.get(startKey) || [];
+        cur.push(item);
+        map.set(startKey, cur);
+      } else {
+        // Multi-day span across calendar cells (capped at 35 days)
+        try {
+          const curD = new Date(`${startKey}T00:00:00+07:00`);
+          const endD = new Date(`${endKey}T00:00:00+07:00`);
+          let count = 0;
+          while (curD <= endD && count < 35) {
+            const k = toLocalDateStr(curD.toISOString());
+            const cur = map.get(k) || [];
+            cur.push(item);
+            map.set(k, cur);
+            curD.setDate(curD.getDate() + 1);
+            count++;
+          }
+        } catch {
+          const cur = map.get(startKey) || [];
+          cur.push(item);
+          map.set(startKey, cur);
+        }
+      }
     });
     return map;
   }, [items]);
@@ -366,7 +419,11 @@ export default function CalendarEvents() {
   const filteredMonthItems = useMemo(() => {
     const periodPrefix = `${year}-${String(month + 1).padStart(2, "0")}`;
     return items.filter((item) => {
-      if (!item.startDate || !item.startDate.startsWith(periodPrefix)) return false;
+      if (!item.startDate) return false;
+      const sKey = toLocalDateStr(item.startDate);
+      const eKey = item.endDate ? toLocalDateStr(item.endDate) : sKey;
+      const overlapsMonth = (sKey && sKey.startsWith(periodPrefix)) || (eKey && eKey.startsWith(periodPrefix));
+      if (!overlapsMonth) return false;
       if (selectedEventType !== "all" && item.type !== selectedEventType) return false;
       if (onlyMine && item.employeeId !== user?.uid && item.assigneeId !== user?.uid && item.creatorId !== user?.uid) {
         return false;
@@ -406,7 +463,10 @@ export default function CalendarEvents() {
     const counts = { total: 0, event: 0, leave: 0, wfh: 0, exception: 0, reminder: 0 };
     const periodPrefix = `${year}-${String(month + 1).padStart(2, "0")}`;
     items.forEach((item) => {
-      if (item.startDate && item.startDate.startsWith(periodPrefix)) {
+      if (!item.startDate) return;
+      const sKey = toLocalDateStr(item.startDate);
+      const eKey = item.endDate ? toLocalDateStr(item.endDate) : sKey;
+      if ((sKey && sKey.startsWith(periodPrefix)) || (eKey && eKey.startsWith(periodPrefix))) {
         counts.total++;
         if (counts[item.type] !== undefined) counts[item.type]++;
       }
@@ -429,8 +489,8 @@ export default function CalendarEvents() {
 
     try {
       setIsSavingEvent(true);
-      const startIso = `${newStartDate}T${newStartTime}:00`;
-      const endIso = `${newEndDate}T${newEndTime}:00`;
+      const startIso = `${newStartDate}T${newStartTime}:00+07:00`;
+      const endIso = `${newEndDate}T${newEndTime}:00+07:00`;
       const selectedEmp = employees.find((e) => e.uid === newAssigneeId);
 
       const payload: CalendarItemInput = {
@@ -505,8 +565,8 @@ export default function CalendarEvents() {
 
     try {
       setIsUpdatingEvent(true);
-      const startIso = `${editStartDate}T${editStartTime}:00`;
-      const endIso = `${editEndDate}T${editEndTime}:00`;
+      const startIso = `${editStartDate}T${editStartTime}:00+07:00`;
+      const endIso = `${editEndDate}T${editEndTime}:00+07:00`;
       const selectedEmp = employees.find((e) => e.uid === editAssigneeId);
 
       const targetId = editingCalendarItem.id || editingCalendarItem._id;
@@ -944,60 +1004,7 @@ export default function CalendarEvents() {
 
 
 
-  /* ==========================================================================
-     9. RENDER SUB-TAB 3: ĐƠN TỪ (REQUESTS)
-     ========================================================================== */
-  const renderRequestsTab = () => (
-    <ScrollView style={{ flex: 1 }} contentContainerStyle={s.tabScroll} showsVerticalScrollIndicator={false}>
-      {/* Action Header */}
-      <View style={s.requestsActionHeader}>
-        <View>
-          <Text style={s.sectionHeader}>Danh sách đơn từ</Text>
-          <Text style={s.sectionSub}>Nghỉ phép, làm từ xa & giải trình chấm công</Text>
-        </View>
-        <Pressable style={s.createReqBtn} onPress={() => router.push("/(tabs)/leave?create=1")}>
-          <Text style={s.createReqTxt}>+ Nộp đơn</Text>
-        </Pressable>
-      </View>
 
-      {/* Applications List */}
-      {leaveApps.length === 0 ? (
-        <View style={s.emptyBox}>
-          <Text style={{ fontSize: 32, marginBottom: 8 }}>📄</Text>
-          <Text style={s.emptyTitle}>Chưa có đơn từ nào</Text>
-          <Text style={s.emptySub}>Bấm "+ Nộp đơn" để gửi yêu cầu nghỉ phép hoặc làm từ xa</Text>
-        </View>
-      ) : (
-        leaveApps.map((app) => {
-          const isApproved = app.status === "approved";
-          const isRejected = app.status === "rejected";
-          const badgeBg = isApproved ? "#ecfdf5" : isRejected ? "#fff1f2" : "#fffbeb";
-          const badgeBorder = isApproved ? "#a7f3d0" : isRejected ? "#fecdd3" : "#fde68a";
-          const badgeCol = isApproved ? "#047857" : isRejected ? "#be123c" : "#b45309";
-          const statusText = isApproved ? "Đã duyệt" : isRejected ? "Từ chối" : "Chờ duyệt";
-
-          return (
-            <View key={app._id} style={s.reqCard}>
-              <View style={s.reqCardTop}>
-                <Text style={s.reqTitle}>{app.type || "Đơn xin nghỉ phép"}</Text>
-                <View style={[s.statusBadge, { backgroundColor: badgeBg, borderColor: badgeBorder }]}>
-                  <Text style={[s.statusBadgeTxt, { color: badgeCol }]}>{statusText}</Text>
-                </View>
-              </View>
-              <Text style={s.reqDates}>
-                📅 {formatDateDisplay(app.startDate)} → {formatDateDisplay(app.endDate)}{" "}
-                {app.chargeableDays ? `(${app.chargeableDays} ngày)` : ""}
-              </Text>
-              {!!app.reason && <Text style={s.reqReason}>Lý do: {app.reason}</Text>}
-              {!!app.employeeName && <Text style={s.reqApplicant}>👤 Người nộp: {app.employeeName}</Text>}
-            </View>
-          );
-        })
-      )}
-
-      <View style={{ height: 80 }} />
-    </ScrollView>
-  );
 
   /* ==========================================================================
      10. CRUD HANDLERS & RENDER SUB-TAB 4: CA & NGÀY LỄ (SHIFTS & HOLIDAYS)
@@ -1612,14 +1619,6 @@ export default function CalendarEvents() {
         </Pressable>
 
         <Pressable
-          style={[s.subTabBtn, subTab === "requests" && s.subTabBtnActive]}
-          onPress={() => setSubTab("requests")}
-        >
-          <Text style={[s.subTabTxt, subTab === "requests" && s.subTabTxtActive]}>
-            📝 Đơn từ
-          </Text>
-        </Pressable>
-        <Pressable
           style={[s.subTabBtn, subTab === "shifts" && s.subTabBtnActive]}
           onPress={() => setSubTab("shifts")}
         >
@@ -1645,7 +1644,6 @@ export default function CalendarEvents() {
       ) : (
         <>
           {subTab === "schedule" && renderScheduleTab()}
-          {subTab === "requests" && renderRequestsTab()}
           {subTab === "shifts" && renderShiftsHolidaysTab()}
         </>
       )}
