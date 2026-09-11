@@ -55,124 +55,236 @@ export function formatTimeAgo(dateStr?: string | Date): string {
   return `${date.getDate()} thg ${date.getMonth() + 1}`;
 }
 
+export function mapResourceItem(item: any, currentUserName?: string): ResourceItem {
+  const isFolder = item.type === "folder";
+  const itemOwner = item.creatorName || item.createdBy?.displayName || item.owner || "Hệ thống";
+  const isMine = currentUserName ? itemOwner === currentUserName : true;
+
+  let mappedType: ResourceItem["type"] = "document";
+  if (isFolder) {
+    mappedType = "folder";
+  } else if (item.section === "drive" && (!item.mimeType || item.mimeType === "application/vnd.google-apps.shortcut")) {
+    mappedType = "link";
+  } else {
+    mappedType = detectResourceType(item.name || item.title || item.filename || "", item.mimeType);
+  }
+
+  const sizeStr = isFolder
+    ? "Thư mục"
+    : item.size
+    ? item.size > 1024 * 1024
+      ? `${(item.size / (1024 * 1024)).toFixed(1)} MB`
+      : `${(item.size / 1024).toFixed(0)} KB`
+    : "1.2 MB";
+
+  const fileUrl = item.fileUrl || item.url || item.driveLink || "";
+
+  return {
+    id: String(item._id || item.id),
+    name: item.name || item.title || item.filename || "Tài nguyên",
+    type: mappedType,
+    subtitle: isFolder
+      ? `Thư mục ${isMine ? "của bạn" : `của ${itemOwner}`} • ${formatTimeAgo(item.updatedAt || item.createdAt)}`
+      : isMine
+      ? `Của bạn • ${formatTimeAgo(item.updatedAt || item.createdAt)}`
+      : `Được chia sẻ bởi ${itemOwner} • ${formatTimeAgo(item.updatedAt || item.createdAt)}`,
+    owner: itemOwner,
+    updatedAt: formatTimeAgo(item.updatedAt || item.createdAt),
+    size: sizeStr,
+    url: fileUrl,
+    uri: fileUrl,
+    content: fileUrl,
+    parentId: item.parentId ? String(item.parentId) : null,
+    isStarred: Boolean(item.isStarred || item.starred),
+    isShared: Boolean(item.isShared || item.shared || (item.shares && item.shares.length > 0)),
+    sharedBy: isMine ? undefined : itemOwner,
+    permission: isMine ? "owner" : "shared",
+    isDeleted: Boolean(item.isDeleted),
+    deletedAt: item.deletedAt ? formatTimeAgo(item.deletedAt) : undefined,
+  };
+}
+
 export function createResourceService(transport: ServiceTransport) {
   return {
-    async list(companyCode?: string, search?: string, currentUserName?: string): Promise<ResourceItem[]> {
+    /**
+     * Liệt kê tài nguyên từ API máy chủ (lưu trên MongoDB).
+     */
+    async list(
+      parentIdOrCompanyCode?: string | null,
+      sectionOrSearch?: string,
+      currentUserName?: string,
+    ): Promise<ResourceItem[]> {
       const items: ResourceItem[] = [];
 
-      // 1. Try fetching from /api/v1/resources if available
       try {
-        const query = search ? `?search=${encodeURIComponent(search)}` : "";
-        const res = await transport.fetch(`/api/v1/resources${query}`);
-        if (res.ok) {
-          const body = await res.json();
-          const list = Array.isArray(body) ? body : body.data || body.items || [];
-          if (Array.isArray(list) && list.length > 0) {
-            return list.map((item: any, idx: number) => {
-              const itemOwner = item.createdBy?.displayName || item.owner || "Hệ thống";
-              const isMine = currentUserName ? itemOwner === currentUserName : true;
-              return {
-                id: item._id || item.id || `res-${idx}`,
-                name: item.title || item.name || item.filename || "Tài nguyên",
-                type: item.type || detectResourceType(item.filename || item.name || "", item.mimeType),
-                subtitle: isMine
-                  ? `Của bạn • ${formatTimeAgo(item.updatedAt || item.createdAt)}`
-                  : `Được chia sẻ bởi ${itemOwner} • ${formatTimeAgo(item.updatedAt || item.createdAt)}`,
-                owner: itemOwner,
-                updatedAt: formatTimeAgo(item.updatedAt || item.createdAt),
-                size: item.size ? `${(item.size / 1024).toFixed(0)} KB` : "1.2 MB",
-                url: item.url || item.fileUrl,
-                isStarred: Boolean(item.isStarred || item.starred),
-                isShared: Boolean(item.isShared || item.shared),
-                sharedBy: isMine ? undefined : itemOwner,
-                permission: isMine ? "owner" : "shared",
-              };
-            });
-          }
+        const params = new URLSearchParams();
+        if (parentIdOrCompanyCode && parentIdOrCompanyCode.length === 24) {
+          params.set("parentId", parentIdOrCompanyCode);
+        } else if (parentIdOrCompanyCode && parentIdOrCompanyCode !== "all") {
+          // If passed as parentId
+          params.set("parentId", parentIdOrCompanyCode);
         }
-      } catch (e) {
-        // Fallback
-      }
 
-      // 2. Fetch files from credentials service (shared with staff)
-      try {
-        const query = companyCode ? `?companyCode=${encodeURIComponent(companyCode)}` : "";
-        const res = await transport.fetch(`/api/v1/hr-credentials${query}`);
-        if (res.ok) {
-          const body = await res.json();
-          const creds = Array.isArray(body) ? body : body.data || body.credentials || [];
-          creds.forEach((c: any) => {
-            const fileName = c.credentialName || c.title || c.fileName || "Văn bằng chứng chỉ";
-            const owner = c.employeeName || c.owner || "Phòng Nhân sự";
-            const isMine = currentUserName ? owner === currentUserName : false;
-            items.push({
-              id: c._id || c.id || `cred-${Math.random()}`,
-              name: fileName,
-              type: detectResourceType(fileName, c.fileType),
-              subtitle: isMine
-                ? `Của bạn • ${formatTimeAgo(c.updatedAt || c.issueDate)}`
-                : `Được chia sẻ bởi ${owner} • ${formatTimeAgo(c.updatedAt || c.issueDate)}`,
-              owner: owner,
-              updatedAt: formatTimeAgo(c.updatedAt || c.issueDate),
-              size: "850 KB",
-              url: c.fileUrl || c.attachment,
-              isStarred: Boolean(c.isStarred),
-              isShared: true,
-              sharedBy: isMine ? undefined : owner,
-              permission: isMine ? "owner" : "shared",
-            });
-          });
+        if (sectionOrSearch === "local" || sectionOrSearch === "drive") {
+          params.set("section", sectionOrSearch);
+        } else if (sectionOrSearch) {
+          params.set("search", sectionOrSearch);
         }
-      } catch (e) {
-        // ignore
-      }
 
-      // 3. Fetch equipment documentation files (shared across company)
-      try {
-        const res = await transport.fetch("/api/v1/equipment");
+        const queryStr = params.toString() ? `?${params.toString()}` : "";
+        const res = await transport.fetch(`/api/v1/resources${queryStr}`);
         if (res.ok) {
           const body = await res.json();
-          const list = Array.isArray(body) ? body : body.data || body.equipment || [];
-          list.forEach((eq: any) => {
-            if (eq.name) {
-              items.push({
-                id: eq._id || eq.id || `eq-${Math.random()}`,
-                name: `Tài liệu HDSD thiết bị - ${eq.name}`,
-                type: "pdf",
-                subtitle: `Được chia sẻ bởi Quản lý thiết bị • ${formatTimeAgo(eq.updatedAt || eq.createdAt)}`,
-                owner: "Quản lý thiết bị",
-                updatedAt: formatTimeAgo(eq.updatedAt || eq.createdAt),
-                size: "1.5 MB",
-                isStarred: eq.status === "ready",
-                isShared: true,
-                sharedBy: "Quản lý thiết bị",
-                permission: "shared",
-              });
-            }
-          });
+          const list = Array.isArray(body) ? body : body.items || body.data || [];
+          return list.map((item: any) => mapResourceItem(item, currentUserName));
         }
-      } catch (e) {
-        // ignore
+      } catch {
+        // Bỏ qua và thử fallback nếu cần
       }
 
       return items;
     },
 
-    async upload(file: { name: string; type: string; uri: string }): Promise<any> {
-      const formData = new FormData();
-      formData.append("file", {
-        uri: file.uri,
-        name: file.name,
-        type: file.type || "application/octet-stream",
-      } as any);
+    /**
+     * Danh sách thùng rác
+     */
+    async listTrash(currentUserName?: string): Promise<ResourceItem[]> {
+      const res = await transport.fetch("/api/v1/resources/trash");
+      if (!res.ok) throw new Error("Không thể tải danh sách thùng rác.");
+      const body = await res.json();
+      const list = Array.isArray(body) ? body : body.items || body.data || [];
+      return list.map((item: any) => mapResourceItem(item, currentUserName));
+    },
 
-      const res = await transport.fetch("/api/v1/media/upload", {
+    /**
+     * Tạo thư mục mới trên cơ sở dữ liệu MongoDB
+     */
+    async createFolder(
+      name: string,
+      parentId?: string | null,
+      section: "local" | "drive" = "local",
+    ): Promise<ResourceItem> {
+      const res = await transport.fetch("/api/v1/resources/folder", {
         method: "POST",
-        body: formData,
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
+          name: name.trim(),
+          parentId: parentId || null,
+          section,
+        }),
       });
+      if (!res.ok) {
+        const err = await res.json().catch(() => ({}));
+        throw new Error(err.message || "Không thể tạo thư mục.");
+      }
+      const body = await res.json();
+      return mapResourceItem(body.item || body);
+    },
 
-      if (!res.ok) throw new Error("Không thể tải lên tệp tài nguyên.");
-      return res.json();
+    /**
+     * Lưu tệp đã upload lên Cloudinary vào cơ sở dữ liệu MongoDB
+     */
+    async createFile(input: {
+      name: string;
+      fileUrl: string;
+      parentId?: string | null;
+      mimeType?: string;
+      size?: number;
+    }): Promise<ResourceItem> {
+      const res = await transport.fetch("/api/v1/resources/file", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
+          name: input.name.trim(),
+          fileUrl: input.fileUrl,
+          parentId: input.parentId || null,
+          mimeType: input.mimeType || "",
+          size: input.size || 0,
+        }),
+      });
+      if (!res.ok) {
+        const err = await res.json().catch(() => ({}));
+        throw new Error(err.message || "Không thể lưu tệp vào hệ thống.");
+      }
+      const body = await res.json();
+      return mapResourceItem(body.item || body);
+    },
+
+    /**
+     * Thêm liên kết web / Google Drive
+     */
+    async addDriveLink(name: string, driveLink: string, driveType?: string): Promise<ResourceItem> {
+      const res = await transport.fetch("/api/v1/resources/drive", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
+          name: name.trim(),
+          driveLink: driveLink.trim(),
+          driveType: driveType || "file",
+        }),
+      });
+      if (!res.ok) {
+        const err = await res.json().catch(() => ({}));
+        throw new Error(err.message || "Không thể lưu liên kết.");
+      }
+      const body = await res.json();
+      return mapResourceItem(body.item || body);
+    },
+
+    /**
+     * Đổi tên tài nguyên
+     */
+    async rename(id: string, name: string): Promise<ResourceItem> {
+      const res = await transport.fetch(`/api/v1/resources/${id}/rename`, {
+        method: "PATCH",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ name: name.trim() }),
+      });
+      if (!res.ok) {
+        const err = await res.json().catch(() => ({}));
+        throw new Error(err.message || "Không thể đổi tên tài nguyên.");
+      }
+      const body = await res.json();
+      return mapResourceItem(body.item || body);
+    },
+
+    /**
+     * Chuyển vào thùng rác (soft delete)
+     */
+    async moveToTrash(id: string): Promise<void> {
+      const res = await transport.fetch(`/api/v1/resources/${id}`, {
+        method: "DELETE",
+      });
+      if (!res.ok) {
+        const err = await res.json().catch(() => ({}));
+        throw new Error(err.message || "Không thể chuyển tệp vào thùng rác.");
+      }
+    },
+
+    /**
+     * Khôi phục từ thùng rác
+     */
+    async restore(id: string): Promise<void> {
+      const res = await transport.fetch(`/api/v1/resources/${id}/restore`, {
+        method: "POST",
+      });
+      if (!res.ok) {
+        const err = await res.json().catch(() => ({}));
+        throw new Error(err.message || "Không thể khôi phục tài nguyên.");
+      }
+    },
+
+    /**
+     * Xóa vĩnh viễn khỏi MongoDB
+     */
+    async deletePermanently(id: string): Promise<void> {
+      const res = await transport.fetch(`/api/v1/resources/${id}`, {
+        method: "DELETE",
+      });
+      if (!res.ok) {
+        const err = await res.json().catch(() => ({}));
+        throw new Error(err.message || "Không thể xóa vĩnh viễn.");
+      }
     },
   };
 }

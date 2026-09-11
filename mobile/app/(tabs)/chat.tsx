@@ -39,8 +39,11 @@ import { File } from "expo-file-system";
 import * as MediaLibrary from "expo-media-library/legacy";
 import * as Sharing from "expo-sharing";
 import { useVideoPlayer, VideoView } from "expo-video";
+import { useFocusEffect } from "expo-router";
 import { useSession } from "../../src/auth/SessionProvider";
+import { useChatUnread } from "../../src/context/ChatUnreadContext";
 import { api, chat, kanbanMedia } from "../../src/api/services";
+import { socketService } from "../../src/api/socketService";
 import { userManagementApi } from "../../src/api/userManagementApi";
 import type {
   ChatAttachment,
@@ -56,6 +59,12 @@ const LUXCARE_HEADER_BG = "#d1fae5"; // Xanh ngọc mint nhạt nền giống m�
 const LUXCARE_HEADER_TEXT = "#065f46"; // Màu chữ/icon xanh ngọc đậm dễ nhìn, tương phản cao
 const LUXCARE_MINT_BG = "#ecfdf5"; // Nền tin nhắn của tôi
 const LUXCARE_MINT_BORDER = "#a7f3d0";
+const ROOM_ACTIVITY_PREFIX = "__LUXCARE_ROOM_ACTIVITY__:";
+
+function getRoomActivityText(content?: string): string | null {
+  if (!content?.startsWith(ROOM_ACTIVITY_PREFIX)) return null;
+  return content.slice(ROOM_ACTIVITY_PREFIX.length).trim() || null;
+}
 
 // Bảng biểu cảm Emoji & Sticker chuẩn Mobile phong phú theo danh mục
 const EMOJI_CATEGORIES = [
@@ -117,17 +126,31 @@ const EMOJI_CATEGORIES = [
 ];
 
 // Helper phân tích tin nhắn chỉ chứa Emoji để phóng to (Big Emoji) như Zalo/Telegram/iOS
-const EMOJI_ONLY_REGEX = /^[\s\p{Extended_Pictographic}\p{Emoji_Presentation}\p{Emoji}\uFE0F\u200D\u{1F1E6}-\u{1F1FF}]+$/u;
+const EMOJI_ONLY_REGEX = /^[\s\p{Extended_Pictographic}\uFE0F\u200D\u{1F1E6}-\u{1F1FF}\u{1F3FB}-\u{1F3FF}]+$/u;
 
 function getEmojiOnlyMeta(text?: string): { isEmojiOnly: boolean; count: number } {
   if (!text) return { isEmojiOnly: false, count: 0 };
   const trimmed = text.trim();
   if (!trimmed) return { isEmojiOnly: false, count: 0 };
+
+  // Nếu chứa chữ số, chữ cái hoặc ký tự thông thường -> chắc chắn là tin nhắn văn bản, không phóng to
+  if (/[\p{L}\p{N}]/u.test(trimmed)) {
+    return { isEmojiOnly: false, count: 0 };
+  }
+
   try {
     if (!EMOJI_ONLY_REGEX.test(trimmed)) {
       return { isEmojiOnly: false, count: 0 };
     }
-    const glyphs = Array.from(trimmed).filter((c) => c.trim().length > 0 && c !== "\uFE0F" && c !== "\u200D");
+    const glyphs = Array.from(trimmed).filter((c) => {
+      const ch = c.trim();
+      return (
+        ch.length > 0 &&
+        ch !== "\uFE0F" &&
+        ch !== "\u200D" &&
+        !/^[\u{1F3FB}-\u{1F3FF}]$/u.test(ch)
+      );
+    });
     if (glyphs.length > 0 && glyphs.length <= 8) {
       return { isEmojiOnly: true, count: glyphs.length };
     }
@@ -795,6 +818,7 @@ function isValidHttpUrl(url?: string | null): boolean {
   return (
     trimmed.startsWith("http://") ||
     trimmed.startsWith("https://") ||
+    trimmed.startsWith("//") ||
     trimmed.startsWith("data:image/") ||
     trimmed.startsWith("file://")
   );
@@ -835,7 +859,8 @@ function UserAvatar({
   style?: any;
 }) {
   const [loadError, setLoadError] = useState(false);
-  const validUrl = isValidHttpUrl(photoURL) ? photoURL!.trim() : null;
+  const rawUrl = isValidHttpUrl(photoURL) ? photoURL!.trim() : null;
+  const validUrl = rawUrl && rawUrl.startsWith("//") ? `https:${rawUrl}` : rawUrl;
 
   useEffect(() => {
     setLoadError(false);
@@ -996,6 +1021,7 @@ function RoomAvatar({
 export default function ChatScreen() {
   const insets = useSafeAreaInsets();
   const { user } = useSession();
+  const { markRoomRead, refreshUnread } = useChatUnread();
   const currentUserId = (user as any)?._id || user?.uid || "";
 
   // Chat Rooms State
@@ -1034,6 +1060,10 @@ export default function ChatScreen() {
 
   // Room Info / Manage Modal
   const [roomInfoModalVisible, setRoomInfoModalVisible] = useState(false);
+  const [roomActionBusy, setRoomActionBusy] = useState(false);
+  const [showAddMembers, setShowAddMembers] = useState(false);
+  const [selectedAddMemberIds, setSelectedAddMemberIds] = useState<string[]>([]);
+  const [groupNameDraft, setGroupNameDraft] = useState("");
 
   // Selected Message Actions Modal
   const [selectedMessage, setSelectedMessage] = useState<ChatMessage | null>(null);
@@ -1092,6 +1122,17 @@ export default function ChatScreen() {
     setCustomAlert((prev) => ({ ...prev, visible: false }));
   };
 
+  const getCurrentUserDisplayName = () => user?.displayName || (user as any)?.fullName || user?.email || "Bạn";
+
+  const postRoomActivity = async (text: string) => {
+    if (!activeRoom?._id || !text.trim()) return;
+    try {
+      await chat.sendMessage(activeRoom._id, `${ROOM_ACTIVITY_PREFIX}${text.trim()}`);
+    } catch (err: any) {
+      console.warn("Không thể gửi hoạt động nhóm vào cuộc trò chuyện:", err?.message);
+    }
+  };
+
   useEffect(() => {
     globalCustomAlert = (title, message) => {
       showCustomAlert(title, message);
@@ -1129,6 +1170,16 @@ export default function ChatScreen() {
       showSub.remove();
       hideSub.remove();
     };
+  }, []);
+
+  // Helper lấy string ID của người gửi (hỗ trợ cả ObjectId object, populated object và string)
+  const getSenderIdString = useCallback((senderId: any): string => {
+    if (!senderId) return "";
+    if (typeof senderId === "string") return senderId;
+    if (senderId._id) return String(senderId._id);
+    if (senderId.uid) return String(senderId.uid);
+    if (typeof senderId.toString === "function") return senderId.toString();
+    return String(senderId);
   }, []);
 
   // Helper nhận diện phòng Trợ lý AI
@@ -1179,26 +1230,40 @@ export default function ChatScreen() {
     [currentUserId]
   );
 
-  // Lấy ảnh đại diện người gửi của tin nhắn (từ senderPhoto, senderId.photoURL, hoặc members)
+  // Lấy ảnh đại diện người gửi của tin nhắn (từ senderPhoto, senderId.photoURL, hoặc members/phòng chat)
   const getMessageSenderPhoto = useCallback(
     (item: ChatMessage): string | null => {
+      // 1. Ảnh trực tiếp trên tin nhắn
       if (isValidHttpUrl(item.senderPhoto)) {
         return item.senderPhoto!.trim();
       }
 
+      // 2. Đối tượng senderId nếu được backend populate
       const sender = typeof item.senderId === "object" ? (item.senderId as any) : null;
       const directPhoto = sender?.photoURL || sender?.avatarURL || sender?.avatarUrl || sender?.profilePhoto;
       if (isValidHttpUrl(directPhoto)) {
         return directPhoto.trim();
       }
 
-      // Tra cứu từ activeRoom.members
-      const senderIdStr = String(sender?._id || sender?.uid || item.senderId || "");
+      const senderIdStr = String(sender?._id || sender?.uid || item.senderId || "").trim();
       const senderName = (item.senderName || "").trim().toLowerCase();
+
+      // 3. Trong cuộc trò chuyện 1-1: Mọi tin nhắn của đối phương (!isMe) có cùng avatar với phòng chat (như thanh Header)
+      if (activeRoom && !activeRoom.isGroup) {
+        const roomPhoto = getRoomAvatarUrl(activeRoom);
+        if (isValidHttpUrl(roomPhoto)) {
+          return roomPhoto!.trim();
+        }
+        if (isValidHttpUrl(activeRoom.avatarURL)) {
+          return activeRoom.avatarURL!.trim();
+        }
+      }
+
+      // 4. Tra cứu từ activeRoom.members
       if (activeRoom?.members) {
         const member = activeRoom.members.find((m) => {
           const memberUser = typeof m.userId === "object" ? (m.userId as any) : null;
-          const memberId = String(memberUser?._id || memberUser?.uid || m.userId || "");
+          const memberId = String(memberUser?._id || memberUser?.uid || m.userId || "").trim();
           return (
             (senderIdStr && memberId === senderIdStr) ||
             (!!senderName && [memberUser?.displayName, memberUser?.email].some((value) =>
@@ -1215,7 +1280,7 @@ export default function ChatScreen() {
         if (!activeRoom.isGroup) {
           const otherMember = activeRoom.members.find((m) => {
             const memberUser = typeof m.userId === "object" ? (m.userId as any) : null;
-            const memberId = String(memberUser?._id || memberUser?.uid || m.userId || "");
+            const memberId = String(memberUser?._id || memberUser?.uid || m.userId || "").trim();
             return memberId && memberId !== currentUserId;
           });
           const otherUser = typeof otherMember?.userId === "object" ? (otherMember.userId as any) : null;
@@ -1223,9 +1288,49 @@ export default function ChatScreen() {
           if (isValidHttpUrl(otherPhoto)) return otherPhoto.trim();
         }
       }
+
+      // 5. Tra cứu từ danh sách toàn bộ nhân viên (usersList)
+      if (usersList && usersList.length > 0) {
+        const foundUser = usersList.find((u) => {
+          const uid = String(u.uid || (u as any)._id || "").trim();
+          return (
+            (senderIdStr && uid === senderIdStr) ||
+            (!!senderName && [u.displayName, u.email].some((val) =>
+              String(val || "").trim().toLowerCase() === senderName,
+            ))
+          );
+        });
+        if (foundUser && isValidHttpUrl(foundUser.photoURL)) {
+          return foundUser.photoURL!.trim();
+        }
+      }
+
+      // 6. Tra cứu từ danh sách rooms đã tải
+      if (rooms && rooms.length > 0) {
+        for (const r of rooms) {
+          if (!r.isGroup && r.members) {
+            const targetM = r.members.find((m) => {
+              const mu = typeof m.userId === "object" ? (m.userId as any) : null;
+              const mid = String(mu?._id || mu?.uid || m.userId || "").trim();
+              return (
+                (senderIdStr && mid === senderIdStr) ||
+                (!!senderName && [mu?.displayName, mu?.email].some((val) =>
+                  String(val || "").trim().toLowerCase() === senderName,
+                ))
+              );
+            });
+            if (targetM) {
+              const mu = typeof targetM.userId === "object" ? (targetM.userId as any) : null;
+              const photo = mu?.photoURL || mu?.avatarURL || mu?.avatarUrl || mu?.profilePhoto || r.avatarURL;
+              if (isValidHttpUrl(photo)) return photo.trim();
+            }
+          }
+        }
+      }
+
       return null;
     },
-    [activeRoom, currentUserId]
+    [activeRoom, currentUserId, getRoomAvatarUrl, usersList, rooms]
   );
 
   // 1. Fetch Rooms from API
@@ -1258,7 +1363,15 @@ export default function ChatScreen() {
 
   useEffect(() => {
     void loadRooms();
-  }, [loadRooms]);
+    void userManagementApi
+      .getUsers()
+      .then((list) => {
+        if (Array.isArray(list)) {
+          setUsersList(list.filter((u) => u.uid !== currentUserId));
+        }
+      })
+      .catch(() => {});
+  }, [loadRooms, currentUserId]);
 
   const onRefresh = useCallback(() => {
     setRefreshing(true);
@@ -1283,6 +1396,7 @@ export default function ChatScreen() {
         return [...sorted, ...stillPending];
       });
       void chat.markAsRead(roomId);
+      markRoomRead(roomId);
     } catch (err: any) {
       if (err?.message?.includes("canceled") || err?.name === "AbortError") return;
       console.warn("Lỗi tải tin nhắn:", err?.message);
@@ -1290,6 +1404,303 @@ export default function ChatScreen() {
       setLoadingMessages(false);
     }
   }, []);
+
+  const activeRoomRef = useRef<ChatRoom | null>(null);
+  useEffect(() => {
+    activeRoomRef.current = activeRoom;
+  }, [activeRoom]);
+
+  const currentUserIdRef = useRef<string>(currentUserId);
+  useEffect(() => {
+    currentUserIdRef.current = currentUserId;
+  }, [currentUserId]);
+
+  // Đảm bảo kết nối Socket nếu chưa kết nối
+  useEffect(() => {
+    const token = api.getAccessToken();
+    if (token && !socketService.isConnected) {
+      socketService.connect(token);
+    }
+  }, []);
+
+  // Lắng nghe sự kiện WebSocket thời gian thực (real-time):
+  // 1. Khi có tin nhắn mới (internal_new_message) -> cập nhật ngay tin nhắn mới nhất, số tin chưa đọc, thứ tự phòng
+  // 2. Khi phòng chat được cập nhật (internal_room_updated)
+  // 3. Khi tin nhắn bị thu hồi (internal_message_deleted)
+  // 4. Khi tin nhắn được đọc (internal_messages_read)
+  // 5. Khi tin nhắn được chỉnh sửa (internal_message_edited)
+  useEffect(() => {
+    const handleNewMessage = (payload: { roomId: string; message: ChatMessage; roomUpdate?: any }) => {
+      if (!payload || !payload.roomId) return;
+      const { roomId, message, roomUpdate } = payload;
+
+      // 1. Cập nhật phòng active nếu người dùng đang ở trong phòng này
+      if (activeRoomRef.current?._id === roomId) {
+        setMessages((prev) => {
+          if (prev.some((m) => m._id === message._id)) return prev;
+
+          // Nếu tin nhắn là của chính mình gửi:
+          const msgSenderId = getSenderIdString(message.senderId);
+          const isFromMe = msgSenderId === currentUserIdRef.current;
+          if (isFromMe) {
+            // Tìm tin nhắn tạm đang gửi (temp_)
+            // Khớp nội dung tin nhắn hoặc lấy tin tạm đầu tiên
+            const tempIndex = prev.findIndex(
+              (m) =>
+                typeof m._id === "string" &&
+                (m._id.startsWith("temp_") || m.status === "sending") &&
+                (m.content === message.content || (!m.content && !message.content))
+            );
+            const fallbackTempIndex =
+              tempIndex !== -1
+                ? tempIndex
+                : prev.findIndex(
+                    (m) => typeof m._id === "string" && (m._id.startsWith("temp_") || m.status === "sending")
+                  );
+
+            if (fallbackTempIndex !== -1) {
+              // Thay thế trực tiếp tin tạm bằng tin nhắn thực tế từ socket
+              const updated = [...prev];
+              updated[fallbackTempIndex] = message;
+              return updated;
+            }
+          }
+
+          return [...prev, message];
+        });
+        void chat.markAsRead(roomId);
+        markRoomRead(roomId);
+      }
+
+      // 2. Cập nhật ngay lập tức danh sách phòng (rooms) ở màn hình ngoài:
+      // Tin nhắn mới nhất, thời gian, số tin chưa đọc, và thứ tự phòng
+      setRooms((prev) => {
+        const index = prev.findIndex((r) => r._id === roomId);
+        if (index === -1) {
+          // Nếu là phòng mới chưa có trong list, fetch lại list
+          void loadRooms(true);
+          return prev;
+        }
+
+        const room = prev[index];
+        const msgSenderId = getSenderIdString(message.senderId);
+        const isFromMe = msgSenderId === currentUserIdRef.current;
+        const isActive = activeRoomRef.current?._id === roomId;
+        const newUnread = isActive || isFromMe ? 0 : (room.unreadCount || 0) + 1;
+
+        const isBot = isChatbotRoom(room);
+        const isCloud = isCloudRoom(room);
+        const updatedRoom: ChatRoom = {
+          ...room,
+          ...(roomUpdate ? { name: roomUpdate.name } : {}),
+          isChatbot: isBot,
+          isPinned: isBot || isCloud ? true : (roomUpdate?.isPinned !== undefined ? roomUpdate.isPinned : room.isPinned),
+          lastMessage: message,
+          updatedAt: message.createdAt || new Date().toISOString(),
+          unreadCount: newUnread,
+        };
+
+        const updatedList = [...prev];
+        updatedList[index] = updatedRoom;
+        return updatedList;
+      });
+
+      // Tải ngầm lại danh sách phòng để đồng bộ 100% với server
+      void loadRooms(true);
+    };
+
+    const handleRoomUpdated = (updatedRoom: any) => {
+      if (!updatedRoom || !updatedRoom._id) return;
+      void loadRooms(true);
+    };
+
+    const handleMessageDeleted = (payload: { roomId: string; messageId: string }) => {
+      if (!payload) return;
+      if (activeRoomRef.current?._id === payload.roomId) {
+        setMessages((prev) =>
+          prev.map((m) =>
+            m._id === payload.messageId ? { ...m, isDeleted: true, content: "Tin nhắn đã được thu hồi" } : m
+          )
+        );
+      }
+      void loadRooms(true);
+    };
+
+    const handleMessagesRead = (payload: { roomId: string; userId: string }) => {
+      if (!payload?.roomId) return;
+      if (payload.userId === currentUserIdRef.current) {
+        setRooms((prev) =>
+          prev.map((r) => (r._id === payload.roomId ? { ...r, unreadCount: 0 } : r))
+        );
+      }
+    };
+
+    const handleMessageEdited = (payload: { roomId: string; messageId: string; message: ChatMessage }) => {
+      if (!payload?.roomId) return;
+      setRooms((prev) =>
+        prev.map((r) => {
+          if (r._id === payload.roomId && r.lastMessage?._id === payload.messageId) {
+            return { ...r, lastMessage: payload.message };
+          }
+          return r;
+        })
+      );
+      if (activeRoomRef.current?._id === payload.roomId) {
+        setMessages((prev) =>
+          prev.map((m) => (m._id === payload.messageId ? { ...m, ...payload.message } : m))
+        );
+      }
+    };
+
+    socketService.on("internal_new_message", handleNewMessage);
+    socketService.on("internal_room_updated", handleRoomUpdated);
+    socketService.on("internal_message_deleted", handleMessageDeleted);
+    socketService.on("internal_messages_read", handleMessagesRead);
+    socketService.on("internal_message_edited", handleMessageEdited);
+
+    return () => {
+      socketService.off("internal_new_message", handleNewMessage);
+      socketService.off("internal_room_updated", handleRoomUpdated);
+      socketService.off("internal_message_deleted", handleMessageDeleted);
+      socketService.off("internal_messages_read", handleMessagesRead);
+      socketService.off("internal_message_edited", handleMessageEdited);
+    };
+  }, [loadRooms, isChatbotRoom, isCloudRoom, getSenderIdString]);
+
+  const getActiveRoomMember = useCallback(
+    (room: ChatRoom | null) =>
+      room?.members?.find((member) => {
+        const memberId = typeof member.userId === "object" ? member.userId?._id || member.userId?.uid : member.userId;
+        return memberId === currentUserId;
+      }),
+    [currentUserId],
+  );
+
+  const canManageActiveGroup = useMemo(() => {
+    const member = getActiveRoomMember(activeRoom);
+    return Boolean(member?.role === "admin" || (activeRoom && activeRoom.creatorId === currentUserId));
+  }, [activeRoom, currentUserId, getActiveRoomMember]);
+
+  const handleUpdateActiveRoom = async (updateData: { name?: string; avatarURL?: string; onlyAdminsCanMessage?: boolean }) => {
+    if (!activeRoom?._id || !activeRoom.isGroup) return;
+    setRoomActionBusy(true);
+    try {
+      const updatedRoom = await chat.updateRoom(activeRoom._id, updateData);
+      setActiveRoom(updatedRoom);
+      setRooms((prev) => prev.map((room) => (room._id === updatedRoom._id ? updatedRoom : room)));
+      const actor = getCurrentUserDisplayName();
+      if (updateData.name !== undefined) await postRoomActivity(`${actor} đã đổi tên nhóm thành "${updateData.name}".`);
+      if (updateData.avatarURL !== undefined) await postRoomActivity(`${actor} đã đổi ảnh đại diện nhóm.`);
+      if (updateData.onlyAdminsCanMessage !== undefined) {
+        await postRoomActivity(
+          updateData.onlyAdminsCanMessage
+            ? `${actor} đã bật quyền chỉ Trưởng/Phó phòng được nhắn tin.`
+            : `${actor} đã tắt quyền chỉ Trưởng/Phó phòng được nhắn tin.`,
+        );
+      }
+      showCustomAlert("Thành công", "Đã cập nhật thông tin nhóm.");
+    } catch (err: any) {
+      showCustomAlert("Lỗi", err?.message || "Không thể cập nhật nhóm chat.");
+    } finally {
+      setRoomActionBusy(false);
+    }
+  };
+
+  const handlePickGroupAvatar = async () => {
+    if (!activeRoom?.isGroup || !canManageActiveGroup) return;
+    try {
+      const result = await ImagePicker.launchImageLibraryAsync({ mediaTypes: ["images"], quality: 0.8 });
+      if (result.canceled || !result.assets?.[0]) return;
+      const asset = result.assets[0];
+      const uploaded = await prepareAttachment(
+        asset.uri,
+        asset.fileName || `group_avatar_${Date.now()}.jpg`,
+        asset.mimeType || "image/jpeg",
+        asset.fileSize,
+      );
+      await handleUpdateActiveRoom({ avatarURL: uploaded.url });
+    } catch (err: any) {
+      showCustomAlert("Lỗi", err?.message || "Không thể đổi ảnh đại diện nhóm.");
+    }
+  };
+
+  const handleAddSelectedMembers = async () => {
+    if (!activeRoom?._id || selectedAddMemberIds.length === 0) return;
+    setRoomActionBusy(true);
+    try {
+      const updatedRoom = await chat.addMembers(activeRoom._id, selectedAddMemberIds);
+      setActiveRoom(updatedRoom);
+      setRooms((prev) => prev.map((room) => (room._id === updatedRoom._id ? updatedRoom : room)));
+      setSelectedAddMemberIds([]);
+      setShowAddMembers(false);
+      const addedNames = usersList
+        .filter((candidate) => selectedAddMemberIds.includes(candidate.uid))
+        .map((candidate) => candidate.displayName || candidate.email)
+        .join(", ");
+      await postRoomActivity(`${getCurrentUserDisplayName()} đã thêm ${addedNames || "thành viên mới"} vào nhóm.`);
+      showCustomAlert("Thành công", "Đã thêm thành viên vào nhóm.");
+    } catch (err: any) {
+      showCustomAlert("Lỗi", err?.message || "Không thể thêm thành viên.");
+    } finally {
+      setRoomActionBusy(false);
+    }
+  };
+
+  const handleRemoveGroupMember = (member: ChatRoomMember) => {
+    if (!activeRoom?._id || !canManageActiveGroup) return;
+    const memberUser = typeof member.userId === "object" ? member.userId : null;
+    const memberId = memberUser?._id || memberUser?.uid;
+    if (!memberId || memberId === currentUserId) return;
+    const memberName = memberUser?.displayName || memberUser?.email || "thành viên";
+
+    showCustomAlert("Xóa thành viên", `Bạn có chắc chắn muốn xóa ${memberName} khỏi nhóm không?`, [
+      { text: "Hủy", style: "cancel" },
+      {
+        text: "Xóa",
+        style: "destructive",
+        onPress: async () => {
+          setRoomActionBusy(true);
+          try {
+            const updatedRoom = await chat.removeMember(activeRoom._id, memberId);
+            setActiveRoom(updatedRoom);
+            setRooms((prev) => prev.map((room) => (room._id === updatedRoom._id ? updatedRoom : room)));
+            await postRoomActivity(`${getCurrentUserDisplayName()} đã xóa ${memberName} khỏi nhóm.`);
+            showCustomAlert("Thành công", `Đã xóa ${memberName} khỏi nhóm.`);
+          } catch (err: any) {
+            showCustomAlert("Lỗi", err?.message || "Không thể xóa thành viên.");
+          } finally {
+            setRoomActionBusy(false);
+          }
+        },
+      },
+    ]);
+  };
+
+  const handleDissolveActiveGroup = () => {
+    if (!activeRoom?._id || !canManageActiveGroup) return;
+    showCustomAlert("Giải tán nhóm", "Bạn có chắc chắn muốn giải tán nhóm này không?", [
+      { text: "Hủy", style: "cancel" },
+      {
+        text: "Giải tán",
+        style: "destructive",
+        onPress: async () => {
+          setRoomActionBusy(true);
+          try {
+            await postRoomActivity(`${getCurrentUserDisplayName()} đã giải tán nhóm.`);
+            await chat.deleteRoom(activeRoom._id);
+            setRoomInfoModalVisible(false);
+            setActiveRoom(null);
+            void loadRooms(true);
+            showCustomAlert("Thành công", "Đã giải tán nhóm.");
+          } catch (err: any) {
+            showCustomAlert("Lỗi", err?.message || "Không thể giải tán nhóm.");
+          } finally {
+            setRoomActionBusy(false);
+          }
+        },
+      },
+    ]);
+  };
 
   // Polling for real-time messages when a room is active
   useEffect(() => {
@@ -1306,6 +1717,34 @@ export default function ChatScreen() {
       if (pollingRef.current) clearInterval(pollingRef.current);
     };
   }, [activeRoom?._id, loadMessages]);
+
+  // Polling danh sách phòng chat khi đang đứng ở màn hình danh sách (activeRoom === null)
+  // để luôn cập nhật tin nhắn mới nhất và số tin chưa đọc (real-time 3.5s fallback)
+  const roomListPollingRef = useRef<any>(null);
+  useEffect(() => {
+    if (!activeRoom) {
+      if (roomListPollingRef.current) clearInterval(roomListPollingRef.current);
+      roomListPollingRef.current = setInterval(() => {
+        void loadRooms(true);
+      }, 3500);
+    } else {
+      if (roomListPollingRef.current) clearInterval(roomListPollingRef.current);
+    }
+    return () => {
+      if (roomListPollingRef.current) clearInterval(roomListPollingRef.current);
+    };
+  }, [activeRoom, loadRooms]);
+
+  // Khi người dùng chuyển tab sang "Trò chuyện", tự động làm mới ngay danh sách và bảo đảm socket kết nối
+  useFocusEffect(
+    useCallback(() => {
+      const token = api.getAccessToken();
+      if (token && !socketService.isConnected) {
+        socketService.connect(token);
+      }
+      void loadRooms(true);
+    }, [loadRooms])
+  );
 
   // Cuộn ngay xuống tin nhắn mới nhất khi vừa vào phòng và tải xong tin nhắn
   useEffect(() => {
@@ -1332,6 +1771,7 @@ export default function ChatScreen() {
 
   // 3. Open Conversation
   const handleOpenRoom = (room: ChatRoom) => {
+    markRoomRead(room._id);
     setActiveRoom(room);
     setMessages([]); // Làm sạch tin nhắn phòng cũ, tránh bị trùng lặp hiển thị
     setChatSearchQuery("");
@@ -1339,6 +1779,27 @@ export default function ChatScreen() {
     isAtBottomRef.current = true;
     isNavigatingToRepliedRef.current = false;
     initialScrollDoneRef.current = false;
+  };
+
+  const handleSaveGroupName = async () => {
+    const nextName = groupNameDraft.trim();
+    if (!nextName || nextName === activeRoom?.name) return;
+    await handleUpdateActiveRoom({ name: nextName });
+    setGroupNameDraft("");
+  };
+
+  const handleOpenRoomInfo = async () => {
+    if (!activeRoom) return;
+    setGroupNameDraft(activeRoom.name || "");
+    setRoomInfoModalVisible(true);
+    if (usersList.length === 0) {
+      try {
+        const list = await userManagementApi.getUsers();
+        setUsersList(list.filter((item) => item.uid !== currentUserId));
+      } catch (err: any) {
+        console.warn("Lỗi tải danh sách thành viên:", err?.message);
+      }
+    }
   };
 
   const handleCloseRoom = () => {
@@ -1350,6 +1811,7 @@ export default function ChatScreen() {
     isAtBottomRef.current = true;
     if (navigatingTimerRef.current) clearTimeout(navigatingTimerRef.current);
     void loadRooms(true);
+    void refreshUnread();
   };
 
   // Xử lý nút Back vật lý trên Android để thoát phòng chat mượt mà
@@ -1511,8 +1973,8 @@ export default function ChatScreen() {
     const optimisticMessage: any = {
       _id: tempId,
       roomId: currentRoomId,
-      senderId: user?.id || "me",
-      senderName: user?.fullName || "Tôi",
+      senderId: currentUserId,
+      senderName: user?.displayName || (user as any)?.fullName || "Tôi",
       content: textToSend,
       attachments: finalAttachments.length > 0 ? finalAttachments : undefined,
       replyTo: replyingMessage || undefined,
@@ -1537,7 +1999,12 @@ export default function ChatScreen() {
         finalAttachments.length > 0 ? finalAttachments : undefined,
         replyId
       );
-      setMessages((prev) => prev.map((m) => (m._id === tempId ? sentMsg : m)));
+      setMessages((prev) => {
+        if (prev.some((m) => m._id === sentMsg._id)) {
+          return prev.filter((m) => m._id !== tempId);
+        }
+        return prev.map((m) => (m._id === tempId ? sentMsg : m));
+      });
       void loadRooms(true);
     } catch (err: any) {
       setMessages((prev) => prev.map((m) => (m._id === tempId ? { ...m, status: "failed" } : m)));
@@ -1581,8 +2048,8 @@ export default function ChatScreen() {
         const optimisticMessage: any = {
           _id: tempId,
           roomId: currentRoomId,
-          senderId: currentUserId || (user as any)?._id || user?.uid || (user as any)?.id || "me",
-          senderName: user?.fullName || "Tôi",
+          senderId: currentUserId,
+          senderName: user?.displayName || (user as any)?.fullName || "Tôi",
           content: "",
           attachments: localAttachments,
           createdAt: new Date().toISOString(),
@@ -1624,9 +2091,12 @@ export default function ChatScreen() {
 
               if (uploadedList.length > 0) {
                 const sentMsg = await chat.sendMessage(currentRoomId, "", uploadedList);
-                setMessages((prev) =>
-                  prev.map((m) => (m._id === tempId ? sentMsg : m))
-                );
+                setMessages((prev) => {
+                  if (prev.some((m) => m._id === sentMsg._id)) {
+                    return prev.filter((m) => m._id !== tempId);
+                  }
+                  return prev.map((m) => (m._id === tempId ? sentMsg : m));
+                });
                 void loadRooms(true);
               } else {
                 setMessages((prev) =>
@@ -1671,8 +2141,8 @@ export default function ChatScreen() {
         const optimisticMessage: any = {
           _id: tempId,
           roomId: currentRoomId,
-          senderId: currentUserId || (user as any)?._id || user?.uid || (user as any)?.id || "me",
-          senderName: user?.fullName || "Tôi",
+          senderId: currentUserId,
+          senderName: user?.displayName || (user as any)?.fullName || "Tôi",
           content: "",
           attachments: [{ url: asset.uri, name: fileName, type: mimeType, size: asset.fileSize }],
           createdAt: new Date().toISOString(),
@@ -1690,7 +2160,12 @@ export default function ChatScreen() {
             const att = await prepareAttachment(asset.uri, fileName, mimeType, asset.fileSize, asset.base64);
             if (att.url && !att.url.startsWith("file://")) {
               const sentMsg = await chat.sendMessage(currentRoomId, "", [att]);
-              setMessages((prev) => prev.map((m) => (m._id === tempId ? sentMsg : m)));
+              setMessages((prev) => {
+                if (prev.some((m) => m._id === sentMsg._id)) {
+                  return prev.filter((m) => m._id !== tempId);
+                }
+                return prev.map((m) => (m._id === tempId ? sentMsg : m));
+              });
               void loadRooms(true);
             } else {
               setMessages((prev) => prev.map((m) => (m._id === tempId ? { ...m, status: "failed" } : m)));
@@ -1813,8 +2288,8 @@ export default function ChatScreen() {
         const optimisticMessage: any = {
           _id: tempId,
           roomId: currentRoomId,
-          senderId: currentUserId || (user as any)?._id || user?.uid || (user as any)?.id || "me",
-          senderName: user?.fullName || "Tôi",
+          senderId: currentUserId,
+          senderName: user?.displayName || (user as any)?.fullName || "Tôi",
           content: "",
           attachments: localAttachments,
           createdAt: new Date().toISOString(),
@@ -1856,9 +2331,12 @@ export default function ChatScreen() {
 
               if (uploadedList.length > 0) {
                 const sentMsg = await chat.sendMessage(currentRoomId, "", uploadedList);
-                setMessages((prev) =>
-                  prev.map((m) => (m._id === tempId ? sentMsg : m))
-                );
+                setMessages((prev) => {
+                  if (prev.some((m) => m._id === sentMsg._id)) {
+                    return prev.filter((m) => m._id !== tempId);
+                  }
+                  return prev.map((m) => (m._id === tempId ? sentMsg : m));
+                });
                 void loadRooms(true);
               } else {
                 setMessages((prev) =>
@@ -2659,11 +3137,18 @@ export default function ChatScreen() {
     });
   }, [rooms, activeTab, searchQuery, isChatbotRoom, isCloudRoom, isRoomPinned]);
 
-  // Messages filtered by in-chat search
+  // Messages filtered by in-chat search & deduplicated by _id
   const displayedMessages = useMemo(() => {
-    if (!chatSearchQuery.trim()) return messages;
+    const seen = new Set<string>();
+    const deduped: ChatMessage[] = [];
+    for (const m of messages) {
+      if (m._id && seen.has(m._id)) continue;
+      if (m._id) seen.add(m._id);
+      deduped.push(m);
+    }
+    if (!chatSearchQuery.trim()) return deduped;
     const q = chatSearchQuery.toLowerCase().trim();
-    return messages.filter((m) => (m.content || "").toLowerCase().includes(q));
+    return deduped.filter((m) => (m.content || "").toLowerCase().includes(q));
   }, [messages, chatSearchQuery]);
 
   // Pinned messages list in active room
@@ -2748,7 +3233,7 @@ export default function ChatScreen() {
 
             <TouchableOpacity
               style={styles.chatTitleContainer}
-              onPress={() => setRoomInfoModalVisible(true)}
+              onPress={() => void handleOpenRoomInfo()}
               activeOpacity={0.8}
             >
               <View style={{ flexDirection: "row", alignItems: "center" }}>
@@ -2787,7 +3272,7 @@ export default function ChatScreen() {
             {/* Menu icon */}
             <TouchableOpacity
               style={styles.chatHeaderIconBtn}
-              onPress={() => setRoomInfoModalVisible(true)}
+              onPress={() => void handleOpenRoomInfo()}
             >
               <Ionicons name="list" size={22} color={LUXCARE_HEADER_TEXT} />
             </TouchableOpacity>
@@ -2984,13 +3469,26 @@ export default function ChatScreen() {
                 }
               }}
               renderItem={({ item }) => {
+                const senderIdStr = getSenderIdString(item.senderId);
                 const isMe =
-                  typeof item.senderId === "object"
-                    ? item.senderId?._id === currentUserId
-                    : item.senderId === currentUserId;
+                  senderIdStr === currentUserId ||
+                  item.senderId === "me" ||
+                  item.senderId === currentUserId ||
+                  (typeof item._id === "string" && item._id.startsWith("temp_")) ||
+                  item.status === "sending";
 
                 const isDeleted = !!item.isDeleted;
                 const rawContent = item.content || "";
+                const roomActivityText = !isDeleted ? getRoomActivityText(rawContent) : null;
+
+                if (roomActivityText) {
+                  return (
+                    <View style={styles.systemMessageRow}>
+                      <Ionicons name="information-circle-outline" size={15} color="#94a3b8" />
+                      <Text style={styles.systemMessageText}>{roomActivityText}</Text>
+                    </View>
+                  );
+                }
 
                 // Tự động phân tách và hiển thị các đường link media (ảnh/audio/ghi âm) trong nội dung
                 const effectiveAttachments: ChatAttachment[] = item.attachments ? [...item.attachments] : [];
@@ -3053,10 +3551,15 @@ export default function ChatScreen() {
                   <View style={[styles.msgRow, isMe ? styles.msgRowMe : styles.msgRowOther]}>
                     {!isMe && (
                       <View style={styles.msgSenderAvatar}>
-                        {isChatbotRoom(activeRoom) ? (
-                          <Image
-                            source={AI_AVATAR}
-                            style={{ width: 28, height: 28, borderRadius: 14 }}
+                        {!activeRoom.isGroup ? (
+                          <RoomAvatar
+                            room={activeRoom}
+                            avatarUrl={getRoomAvatarUrl(activeRoom)}
+                            roomName={getRoomDisplayName(activeRoom)}
+                            isBot={isChatbotRoom(activeRoom)}
+                            isCloud={isCloudRoom(activeRoom)}
+                            size={28}
+                            fontSize={11}
                           />
                         ) : (
                           <UserAvatar
@@ -3183,7 +3686,7 @@ export default function ChatScreen() {
                                           {getCleanFileName(att)}
                                         </Text>
                                         <Text style={styles.attFileSize}>
-                                          {item.status === "sending" ? "Đang tải lên..." : formatFileSize(att.size)}
+                                          {item.status === "sending" ? "Đang gửi..." : formatFileSize(att.size)}
                                         </Text>
                                       </View>
                                       <View style={styles.attFileDownloadWrap}>
@@ -3255,7 +3758,7 @@ export default function ChatScreen() {
                             ]}
                           >
                             {item.status === "sending"
-                              ? "Đang tải lên..."
+                              ? "Đang gửi..."
                               : item.status === "failed"
                               ? "Lỗi gửi"
                               : item.readBy && item.readBy.length > 1
@@ -3651,10 +4154,13 @@ export default function ChatScreen() {
                     <TouchableOpacity
                       style={styles.actionGridItem}
                       onPress={() => {
+                        const senderIdStr = getSenderIdString(selectedMessage.senderId);
                         const isMe =
-                          typeof selectedMessage.senderId === "object"
-                            ? selectedMessage.senderId?._id === currentUserId
-                            : selectedMessage.senderId === currentUserId;
+                          senderIdStr === currentUserId ||
+                          selectedMessage.senderId === "me" ||
+                          selectedMessage.senderId === currentUserId ||
+                          (typeof selectedMessage._id === "string" && selectedMessage._id.startsWith("temp_")) ||
+                          selectedMessage.status === "sending";
 
                         if (isMe) {
                           void handleDeleteMessage(selectedMessage);
@@ -3771,11 +4277,94 @@ export default function ChatScreen() {
                 <Text style={styles.roomInfoType}>
                   {activeRoom.isGroup ? `Nhóm trò chuyện (${activeRoom.members?.length} thành viên)` : "Cuộc trò chuyện cá nhân"}
                 </Text>
+                {activeRoom.isGroup && canManageActiveGroup && (
+                  <View style={{ width: "100%", marginTop: 16, gap: 10 }}>
+                    <TextInput
+                      style={styles.modalInput}
+                      value={groupNameDraft}
+                      onChangeText={setGroupNameDraft}
+                      placeholder="Tên nhóm"
+                      placeholderTextColor="#94a3b8"
+                    />
+                    <View style={{ flexDirection: "row", gap: 10 }}>
+                      <TouchableOpacity
+                        style={[styles.roomManageBtn, { flex: 1 }]}
+                        onPress={() => void handleSaveGroupName()}
+                        disabled={roomActionBusy}
+                      >
+                        <Ionicons name="create-outline" size={18} color="#2563eb" />
+                        <Text style={styles.roomManageBtnText}>Lưu tên</Text>
+                      </TouchableOpacity>
+                      <TouchableOpacity
+                        style={[styles.roomManageBtn, { flex: 1 }]}
+                        onPress={() => void handlePickGroupAvatar()}
+                        disabled={roomActionBusy}
+                      >
+                        <Ionicons name="image-outline" size={18} color="#059669" />
+                        <Text style={styles.roomManageBtnText}>Đổi ảnh</Text>
+                      </TouchableOpacity>
+                    </View>
+                    <TouchableOpacity
+                      style={styles.roomManageBtn}
+                      onPress={() => void handleUpdateActiveRoom({ onlyAdminsCanMessage: !activeRoom.onlyAdminsCanMessage })}
+                      disabled={roomActionBusy}
+                    >
+                      <Ionicons
+                        name={activeRoom.onlyAdminsCanMessage ? "checkbox" : "square-outline"}
+                        size={20}
+                        color="#7c3aed"
+                      />
+                      <Text style={styles.roomManageBtnText}>Chỉ Trưởng/Phó phòng được nhắn tin</Text>
+                    </TouchableOpacity>
+                  </View>
+                )}
               </View>
 
               {activeRoom.isGroup && (
                 <View style={{ marginTop: 24 }}>
-                  <Text style={styles.sectionHeader}>Danh sách thành viên</Text>
+                  <View style={styles.sectionHeaderRow}>
+                    <Text style={styles.sectionHeader}>Danh sách thành viên</Text>
+                    {canManageActiveGroup && (
+                      <TouchableOpacity
+                        style={styles.addMemberBtn}
+                        onPress={() => setShowAddMembers((prev) => !prev)}
+                        disabled={roomActionBusy}
+                      >
+                        <Ionicons name="person-add-outline" size={16} color="#059669" />
+                        <Text style={styles.addMemberBtnText}>Thêm</Text>
+                      </TouchableOpacity>
+                    )}
+                  </View>
+                  {showAddMembers && canManageActiveGroup && (
+                    <View style={styles.addMembersPanel}>
+                      {usersList
+                        .filter((candidate) => !activeRoom.members?.some((member) => {
+                          const memberId = typeof member.userId === "object" ? member.userId?._id || member.userId?.uid : member.userId;
+                          return memberId === candidate.uid;
+                        }))
+                        .map((candidate) => {
+                          const selected = selectedAddMemberIds.includes(candidate.uid);
+                          return (
+                            <TouchableOpacity
+                              key={candidate.uid}
+                              style={styles.addMemberRow}
+                              onPress={() => setSelectedAddMemberIds((prev) => selected ? prev.filter((id) => id !== candidate.uid) : [...prev, candidate.uid])}
+                            >
+                              <UserAvatar photoURL={candidate.photoURL} name={candidate.displayName || candidate.email} size={32} />
+                              <Text style={styles.addMemberName}>{candidate.displayName || candidate.email}</Text>
+                              <Ionicons name={selected ? "checkbox" : "square-outline"} size={20} color={selected ? LUXCARE_PRIMARY : "#cbd5e1"} />
+                            </TouchableOpacity>
+                          );
+                        })}
+                      <TouchableOpacity
+                        style={[styles.submitBtn, { alignSelf: "flex-end", opacity: selectedAddMemberIds.length > 0 && !roomActionBusy ? 1 : 0.5 }]}
+                        onPress={() => void handleAddSelectedMembers()}
+                        disabled={selectedAddMemberIds.length === 0 || roomActionBusy}
+                      >
+                        <Text style={styles.submitBtnText}>Thêm vào nhóm</Text>
+                      </TouchableOpacity>
+                    </View>
+                  )}
                   {activeRoom.members?.map((m: ChatRoomMember, idx: number) => {
                     const mUser = typeof m.userId === "object" ? m.userId : null;
                     return (
@@ -3790,8 +4379,17 @@ export default function ChatScreen() {
                         </View>
                         <View style={{ flex: 1, marginLeft: 12 }}>
                           <Text style={styles.memberName}>{mUser?.displayName || mUser?.email || "Thành viên"}</Text>
-                          <Text style={styles.memberRole}>{m.role === "admin" ? "Trưởng nhóm" : "Thành viên"}</Text>
+                          <Text style={styles.memberRole}>{m.role === "admin" ? "Trưởng nhóm" : m.role === "deputy" ? "Phó phòng" : "Thành viên"}</Text>
                         </View>
+                        {canManageActiveGroup && mUser && (mUser._id || mUser.uid) !== currentUserId && (
+                          <TouchableOpacity
+                            onPress={() => handleRemoveGroupMember(m)}
+                            disabled={roomActionBusy}
+                            hitSlop={8}
+                          >
+                            <Ionicons name="person-remove-outline" size={20} color="#dc2626" />
+                          </TouchableOpacity>
+                        )}
                       </View>
                     );
                   })}
@@ -3800,31 +4398,42 @@ export default function ChatScreen() {
 
               <View style={{ marginTop: 32 }}>
                 {activeRoom.isGroup && (
-                  <TouchableOpacity
-                    style={styles.dangerBtn}
-                    onPress={() => {
-                      showCustomAlert("Rời nhóm", "Bạn có chắc chắn muốn rời khỏi nhóm này không?", [
-                        { text: "Hủy", style: "cancel" },
-                        {
-                          text: "Rời nhóm",
-                          style: "destructive",
-                          onPress: async () => {
-                            try {
-                              await chat.leaveRoom(activeRoom._id);
-                              setRoomInfoModalVisible(false);
-                              setActiveRoom(null);
-                              void loadRooms(true);
-                            } catch (err: any) {
-                              showCustomAlert("Lỗi", err?.message || "Không thể rời nhóm.");
-                            }
+                  <>
+                    <TouchableOpacity
+                      style={styles.dangerBtn}
+                      onPress={() => {
+                        showCustomAlert("Rời nhóm", "Bạn có chắc chắn muốn rời khỏi nhóm này không?", [
+                          { text: "Hủy", style: "cancel" },
+                          {
+                            text: "Rời nhóm",
+                            style: "destructive",
+                            onPress: async () => {
+                              try {
+                                await postRoomActivity(`${getCurrentUserDisplayName()} đã rời cuộc trò chuyện.`);
+                                await chat.leaveRoom(activeRoom._id);
+                                setRoomInfoModalVisible(false);
+                                setActiveRoom(null);
+                                void loadRooms(true);
+                                showCustomAlert("Thành công", "Bạn đã rời cuộc trò chuyện.");
+                              } catch (err: any) {
+                                showCustomAlert("Lỗi", err?.message || "Không thể rời nhóm.");
+                              }
+                            },
                           },
-                        },
-                      ]);
-                    }}
-                  >
-                    <Ionicons name="log-out-outline" size={20} color="#dc2626" style={{ marginRight: 8 }} />
-                    <Text style={styles.dangerBtnText}>Rời khỏi nhóm trò chuyện</Text>
-                  </TouchableOpacity>
+                        ]);
+                      }}
+                      disabled={roomActionBusy}
+                    >
+                      <Ionicons name="log-out-outline" size={20} color="#dc2626" style={{ marginRight: 8 }} />
+                      <Text style={styles.dangerBtnText}>Rời khỏi nhóm trò chuyện</Text>
+                    </TouchableOpacity>
+                    {canManageActiveGroup && (
+                      <TouchableOpacity style={[styles.dangerBtn, { marginTop: 10 }]} onPress={handleDissolveActiveGroup} disabled={roomActionBusy}>
+                        <Ionicons name="trash-outline" size={20} color="#991b1b" style={{ marginRight: 8 }} />
+                        <Text style={[styles.dangerBtnText, { color: "#991b1b" }]}>Giải tán nhóm</Text>
+                      </TouchableOpacity>
+                    )}
+                  </>
                 )}
               </View>
             </ScrollView>
@@ -3974,6 +4583,7 @@ export default function ChatScreen() {
       ) : (
         <FlatList
           data={filteredRooms}
+          extraData={filteredRooms}
           keyExtractor={(item) => item._id}
           refreshControl={<RefreshControl refreshing={refreshing} onRefresh={onRefresh} colors={[LUXCARE_PRIMARY]} />}
           contentContainerStyle={filteredRooms.length === 0 ? styles.emptyContainer : styles.listContent}
@@ -3991,19 +4601,32 @@ export default function ChatScreen() {
           }
           renderItem={({ item }) => {
             const roomName = getRoomDisplayName(item);
-            const isMeLastSender =
-              typeof item.lastMessage?.senderId === "object"
-                ? item.lastMessage?.senderId?._id === currentUserId
-                : item.lastMessage?.senderId === currentUserId;
+            const isMeLastSender = getSenderIdString(item.lastMessage?.senderId) === currentUserId;
 
             let lastMsgText = "Chưa có tin nhắn";
             if (item.lastMessage) {
               if (item.lastMessage.isDeleted) {
                 lastMsgText = "Tin nhắn đã được thu hồi";
               } else if (item.lastMessage.attachments && item.lastMessage.attachments.length > 0) {
-                lastMsgText = isMeLastSender ? "Bạn: [Hình ảnh/Tệp]" : `${item.lastMessage.senderName || "Đồng nghiệp"}: [Hình ảnh/Tệp]`;
+                const firstAtt = item.lastMessage.attachments[0];
+                const attType = ((firstAtt as any)?.fileType || firstAtt?.type || "").toLowerCase();
+                const attUrl = (firstAtt as any)?.fileUrl || firstAtt?.url || "";
+                const attName = (firstAtt as any)?.fileName || firstAtt?.name || "Tài liệu";
+                let attLabel = "[Hình ảnh/Tệp]";
+                if (attType === "audio" || attType.includes("audio") || attUrl.match(/\.(m4a|mp3|wav|aac|ogg)/i)) {
+                  attLabel = "[Tin nhắn thoại]";
+                } else if (attType === "image" || attType.includes("image") || attUrl.match(/\.(png|jpe?g|webp|gif)/i)) {
+                  attLabel = "[Hình ảnh]";
+                } else if (attType === "video" || attType.includes("video") || attUrl.match(/\.(mp4|mov|avi|mkv)/i)) {
+                  attLabel = "[Video]";
+                } else if (attType === "document" || attType === "pdf" || attUrl.match(/\.(pdf|docx?|xlsx?|pptx?)/i)) {
+                  attLabel = `[Tệp: ${attName}]`;
+                }
+                lastMsgText = isMeLastSender ? `Bạn: ${attLabel}` : `${item.isGroup && item.lastMessage.senderName ? `${item.lastMessage.senderName}: ` : ""}${attLabel}`;
               } else if (item.lastMessage.content) {
-                lastMsgText = isMeLastSender ? `Bạn: ${item.lastMessage.content}` : `${item.lastMessage.senderName ? `${item.lastMessage.senderName}: ` : ""}${item.lastMessage.content}`;
+                lastMsgText = isMeLastSender
+                  ? `Bạn: ${item.lastMessage.content}`
+                  : `${item.isGroup && item.lastMessage.senderName ? `${item.lastMessage.senderName}: ` : ""}${item.lastMessage.content}`;
               }
             }
 
@@ -4714,7 +5337,7 @@ const styles = StyleSheet.create({
     width: 28,
     height: 28,
     borderRadius: 14,
-    backgroundColor: "#0d9488",
+    backgroundColor: "transparent",
     alignItems: "center",
     justifyContent: "center",
     marginRight: 6,
@@ -4737,6 +5360,19 @@ const styles = StyleSheet.create({
     color: "#64748b",
     marginBottom: 3,
     marginLeft: 4,
+  },
+  systemMessageRow: {
+    flexDirection: "row",
+    alignItems: "center",
+    justifyContent: "center",
+    gap: 5,
+    paddingHorizontal: 20,
+    paddingVertical: 8,
+  },
+  systemMessageText: {
+    color: "#94a3b8",
+    fontSize: 12,
+    textAlign: "center",
   },
   msgBubble: {
     borderRadius: 14,
@@ -5542,6 +6178,87 @@ const styles = StyleSheet.create({
     fontSize: 13,
     color: "#64748b",
     marginTop: 4,
+  },
+  roomManageBtn: {
+    flexDirection: "row",
+    alignItems: "center",
+    justifyContent: "center",
+    gap: 8,
+    paddingVertical: 11,
+    paddingHorizontal: 12,
+    borderRadius: 12,
+    backgroundColor: "#f8fafc",
+    borderWidth: 1,
+    borderColor: "#e2e8f0",
+  },
+  roomManageBtnText: {
+    color: "#334155",
+    fontSize: 13,
+    fontWeight: "600",
+  },
+  modalInput: {
+    width: "100%",
+    backgroundColor: "#f8fafc",
+    borderRadius: 12,
+    paddingHorizontal: 14,
+    paddingVertical: 10,
+    fontSize: 14,
+    color: "#0f172a",
+    borderWidth: 1,
+    borderColor: "#e2e8f0",
+  },
+  submitBtn: {
+    backgroundColor: "#059669",
+    paddingVertical: 10,
+    paddingHorizontal: 16,
+    borderRadius: 10,
+    alignItems: "center",
+    justifyContent: "center",
+  },
+  submitBtnText: {
+    color: "#ffffff",
+    fontSize: 14,
+    fontWeight: "700",
+  },
+  sectionHeaderRow: {
+    flexDirection: "row",
+    alignItems: "center",
+    justifyContent: "space-between",
+  },
+  addMemberBtn: {
+    flexDirection: "row",
+    alignItems: "center",
+    gap: 5,
+    paddingHorizontal: 10,
+    paddingVertical: 6,
+    borderRadius: 10,
+    backgroundColor: "#ecfdf5",
+  },
+  addMemberBtnText: {
+    color: "#059669",
+    fontSize: 12,
+    fontWeight: "700",
+  },
+  addMembersPanel: {
+    gap: 8,
+    padding: 12,
+    marginBottom: 12,
+    borderRadius: 14,
+    backgroundColor: "#f8fafc",
+    borderWidth: 1,
+    borderColor: "#e2e8f0",
+  },
+  addMemberRow: {
+    flexDirection: "row",
+    alignItems: "center",
+    gap: 10,
+    paddingVertical: 6,
+  },
+  addMemberName: {
+    flex: 1,
+    color: "#0f172a",
+    fontSize: 13,
+    fontWeight: "600",
   },
   sectionHeader: {
     fontSize: 14,

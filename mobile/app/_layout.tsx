@@ -101,14 +101,18 @@ const splashStyles = StyleSheet.create({
   },
 });
 
+import { ChatUnreadProvider } from "../src/context/ChatUnreadContext";
+
 export default function RootLayout() {
   return (
     <SafeAreaProvider>
       <SessionProvider>
-        <LoadingProvider>
-          <StatusBar style="dark" />
-          <Routes />
-        </LoadingProvider>
+        <ChatUnreadProvider>
+          <LoadingProvider>
+            <StatusBar style="dark" />
+            <Routes />
+          </LoadingProvider>
+        </ChatUnreadProvider>
       </SessionProvider>
     </SafeAreaProvider>
   );

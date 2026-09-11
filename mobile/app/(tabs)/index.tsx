@@ -29,6 +29,7 @@ import { DashboardOverviewSection } from "../../src/components/dashboard";
 import { getAllServicesFlat, isServiceAccessible, LUXCARE_MODULES } from "../../src/components";
 import { isBlogEditorUser } from "../../../src/utils/permissionUtils";
 import { BranchSelector } from "../../src/features/branches/BranchSelector";
+import { useChatUnread } from "../../src/context/ChatUnreadContext";
 
 const { width: SCREEN_WIDTH } = Dimensions.get("window");
 
@@ -45,6 +46,7 @@ interface LuxCareFeature {
 
 export default function Home() {
   const { user, selectedBranch } = useSession();
+  const { totalUnread: unreadChatCount } = useChatUnread();
   const { navigateWithLoading } = useAppLoading();
   const isOwner = ["admin", "superadmin", "branch_owner"].includes(user?.role || "");
   const isEditor = isBlogEditorUser(user);
@@ -189,6 +191,7 @@ export default function Home() {
         color: "#ec4899", // Hồng pink năng động
         bgColor: "#fdf2f8",
         route: "/(tabs)/chat",
+        badge: unreadChatCount > 0 ? (unreadChatCount > 99 ? "99+" : `${unreadChatCount}`) : undefined,
       },
       {
         id: "modules",
@@ -199,11 +202,18 @@ export default function Home() {
         route: "/(tabs)/modules",
       },
     ].filter((item) => item.id === "modules" || isServiceAccessible(item as any, user)) as LuxCareFeature[],
-    [actions, user],
+    [actions, user, unreadChatCount],
   );
 
   // Danh sách toàn bộ các tính năng để tìm kiếm toàn diện (đã lọc quyền)
-  const allServicesFlat = useMemo(() => getAllServicesFlat(LUXCARE_MODULES, user), [user]);
+  const allServicesFlat = useMemo(() => {
+    const list = getAllServicesFlat(LUXCARE_MODULES, user);
+    if (!unreadChatCount) return list;
+    const badgeText = unreadChatCount > 99 ? "99+" : `${unreadChatCount}`;
+    return list.map((item) =>
+      item.route === "/(tabs)/chat" ? { ...item, badge: badgeText } : item
+    );
+  }, [user, unreadChatCount]);
 
   const isSearching = searchQuery.trim().length > 0;
 
