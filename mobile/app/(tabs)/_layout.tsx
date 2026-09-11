@@ -249,7 +249,7 @@ export default function TabLayout() {
         options={{
           title: "Thông báo",
           tabBarBadge: unreadCount > 0 ? (unreadCount > 99 ? "99+" : unreadCount) : undefined,
-          headerShown: true,
+          headerShown: false,
           href: isEditor ? null : undefined,
           tabBarIcon: ({ focused }) => (
             <MomoTabIcon name="notifications" outlineName="notifications-outline" focused={focused} />
@@ -260,7 +260,7 @@ export default function TabLayout() {
         name="profile"
         options={{
           title: "Tài khoản",
-          headerShown: true,
+          headerShown: false,
           href: isEditor ? null : undefined,
           tabBarIcon: ({ focused }) => (
             <MomoTabIcon name="person" outlineName="person-outline" focused={focused} />
