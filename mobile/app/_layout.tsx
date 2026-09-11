@@ -1,6 +1,6 @@
 import { useEffect, useRef, useState } from "react";
 import { Animated, Image, StyleSheet, Text, TouchableOpacity, View } from "react-native";
-import { Stack } from "expo-router";
+import { router, Stack } from "expo-router";
 import { StatusBar } from "expo-status-bar";
 import { useFonts } from "expo-font";
 import { SafeAreaProvider, SafeAreaView } from "react-native-safe-area-context";
@@ -79,7 +79,8 @@ function Routes() {
       return (
         <SafeAreaView style={sessionExpiredStyles.container}>
           <StatusBar style="dark" />
-          <View style={sessionExpiredStyles.content}>
+          <View style={sessionExpiredStyles.topSpacer} />
+          <View style={sessionExpiredStyles.lowerSection}>
             <Image
               source={require("../public/het-phien.png")}
               style={sessionExpiredStyles.image}
@@ -91,6 +92,7 @@ function Routes() {
                 resetSessionReplaced?.();
                 await api.clear().catch(() => {});
                 await retry();
+                router.replace("/login");
               }}
               activeOpacity={0.88}
             >
@@ -152,33 +154,36 @@ const sessionExpiredStyles = StyleSheet.create({
     flex: 1,
     backgroundColor: "#ffffff",
   },
-  content: {
+  topSpacer: {
     flex: 1,
-    backgroundColor: "#ffffff",
+  },
+  lowerSection: {
+    flex: 1.2,
     alignItems: "center",
-    justifyContent: "center",
+    justifyContent: "flex-start",
     paddingHorizontal: 24,
+    paddingBottom: 32,
   },
   image: {
     width: "100%",
-    maxWidth: 360,
+    maxWidth: 340,
     aspectRatio: 1672 / 941,
-    marginBottom: 28,
+    marginBottom: 24,
   },
   button: {
     width: "100%",
     maxWidth: 320,
     backgroundColor: "#059669",
-    paddingVertical: 14,
+    paddingVertical: 15,
     paddingHorizontal: 24,
-    borderRadius: 12,
+    borderRadius: 14,
     alignItems: "center",
     justifyContent: "center",
     shadowColor: "#059669",
     shadowOffset: { width: 0, height: 4 },
-    shadowOpacity: 0.2,
+    shadowOpacity: 0.25,
     shadowRadius: 8,
-    elevation: 3,
+    elevation: 4,
   },
   buttonText: {
     color: "#ffffff",
