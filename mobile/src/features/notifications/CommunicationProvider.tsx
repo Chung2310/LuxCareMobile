@@ -138,7 +138,7 @@ export function CommunicationProvider({ children }: React.PropsWithChildren) {
       if (room?.members && chatNotificationsMuted(room, user.uid))
         setBanner(previous => previous?.roomId === room._id ? null : previous);
     }));
-    const nativeReceived = Notifications?.addNotificationReceivedListener(notification => {
+    const nativeReceived = Notifications?.addNotificationReceivedListener((notification: any) => {
       const content = notification.request.content;
       const data = parseChatPush(content.data);
       if (!data || data.recipientUid !== user.uid || data.companyCode !== user.companyCode || !canUseModule(user, "chat")) return;
@@ -154,7 +154,7 @@ export function CommunicationProvider({ children }: React.PropsWithChildren) {
     if (!Notifications) return;
     const response = Notifications.getLastNotificationResponse();
     if (response) setPendingChat(parseChatPush(response.notification.request.content.data));
-    const listener = Notifications.addNotificationResponseReceivedListener(event => {
+    const listener = Notifications.addNotificationResponseReceivedListener((event: any) => {
       const data = parseChatPush(event.notification.request.content.data);
       if (data) setPendingChat(data);
     });

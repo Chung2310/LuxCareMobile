@@ -155,11 +155,11 @@ export function NotificationProvider({ children }: React.PropsWithChildren) {
         playNotificationSound();
       }
     };
-    const off = socketService.subscribe("new_notification", raw => receive(raw, raw?.title, raw?.body));
+    const off = socketService.subscribe("new_notification", (raw: any) => receive(raw, raw?.title, raw?.body));
     const offChanged = socketService.subscribe("notifications:changed", refresh);
     if (!Notifications) return () => { off(); offChanged(); };
-    const received = Notifications.addNotificationReceivedListener(n => receive(n.request.content.data, n.request.content.title, n.request.content.body));
-    const response = Notifications.addNotificationResponseReceivedListener(r => setPending(parseNoticePayload(r.notification.request.content.data)));
+    const received = Notifications.addNotificationReceivedListener((n: any) => receive(n.request.content.data, n.request.content.title, n.request.content.body));
+    const response = Notifications.addNotificationResponseReceivedListener((r: any) => setPending(parseNoticePayload(r.notification.request.content.data)));
     const initial = Notifications.getLastNotificationResponse();
     if (initial) setPending(parseNoticePayload(initial.notification.request.content.data));
     return () => { off(); offChanged(); received.remove(); response.remove(); };

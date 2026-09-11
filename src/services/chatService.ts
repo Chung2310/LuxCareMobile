@@ -3,8 +3,8 @@ import { browserTransport } from "./serviceTransport";
 
 export interface ChatAttachment {
   url: string;
-  name: string;
-  type: string;
+  name?: string;
+  type?: string;
   size?: number;
   uploadToken?: string;
 }
@@ -30,6 +30,7 @@ export interface ChatMessage {
   replyTo?: any;
   isDeleted?: boolean;
   editedAt?: string | null;
+  status?: "sending" | "sent" | "failed";
   createdAt: string;
 }
 

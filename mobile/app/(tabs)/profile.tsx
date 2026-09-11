@@ -202,19 +202,6 @@ export default function Profile() {
               <Text style={styles.arrowIcon}>›</Text>
             </Pressable>
 
-            {/* App Version Info */}
-            <View style={styles.actionRow}>
-              <View style={[styles.actionIconBox, { backgroundColor: "#f1f5f9" }]}>
-                <Text style={styles.actionIcon}>ℹ️</Text>
-              </View>
-              <View style={{ flex: 1 }}>
-                <Text style={styles.actionTitle}>Phiên bản ứng dụng</Text>
-                <Text style={styles.actionSub}>LuxCare Mobile v1.0.0 (Expo React Native)</Text>
-              </View>
-              <View style={styles.versionBadge}>
-                <Text style={styles.versionBadgeText}>MỚI NHẤT</Text>
-              </View>
-            </View>
           </View>
         </View>
 
