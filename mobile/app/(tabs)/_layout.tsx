@@ -4,6 +4,7 @@ import { Redirect, Tabs } from "expo-router";
 import { useSafeAreaInsets } from "react-native-safe-area-context";
 import { Ionicons } from "@expo/vector-icons";
 import { useSession } from "../../src/auth/SessionProvider";
+import { useCommunication } from "../../src/features/notifications/CommunicationProvider";
 import { useNotifications } from "../../src/features/notifications/NotificationProvider";
 import { colors } from "../../src/ui";
 import { canUseModule } from "../../src/auth/access";
@@ -160,7 +161,8 @@ function MomoTabButton(props: any) {
 }
 
 export default function TabLayout() {
-  const { unreadCount } = useNotifications();
+  const { chatUnread, blogUnread } = useCommunication();
+  const { unreadCount, workUnread } = useNotifications();
   const { user, selectedBranch } = useSession();
   const insets = useSafeAreaInsets();
   if (!user) return <Redirect href="/login" />;
@@ -222,6 +224,7 @@ export default function TabLayout() {
         name="work"
         options={{
           title: "Công việc",
+          tabBarBadge: workUnread > 0 ? (workUnread > 99 ? "99+" : workUnread) : undefined,
           headerShown: false,
           href: isEditor ? null : canUseModule(user, "hr") ? undefined : null,
           tabBarIcon: ({ focused }) => (
@@ -233,6 +236,7 @@ export default function TabLayout() {
         name="chat"
         options={{
           title: "Trò chuyện",
+          tabBarBadge: chatUnread > 0 ? (chatUnread > 99 ? "99+" : chatUnread) : undefined,
           headerShown: false,
           href: isEditor ? null : undefined,
           tabBarIcon: ({ focused }) => (
@@ -245,7 +249,7 @@ export default function TabLayout() {
         options={{
           title: "Thông báo",
           tabBarBadge: unreadCount > 0 ? (unreadCount > 99 ? "99+" : unreadCount) : undefined,
-          headerShown: true,
+          headerShown: false,
           href: isEditor ? null : undefined,
           tabBarIcon: ({ focused }) => (
             <MomoTabIcon name="notifications" outlineName="notifications-outline" focused={focused} />
@@ -256,7 +260,7 @@ export default function TabLayout() {
         name="profile"
         options={{
           title: "Tài khoản",
-          headerShown: true,
+          headerShown: false,
           href: isEditor ? null : undefined,
           tabBarIcon: ({ focused }) => (
             <MomoTabIcon name="person" outlineName="person-outline" focused={focused} />
@@ -292,7 +296,8 @@ export default function TabLayout() {
       <Tabs.Screen name="attendance-history" options={{ title: "Lịch sử chấm công", href: null }} />
       <Tabs.Screen name="kpi" options={{ title: "KPI tháng", href: null }} />
       <Tabs.Screen name="org-chart" options={{ title: "Sơ đồ tổ chức", href: null }} />
-      <Tabs.Screen name="blog" options={{ title: "Blog nội bộ & Thảo luận", href: isEditor ? undefined : null }} />
+      <Tabs.Screen name="blog" options={{ title: "Blog nội bộ & Thảo luận", href: isEditor ? undefined : null,
+        tabBarBadge: blogUnread > 0 ? (blogUnread > 99 ? "99+" : blogUnread) : undefined }} />
       <Tabs.Screen name="training" options={{ title: "Đào tạo", href: null }} />
       <Tabs.Screen name="celebration-email" options={{ title: "Email chúc mừng", href: null }} />
       <Tabs.Screen name="knowledge" options={{ title: "Kho tri thức & SOP", href: null }} />

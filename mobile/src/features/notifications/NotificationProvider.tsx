@@ -17,8 +17,8 @@ if (Notifications) Notifications.setNotificationHandler({ handleNotification: as
   shouldShowBanner: false, shouldShowList: false, shouldPlaySound: false, shouldSetBadge: false,
 }) });
 
-type State = { revision: number; unreadCount: number; refresh: () => void; permissionDenied: boolean; pushError: string | null };
-const Context = createContext<State>({ revision: 0, unreadCount: 0, refresh: () => {}, permissionDenied: false, pushError: null });
+type State = { revision: number; unreadCount: number; workUnread: number; refresh: () => void; permissionDenied: boolean; pushError: string | null };
+const Context = createContext<State>({ revision: 0, unreadCount: 0, workUnread: 0, refresh: () => {}, permissionDenied: false, pushError: null });
 export const useNotifications = () => useContext(Context);
 let permissionRequest: Promise<NotificationPermissionsStatus> | undefined;
 async function initialPermission() {
@@ -42,6 +42,7 @@ export function NotificationProvider({ children }: React.PropsWithChildren) {
   const insets = useSafeAreaInsets();
   const [revision, setRevision] = useState(0);
   const [unreadCount, setUnreadCount] = useState(0);
+  const [workUnread, setWorkUnread] = useState(0);
   const [permissionDenied, setDenied] = useState(false);
   const [pushError, setPushError] = useState<string | null>(nativeNotificationsUnavailableReason);
   const [pending, setPending] = useState<NoticePayload | null>(null);
@@ -70,8 +71,19 @@ export function NotificationProvider({ children }: React.PropsWithChildren) {
   }, [unreadCount]);
 
   useEffect(() => {
+    let active = true;
+    if (!user) { setWorkUnread(0); return; }
+    const timer = setTimeout(() => void notifications.getNotifications({ limit: 1, type: "task", read: false }).then(result => {
+      // unreadCount is global; total respects the task + unread filters.
+      if (active) setWorkUnread(result.total);
+    }).catch(() => {}), 150);
+    return () => { active = false; clearTimeout(timer); };
+  }, [user?.uid, user?.companyCode, revision]);
+
+  useEffect(() => {
     seen.current.clear();
     setUnreadCount(0);
+    setWorkUnread(0);
     setBanner(null);
     setPushError(nativeNotificationsUnavailableReason);
     let active = true;
@@ -163,7 +175,7 @@ export function NotificationProvider({ children }: React.PropsWithChildren) {
     return () => clearTimeout(timer);
   }, [banner]);
 
-  return <Context.Provider value={{ revision, unreadCount, refresh, permissionDenied, pushError }}>
+  return <Context.Provider value={{ revision, unreadCount, workUnread, refresh, permissionDenied, pushError }}>
     {children}
     {banner && user && (
       <RealtimeNotificationToast

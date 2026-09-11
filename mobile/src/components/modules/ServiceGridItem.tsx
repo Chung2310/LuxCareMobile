@@ -7,6 +7,8 @@ import {
 } from "react-native";
 import { Ionicons } from "@expo/vector-icons";
 import type { ServiceItem } from "./types";
+import { useNotifications } from "../../features/notifications/NotificationProvider";
+import { useCommunication, communicationBadge } from "../../features/notifications/CommunicationProvider";
 
 interface ServiceGridItemProps {
   item: ServiceItem;
@@ -21,6 +23,9 @@ export const ServiceGridItem: React.FC<ServiceGridItemProps> = ({
   widthPercentage = "25%",
   iconSize = 25,
 }) => {
+  const { blogUnread, chatUnread } = useCommunication();
+  const { workUnread } = useNotifications();
+  const badge = communicationBadge(item.route, blogUnread, chatUnread, item.badge, workUnread);
   return (
     <TouchableOpacity
       style={[styles.container, { width: widthPercentage }]}
@@ -29,9 +34,9 @@ export const ServiceGridItem: React.FC<ServiceGridItemProps> = ({
     >
       <View style={[styles.iconBox, { backgroundColor: item.bgColor }]}>
         <Ionicons name={item.icon} size={iconSize} color={item.color} />
-        {Boolean(item.badge) && (
+        {Boolean(badge) && (
           <View style={styles.badge}>
-            <Text style={styles.badgeText}>{item.badge}</Text>
+            <Text style={styles.badgeText}>{badge}</Text>
           </View>
         )}
       </View>

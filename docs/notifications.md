@@ -1,5 +1,15 @@
 # Thông báo realtime và push mobile
 
+## Chat và Blog realtime
+
+`CommunicationProvider` nghe các event có sẵn của backend: `internal_new_message`, `internal_room_updated/deleted`, `internal_message_edited/deleted/reaction`, `internal_messages_read`, `blog_post_created/deleted/pinned/liked`. Không cần thêm endpoint backend cho phần realtime này.
+
+Chat hiển thị banner khi nhận tin của người khác ngoài phòng đang xem, mở đúng phòng khi chạm banner, và lấy số chưa đọc từ API cho tab/icon chức năng. Phòng đang mở cập nhật theo socket; polling 15 giây chỉ dự phòng khi mất socket. App không đánh dấu đã đọc khi tab không hiển thị hoặc app chạy nền.
+
+Blog hiển thị banner bài mới và số bài chưa xem trên icon ở trang chủ, danh sách chức năng và mục ghim. Đánh dấu đã xem khi kênh được tải thành công trong màn hình đang mở. Chỉ tính 50 bài API đang trả về, không tính bài tự đăng. Lần đồng bộ đầu tiên trên thiết bị lấy các bài hiện tại làm mốc; các bài mới sau đó được đếm. Trạng thái xem lưu riêng theo API server/công ty/tài khoản trên thiết bị, chưa đồng bộ đã xem giữa nhiều thiết bị. Khi reconnect/foreground, tải lại API để cập nhật nội dung và badge.
+
+Phần Chat/Blog này là realtime trong app, chạy được trên Expo Go; chưa bổ sung push nền cho hai loại nội dung này.
+
 Expo Go: không nạp `expo-notifications` hoặc gọi API native push. Vẫn dùng socket, banner và badge trong ứng dụng; màn hình Thông báo giải thích giới hạn này. Luồng xin quyền và push native chạy trong development/release build của LuxCare.
 
 Backend: `E:/Igen/LuxCare`. Mobile: `mobile/`.
@@ -32,6 +42,17 @@ Cấu hình FCM v1 service account và APNs credentials trong EAS cho project t�
 Triển khai backend trước, bảo đảm MongoDB tạo index unique của `MobilePushDevice` và `MobilePushJob` cùng TTL/index hàng đợi theo schema. Nếu môi trường tắt autoIndex, tạo các index theo schema trong quy trình migration trước khi bật worker. Cho phép backend kết nối HTTPS tới `exp.host`.
 
 Build lại native sau khi thêm plugin; cập nhật JavaScript đơn thuần không bổ sung native module. Dùng development/release build để kiểm thử push, không dùng Expo Go Android.
+
+## Thông báo chat và tắt thông báo
+
+- Mobile: mở cuộc trò chuyện → Thông tin cuộc trò chuyện → Tắt/Bật thông báo tin nhắn. Áp dụng riêng cho mỗi người trong chat cá nhân hoặc nhóm, lưu trên backend và đồng bộ qua socket. Không chặn gửi tin, không ẩn nội dung và không giảm badge chưa đọc.
+- API mới: `PATCH /api/v1/chat/rooms/:roomId/notifications`, body `{"muted":true}`. Cần quyền chat và là thành viên đúng công ty; chỉ cập nhật cài đặt của người đang đăng nhập.
+- Tin nhắn mới có hàng đợi Expo Push bền vững; kiểm tra lại thành viên, công ty, đã đọc, tắt thông báo và phiên thiết bị trước gửi. Không gửi lại tin cũ khi bật thông báo. Web Push hiện có cũng kiểm tra mute.
+- Foreground dùng chung khóa messageId để tránh banner trùng socket/push. Chạm push mở phòng sau khi xác minh tài khoản và quyền truy cập, kể cả khi khởi động ứng dụng từ trạng thái đóng.
+- Triển khai backend LuxCare cùng thay đổi mobile; tạo index `ChatMessage { mobilePushQueued: 1, createdAt: 1 }` nếu autoIndex bị tắt. Không backfill cờ cho tin nhắn lịch sử. Push chat hết hạn sau một giờ.
+- Push đã chuyển sang nhà cung cấp trước thời điểm tắt có thể vẫn xuất hiện; không thể thu hồi bằng cài đặt này. Tắt thông báo cần kết nối mạng để lưu thành công.
+
+Kiểm thử thiết bị: dùng hai tài khoản, thử chat cá nhân và nhóm ở foreground/background/khóa màn hình; tắt thông báo và kiểm tra không có banner/push nhưng badge vẫn tăng; bật lại và chỉ nhận tin mới; thử đã đọc trước lúc worker gửi, chạm push khi app đóng, đổi tài khoản và rời nhóm.
 
 ## Xác minh
 
