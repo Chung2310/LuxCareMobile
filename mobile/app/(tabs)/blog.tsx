@@ -16,6 +16,7 @@ import {
   Linking,
   Image,
   Share,
+  ImageBackground,
 } from "react-native";
 import * as DocumentPicker from "expo-document-picker";
 import * as ImagePicker from "expo-image-picker";
@@ -537,7 +538,12 @@ export default function BlogScreen() {
   );
 
   return (
-    <SafeAreaView edges={["top", "bottom"]} style={styles.container}>
+    <ImageBackground
+      source={require("../../public/blog-bg.png")}
+      style={styles.backgroundImageContainer}
+      resizeMode="cover"
+    >
+      <SafeAreaView edges={["top", "bottom"]} style={styles.safeArea}>
       <KeyboardAvoidingView
         style={{ flex: 1 }}
         behavior={Platform.OS === "ios" ? "padding" : "height"}
@@ -1212,7 +1218,8 @@ export default function BlogScreen() {
           </View>
         </Modal>
       </KeyboardAvoidingView>
-    </SafeAreaView>
+      </SafeAreaView>
+    </ImageBackground>
   );
 }
 
@@ -1417,15 +1424,25 @@ const styles = StyleSheet.create({
     flex: 1,
   },
 
+  backgroundImageContainer: {
+    flex: 1,
+    width: "100%",
+    height: "100%",
+    backgroundColor: "#ecfdf5",
+  },
+  safeArea: {
+    flex: 1,
+    backgroundColor: "transparent",
+  },
   container: {
     flex: 1,
-    backgroundColor: "#ecfdf5",
+    backgroundColor: "transparent",
   },
   header: {
     flexDirection: "row",
     alignItems: "center",
     justifyContent: "space-between",
-    backgroundColor: "#d1fae5",
+    backgroundColor: "rgba(209, 250, 229, 0.94)",
     paddingHorizontal: 14,
     paddingVertical: 10,
     borderBottomWidth: 1,
