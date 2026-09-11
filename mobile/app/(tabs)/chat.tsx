@@ -3027,10 +3027,13 @@ export default function ChatScreen() {
 
                 return (
                   <View style={[styles.msgRow, isMe ? styles.msgRowMe : styles.msgRowOther]}>
-                    {!isMe && (activeRoom.isGroup || isChatbotRoom(activeRoom)) && (
+                    {!isMe && (
                       <View style={styles.msgSenderAvatar}>
                         {isChatbotRoom(activeRoom) ? (
-                          <Ionicons name="sparkles" size={14} color="#ffffff" />
+                          <Image
+                            source={AI_AVATAR}
+                            style={{ width: 28, height: 28, borderRadius: 14 }}
+                          />
                         ) : (
                           <UserAvatar
                             photoURL={getMessageSenderPhoto(item)}
