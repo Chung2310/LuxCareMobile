@@ -578,31 +578,82 @@ export default function BlogScreen() {
     }
   };
 
-  const handleDownloadFile = async (url: string, fileName?: string) => {
-    if (!url) return;
+  const isDownloadingRef = useRef(false);
+
+  const handleDownloadFile = async (
+    url: string,
+    fileName?: string,
+    fileType: "image" | "video" | "file" = "file"
+  ) => {
+    if (!url || isDownloadingRef.current) return;
+    isDownloadingRef.current = true;
     try {
-      const ext = url.split("?")[0].split(".").pop() || "dat";
+      const ext = (url.split("?")[0].split(".").pop() || "dat").toLowerCase();
       const safeName = fileName
         ? fileName.replace(/[^a-zA-Z0-9._-]/g, "_")
         : `luxcare_${Date.now()}.${ext}`;
-      const destPath = `${FileSystem.documentDirectory}${safeName}`;
-      showAlert("Đang tải xuống...", `Đang tải "${fileName || safeName}" về thiết bị...`);
-      const res = await FileSystem.downloadAsync(url, destPath);
-      if (res && res.status === 200) {
-        const canShare = await Sharing.isAvailableAsync();
-        if (canShare) {
-          await Sharing.shareAsync(res.uri, {
-            dialogTitle: `Lưu "${fileName || safeName}" vào thiết bị`,
-            UTI: "public.item",
-          });
-        } else {
-          showAlert("Tải xuống thành công", `Đã lưu "${fileName || safeName}" vào thiết bị.`);
+
+      const isImg = fileType === "image" || ["jpg", "jpeg", "png", "gif", "webp", "bmp", "heic"].includes(ext);
+      const isVid = fileType === "video" || ["mp4", "mov", "avi", "mkv", "webm", "m4v", "3gp"].includes(ext);
+
+      if (Platform.OS === "web") {
+        try {
+          const a = document.createElement("a");
+          a.href = url;
+          a.download = fileName || safeName;
+          document.body.appendChild(a);
+          a.click();
+          document.body.removeChild(a);
+          showAlert("Tải xuống thành công", `Đã bắt đầu tải "${fileName || safeName}".`);
+          return;
+        } catch {
+          await Linking.openURL(url);
+          return;
         }
-      } else {
-        showAlert("Tải xuống thất bại", "Không thể tải tệp. Vui lòng kiểm tra kết nối mạng.");
       }
+
+      showAlert("Đang tải xuống...", `Đang tải "${fileName || safeName}" về thiết bị...`);
+      const targetDir = FileSystem.documentDirectory || FileSystem.cacheDirectory;
+      const destPath = `${targetDir}${safeName}`;
+      const res = await FileSystem.downloadAsync(url, destPath);
+
+      if (!res || res.status !== 200) {
+        showAlert("Tải xuống thất bại", "Không thể tải tệp. Vui lòng kiểm tra kết nối mạng.");
+        return;
+      }
+
+      if (isImg || isVid) {
+        try {
+          const MediaLibrary = require("expo-media-library");
+          const perm = await MediaLibrary.requestPermissionsAsync();
+          if (perm.status === "granted" || perm.granted) {
+            await MediaLibrary.saveToLibraryAsync(res.uri);
+            showAlert(
+              "Tải xuống thành công",
+              `Đã lưu ${isVid ? "video" : "hình ảnh"} vào Thư viện của thiết bị.`
+            );
+            return;
+          } else {
+            showAlert(
+              "Quyền truy cập",
+              "Cần cấp quyền truy cập Thư viện ảnh để lưu tệp vào thiết bị."
+            );
+            return;
+          }
+        } catch (mediaErr) {
+          console.warn("Lỗi MediaLibrary:", mediaErr);
+        }
+      }
+
+      // Tệp tài liệu hoặc định dạng khác
+      showAlert(
+        "Tải xuống thành công",
+        `Đã lưu "${fileName || safeName}" vào bộ nhớ thiết bị.`
+      );
     } catch (err: any) {
       showAlert("Lỗi tải xuống", err?.message || "Có lỗi xảy ra khi tải tệp về thiết bị.");
+    } finally {
+      isDownloadingRef.current = false;
     }
   };
 
@@ -869,7 +920,7 @@ export default function BlogScreen() {
                       if (att.url) void shareMediaOrFile(att.url, att.name || "hinh_anh.jpg");
                     };
                     const downloadImage = () => {
-                      if (att.url) void handleDownloadFile(att.url, att.name || "hinh_anh.jpg");
+                      if (att.url) void handleDownloadFile(att.url, att.name || "hinh_anh.jpg", "image");
                     };
                     return (
                       <Pressable key={att.id} style={styles.inlineImageWrap} onPress={() => setViewImageUrl(att.url || null)}>
@@ -917,7 +968,7 @@ export default function BlogScreen() {
                         {att.url ? (
                           <Pressable
                             style={styles.webDownloadBtn}
-                            onPress={() => void handleDownloadFile(att.url!, att.name)}
+                            onPress={() => void handleDownloadFile(att.url!, att.name, "video")}
                           >
                             <Ionicons name="download-outline" size={14} color="#000000" />
                             <Text style={styles.webDownloadText}>Tải về</Text>
@@ -955,7 +1006,7 @@ export default function BlogScreen() {
                           {att.url ? (
                             <Pressable
                               style={styles.webDownloadBtn}
-                              onPress={() => void handleDownloadFile(att.url!, att.name)}
+                              onPress={() => void handleDownloadFile(att.url!, att.name, "file")}
                             >
                               <Ionicons name="download-outline" size={14} color="#000000" />
                               <Text style={styles.webDownloadText}>Tải về</Text>
@@ -1326,6 +1377,15 @@ export default function BlogScreen() {
             >
               <Ionicons name="close" size={24} color="#ffffff" />
             </Pressable>
+            {/* Download button */}
+            <Pressable
+              style={styles.imageViewerDownload}
+              onPress={() => {
+                if (viewImageUrl) void handleDownloadFile(viewImageUrl, "hinh_anh.jpg", "image");
+              }}
+            >
+              <Ionicons name="download-outline" size={22} color="#ffffff" />
+            </Pressable>
             {/* Share button */}
             <Pressable
               style={styles.imageViewerShare}
@@ -1490,6 +1550,17 @@ const styles = StyleSheet.create({
     borderRadius: 22,
     width: 44,
     height: 44,
+    alignItems: "center",
+    justifyContent: "center",
+  },
+  imageViewerDownload: {
+    position: "absolute",
+    bottom: 48,
+    right: 84,
+    backgroundColor: "rgba(255,255,255,0.15)",
+    borderRadius: 22,
+    width: 48,
+    height: 48,
     alignItems: "center",
     justifyContent: "center",
   },
