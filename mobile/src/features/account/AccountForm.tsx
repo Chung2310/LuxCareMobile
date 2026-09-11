@@ -19,6 +19,7 @@ import { File } from "expo-file-system";
 import { account, kanbanMedia } from "../../api/services";
 import { messageOf, useSession } from "../../auth/SessionProvider";
 import { confirmedPassword, profileName } from "./validation";
+import { Ionicons } from "@expo/vector-icons";
 
 const PRESET_AVATARS = [
   "https://images.unsplash.com/photo-1537368910025-700350fe46c7?w=150&auto=format&fit=crop&q=80",
@@ -264,7 +265,7 @@ export function AccountForm({
             onPress={onClose}
             disabled={busy || uploadingPhoto}
           >
-            <Text style={styles.backBtnText}>✕</Text>
+            <Ionicons name="close" size={20} color="#475569" />
           </Pressable>
 
           <View style={{ flex: 1, alignItems: "center" }}>
@@ -303,7 +304,7 @@ export function AccountForm({
           {/* Success Banner */}
           {success && (
             <View style={styles.successCard}>
-              <Text style={styles.successIcon}>🎉</Text>
+              <Ionicons name="checkmark-circle" size={54} color="#059669" style={{ marginBottom: 6 }} />
               <Text style={styles.successTitle}>
                 {isProfile ? "Cập nhật hồ sơ thành công!" : "Đổi mật khẩu thành công!"}
               </Text>
@@ -321,7 +322,8 @@ export function AccountForm({
           {/* Error Banner */}
           {!!error && (
             <View style={styles.errorBanner}>
-              <Text style={styles.errorBannerText}>⚠️ {error}</Text>
+              <Ionicons name="alert-circle-outline" size={18} color="#e11d48" />
+              <Text style={styles.errorBannerText}>{error}</Text>
             </View>
           )}
 
@@ -330,7 +332,9 @@ export function AccountForm({
               {/* Section Avatar Picker */}
               <View style={styles.card}>
                 <View style={styles.sectionHeaderRow}>
-                  <Text style={styles.sectionIcon}>🖼️</Text>
+                  <View style={styles.sectionIconBox}>
+                    <Ionicons name="image-outline" size={16} color="#059669" />
+                  </View>
                   <Text style={styles.sectionTitle}>Ảnh đại diện (Avatar)</Text>
                 </View>
 
@@ -355,7 +359,7 @@ export function AccountForm({
                       {uploadingPhoto ? (
                         <ActivityIndicator size="small" color="#ffffff" />
                       ) : (
-                        <Text style={styles.cameraIcon}>📷</Text>
+                        <Ionicons name="camera" size={13} color="#ffffff" />
                       )}
                     </View>
                   </Pressable>
@@ -372,7 +376,7 @@ export function AccountForm({
                         disabled={disabled}
                         onPress={pickImageFromCamera}
                       >
-                        <Text style={styles.actionSmallBtnIcon}>📷</Text>
+                        <Ionicons name="camera-outline" size={15} color="#ffffff" />
                         <Text style={styles.actionSmallBtnText}>Chụp ảnh</Text>
                       </Pressable>
 
@@ -386,7 +390,7 @@ export function AccountForm({
                         disabled={disabled}
                         onPress={pickImageFromLibrary}
                       >
-                        <Text style={styles.actionSmallBtnIcon}>🖼️</Text>
+                        <Ionicons name="images-outline" size={15} color="#334155" />
                         <Text style={styles.actionSmallBtnTextSecondary}>Thư viện</Text>
                       </Pressable>
                     </View>
@@ -401,7 +405,8 @@ export function AccountForm({
                         disabled={disabled}
                         onPress={() => setPhotoURL("")}
                       >
-                        <Text style={styles.removePhotoBtnText}>✕ Xóa ảnh đại diện</Text>
+                        <Ionicons name="trash-outline" size={13} color="#e11d48" />
+                        <Text style={styles.removePhotoBtnText}>Xóa ảnh đại diện</Text>
                       </Pressable>
                     ) : (
                       <Text style={styles.avatarHint}>Chạm vào ảnh hoặc chọn cách tải</Text>
@@ -432,7 +437,7 @@ export function AccountForm({
                           <Image source={{ uri: url }} style={styles.presetThumb} />
                           {isSelected && (
                             <View style={styles.presetCheck}>
-                              <Text style={styles.presetCheckText}>✓</Text>
+                              <Ionicons name="checkmark" size={11} color="#ffffff" />
                             </View>
                           )}
                         </Pressable>
@@ -445,14 +450,16 @@ export function AccountForm({
               {/* Section Basic Info */}
               <View style={styles.card}>
                 <View style={styles.sectionHeaderRow}>
-                  <Text style={styles.sectionIcon}>👤</Text>
+                  <View style={styles.sectionIconBox}>
+                    <Ionicons name="person-outline" size={16} color="#059669" />
+                  </View>
                   <Text style={styles.sectionTitle}>Thông tin cá nhân</Text>
                 </View>
 
                 <View style={styles.inputGroup}>
                   <Text style={styles.inputLabel}>Tài khoản Email</Text>
                   <View style={styles.emailBox}>
-                    <Text style={styles.emailBoxIcon}>✉️</Text>
+                    <Ionicons name="mail-outline" size={16} color="#64748b" />
                     <Text style={styles.emailBoxText}>{user?.email}</Text>
                     <View style={styles.lockedBadge}>
                       <Text style={styles.lockedBadgeText}>Cố định</Text>
@@ -497,7 +504,9 @@ export function AccountForm({
           {!success && !isProfile && (
             <View style={styles.card}>
               <View style={styles.sectionHeaderRow}>
-                <Text style={styles.sectionIcon}>🔒</Text>
+                <View style={styles.sectionIconBox}>
+                  <Ionicons name="shield-checkmark-outline" size={16} color="#059669" />
+                </View>
                 <Text style={styles.sectionTitle}>Bảo mật tài khoản</Text>
               </View>
 
@@ -521,7 +530,11 @@ export function AccountForm({
                     style={styles.eyeBtn}
                     onPress={() => setShowPassword((v) => !v)}
                   >
-                    <Text style={styles.eyeIcon}>{showPassword ? "👁️" : "🙈"}</Text>
+                    <Ionicons
+                      name={showPassword ? "eye-outline" : "eye-off-outline"}
+                      size={18}
+                      color="#64748b"
+                    />
                   </Pressable>
                 </View>
                 {password.length > 0 && password.length < 6 && (
@@ -549,14 +562,21 @@ export function AccountForm({
                     style={styles.eyeBtn}
                     onPress={() => setShowConfirmation((v) => !v)}
                   >
-                    <Text style={styles.eyeIcon}>{showConfirmation ? "👁️" : "🙈"}</Text>
+                    <Ionicons
+                      name={showConfirmation ? "eye-outline" : "eye-off-outline"}
+                      size={18}
+                      color="#64748b"
+                    />
                   </Pressable>
                 </View>
                 {confirmation.length > 0 && password !== confirmation && (
                   <Text style={styles.errorHint}>Mật khẩu xác nhận chưa khớp.</Text>
                 )}
                 {confirmation.length > 0 && isPasswordValid && (
-                  <Text style={styles.successHint}>✓ Mật khẩu khớp và hợp lệ.</Text>
+                  <View style={{ flexDirection: "row", alignItems: "center", gap: 4, marginTop: 2 }}>
+                    <Ionicons name="checkmark-circle" size={14} color="#059669" />
+                    <Text style={styles.successHint}>Mật khẩu khớp và hợp lệ.</Text>
+                  </View>
                 )}
               </View>
 
@@ -661,8 +681,13 @@ const styles = StyleSheet.create({
     borderBottomColor: "#f1f5f9",
     paddingBottom: 10,
   },
-  sectionIcon: {
-    fontSize: 16,
+  sectionIconBox: {
+    width: 28,
+    height: 28,
+    borderRadius: 8,
+    backgroundColor: "#ecfdf5",
+    alignItems: "center",
+    justifyContent: "center",
   },
   sectionTitle: {
     fontSize: 13,
@@ -758,9 +783,12 @@ const styles = StyleSheet.create({
     marginTop: 2,
   },
   removePhotoBtn: {
-    paddingVertical: 6,
-    paddingHorizontal: 10,
+    flexDirection: "row",
     alignItems: "center",
+    gap: 4,
+    paddingVertical: 6,
+    paddingHorizontal: 8,
+    alignSelf: "flex-start",
   },
   removePhotoBtnText: {
     color: "#e11d48",
