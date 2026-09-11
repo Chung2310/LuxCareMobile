@@ -18,6 +18,7 @@ import {
   StyleSheet,
   Text,
   TextInput,
+  ToastAndroid,
   TouchableOpacity,
   View,
 } from "react-native";
@@ -35,7 +36,9 @@ import * as DocumentPicker from "expo-document-picker";
 import * as Clipboard from "expo-clipboard";
 import * as FileSystem from "expo-file-system/legacy";
 import { File } from "expo-file-system";
+import * as MediaLibrary from "expo-media-library/legacy";
 import * as Sharing from "expo-sharing";
+import { useVideoPlayer, VideoView } from "expo-video";
 import { useSession } from "../../src/auth/SessionProvider";
 import { api, chat, kanbanMedia } from "../../src/api/services";
 import { userManagementApi } from "../../src/api/userManagementApi";
@@ -187,10 +190,21 @@ function extractDownloadableAttachments(msg?: ChatMessage | null): ChatAttachmen
             name = "Hinh_anh.jpg";
             type = "image/jpeg";
           } else if (
+            trimmed.match(/\.(mp4|mov|avi|mkv|webm|m4v|3gp)($|\?[^\s]*)/i) ||
+            trimmed.startsWith("data:video/") ||
+            (trimmed.includes("cloudinary.com") &&
+              trimmed.includes("/video/upload/") &&
+              !trimmed.includes("Audio_") &&
+              !trimmed.includes("Ghi_am") &&
+              !trimmed.match(/\.(mp3|m4a|wav|aac|ogg|opus|flac)($|\?[^\s]*)/i))
+          ) {
+            name = "Video.mp4";
+            type = "video/mp4";
+          } else if (
             trimmed.match(/\.(mp3|m4a|wav|aac|ogg|opus|flac)($|\?[^\s]*)/i) ||
             trimmed.startsWith("data:audio/") ||
             trimmed.includes("Audio_") ||
-            trimmed.includes("/video/upload/")
+            trimmed.includes("Ghi_am")
           ) {
             name = "Ghi_am.m4a";
             type = "audio/mpeg";
@@ -387,6 +401,207 @@ async function prepareAttachment(
   };
 }
 
+// Helper phân loại chính xác các loại tệp tin media đính kèm
+function isVideoAttachment(att?: ChatAttachment | null): boolean {
+  if (!att) return false;
+  if (att.type?.startsWith("video/")) return true;
+  const url = (att.url || "").trim().toLowerCase();
+  const name = (att.name || "").trim().toLowerCase();
+  if (/\.(mp4|mov|avi|mkv|webm|m4v|3gp)($|\?[^\s]*)/i.test(url) || /\.(mp4|mov|avi|mkv|webm|m4v|3gp)$/i.test(name)) {
+    return true;
+  }
+  if (url.startsWith("data:video/")) return true;
+  if (url.includes("cloudinary.com") && url.includes("/video/upload/")) {
+    const isAudio =
+      url.includes("audio_") ||
+      name.includes("audio_") ||
+      name.includes("ghi_am") ||
+      /\.(mp3|m4a|wav|aac|ogg|opus|flac)($|\?[^\s]*)/i.test(url) ||
+      /\.(mp3|m4a|wav|aac|ogg|opus|flac)$/i.test(name);
+    return !isAudio;
+  }
+  return false;
+}
+
+function isAudioAttachment(att?: ChatAttachment | null): boolean {
+  if (!att) return false;
+  if (isVideoAttachment(att)) return false;
+  if (att.type?.startsWith("audio/")) return true;
+  const url = (att.url || "").trim().toLowerCase();
+  const name = (att.name || "").trim().toLowerCase();
+  if (/\.(mp3|m4a|wav|aac|ogg|opus|flac)($|\?[^\s]*)/i.test(url) || /\.(mp3|m4a|wav|aac|ogg|opus|flac)$/i.test(name)) {
+    return true;
+  }
+  if (url.startsWith("data:audio/")) return true;
+  if (url.includes("cloudinary.com") && (url.includes("audio_") || name.includes("audio_") || name.includes("ghi_am"))) {
+    return true;
+  }
+  return false;
+}
+
+function isImageAttachment(att?: ChatAttachment | null): boolean {
+  if (!att) return false;
+  if (att.type?.startsWith("image/")) return true;
+  const url = (att.url || "").trim().toLowerCase();
+  const name = (att.name || "").trim().toLowerCase();
+  if (/\.(jpeg|jpg|gif|png|webp|bmp|svg)($|\?[^\s]*)/i.test(url) || /\.(jpeg|jpg|gif|png|webp|bmp|svg)$/i.test(name)) {
+    return true;
+  }
+  if (url.startsWith("data:image/") || url.includes("/image/upload/")) return true;
+  return false;
+}
+
+// Khung hiển thị Video trong tin nhắn chat (có hình thu nhỏ & nút Play)
+function ChatVideoBubble({
+  att,
+  isMe,
+  isSending,
+  onPress,
+}: {
+  att: ChatAttachment;
+  isMe: boolean;
+  isSending?: boolean;
+  onPress: () => void;
+}) {
+  const isCloudinary = att.url?.includes("cloudinary.com");
+  const thumbUrl = isCloudinary
+    ? att.url.replace(/\.(mp4|mov|avi|mkv|webm|m4v|3gp)($|\?[^\s]*)/i, ".jpg")
+    : null;
+
+  return (
+    <TouchableOpacity
+      style={styles.videoBubbleCard}
+      onPress={onPress}
+      activeOpacity={0.88}
+    >
+      {thumbUrl ? (
+        <Image
+          source={{ uri: thumbUrl }}
+          style={styles.videoBubbleThumb}
+          resizeMode="cover"
+        />
+      ) : (
+        <View style={styles.videoBubblePlaceholder}>
+          <Ionicons name="videocam" size={38} color="#ffffff" />
+        </View>
+      )}
+
+      {/* Lớp phủ tối mỏng giúp nổi bật nút Play */}
+      <View style={styles.videoBubbleOverlay} />
+
+      {/* Nút Play trung tâm hoặc vòng xoay đang gửi - Luôn căn chính giữa 100% */}
+      {isSending ? (
+        <View style={styles.videoBubbleSpinnerCenter}>
+          <View style={styles.attSpinnerBadge}>
+            <ActivityIndicator size="small" color="#ffffff" />
+          </View>
+        </View>
+      ) : (
+        <View style={styles.videoBubblePlayBtn} pointerEvents="none">
+          <Ionicons name="play" size={28} color="#ffffff" style={{ marginLeft: 3 }} />
+        </View>
+      )}
+
+      {/* Thanh thông tin dưới video */}
+      <View style={styles.videoBubbleFooter}>
+        <View style={styles.videoBubbleBadge}>
+          <Ionicons name="videocam" size={11} color="#ffffff" />
+          <Text style={styles.videoBubbleBadgeText}>VIDEO</Text>
+        </View>
+        <Text style={styles.videoBubbleName} numberOfLines={1}>
+          {getCleanFileName(att)}
+        </Text>
+      </View>
+    </TouchableOpacity>
+  );
+}
+
+// Trình phát Video toàn màn hình tích hợp expo-video (đầy đủ nút điều khiển và nút tải về)
+function FullscreenVideoPlayer({
+  videoUri,
+  fileName,
+  onClose,
+  onDownload,
+  toastElement,
+}: {
+  videoUri: string | null;
+  fileName: string;
+  onClose: () => void;
+  onDownload: () => Promise<void> | void;
+  toastElement?: React.ReactNode;
+}) {
+  const [downloading, setDownloading] = useState(false);
+  const player = useVideoPlayer(videoUri || null, (p: any) => {
+    if (videoUri) {
+      p.loop = false;
+      p.play();
+    }
+  });
+
+  const handlePressDownload = async () => {
+    if (downloading) return;
+    setDownloading(true);
+    try {
+      await onDownload();
+    } finally {
+      setDownloading(false);
+    }
+  };
+
+  return (
+    <View style={styles.videoModalOverlay}>
+      <SafeAreaView style={styles.videoModalSafeArea}>
+        {/* Thanh công cụ phía trên */}
+        <View style={styles.videoModalTopBar}>
+          <TouchableOpacity
+            style={styles.videoModalIconBtn}
+            onPress={onClose}
+            activeOpacity={0.75}
+          >
+            <Ionicons name="close" size={26} color="#ffffff" />
+          </TouchableOpacity>
+          <Text style={styles.videoModalHeaderTitle} numberOfLines={1}>
+            {fileName}
+          </Text>
+          <TouchableOpacity
+            style={styles.videoModalIconBtn}
+            onPress={handlePressDownload}
+            activeOpacity={0.75}
+            disabled={downloading}
+          >
+            {downloading ? (
+              <ActivityIndicator size="small" color="#ffffff" />
+            ) : (
+              <Ionicons name="download-outline" size={22} color="#ffffff" />
+            )}
+          </TouchableOpacity>
+        </View>
+
+        {/* Khung video expo-video chuẩn */}
+        <View style={styles.videoModalContent}>
+          {videoUri ? (
+            <VideoView
+              player={player}
+              style={styles.videoModalVideoView}
+              nativeControls
+              contentFit="contain"
+              allowsPictureInPicture={false}
+            />
+          ) : (
+            <View style={styles.videoModalErrorWrap}>
+              <Ionicons name="alert-circle-outline" size={48} color="#94a3b8" />
+              <Text style={styles.videoModalErrorText}>Không tìm thấy đường dẫn video</Text>
+            </View>
+          )}
+        </View>
+
+        {/* Thông báo nổi toast ngay trên màn hình video */}
+        {toastElement}
+      </SafeAreaView>
+    </View>
+  );
+}
+
 function VoiceNoteBubble({ att, isMe }: { att: ChatAttachment; isMe: boolean }) {
   const player = useAudioPlayer(att.url || "");
   const status = useAudioPlayerStatus(player);
@@ -548,6 +763,225 @@ function AnimatedReactionItem({
   );
 }
 
+// Bảng màu avatar người dùng phong phú, hiện đại
+const AVATAR_COLORS = [
+  "#059669", "#0284c7", "#7c3aed", "#db2777", "#d97706",
+  "#4f46e5", "#0891b2", "#16a34a", "#e11d48", "#9333ea"
+];
+
+function getAvatarBgColor(name?: string): string {
+  if (!name) return "#059669";
+  let hash = 0;
+  for (let i = 0; i < name.length; i++) {
+    hash = name.charCodeAt(i) + ((hash << 5) - hash);
+  }
+  return AVATAR_COLORS[Math.abs(hash) % AVATAR_COLORS.length];
+}
+
+function isValidHttpUrl(url?: string | null): boolean {
+  if (!url || typeof url !== "string") return false;
+  const trimmed = url.trim().toLowerCase();
+  if (
+    !trimmed ||
+    trimmed === "null" ||
+    trimmed === "undefined" ||
+    trimmed === "default" ||
+    trimmed === "none" ||
+    trimmed === "[object object]" ||
+    trimmed.length < 5
+  ) {
+    return false;
+  }
+  return (
+    trimmed.startsWith("http://") ||
+    trimmed.startsWith("https://") ||
+    trimmed.startsWith("data:image/") ||
+    trimmed.startsWith("file://")
+  );
+}
+
+function extractInitials(name?: string): string {
+  if (!name || typeof name !== "string") return "";
+  const parts = name.trim().split(/\s+/).filter(Boolean);
+  if (parts.length >= 2) {
+    return (parts[parts.length - 2][0] + parts[parts.length - 1][0]).toUpperCase();
+  }
+  if (parts.length === 1 && parts[0].length >= 2) {
+    return parts[0].slice(0, 2).toUpperCase();
+  }
+  if (parts.length === 1) {
+    return parts[0][0].toUpperCase();
+  }
+  return "";
+}
+
+/**
+ * Avatar người dùng cá nhân (dùng cho danh sách chọn, thành viên phòng chat, người gửi tin nhắn)
+ */
+function UserAvatar({
+  photoURL,
+  name,
+  size = 40,
+  fontSize = 15,
+  style,
+}: {
+  photoURL?: string | null;
+  name?: string;
+  size?: number;
+  fontSize?: number;
+  style?: any;
+}) {
+  const [loadError, setLoadError] = useState(false);
+  const validUrl = isValidHttpUrl(photoURL) ? photoURL!.trim() : null;
+
+  useEffect(() => {
+    setLoadError(false);
+  }, [photoURL]);
+
+  if (validUrl && !loadError) {
+    return (
+      <Image
+        source={{ uri: validUrl }}
+        style={[
+          {
+            width: size,
+            height: size,
+            borderRadius: size / 2,
+            backgroundColor: "#f1f5f9",
+          },
+          style,
+        ]}
+        onError={() => setLoadError(true)}
+      />
+    );
+  }
+
+  const initials = extractInitials(name);
+  const bgColor = getAvatarBgColor(name);
+
+  return (
+    <View
+      style={[
+        {
+          width: size,
+          height: size,
+          borderRadius: size / 2,
+          backgroundColor: bgColor,
+          alignItems: "center",
+          justifyContent: "center",
+        },
+        style,
+      ]}
+    >
+      {initials ? (
+        <Text style={{ color: "#ffffff", fontSize, fontWeight: "700" }}>{initials}</Text>
+      ) : (
+        <Ionicons name="person" size={Math.round(size * 0.48)} color="#ffffff" />
+      )}
+    </View>
+  );
+}
+
+/**
+ * Avatar phòng chat (hỗ trợ Trợ lý AI, Nhóm trò chuyện, Trò chuyện 1-1, tự động fallback nếu không có avatar hoặc ảnh lỗi)
+ */
+function RoomAvatar({
+  room,
+  avatarUrl,
+  roomName,
+  isBot,
+  size = 50,
+  fontSize = 18,
+}: {
+  room?: ChatRoom | null;
+  avatarUrl?: string | null;
+  roomName?: string;
+  isBot?: boolean;
+  size?: number;
+  fontSize?: number;
+}) {
+  const [loadError, setLoadError] = useState(false);
+  const validUrl = isValidHttpUrl(avatarUrl) ? avatarUrl!.trim() : null;
+
+  useEffect(() => {
+    setLoadError(false);
+  }, [avatarUrl]);
+
+  // 1. Trợ lý AI
+  if (isBot) {
+    return (
+      <View
+        style={[
+          styles.avatarPlaceholder,
+          { width: size, height: size, borderRadius: size / 2, backgroundColor: "#6366f1" },
+        ]}
+      >
+        <Ionicons name="sparkles" size={Math.round(size * 0.44)} color="#ffffff" />
+      </View>
+    );
+  }
+
+  // 2. Nhóm trò chuyện
+  if (room?.isGroup) {
+    if (validUrl && !loadError) {
+      return (
+        <Image
+          source={{ uri: validUrl }}
+          style={[styles.avatarImg, { width: size, height: size, borderRadius: size / 2 }]}
+          onError={() => setLoadError(true)}
+        />
+      );
+    }
+    return (
+      <View
+        style={[
+          styles.avatarPlaceholder,
+          { width: size, height: size, borderRadius: size / 2, backgroundColor: "#0d9488" },
+        ]}
+      >
+        <Ionicons name="people" size={Math.round(size * 0.44)} color="#ffffff" />
+      </View>
+    );
+  }
+
+  // 3. Trò chuyện 1-1: Có ảnh đại diện hợp lệ và tải thành công
+  if (validUrl && !loadError) {
+    return (
+      <Image
+        source={{ uri: validUrl }}
+        style={[styles.avatarImg, { width: size, height: size, borderRadius: size / 2 }]}
+        onError={() => setLoadError(true)}
+      />
+    );
+  }
+
+  // 4. Avatar mặc định khi không có ảnh (hoặc ảnh lỗi 404): Vòng tròn màu với chữ viết tắt hoặc icon người
+  const initials = extractInitials(roomName);
+  const bgColor = getAvatarBgColor(roomName);
+
+  return (
+    <View
+      style={[
+        styles.avatarPlaceholder,
+        {
+          width: size,
+          height: size,
+          borderRadius: size / 2,
+          backgroundColor: bgColor,
+          alignItems: "center",
+          justifyContent: "center",
+        },
+      ]}
+    >
+      {initials ? (
+        <Text style={[styles.avatarInitial, { fontSize }]}>{initials}</Text>
+      ) : (
+        <Ionicons name="person" size={Math.round(size * 0.48)} color="#ffffff" />
+      )}
+    </View>
+  );
+}
+
 export default function ChatScreen() {
   const insets = useSafeAreaInsets();
   const { user } = useSession();
@@ -569,6 +1003,8 @@ export default function ChatScreen() {
   const [showEmojiPicker, setShowEmojiPicker] = useState(false);
   const [activeEmojiCategory, setActiveEmojiCategory] = useState("smileys");
   const [previewImageUri, setPreviewImageUri] = useState<string | null>(null);
+  const [previewVideoUri, setPreviewVideoUri] = useState<string | null>(null);
+  const [previewVideoName, setPreviewVideoName] = useState<string>("Video");
 
   // Audio Recorder từ expo-audio (thu âm microphone thực tế)
   const audioRecorder = useAudioRecorder(RecordingPresets.HIGH_QUALITY);
@@ -684,20 +1120,100 @@ export default function ChatScreen() {
     };
   }, []);
 
-  // 1. Fetch Rooms from API
-  const loadRooms = useCallback(async (silent = false) => {
-    if (!silent) setLoadingRooms(true);
-    try {
-      const data = await chat.getRooms();
-      setRooms(data);
-    } catch (err: any) {
-      if (err?.message?.includes("canceled") || err?.name === "AbortError") return;
-      console.warn("Lỗi tải danh sách phòng chat:", err?.message);
-    } finally {
-      setLoadingRooms(false);
-      setRefreshing(false);
-    }
+  // Helper nhận diện phòng Trợ lý AI
+  const isChatbotRoom = useCallback((room?: ChatRoom | null) => {
+    if (!room) return false;
+    return !!room.isChatbot || (room.name || "").toLowerCase() === "trợ lý ai";
   }, []);
+
+  // Helper kiểm tra phòng có được ghim lên đầu hay không
+  const isRoomPinned = useCallback(
+    (room?: ChatRoom | null) => {
+      if (!room) return false;
+      if (isChatbotRoom(room)) return true;
+      if (room.isPinned !== undefined) return !!room.isPinned;
+      const member = room.members?.find((m) => {
+        const uId = typeof m.userId === "object" ? m.userId?._id || m.userId?.uid : m.userId;
+        return uId === currentUserId;
+      });
+      return !!member?.isPinned;
+    },
+    [currentUserId, isChatbotRoom]
+  );
+
+  // Lấy ảnh đại diện của phòng chat (nhóm dùng avatar nhóm, 1-1 lấy ảnh profile của người đối diện)
+  const getRoomAvatarUrl = useCallback(
+    (room?: ChatRoom | null): string | null => {
+      if (!room) return null;
+      if (isValidHttpUrl(room.avatarURL)) {
+        return room.avatarURL!.trim();
+      }
+      if (!room.isGroup) {
+        const otherMember = room.members?.find((m) => {
+          const uId = typeof m.userId === "object" ? m.userId?._id || m.userId?.uid : m.userId;
+          return uId !== currentUserId;
+        });
+        if (typeof otherMember?.userId === "object" && isValidHttpUrl(otherMember.userId?.photoURL)) {
+          return otherMember.userId.photoURL!.trim();
+        }
+      }
+      return null;
+    },
+    [currentUserId]
+  );
+
+  // Lấy ảnh đại diện người gửi của tin nhắn (từ senderPhoto, senderId.photoURL, hoặc members)
+  const getMessageSenderPhoto = useCallback(
+    (item: ChatMessage): string | null => {
+      if (isValidHttpUrl(item.senderPhoto)) {
+        return item.senderPhoto!.trim();
+      }
+      if (typeof item.senderId === "object" && isValidHttpUrl(item.senderId?.photoURL)) {
+        return item.senderId.photoURL!.trim();
+      }
+      // Tra cứu từ activeRoom.members
+      const senderIdStr = typeof item.senderId === "object" ? item.senderId?._id : item.senderId;
+      if (senderIdStr && activeRoom?.members) {
+        const member = activeRoom.members.find((m) => {
+          const uId = typeof m.userId === "object" ? m.userId?._id || m.userId?.uid : m.userId;
+          return uId === senderIdStr;
+        });
+        if (typeof member?.userId === "object" && isValidHttpUrl(member.userId?.photoURL)) {
+          return member.userId.photoURL!.trim();
+        }
+      }
+      return null;
+    },
+    [activeRoom?.members]
+  );
+
+  // 1. Fetch Rooms from API
+  const loadRooms = useCallback(
+    async (silent = false) => {
+      if (!silent) setLoadingRooms(true);
+      try {
+        const data = await chat.getRooms();
+        const enriched = data.map((room) => {
+          const isBot = isChatbotRoom(room);
+          const computedAvatar = getRoomAvatarUrl(room);
+          return {
+            ...room,
+            isChatbot: isBot,
+            isPinned: isBot ? true : isRoomPinned(room),
+            avatarURL: computedAvatar || undefined,
+          };
+        });
+        setRooms(enriched);
+      } catch (err: any) {
+        if (err?.message?.includes("canceled") || err?.name === "AbortError") return;
+        console.warn("Lỗi tải danh sách phòng chat:", err?.message);
+      } finally {
+        setLoadingRooms(false);
+        setRefreshing(false);
+      }
+    },
+    [isChatbotRoom, isRoomPinned, getRoomAvatarUrl]
+  );
 
   useEffect(() => {
     void loadRooms();
@@ -726,14 +1242,6 @@ export default function ChatScreen() {
         return [...sorted, ...stillPending];
       });
       void chat.markAsRead(roomId);
-
-      // Nếu mới vào phòng lần đầu, cuộn xuống dưới cùng
-      if (!initialScrollDoneRef.current) {
-        initialScrollDoneRef.current = true;
-        setTimeout(() => {
-          flatListRef.current?.scrollToEnd({ animated: false });
-        }, 120);
-      }
     } catch (err: any) {
       if (err?.message?.includes("canceled") || err?.name === "AbortError") return;
       console.warn("Lỗi tải tin nhắn:", err?.message);
@@ -758,6 +1266,29 @@ export default function ChatScreen() {
     };
   }, [activeRoom?._id, loadMessages]);
 
+  // Cuộn ngay xuống tin nhắn mới nhất khi vừa vào phòng và tải xong tin nhắn
+  useEffect(() => {
+    if (!loadingMessages && messages.length > 0 && !initialScrollDoneRef.current) {
+      const t1 = setTimeout(() => {
+        flatListRef.current?.scrollToEnd({ animated: false });
+      }, 50);
+      const t2 = setTimeout(() => {
+        flatListRef.current?.scrollToEnd({ animated: false });
+      }, 160);
+      const t3 = setTimeout(() => {
+        flatListRef.current?.scrollToEnd({ animated: false });
+        initialScrollDoneRef.current = true;
+        isAtBottomRef.current = true;
+      }, 380);
+
+      return () => {
+        clearTimeout(t1);
+        clearTimeout(t2);
+        clearTimeout(t3);
+      };
+    }
+  }, [loadingMessages, messages.length, activeRoom?._id]);
+
   // 3. Open Conversation
   const handleOpenRoom = (room: ChatRoom) => {
     setActiveRoom(room);
@@ -774,6 +1305,8 @@ export default function ChatScreen() {
     setMessages([]); // Làm sạch tin nhắn khi thoát phòng
     setShowEmojiPicker(false);
     isNavigatingToRepliedRef.current = false;
+    initialScrollDoneRef.current = false;
+    isAtBottomRef.current = true;
     if (navigatingTimerRef.current) clearTimeout(navigatingTimerRef.current);
     void loadRooms(true);
   };
@@ -787,6 +1320,10 @@ export default function ChatScreen() {
       }
       if (showPinnedDropdown) {
         setShowPinnedDropdown(false);
+        return true;
+      }
+      if (previewVideoUri) {
+        setPreviewVideoUri(null);
         return true;
       }
       if (previewImageUri) {
@@ -837,7 +1374,17 @@ export default function ChatScreen() {
     setIsForwarding(true);
     try {
       const textToSend = forwardingMessage.content || "";
-      const attachments = forwardingMessage.attachments || [];
+      const rawAttachments = forwardingMessage.attachments || [];
+      // Loại bỏ uploadToken khỏi attachments khi chuyển tiếp:
+      // Tệp đã được lưu trữ vĩnh viễn trên hệ thống. Nếu gửi kèm uploadToken cũ của người
+      // tải lên ban đầu, backend sẽ kiểm tra quyền sở hữu token và báo lỗi:
+      // "Upload không thuộc người tải lên hiện tại."
+      const attachments = rawAttachments.map(({ uploadToken, ...rest }) => ({
+        url: rest.url,
+        name: rest.name || "Tệp đính kèm",
+        type: rest.type || "application/octet-stream",
+        size: rest.size,
+      }));
       const note = forwardNote.trim();
 
       for (const targetRoomId of selectedForwardRoomIds) {
@@ -891,21 +1438,15 @@ export default function ChatScreen() {
           trimmed.startsWith("file://") ||
           trimmed.startsWith("data:");
         if (isHttpOrFile && !trimmed.includes(" ")) {
-          const isImg =
-            trimmed.match(/\.(jpeg|jpg|gif|png|webp|bmp|svg)($|\?[^\s]*)/i) ||
-            trimmed.includes("/image/upload/") ||
-            trimmed.startsWith("data:image/");
-          const isAud =
-            trimmed.match(/\.(mp3|m4a|wav|aac|ogg|opus|flac)($|\?[^\s]*)/i) ||
-            trimmed.startsWith("data:audio/") ||
-            (trimmed.includes("cloudinary.com") &&
-              (trimmed.includes("/video/upload/") ||
-                trimmed.includes("Audio_") ||
-                trimmed.includes(".mp3") ||
-                trimmed.includes(".m4a")));
+          const isImg = isImageAttachment({ url: trimmed });
+          const isVid = isVideoAttachment({ url: trimmed });
+          const isAud = !isVid && isAudioAttachment({ url: trimmed });
 
           if (isImg) {
             extractedAtts.push({ url: trimmed, type: "image/jpeg", name: "Hình ảnh" });
+            continue;
+          } else if (isVid) {
+            extractedAtts.push({ url: trimmed, type: "video/mp4", name: "Video.mp4" });
             continue;
           } else if (isAud) {
             extractedAtts.push({ url: trimmed, type: "audio/mpeg", name: "Ghi âm" });
@@ -983,12 +1524,18 @@ export default function ChatScreen() {
         const tempId = `temp_img_${Date.now()}_${Math.random().toString(36).substring(2, 6)}`;
 
         // 1. TẠO NGAY TIN NHẮN TẠM (OPTIMISTIC) HIỂN THỊ TRỰC TIẾP TRÊN MÀN HÌNH CHAT (0ms)
-        const localAttachments: ChatAttachment[] = result.assets.map((asset, i) => ({
-          url: asset.uri,
-          type: asset.mimeType || "image/jpeg",
-          name: asset.fileName || `IMG_${Date.now()}_${i + 1}.jpg`,
-          size: asset.fileSize,
-        }));
+        const localAttachments: ChatAttachment[] = result.assets.map((asset, i) => {
+          const isVid =
+            asset.type === "video" ||
+            asset.mimeType?.startsWith("video/") ||
+            asset.fileName?.match(/\.(mp4|mov|avi|mkv|webm)$/i);
+          return {
+            url: asset.uri,
+            type: isVid ? (asset.mimeType || "video/mp4") : (asset.mimeType || "image/jpeg"),
+            name: asset.fileName || (isVid ? `VID_${Date.now()}_${i + 1}.mp4` : `IMG_${Date.now()}_${i + 1}.jpg`),
+            size: asset.fileSize,
+          };
+        });
 
         const optimisticMessage: any = {
           _id: tempId,
@@ -1014,15 +1561,19 @@ export default function ChatScreen() {
             try {
               const uploadTasks = result.assets.map(async (asset, i) => {
                 if (!asset.uri) return null;
-                const fileName = asset.fileName || `IMG_${Date.now()}_${i + 1}.jpg`;
-                const mimeType = asset.mimeType || "image/jpeg";
+                const isVid =
+                  asset.type === "video" ||
+                  asset.mimeType?.startsWith("video/") ||
+                  asset.fileName?.match(/\.(mp4|mov|avi|mkv|webm)$/i);
+                const fileName = asset.fileName || (isVid ? `VID_${Date.now()}_${i + 1}.mp4` : `IMG_${Date.now()}_${i + 1}.jpg`);
+                const mimeType = isVid ? (asset.mimeType || "video/mp4") : (asset.mimeType || "image/jpeg");
                 try {
                   const att = await prepareAttachment(asset.uri, fileName, mimeType, asset.fileSize, asset.base64);
                   if (att.url && !att.url.startsWith("file://")) {
                     return att;
                   }
                 } catch (err) {
-                  console.warn("Lỗi upload ảnh:", err);
+                  console.warn("Lỗi upload media:", err);
                 }
                 return null;
               });
@@ -1404,41 +1955,39 @@ export default function ChatScreen() {
       }
 
       if (isMedia) {
-        // Ảnh / âm thanh → lưu vào Gallery/Photos nếu có Native Module
-        const hasNativeMediaLibrary = Boolean(
-          (NativeModules as any)?.ExpoMediaLibrary ||
-          (NativeModules as any)?.ExpoMediaLibraryNext ||
-          (global as any)?.expo?.modules?.ExpoMediaLibraryNext
-        );
-
-        if (hasNativeMediaLibrary) {
-          try {
-            const MediaLibrary = require("expo-media-library");
-            const { status } = await MediaLibrary.requestPermissionsAsync();
-            if (status === "granted") {
-              await MediaLibrary.saveToLibraryAsync(targetPath);
-              showToast("Đã lưu ảnh/âm thanh vào thư viện");
-              return;
-            }
-          } catch {}
-        }
-
-        // Fallback: Mở share sheet
+        // Tải và lưu trực tiếp ảnh / video / âm thanh vào bộ sưu tập máy (chuẩn như Zalo)
         try {
-          const canShare = await Sharing.isAvailableAsync();
-          if (canShare) {
-            await Sharing.shareAsync(targetPath, { mimeType, dialogTitle: fileName });
+          let perm = await MediaLibrary.getPermissionsAsync(true);
+          if (!perm.granted && perm.status !== "granted") {
+            perm = await MediaLibrary.requestPermissionsAsync(true);
+          }
+
+          if (perm.granted || perm.status === "granted") {
+            await MediaLibrary.saveToLibraryAsync(targetPath);
+            const isVideo = mimeType.startsWith("video/") || fileName.endsWith(".mp4") || fileName.endsWith(".mov");
+            const isAudio = mimeType.startsWith("audio/") || fileName.endsWith(".m4a") || fileName.endsWith(".mp3");
+            const label = isVideo ? "video" : isAudio ? "bản ghi âm" : "ảnh";
+            showToast(`Đã lưu ${label} vào máy`);
+            return;
+          } else {
+            showCustomAlert(
+              "Quyền truy cập",
+              "Vui lòng cấp quyền truy cập để ứng dụng lưu ảnh/video vào thiết bị của bạn."
+            );
             return;
           }
-        } catch (shareErr) {
-          console.warn("Lỗi shareAsync media:", shareErr);
-        }
-
-        // Nếu shareAsync lỗi và có URL mạng, mở bằng trình duyệt
-        if (resolvedUrl.startsWith("http://") || resolvedUrl.startsWith("https://")) {
-          await Linking.openURL(resolvedUrl);
-        } else {
-          showToast("Đã lưu tệp vào thư mục ứng dụng");
+        } catch (mediaErr: any) {
+          console.warn("Lỗi lưu MediaLibrary:", mediaErr);
+          // Fallback nếu không lưu được qua MediaLibrary và có URL trực tuyến: tải về bằng trình duyệt vào thư mục Download của máy
+          if (resolvedUrl.startsWith("http://") || resolvedUrl.startsWith("https://")) {
+            try {
+              await Linking.openURL(resolvedUrl);
+              showToast("Đang tải về qua trình duyệt...");
+              return;
+            } catch {}
+          }
+          showCustomAlert("Lỗi tải tệp", "Không thể lưu tệp vào máy. Vui lòng thử lại sau.");
+          return;
         }
       } else {
         // Tài liệu (Word, Excel, PDF,...) - Popup bo góc hiện đại không dùng emoji
@@ -1629,9 +2178,10 @@ export default function ChatScreen() {
 
   // 13. Helpers for Room Display
   const getRoomDisplayName = (room: ChatRoom) => {
+    if (isChatbotRoom(room)) return "Trợ lý AI";
     if (room.name) return room.name;
     if (!room.isGroup) {
-      const otherMember = room.members.find((m) => {
+      const otherMember = room.members?.find((m) => {
         const uId = typeof m.userId === "object" ? m.userId?._id || m.userId?.uid : m.userId;
         return uId !== currentUserId;
       });
@@ -1663,17 +2213,14 @@ export default function ChatScreen() {
         activeOpacity={0.7}
       >
         <View style={styles.forwardRoomAvatar}>
-          {room.avatarURL ? (
-            <Image source={{ uri: room.avatarURL }} style={styles.forwardAvatarImg} />
-          ) : (
-            <View style={[styles.avatarPlaceholder, room.isGroup && { backgroundColor: "#0d9488" }]}>
-              {room.isGroup ? (
-                <Ionicons name="people" size={20} color="#ffffff" />
-              ) : (
-                <Text style={styles.avatarInitial}>{getRoomAvatarInitial(room)}</Text>
-              )}
-            </View>
-          )}
+          <RoomAvatar
+            room={room}
+            avatarUrl={getRoomAvatarUrl(room)}
+            roomName={roomName}
+            isBot={isChatbotRoom(room)}
+            size={44}
+            fontSize={16}
+          />
         </View>
 
         <Text style={styles.forwardRoomName} numberOfLines={1}>
@@ -1895,6 +2442,11 @@ export default function ChatScreen() {
 
   // Hiển thị Toast thông báo bo tròn đẹp mắt
   const showToast = (text: string) => {
+    if (Platform.OS === "android") {
+      try {
+        ToastAndroid.show(text, ToastAndroid.SHORT);
+      } catch {}
+    }
     setToastText(text);
     if (toastTimerRef.current) clearTimeout(toastTimerRef.current);
     Animated.timing(toastOpacity, {
@@ -1911,7 +2463,7 @@ export default function ChatScreen() {
       }).start(() => {
         setToastText(null);
       });
-    }, 2000);
+    }, 2500);
   };
 
   const renderToast = () => {
@@ -1929,11 +2481,15 @@ export default function ChatScreen() {
     );
   };
 
-  // Popup thông báo / Hộp thoại cảnh báo bo góc tròn (Chuẩn UX Mobile cao cấp)
+  // Popup thông báo / Hộp thoại cảnh báo bo góc tròn (Chuẩn UX Mobile cao cấp, nền trắng thuần, nút đóng X)
   const renderCustomAlert = () => {
     if (!customAlert.visible) return null;
 
-    const isTwoButtons = customAlert.buttons.length === 2;
+    // Lọc bỏ nút "Đóng" nếu đã có icon đóng ở góc trên bên phải popup
+    const effectiveButtons = customAlert.buttons.filter(
+      (b) => b.style !== "cancel" && b.text.trim().toLowerCase() !== "đóng"
+    );
+    const isTwoButtons = effectiveButtons.length === 2;
 
     return (
       <Modal
@@ -1944,56 +2500,65 @@ export default function ChatScreen() {
       >
         <Pressable style={styles.customAlertOverlay} onPress={hideCustomAlert}>
           <Pressable style={styles.customAlertCard} onPress={(e) => e.stopPropagation()}>
+            {/* Nút đóng icon X góc trên bên phải */}
+            <TouchableOpacity
+              style={styles.customAlertCloseBtn}
+              onPress={hideCustomAlert}
+              hitSlop={12}
+              activeOpacity={0.7}
+            >
+              <Ionicons name="close" size={20} color="#64748b" />
+            </TouchableOpacity>
+
             <Text style={styles.customAlertTitle}>{customAlert.title}</Text>
             {!!customAlert.message && (
               <Text style={styles.customAlertMessage}>{customAlert.message}</Text>
             )}
 
-            <View
-              style={[
-                styles.customAlertBtnContainer,
-                isTwoButtons ? styles.customAlertBtnRow : styles.customAlertBtnCol,
-              ]}
-            >
-              {customAlert.buttons.map((btn, idx) => {
-                const isDestructive = btn.style === "destructive";
-                const isCancel = btn.style === "cancel";
-                const isSecondary = btn.style === "secondary";
-                const isPrimary = !isDestructive && !isCancel && !isSecondary;
+            {effectiveButtons.length > 0 && (
+              <View
+                style={[
+                  styles.customAlertBtnContainer,
+                  isTwoButtons ? styles.customAlertBtnRow : styles.customAlertBtnCol,
+                ]}
+              >
+                {effectiveButtons.map((btn, idx) => {
+                  const isDestructive = btn.style === "destructive";
+                  const isSecondary = btn.style === "secondary";
+                  const isPrimary = !isDestructive && !isSecondary;
 
-                return (
-                  <TouchableOpacity
-                    key={idx}
-                    style={[
-                      styles.customAlertBtn,
-                      isTwoButtons && { flex: 1 },
-                      isDestructive && styles.customAlertBtnDestructive,
-                      isCancel && styles.customAlertBtnCancel,
-                      isSecondary && styles.customAlertBtnSecondary,
-                      isPrimary && styles.customAlertBtnPrimary,
-                    ]}
-                    onPress={() => {
-                      hideCustomAlert();
-                      if (btn.onPress) btn.onPress();
-                    }}
-                    activeOpacity={0.75}
-                  >
-                    <Text
+                  return (
+                    <TouchableOpacity
+                      key={idx}
                       style={[
-                        styles.customAlertBtnText,
-                        isDestructive && styles.customAlertBtnTextDestructive,
-                        isCancel && styles.customAlertBtnTextCancel,
-                        isSecondary && styles.customAlertBtnTextSecondary,
-                        isPrimary && styles.customAlertBtnTextPrimary,
+                        styles.customAlertBtn,
+                        isTwoButtons && { flex: 1 },
+                        isDestructive && styles.customAlertBtnDestructive,
+                        isSecondary && styles.customAlertBtnSecondary,
+                        isPrimary && styles.customAlertBtnPrimary,
                       ]}
-                      numberOfLines={2}
+                      onPress={() => {
+                        hideCustomAlert();
+                        if (btn.onPress) btn.onPress();
+                      }}
+                      activeOpacity={0.75}
                     >
-                      {btn.text}
-                    </Text>
-                  </TouchableOpacity>
-                );
-              })}
-            </View>
+                      <Text
+                        style={[
+                          styles.customAlertBtnText,
+                          isDestructive && styles.customAlertBtnTextDestructive,
+                          isSecondary && styles.customAlertBtnTextSecondary,
+                          isPrimary && styles.customAlertBtnTextPrimary,
+                        ]}
+                        numberOfLines={2}
+                      >
+                        {btn.text}
+                      </Text>
+                    </TouchableOpacity>
+                  );
+                })}
+              </View>
+            )}
           </Pressable>
         </Pressable>
       </Modal>
@@ -2020,7 +2585,7 @@ export default function ChatScreen() {
   const filteredRooms = useMemo(() => {
     let list = [...rooms];
     if (activeTab === "other") {
-      list = list.filter((r) => r.isChatbot || r.isGroup);
+      list = list.filter((r) => isChatbotRoom(r) || r.isGroup);
     }
     if (searchQuery.trim()) {
       const q = searchQuery.toLowerCase().trim();
@@ -2031,12 +2596,20 @@ export default function ChatScreen() {
       });
     }
     return list.sort((a, b) => {
-      const aPinned = a.isPinned ? 1 : 0;
-      const bPinned = b.isPinned ? 1 : 0;
+      // 1. Trợ lý AI luôn luôn được ghim lên vị trí đầu tiên tuyệt đối
+      const aIsBot = isChatbotRoom(a) ? 1 : 0;
+      const bIsBot = isChatbotRoom(b) ? 1 : 0;
+      if (aIsBot !== bIsBot) return bIsBot - aIsBot;
+
+      // 2. Các cuộc trò chuyện được ghim tiếp theo
+      const aPinned = (a.isPinned || isRoomPinned(a)) ? 1 : 0;
+      const bPinned = (b.isPinned || isRoomPinned(b)) ? 1 : 0;
       if (aPinned !== bPinned) return bPinned - aPinned;
+
+      // 3. Cuối cùng sắp xếp theo thời gian cập nhật mới nhất
       return new Date(b.updatedAt || 0).getTime() - new Date(a.updatedAt || 0).getTime();
     });
-  }, [rooms, activeTab, searchQuery, currentUserId]);
+  }, [rooms, activeTab, searchQuery, isChatbotRoom, isRoomPinned]);
 
   // Messages filtered by in-chat search
   const displayedMessages = useMemo(() => {
@@ -2130,14 +2703,28 @@ export default function ChatScreen() {
               onPress={() => setRoomInfoModalVisible(true)}
               activeOpacity={0.8}
             >
-              <Text style={styles.chatHeaderTitle} numberOfLines={1}>
-                {getRoomDisplayName(activeRoom)}
-              </Text>
-              <Text style={styles.chatHeaderSubtitle}>
-                {activeRoom.isGroup
-                  ? `${activeRoom.members?.length || 0} thành viên`
-                  : "Bấm để xem thông tin"}
-              </Text>
+              <View style={{ flexDirection: "row", alignItems: "center" }}>
+                <View style={styles.chatHeaderAvatarWrap}>
+                  <RoomAvatar
+                    room={activeRoom}
+                    avatarUrl={getRoomAvatarUrl(activeRoom)}
+                    roomName={getRoomDisplayName(activeRoom)}
+                    isBot={isChatbotRoom(activeRoom)}
+                    size={38}
+                    fontSize={14}
+                  />
+                </View>
+                <View style={{ flex: 1 }}>
+                  <Text style={styles.chatHeaderTitle} numberOfLines={1}>
+                    {getRoomDisplayName(activeRoom)}
+                  </Text>
+                  <Text style={styles.chatHeaderSubtitle}>
+                    {activeRoom.isGroup
+                      ? `${activeRoom.members?.length || 0} thành viên`
+                      : "Bấm để xem thông tin"}
+                  </Text>
+                </View>
+              </View>
             </TouchableOpacity>
 
             {/* Search icon */}
@@ -2308,9 +2895,9 @@ export default function ChatScreen() {
               data={displayedMessages}
               keyExtractor={(item, index) => (item._id ? `${item._id}-${index}` : `msg-${index}`)}
               contentContainerStyle={styles.messagesList}
-              initialNumToRender={15}
-              maxToRenderPerBatch={10}
-              windowSize={10}
+              initialNumToRender={50}
+              maxToRenderPerBatch={25}
+              windowSize={15}
               removeClippedSubviews={Platform.OS === "android"}
               showsVerticalScrollIndicator={false}
               keyboardShouldPersistTaps="handled"
@@ -2319,7 +2906,11 @@ export default function ChatScreen() {
                 const paddingToBottom = 120;
                 const isBottom =
                   layoutMeasurement.height + contentOffset.y >= contentSize.height - paddingToBottom;
-                isAtBottomRef.current = isBottom;
+                // Chỉ cập nhật isAtBottomRef sau khi đã cuộn khởi tạo xong xuống đáy,
+                // tránh việc FlatList vừa render ở offset 0 khiến isAtBottomRef bị gán false sai lầm
+                if (initialScrollDoneRef.current) {
+                  isAtBottomRef.current = isBottom;
+                }
                 if (isBottom) {
                   isNavigatingToRepliedRef.current = false;
                 }
@@ -2333,15 +2924,13 @@ export default function ChatScreen() {
               }}
               onContentSizeChange={() => {
                 if (!initialScrollDoneRef.current) {
-                  initialScrollDoneRef.current = true;
                   flatListRef.current?.scrollToEnd({ animated: false });
                 } else if (isAtBottomRef.current && !isNavigatingToRepliedRef.current && !highlightedMessageId) {
                   flatListRef.current?.scrollToEnd({ animated: true });
                 }
               }}
               onLayout={() => {
-                if (!initialScrollDoneRef.current) {
-                  initialScrollDoneRef.current = true;
+                if (!initialScrollDoneRef.current && displayedMessages.length > 0) {
                   flatListRef.current?.scrollToEnd({ animated: false });
                 }
               }}
@@ -2371,22 +2960,18 @@ export default function ChatScreen() {
                       trimmed.startsWith("data:");
 
                     if (isHttpOrFile && !trimmed.includes(" ")) {
-                      const isImg =
-                        trimmed.match(/\.(jpeg|jpg|gif|png|webp|bmp|svg)($|\?[^\s]*)/i) ||
-                        trimmed.includes("/image/upload/") ||
-                        trimmed.startsWith("data:image/");
-                      const isAud =
-                        trimmed.match(/\.(mp3|m4a|wav|aac|ogg|opus|flac)($|\?[^\s]*)/i) ||
-                        trimmed.startsWith("data:audio/") ||
-                        (trimmed.includes("cloudinary.com") &&
-                          (trimmed.includes("/video/upload/") ||
-                            trimmed.includes("Audio_") ||
-                            trimmed.includes(".mp3") ||
-                            trimmed.includes(".m4a")));
+                      const isImg = isImageAttachment({ url: trimmed });
+                      const isVid = isVideoAttachment({ url: trimmed });
+                      const isAud = !isVid && isAudioAttachment({ url: trimmed });
 
                       if (isImg) {
                         if (!effectiveAttachments.some((a) => a.url === trimmed)) {
                           effectiveAttachments.push({ url: trimmed, type: "image/jpeg", name: "Hình ảnh" });
+                        }
+                        continue;
+                      } else if (isVid) {
+                        if (!effectiveAttachments.some((a) => a.url === trimmed)) {
+                          effectiveAttachments.push({ url: trimmed, type: "video/mp4", name: "Video.mp4" });
                         }
                         continue;
                       } else if (isAud) {
@@ -2417,11 +3002,18 @@ export default function ChatScreen() {
 
                 return (
                   <View style={[styles.msgRow, isMe ? styles.msgRowMe : styles.msgRowOther]}>
-                    {!isMe && activeRoom.isGroup && (
+                    {!isMe && (activeRoom.isGroup || isChatbotRoom(activeRoom)) && (
                       <View style={styles.msgSenderAvatar}>
-                        <Text style={styles.msgSenderAvatarText}>
-                          {(item.senderName || "U").slice(0, 1).toUpperCase()}
-                        </Text>
+                        {isChatbotRoom(activeRoom) ? (
+                          <Ionicons name="sparkles" size={14} color="#ffffff" />
+                        ) : (
+                          <UserAvatar
+                            photoURL={getMessageSenderPhoto(item)}
+                            name={item.senderName || "U"}
+                            size={28}
+                            fontSize={11}
+                          />
+                        )}
                       </View>
                     )}
 
@@ -2469,20 +3061,9 @@ export default function ChatScreen() {
                             {effectiveAttachments && effectiveAttachments.length > 0 && (
                               <View style={styles.msgAttachmentsWrap}>
                                 {effectiveAttachments.map((att: ChatAttachment, idx: number) => {
-                                  const isImg =
-                                    att.type?.startsWith("image/") ||
-                                    att.url?.match(/\.(jpeg|jpg|gif|png|webp)($|\?[^\s]*)/i) ||
-                                    att.url?.includes("/image/upload/") ||
-                                    att.name?.match(/\.(jpeg|jpg|gif|png|webp)$/i);
-                                  const isAud =
-                                    att.type?.startsWith("audio/") ||
-                                    att.url?.match(/\.(mp3|m4a|wav|aac|ogg)($|\?[^\s]*)/i) ||
-                                    (att.url?.includes("cloudinary.com") &&
-                                      (att.url.includes("/video/upload/") ||
-                                        att.url.includes("Audio_") ||
-                                        att.url.includes(".mp3") ||
-                                        att.url.includes(".m4a"))) ||
-                                    att.name?.match(/\.(mp3|m4a|wav|aac|ogg)$/i);
+                                  const isImg = isImageAttachment(att);
+                                  const isVid = isVideoAttachment(att);
+                                  const isAud = !isVid && isAudioAttachment(att);
 
                                   if (isImg) {
                                     return (
@@ -2505,6 +3086,21 @@ export default function ChatScreen() {
                                           </View>
                                         )}
                                       </TouchableOpacity>
+                                    );
+                                  }
+
+                                  if (isVid) {
+                                    return (
+                                      <ChatVideoBubble
+                                        key={`vid-${idx}-${att.url}`}
+                                        att={att}
+                                        isMe={isMe}
+                                        isSending={item.status === "sending"}
+                                        onPress={() => {
+                                          setPreviewVideoName(getCleanFileName(att) || "Video");
+                                          setPreviewVideoUri(att.url);
+                                        }}
+                                      />
                                     );
                                   }
 
@@ -2864,29 +3460,15 @@ export default function ChatScreen() {
 
               {/* 2. ACTION GRID SHEET (Bảng chức năng dạng lưới 4 cột) */}
               {selectedMessage && (() => {
-                const hasAudioAtt = selectedMessage.attachments?.some(
-                  (a) =>
-                    a.type?.startsWith("audio/") ||
-                    a.url?.match(/\.(mp3|m4a|wav|aac|ogg)($|\?[^\s]*)/i) ||
-                    (a.url?.includes("cloudinary.com") &&
-                      (a.url.includes("/video/upload/") ||
-                        a.url.includes("Audio_") ||
-                        a.url.includes(".mp3") ||
-                        a.url.includes(".m4a"))) ||
-                    a.name?.match(/\.(mp3|m4a|wav|aac|ogg)$/i)
-                );
+                const hasVideoAtt = selectedMessage.attachments?.some((a) => isVideoAttachment(a));
+                const hasAudioAtt = selectedMessage.attachments?.some((a) => isAudioAttachment(a));
                 const contentTrimmed = (selectedMessage.content || "").trim();
                 const isPureAudioContent =
                   (contentTrimmed.startsWith("http://") || contentTrimmed.startsWith("https://")) &&
                   !contentTrimmed.includes(" ") &&
-                  (contentTrimmed.match(/\.(mp3|m4a|wav|aac|ogg)($|\?[^\s]*)/i) ||
-                    (contentTrimmed.includes("cloudinary.com") &&
-                      (contentTrimmed.includes("/video/upload/") ||
-                        contentTrimmed.includes("Audio_") ||
-                        contentTrimmed.includes(".mp3") ||
-                        contentTrimmed.includes(".m4a"))));
+                  isAudioAttachment({ url: contentTrimmed });
 
-                const isVoiceMessage = Boolean(hasAudioAtt || isPureAudioContent);
+                const isVoiceMessage = Boolean(hasAudioAtt || isPureAudioContent) && !hasVideoAtt;
                 const downloadableFiles = extractDownloadableAttachments(selectedMessage);
                 const hasDownloadableMedia = downloadableFiles.length > 0;
 
@@ -3125,11 +3707,14 @@ export default function ChatScreen() {
 
             <ScrollView contentContainerStyle={{ padding: 16 }}>
               <View style={styles.roomInfoHero}>
-                <View style={[styles.avatarPlaceholder, { width: 72, height: 72, borderRadius: 36 }]}>
-                  <Text style={{ fontSize: 28, color: "#ffffff", fontWeight: "700" }}>
-                    {getRoomAvatarInitial(activeRoom)}
-                  </Text>
-                </View>
+                <RoomAvatar
+                  room={activeRoom}
+                  avatarUrl={getRoomAvatarUrl(activeRoom)}
+                  roomName={getRoomDisplayName(activeRoom)}
+                  isBot={isChatbotRoom(activeRoom)}
+                  size={72}
+                  fontSize={28}
+                />
                 <Text style={styles.roomInfoName}>{getRoomDisplayName(activeRoom)}</Text>
                 <Text style={styles.roomInfoType}>
                   {activeRoom.isGroup ? `Nhóm trò chuyện (${activeRoom.members?.length} thành viên)` : "Cuộc trò chuyện cá nhân"}
@@ -3144,9 +3729,12 @@ export default function ChatScreen() {
                     return (
                       <View key={idx} style={styles.memberRow}>
                         <View style={styles.memberAvatar}>
-                          <Text style={styles.memberAvatarText}>
-                            {(mUser?.displayName || "U").slice(0, 1).toUpperCase()}
-                          </Text>
+                          <UserAvatar
+                            photoURL={mUser?.photoURL}
+                            name={mUser?.displayName || "U"}
+                            size={38}
+                            fontSize={14}
+                          />
                         </View>
                         <View style={{ flex: 1, marginLeft: 12 }}>
                           <Text style={styles.memberName}>{mUser?.displayName || mUser?.email || "Thành viên"}</Text>
@@ -3214,10 +3802,19 @@ export default function ChatScreen() {
                 <TouchableOpacity
                   style={styles.imagePreviewDownloadBtn}
                   onPress={() => {
+                    let ext = "jpg";
+                    let mime = "image/jpeg";
+                    if (previewImageUri.includes(".png")) {
+                      ext = "png";
+                      mime = "image/png";
+                    } else if (previewImageUri.includes(".webp")) {
+                      ext = "webp";
+                      mime = "image/webp";
+                    }
                     void handleDownloadAttachment({
                       url: previewImageUri,
-                      type: "image/jpeg",
-                      name: `IMG_${Date.now()}.jpg`,
+                      type: mime,
+                      name: `Anh_${Date.now()}.${ext}`,
                     });
                   }}
                   activeOpacity={0.8}
@@ -3232,8 +3829,33 @@ export default function ChatScreen() {
                   resizeMode="contain"
                 />
               )}
+              {renderToast()}
             </SafeAreaView>
           </View>
+        </Modal>
+
+        {/* MODAL: XEM VIDEO FULLSCREEN TRỰC TIẾP TRONG APP (CHUẨN ZALO) */}
+        <Modal
+          visible={!!previewVideoUri}
+          transparent
+          animationType="fade"
+          onRequestClose={() => setPreviewVideoUri(null)}
+        >
+          <FullscreenVideoPlayer
+            videoUri={previewVideoUri}
+            fileName={previewVideoName}
+            onClose={() => setPreviewVideoUri(null)}
+            onDownload={async () => {
+              if (previewVideoUri) {
+                await handleDownloadAttachment({
+                  url: previewVideoUri,
+                  type: "video/mp4",
+                  name: previewVideoName.endsWith(".mp4") ? previewVideoName : `${previewVideoName}.mp4`,
+                });
+              }
+            }}
+            toastElement={renderToast()}
+          />
         </Modal>
 
         {/* FLOATING ROUNDED TOAST FEEDBACK */}
@@ -3334,42 +3956,36 @@ export default function ChatScreen() {
             }
 
             const unreadCount = item.unreadCount || 0;
+            const isPinned = item.isPinned || isRoomPinned(item);
 
             return (
               <TouchableOpacity
-                style={[styles.roomCard, item.isPinned && styles.roomCardPinned]}
+                style={[styles.roomCard, isPinned && styles.roomCardPinned]}
                 onPress={() => handleOpenRoom(item)}
                 onLongPress={() => {
-                  showCustomAlert(roomName, "Tùy chọn cuộc trò chuyện", [
+                  const title = isPinned ? "Bỏ ghim tin nhắn ?" : "Ghim tin nhắn ?";
+                  const message = isPinned
+                    ? `Bỏ ghim cuộc trò chuyện "${roomName}"?`
+                    : `Ghim cuộc trò chuyện "${roomName}" lên đầu danh sách?`;
+                  showCustomAlert(title, message, [
                     {
-                      text: item.isPinned ? "Bỏ ghim" : "Ghim lên đầu",
+                      text: isPinned ? "Bỏ ghim tin nhắn" : "Ghim tin nhắn",
                       onPress: () => void handleTogglePin(item._id),
                     },
-                    {
-                      text: "Đánh dấu đã đọc",
-                      onPress: () => {
-                        void chat.markAsRead(item._id);
-                        void loadRooms(true);
-                      },
-                    },
-                    { text: "Đóng", style: "cancel" },
                   ]);
                 }}
                 activeOpacity={0.7}
               >
                 {/* Avatar */}
                 <View style={styles.avatarContainer}>
-                  {item.avatarURL ? (
-                    <Image source={{ uri: item.avatarURL }} style={styles.avatarImg} />
-                  ) : (
-                    <View style={[styles.avatarPlaceholder, item.isGroup && { backgroundColor: "#0d9488" }]}>
-                      {item.isGroup ? (
-                        <Ionicons name="people" size={22} color="#ffffff" />
-                      ) : (
-                        <Text style={styles.avatarInitial}>{getRoomAvatarInitial(item)}</Text>
-                      )}
-                    </View>
-                  )}
+                  <RoomAvatar
+                    room={item}
+                    avatarUrl={getRoomAvatarUrl(item)}
+                    roomName={roomName}
+                    isBot={isChatbotRoom(item)}
+                    size={50}
+                    fontSize={18}
+                  />
                 </View>
 
                 {/* Content */}
@@ -3379,7 +3995,7 @@ export default function ChatScreen() {
                       {roomName}
                     </Text>
                     <View style={styles.roomTimeRow}>
-                      {item.isPinned && (
+                      {isPinned && (
                         <Ionicons name="pin" size={13} color="#059669" style={{ marginRight: 4 }} />
                       )}
                       <Text style={styles.roomTime}>{formatMessageTime(item.lastMessage?.createdAt || item.updatedAt)}</Text>
@@ -3497,9 +4113,12 @@ export default function ChatScreen() {
                     activeOpacity={0.7}
                   >
                     <View style={styles.userPickAvatar}>
-                      <Text style={styles.userPickAvatarText}>
-                        {(item.displayName || item.email || "U").slice(0, 2).toUpperCase()}
-                      </Text>
+                      <UserAvatar
+                        photoURL={item.photoURL}
+                        name={item.displayName || item.email || "U"}
+                        size={42}
+                        fontSize={15}
+                      />
                     </View>
                     <View style={{ flex: 1, marginLeft: 12 }}>
                       <Text style={styles.userPickName}>{item.displayName || item.email}</Text>
@@ -3540,10 +4159,19 @@ export default function ChatScreen() {
               <TouchableOpacity
                 style={styles.imagePreviewDownloadBtn}
                 onPress={() => {
+                  let ext = "jpg";
+                  let mime = "image/jpeg";
+                  if (previewImageUri.includes(".png")) {
+                    ext = "png";
+                    mime = "image/png";
+                  } else if (previewImageUri.includes(".webp")) {
+                    ext = "webp";
+                    mime = "image/webp";
+                  }
                   void handleDownloadAttachment({
                     url: previewImageUri,
-                    type: "image/jpeg",
-                    name: `IMG_${Date.now()}.jpg`,
+                    type: mime,
+                    name: `Anh_${Date.now()}.${ext}`,
                   });
                 }}
                 activeOpacity={0.8}
@@ -3558,9 +4186,40 @@ export default function ChatScreen() {
                 resizeMode="contain"
               />
             )}
+            {renderToast()}
           </SafeAreaView>
         </View>
       </Modal>
+
+      {/* MODAL: XEM VIDEO FULLSCREEN TRỰC TIẾP TRONG APP (CHUẨN ZALO) */}
+      <Modal
+        visible={!!previewVideoUri}
+        transparent
+        animationType="fade"
+        onRequestClose={() => setPreviewVideoUri(null)}
+      >
+        <FullscreenVideoPlayer
+          videoUri={previewVideoUri}
+          fileName={previewVideoName}
+          onClose={() => setPreviewVideoUri(null)}
+          onDownload={async () => {
+            if (previewVideoUri) {
+              await handleDownloadAttachment({
+                url: previewVideoUri,
+                type: "video/mp4",
+                name: previewVideoName.endsWith(".mp4") ? previewVideoName : `${previewVideoName}.mp4`,
+              });
+            }
+          }}
+          toastElement={renderToast()}
+        />
+      </Modal>
+
+      {/* FLOATING ROUNDED TOAST FEEDBACK */}
+      {renderToast()}
+
+      {/* CUSTOM ROUNDED ALERT MODAL */}
+      {renderCustomAlert()}
     </View>
   );
 
@@ -3821,6 +4480,27 @@ const styles = StyleSheet.create({
   chatTitleContainer: {
     flex: 1,
   },
+  chatHeaderAvatarWrap: {
+    marginRight: 10,
+  },
+  chatHeaderAvatarImg: {
+    width: 38,
+    height: 38,
+    borderRadius: 19,
+  },
+  chatHeaderAvatarPlaceholder: {
+    width: 38,
+    height: 38,
+    borderRadius: 19,
+    backgroundColor: LUXCARE_PRIMARY,
+    alignItems: "center",
+    justifyContent: "center",
+  },
+  chatHeaderAvatarText: {
+    color: "#ffffff",
+    fontSize: 14,
+    fontWeight: "700",
+  },
   chatHeaderTitle: {
     color: LUXCARE_HEADER_TEXT,
     fontSize: 17,
@@ -3986,6 +4666,12 @@ const styles = StyleSheet.create({
     justifyContent: "center",
     marginRight: 6,
     marginBottom: 16,
+    overflow: "hidden",
+  },
+  msgSenderAvatarImg: {
+    width: 28,
+    height: 28,
+    borderRadius: 14,
   },
   msgSenderAvatarText: {
     color: "#ffffff",
@@ -4085,17 +4771,18 @@ const styles = StyleSheet.create({
     marginBottom: 6,
   },
   attItem: {
-    borderRadius: 8,
+    borderRadius: 14,
     overflow: "hidden",
-    marginVertical: 2,
+    marginVertical: 3,
     position: "relative",
     width: 200,
-    height: 150,
+    aspectRatio: 9 / 16,
+    backgroundColor: "#0f172a",
   },
   attImage: {
-    width: 200,
-    height: 150,
-    borderRadius: 8,
+    width: "100%",
+    height: "100%",
+    borderRadius: 14,
   },
   attSpinnerCenterWrap: {
     position: "absolute",
@@ -4639,6 +5326,12 @@ const styles = StyleSheet.create({
     backgroundColor: LUXCARE_PRIMARY,
     alignItems: "center",
     justifyContent: "center",
+    overflow: "hidden",
+  },
+  userPickAvatarImg: {
+    width: 42,
+    height: 42,
+    borderRadius: 21,
   },
   userPickAvatarText: {
     color: "#ffffff",
@@ -4820,6 +5513,12 @@ const styles = StyleSheet.create({
     backgroundColor: LUXCARE_PRIMARY,
     alignItems: "center",
     justifyContent: "center",
+    overflow: "hidden",
+  },
+  memberAvatarImg: {
+    width: 38,
+    height: 38,
+    borderRadius: 19,
   },
   memberAvatarText: {
     color: "#ffffff",
@@ -5067,14 +5766,27 @@ const styles = StyleSheet.create({
     backgroundColor: "#ffffff",
     borderRadius: 24,
     paddingHorizontal: 22,
-    paddingTop: 24,
-    paddingBottom: 20,
+    paddingTop: 28,
+    paddingBottom: 22,
     alignItems: "center",
+    position: "relative",
     shadowColor: "#000",
     shadowOffset: { width: 0, height: 10 },
-    shadowOpacity: 0.2,
+    shadowOpacity: 0.15,
     shadowRadius: 20,
     elevation: 12,
+  },
+  customAlertCloseBtn: {
+    position: "absolute",
+    top: 14,
+    right: 14,
+    width: 32,
+    height: 32,
+    borderRadius: 16,
+    backgroundColor: "#f1f5f9",
+    alignItems: "center",
+    justifyContent: "center",
+    zIndex: 10,
   },
   customAlertTitle: {
     fontSize: 18,
@@ -5110,12 +5822,12 @@ const styles = StyleSheet.create({
     justifyContent: "center",
   },
   customAlertBtnPrimary: {
-    backgroundColor: "#059669",
+    backgroundColor: "#0f172a",
   },
   customAlertBtnSecondary: {
-    backgroundColor: "#ecfdf5",
+    backgroundColor: "#f8fafc",
     borderWidth: 1,
-    borderColor: "#a7f3d0",
+    borderColor: "#e2e8f0",
   },
   customAlertBtnCancel: {
     backgroundColor: "#f8fafc",
@@ -5136,13 +5848,171 @@ const styles = StyleSheet.create({
     color: "#ffffff",
   },
   customAlertBtnTextSecondary: {
-    color: "#065f46",
+    color: "#334155",
   },
   customAlertBtnTextCancel: {
     color: "#64748b",
   },
   customAlertBtnTextDestructive: {
     color: "#dc2626",
+  },
+
+  /* VIDEO ATTACHMENT BUBBLE STYLES (CHUẨN ZALO - RATIO 9:16) */
+  videoBubbleCard: {
+    width: 200,
+    aspectRatio: 9 / 16,
+    borderRadius: 14,
+    overflow: "hidden",
+    marginVertical: 3,
+    backgroundColor: "#0f172a",
+    position: "relative",
+  },
+  videoBubbleThumb: {
+    position: "absolute",
+    top: 0,
+    left: 0,
+    right: 0,
+    bottom: 0,
+    width: "100%",
+    height: "100%",
+  },
+  videoBubblePlaceholder: {
+    position: "absolute",
+    top: 0,
+    left: 0,
+    right: 0,
+    bottom: 0,
+    width: "100%",
+    height: "100%",
+    backgroundColor: "#1e293b",
+    alignItems: "center",
+    justifyContent: "center",
+  },
+  videoBubbleOverlay: {
+    position: "absolute",
+    top: 0,
+    left: 0,
+    right: 0,
+    bottom: 0,
+    backgroundColor: "rgba(0, 0, 0, 0.25)",
+  },
+  videoBubblePlayBtn: {
+    position: "absolute",
+    top: "50%",
+    left: "50%",
+    marginTop: -26,
+    marginLeft: -26,
+    width: 52,
+    height: 52,
+    borderRadius: 26,
+    backgroundColor: "rgba(5, 150, 105, 0.92)",
+    alignItems: "center",
+    justifyContent: "center",
+    shadowColor: "#000",
+    shadowOffset: { width: 0, height: 2 },
+    shadowOpacity: 0.35,
+    shadowRadius: 5,
+    elevation: 6,
+    zIndex: 10,
+  },
+  videoBubbleSpinnerCenter: {
+    position: "absolute",
+    top: "50%",
+    left: "50%",
+    marginTop: -20,
+    marginLeft: -20,
+    width: 40,
+    height: 40,
+    alignItems: "center",
+    justifyContent: "center",
+    zIndex: 10,
+  },
+  videoBubbleFooter: {
+    position: "absolute",
+    bottom: 0,
+    left: 0,
+    right: 0,
+    flexDirection: "row",
+    alignItems: "center",
+    backgroundColor: "rgba(0, 0, 0, 0.65)",
+    paddingVertical: 6,
+    paddingHorizontal: 10,
+    zIndex: 8,
+  },
+  videoBubbleBadge: {
+    flexDirection: "row",
+    alignItems: "center",
+    backgroundColor: "rgba(5, 150, 105, 0.85)",
+    paddingHorizontal: 5,
+    paddingVertical: 1.5,
+    borderRadius: 4,
+    marginRight: 6,
+  },
+  videoBubbleBadgeText: {
+    color: "#ffffff",
+    fontSize: 9.5,
+    fontWeight: "700",
+    marginLeft: 3,
+    letterSpacing: 0.5,
+  },
+  videoBubbleName: {
+    flex: 1,
+    color: "#ffffff",
+    fontSize: 11,
+    fontWeight: "500",
+  },
+
+  /* FULLSCREEN VIDEO MODAL STYLES */
+  videoModalOverlay: {
+    flex: 1,
+    backgroundColor: "#000000",
+  },
+  videoModalSafeArea: {
+    flex: 1,
+    backgroundColor: "#000000",
+  },
+  videoModalTopBar: {
+    flexDirection: "row",
+    alignItems: "center",
+    justifyContent: "space-between",
+    paddingHorizontal: 16,
+    paddingVertical: 12,
+    zIndex: 20,
+  },
+  videoModalIconBtn: {
+    width: 40,
+    height: 40,
+    borderRadius: 20,
+    backgroundColor: "rgba(255, 255, 255, 0.18)",
+    alignItems: "center",
+    justifyContent: "center",
+  },
+  videoModalHeaderTitle: {
+    flex: 1,
+    color: "#ffffff",
+    fontSize: 14.5,
+    fontWeight: "600",
+    textAlign: "center",
+    marginHorizontal: 12,
+  },
+  videoModalContent: {
+    flex: 1,
+    justifyContent: "center",
+    alignItems: "center",
+  },
+  videoModalVideoView: {
+    width: "100%",
+    height: "100%",
+  },
+  videoModalErrorWrap: {
+    alignItems: "center",
+    justifyContent: "center",
+    padding: 24,
+  },
+  videoModalErrorText: {
+    color: "#94a3b8",
+    fontSize: 14,
+    marginTop: 10,
   },
 });
 
