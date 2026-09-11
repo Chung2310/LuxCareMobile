@@ -718,7 +718,7 @@ export default function BlogScreen() {
                           <Ionicons
                             name={post.isPinned ? "push" : "push-outline"}
                             size={16}
-                            color="#ffffff"
+                            color="#000000"
                           />
                         </Pressable>
                         <Pressable
@@ -726,7 +726,7 @@ export default function BlogScreen() {
                           onPress={() => handleDeletePost(post.id)}
                           hitSlop={6}
                         >
-                          <Ionicons name="trash-outline" size={16} color="#ffffff" />
+                          <Ionicons name="trash-outline" size={16} color="#000000" />
                         </Pressable>
                       </View>
                     )}
@@ -749,7 +749,7 @@ export default function BlogScreen() {
                           style={styles.urlBox}
                           onPress={() => handleOpenLink(trimmed)}
                         >
-                          <Ionicons name="link-outline" size={16} color="#ffffff" />
+                          <Ionicons name="link-outline" size={16} color="#000000" />
                           <Text style={styles.urlText} numberOfLines={2}>
                             {trimmed}
                           </Text>
@@ -816,7 +816,7 @@ export default function BlogScreen() {
                     return (
                       <View key={att.id} style={styles.webFileCard}>
                         <View style={styles.webFileIconWrap}>
-                          <Ionicons name="document-text" size={20} color="#ffffff" />
+                          <Ionicons name="document-text" size={20} color="#000000" />
                         </View>
                         <View style={styles.webFileMeta}>
                           <Text style={styles.webFileName} numberOfLines={1}>
@@ -829,7 +829,7 @@ export default function BlogScreen() {
                           style={styles.webDownloadBtn}
                           onPress={() => void shareOrOpenFile()}
                         >
-                          <Ionicons name="share-social-outline" size={14} color="#ffffff" />
+                          <Ionicons name="share-social-outline" size={14} color="#000000" />
                           <Text style={styles.webDownloadText}>Chia sẻ</Text>
                         </Pressable>
                       </View>
@@ -850,7 +850,7 @@ export default function BlogScreen() {
                         <Ionicons
                           name={post.reactions?.[0]?.userReacted ? "heart" : "heart-outline"}
                           size={16}
-                          color={post.reactions?.[0]?.userReacted ? "#ff6b81" : "#ffffff"}
+                          color={post.reactions?.[0]?.userReacted ? "#dc2626" : "#000000"}
                         />
                         <Text style={[styles.likeBtnText, post.reactions?.[0]?.userReacted && { color: "#dc2626" }]}>
                           Thích {post.reactions?.[0]?.count ? `(${post.reactions[0].count})` : ""}
@@ -861,7 +861,7 @@ export default function BlogScreen() {
                         style={styles.sharePostBtn}
                         onPress={() => void handleSharePost(post)}
                       >
-                        <Ionicons name="share-social-outline" size={16} color="#ffffff" />
+                        <Ionicons name="share-social-outline" size={16} color="#000000" />
                         <Text style={styles.sharePostBtnText}>Chia sẻ</Text>
                       </Pressable>
                     </View>
@@ -1590,17 +1590,17 @@ const styles = StyleSheet.create({
     fontFamily: "Inter-Regular",
   },
   postCard: {
-    backgroundColor: "#065f46", // Xanh lá đậm chuẩn thương hiệu LuxCare
+    backgroundColor: "rgba(236, 253, 245, 0.95)", // Xanh lá nhạt mint sang trọng
     borderRadius: 16,
     padding: 14,
     marginBottom: 12,
     borderWidth: 1,
-    borderColor: "rgba(255, 255, 255, 0.15)",
-    shadowColor: "#000",
-    shadowOffset: { width: 0, height: 3 },
-    shadowOpacity: 0.16,
-    shadowRadius: 6,
-    elevation: 4,
+    borderColor: "#a7f3d0",
+    shadowColor: "#059669",
+    shadowOffset: { width: 0, height: 2 },
+    shadowOpacity: 0.08,
+    shadowRadius: 5,
+    elevation: 3,
   },
   postHeaderRow: {
     flexDirection: "row",
@@ -1612,7 +1612,7 @@ const styles = StyleSheet.create({
     width: 36,
     height: 36,
     borderRadius: 18,
-    backgroundColor: "#eab308",
+    backgroundColor: "#059669",
     alignItems: "center",
     justifyContent: "center",
   },
@@ -1633,26 +1633,26 @@ const styles = StyleSheet.create({
   authorName: {
     fontSize: 14,
     fontWeight: "800",
-    color: "#ffffff",
+    color: "#0f172a", // Chữ đen
     fontFamily: "Inter-Bold",
   },
   editorRoleBadge: {
-    backgroundColor: "rgba(255, 255, 255, 0.2)",
+    backgroundColor: "#d1fae5",
     paddingHorizontal: 6,
     paddingVertical: 2,
     borderRadius: 6,
     borderWidth: 1,
-    borderColor: "rgba(255, 255, 255, 0.3)",
+    borderColor: "#a7f3d0",
   },
   editorRoleBadgeText: {
     fontSize: 10.5,
     fontWeight: "800",
-    color: "#ffffff",
+    color: "#065f46",
     fontFamily: "Inter-Bold",
   },
   postTime: {
     fontSize: 11,
-    color: "#a7f3d0",
+    color: "#047857",
     fontFamily: "Inter-Regular",
     marginTop: 2,
   },
@@ -1663,22 +1663,22 @@ const styles = StyleSheet.create({
   },
   editorActionBtn: {
     padding: 4,
-    backgroundColor: "rgba(255, 255, 255, 0.2)",
+    backgroundColor: "#ffffff",
     borderRadius: 6,
     borderWidth: 1,
-    borderColor: "rgba(255, 255, 255, 0.3)",
+    borderColor: "#a7f3d0",
   },
   articleTitle: {
     fontSize: 14.5,
     fontWeight: "800",
-    color: "#ffffff",
+    color: "#0f172a", // Chữ đen
     fontFamily: "Inter-Bold",
     marginBottom: 6,
     lineHeight: 20,
   },
   postContentText: {
     fontSize: 13,
-    color: "#ffffff",
+    color: "#0f172a", // Chữ đen
     lineHeight: 20,
     fontFamily: "Inter-Regular",
     marginBottom: 10,
@@ -1686,35 +1686,35 @@ const styles = StyleSheet.create({
   urlBox: {
     flexDirection: "row",
     alignItems: "center",
-    backgroundColor: "rgba(255, 255, 255, 0.15)",
+    backgroundColor: "#ffffff",
     padding: 10,
     borderRadius: 8,
     gap: 6,
     marginBottom: 10,
     borderWidth: 1,
-    borderColor: "rgba(255, 255, 255, 0.25)",
+    borderColor: "#a7f3d0",
   },
   urlText: {
     flex: 1,
     fontSize: 12.5,
-    color: "#ffffff",
+    color: "#047857",
     fontFamily: "Inter-Medium",
   },
   webFileCard: {
     flexDirection: "row",
     alignItems: "center",
-    backgroundColor: "rgba(255, 255, 255, 0.15)",
+    backgroundColor: "#ffffff",
     borderRadius: 10,
     padding: 10,
     marginBottom: 8,
     borderWidth: 1,
-    borderColor: "rgba(255, 255, 255, 0.25)",
+    borderColor: "#a7f3d0",
   },
   webFileIconWrap: {
     width: 30,
     height: 30,
     borderRadius: 8,
-    backgroundColor: "rgba(255, 255, 255, 0.2)",
+    backgroundColor: "#ecfdf5",
     alignItems: "center",
     justifyContent: "center",
     marginRight: 10,
@@ -1725,18 +1725,18 @@ const styles = StyleSheet.create({
   webFileName: {
     fontSize: 12.5,
     fontWeight: "700",
-    color: "#ffffff",
+    color: "#0f172a",
     fontFamily: "Inter-Bold",
   },
   webFileSize: {
     fontSize: 11,
-    color: "#d1fae5",
+    color: "#64748b",
   },
   webDownloadBtn: {
     flexDirection: "row",
     alignItems: "center",
     gap: 4,
-    backgroundColor: "rgba(255, 255, 255, 0.25)",
+    backgroundColor: "#d1fae5",
     paddingHorizontal: 8,
     paddingVertical: 4,
     borderRadius: 8,
@@ -1744,7 +1744,7 @@ const styles = StyleSheet.create({
   webDownloadText: {
     fontSize: 11.5,
     fontWeight: "700",
-    color: "#ffffff",
+    color: "#065f46",
     fontFamily: "Inter-Bold",
   },
   postCardFooter: {
@@ -1754,18 +1754,21 @@ const styles = StyleSheet.create({
     marginTop: 6,
     paddingTop: 8,
     borderTopWidth: 1,
-    borderTopColor: "rgba(255, 255, 255, 0.2)",
+    borderTopColor: "#a7f3d0",
   },
   tagBadge: {
-    backgroundColor: "rgba(255, 255, 255, 0.2)",
+    backgroundColor: "#d1fae5",
     paddingHorizontal: 8,
     paddingVertical: 3,
     borderRadius: 8,
+    borderWidth: 1,
+    borderColor: "#a7f3d0",
   },
   tagBadgeText: {
     fontSize: 11,
-    color: "#ffffff",
+    color: "#065f46",
     fontFamily: "Inter-Medium",
+    fontWeight: "700",
   },
   footerActionsRight: {
     flexDirection: "row",
@@ -1781,7 +1784,7 @@ const styles = StyleSheet.create({
   },
   likeBtnText: {
     fontSize: 12,
-    color: "#ffffff",
+    color: "#0f172a", // Chữ đen
     fontFamily: "Inter-Medium",
   },
   sharePostBtn: {
@@ -1793,7 +1796,7 @@ const styles = StyleSheet.create({
   },
   sharePostBtnText: {
     fontSize: 12,
-    color: "#ffffff",
+    color: "#0f172a", // Chữ đen
     fontFamily: "Inter-Medium",
   },
 
