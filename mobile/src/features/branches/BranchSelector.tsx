@@ -12,6 +12,7 @@ import { SafeAreaView } from "react-native-safe-area-context";
 import type { BranchRecord } from "../../../../src/services/branchService";
 import { branches } from "../../api/services";
 import { useSession, messageOf } from "../../auth/SessionProvider";
+import { Ionicons } from "@expo/vector-icons";
 
 
 export function BranchSelector({
@@ -73,7 +74,7 @@ export function BranchSelector({
           onPress={() => void load()}
         >
           <View style={styles.triggerIconBox}>
-            <Text style={styles.triggerIcon}>📍</Text>
+            <Ionicons name="location-outline" size={18} color="#059669" />
           </View>
 
           <View style={{ flex: 1 }}>
@@ -84,7 +85,8 @@ export function BranchSelector({
           </View>
 
           <View style={styles.changeBadge}>
-            <Text style={styles.changeBadgeText}>Đổi ›</Text>
+            <Text style={styles.changeBadgeText}>Đổi</Text>
+            <Ionicons name="chevron-forward" size={12} color="#059669" />
           </View>
         </Pressable>
       )}
@@ -132,8 +134,9 @@ export function BranchSelector({
               ]}
               onPress={() => choose(null)}
             >
-              <View style={[styles.codeBadge, { backgroundColor: "#ecfdf5", borderColor: "#a7f3d0", borderWidth: 1 }]}>
-                <Text style={[styles.codeBadgeText, { color: "#047857" }]}>🌐 TẤT CẢ</Text>
+              <View style={[styles.codeBadge, { backgroundColor: "#ecfdf5", borderColor: "#a7f3d0", borderWidth: 1, flexDirection: "row", alignItems: "center", gap: 4 }]}>
+                <Ionicons name="globe-outline" size={12} color="#047857" />
+                <Text style={[styles.codeBadgeText, { color: "#047857" }]}>TẤT CẢ</Text>
               </View>
 
               <View style={{ flex: 1 }}>
@@ -159,7 +162,8 @@ export function BranchSelector({
 
             {!!error && (
               <View style={styles.errorBox}>
-                <Text style={styles.errorText}>⚠️ {error}</Text>
+                <Ionicons name="alert-circle-outline" size={16} color="#e11d48" />
+                <Text style={styles.errorText}>{error}</Text>
                 <Pressable style={styles.retryBtn} onPress={() => void load()}>
                   <Text style={styles.retryBtnText}>Thử lại</Text>
                 </Pressable>
