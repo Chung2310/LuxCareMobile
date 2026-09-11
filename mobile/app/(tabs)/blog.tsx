@@ -26,6 +26,7 @@ import { File } from "expo-file-system";
 import { SafeAreaView } from "react-native-safe-area-context";
 import { useRouter } from "expo-router";
 import { Ionicons } from "@expo/vector-icons";
+import { Pin } from "lucide-react-native";
 import { useSession } from "../../src/auth/SessionProvider";
 import { blog, kanbanMedia } from "../../src/api/services";
 import { isBlogEditorUser } from "../../../src/utils/permissionUtils";
@@ -560,7 +561,6 @@ export default function BlogScreen() {
             <Text style={styles.channelTitleText} numberOfLines={1}>
               {selectedChannel.name}
             </Text>
-            <Ionicons name="chevron-down" size={15} color="#000000" />
           </Pressable>
 
           {/* Right Action Controls: Search icon & Logout button to return to login screen */}
@@ -620,9 +620,9 @@ export default function BlogScreen() {
             }}
           >
             <View style={styles.pinnedLeft}>
-              <Text style={styles.pinnedIcon}>📌</Text>
+              <Pin size={15} color="#92400e" style={styles.pinnedIcon} />
               <Text style={styles.pinnedText} numberOfLines={1}>
-                <Text style={{ fontWeight: "800", color: "#ea580c" }}>
+                <Text style={{ fontWeight: "800", color: "#92400e" }}>
                   Tin ghim {pinnedPosts.length > 0 ? `(${pinnedPosts.length}): ` : ": "}
                 </Text>
                 {pinnedPosts.length > 0
@@ -630,7 +630,7 @@ export default function BlogScreen() {
                   : "Chưa có tin ghim. BTV ấn giữ bài viết bất kỳ để ghim bài."}
               </Text>
             </View>
-            <Ionicons name="chevron-forward" size={16} color="#000000" />
+            <Ionicons name="chevron-forward" size={16} color="#92400e" />
           </Pressable>
         )}
 
@@ -699,7 +699,7 @@ export default function BlogScreen() {
                         </View>
                         {post.isPinned && (
                           <View style={styles.pinnedBadgeRow}>
-                            <Text style={{ fontSize: 11 }}>📌</Text>
+                            <Pin size={11} color="#92400e" />
                             <Text style={styles.pinnedBadgeText}>Tin ghim</Text>
                           </View>
                         )}
@@ -1070,7 +1070,7 @@ export default function BlogScreen() {
             <Pressable style={styles.pinnedModalCard} onPress={(e) => e.stopPropagation()}>
               <View style={styles.pinnedModalHeader}>
                 <View style={{ flexDirection: "row", alignItems: "center", gap: 6 }}>
-                  <Text style={{ fontSize: 18 }}>📌</Text>
+                  <Pin size={18} color="#92400e" />
                   <Text style={styles.pinnedModalTitle}>
                     Danh sách tin ghim ({pinnedPosts.length})
                   </Text>
@@ -1526,14 +1526,19 @@ const styles = StyleSheet.create({
     flexDirection: "row",
     alignItems: "center",
     justifyContent: "space-between",
-    backgroundColor: "#fff7ed",
+    backgroundColor: "#fef3c7", // Vàng hổ phách mật ong sang trọng, ấm áp, khác biệt hoàn toàn với xanh/trắng/cam
     marginHorizontal: 12,
     marginTop: 8,
     paddingHorizontal: 14,
     paddingVertical: 9,
     borderRadius: 14,
     borderWidth: 1,
-    borderColor: "#ffedd5",
+    borderColor: "#fde68a",
+    shadowColor: "#92400e",
+    shadowOffset: { width: 0, height: 2 },
+    shadowOpacity: 0.06,
+    shadowRadius: 4,
+    elevation: 2,
   },
   pinnedLeft: {
     flexDirection: "row",
@@ -1542,11 +1547,11 @@ const styles = StyleSheet.create({
     flex: 1,
   },
   pinnedIcon: {
-    fontSize: 14,
+    marginRight: 2,
   },
   pinnedText: {
     fontSize: 12,
-    color: "#c2410c",
+    color: "#78350f",
     fontFamily: "Inter-Medium",
     flex: 1,
   },
@@ -2088,12 +2093,12 @@ const styles = StyleSheet.create({
     fontFamily: "Inter-Medium",
   },
   pinnedItemCard: {
-    backgroundColor: "#fff7ed",
+    backgroundColor: "#fef3c7",
     borderRadius: 12,
     padding: 12,
     marginBottom: 10,
     borderWidth: 1,
-    borderColor: "#ffedd5",
+    borderColor: "#fde68a",
   },
   pinnedItemHeader: {
     flexDirection: "row",
@@ -2104,7 +2109,7 @@ const styles = StyleSheet.create({
   pinnedItemAuthor: {
     fontSize: 12.5,
     fontWeight: "700",
-    color: "#c2410c",
+    color: "#92400e",
     fontFamily: "Inter-Bold",
   },
   pinnedItemTime: {
@@ -2141,18 +2146,18 @@ const styles = StyleSheet.create({
   pinnedBadgeRow: {
     flexDirection: "row",
     alignItems: "center",
-    gap: 3,
-    backgroundColor: "#fff7ed",
+    gap: 4,
+    backgroundColor: "#fef3c7",
     paddingHorizontal: 6,
     paddingVertical: 2,
     borderRadius: 6,
     borderWidth: 1,
-    borderColor: "#ffedd5",
+    borderColor: "#fde68a",
   },
   pinnedBadgeText: {
     fontSize: 10.5,
     fontWeight: "800",
-    color: "#ea580c",
+    color: "#92400e",
     fontFamily: "Inter-Bold",
   },
   inlineLinkText: {
