@@ -1,6 +1,9 @@
 name: Build iOS IPA for Sideloadly
 
 on:
+  push:
+    branches:
+      - develop
   workflow_dispatch:
 
 permissions:

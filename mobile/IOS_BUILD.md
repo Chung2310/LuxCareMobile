@@ -3,6 +3,7 @@
 ## Cài qua USB bằng Sideloadly (không cần ký trên EAS)
 
 Dùng workflow **Build iOS IPA for Sideloadly** trong `.github/workflows/build-ios-sideloadly.yml`.
+Workflow tự chạy khi `develop` nhận commit mới (merge PR hoặc push trực tiếp); không chạy khi PR chỉ được mở/cập nhật. Vẫn hỗ trợ chạy thủ công qua Run workflow.
 Workflow này chạy Xcode trên GitHub macOS 26, build Release cho iPhone thật, tắt code signing rồi đóng gói `Payload/*.app` thành `LuxCare-unsigned.ipa`.
 Không cần EXPO_TOKEN, chứng chỉ .p12, provisioning profile, Apple Developer trả phí hoặc đăng ký UDID cho bước build này.
 Không gửi Apple ID/mật khẩu lên GitHub. Sideloadly ký và cài bằng tài khoản của bạn trên máy tính.
@@ -14,7 +15,7 @@ Không gửi Apple ID/mật khẩu lên GitHub. Sideloadly ký và cài bằng t
    - `LUXCARE_IOS_BUNDLE_IDENTIFIER`: ví dụ `com.yourcompany.luxcare`, giữ ổn định qua các lần cài.
    - `EXPO_PUBLIC_EAS_PROJECT_ID`: không bắt buộc cho build unsigned; chỉ dùng nếu đã có dự án Expo phù hợp.
 2. Đưa workflow lên nhánh mặc định để hiện nút Run workflow.
-3. Actions → **Build iOS IPA for Sideloadly** → Run workflow → chọn nhánh.
+3. Merge PR vào `develop` để tự build, hoặc Actions → **Build iOS IPA for Sideloadly** → Run workflow → chọn nhánh.
 4. Tải artifact `LuxCare-ios-sideloadly-<run number>`, giải nén ZIP ngoài để lấy IPA. Không giải nén file IPA.
 5. Cài Sideloadly từ trang chính thức. Trên Windows, làm theo yêu cầu iTunes/iCloud bản web của Sideloadly.
 6. Kết nối iPhone qua USB, mở khóa và chọn Trust/Tin cậy máy tính.
