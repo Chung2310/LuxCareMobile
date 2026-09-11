@@ -1,4 +1,4 @@
-import React, { createContext, useCallback, useContext, useEffect, useRef, useState } from "react";
+import React, { createContext, useCallback, useContext, useEffect, useMemo, useRef, useState } from "react";
 import { AppState, Platform, Pressable, Text, View } from "react-native";
 import { router, usePathname, useRootNavigationState } from "expo-router";
 import { nativeNotifications as Notifications } from "./nativeNotifications";
@@ -15,9 +15,11 @@ import { RealtimeNotificationToast } from "./RealtimeNotificationToast";
 import { playNotificationSound } from "./notificationSound";
 export { communicationBadge } from "./communicationState";
 
-type State = { blogUnread: number; chatUnread: number; blogRevision: number; chatRevision: number;
+import type { ChatRoom } from "../../../../src/services/chatService";
+
+type State = { chatRooms: ChatRoom[] | null; blogUnread: number; chatUnread: number; blogRevision: number; chatRevision: number;
   markBlogSeen: (ids: string[]) => void; setActiveChatRoom: (id: string | null) => void; refreshChat: () => void };
-const Context = createContext<State>({ blogUnread: 0, chatUnread: 0, blogRevision: 0, chatRevision: 0,
+const Context = createContext<State>({ chatRooms: null, blogUnread: 0, chatUnread: 0, blogRevision: 0, chatRevision: 0,
   markBlogSeen: () => {}, setActiveChatRoom: () => {}, refreshChat: () => {} });
 export const useCommunication = () => useContext(Context);
 
@@ -32,7 +34,7 @@ export function CommunicationProvider({ children }: React.PropsWithChildren) {
   const [blogRevision, setBlogRevision] = useState(0);
   const [chatRevision, setChatRevision] = useState(0);
   const [chatRefresh, setChatRefresh] = useState(0);
-  const [chatCount, setChatCount] = useState({ scope: "", count: 0 });
+  const [chatCount, setChatCount] = useState<{ scope: string; count: number; rooms: ChatRoom[] }>({ scope: "", count: 0, rooms: [] });
   const [snapshot, setSnapshot] = useState<{ scope: string; posts: BlogPost[] } | null>(null);
   const [seen, setSeen] = useState<{ scope: string; ids: string[] | null } | null>(null);
   const [banner, setBanner] = useState<{ scope: string; title: string; body: string; roomId?: string } | null>(null);
@@ -90,8 +92,11 @@ export function CommunicationProvider({ children }: React.PropsWithChildren) {
     if (!canUseModule(user, "chat")) return;
     let active = true;
     const timer = setTimeout(() => void chat.getRooms().then(rooms => {
-      if (active) setChatCount({ scope, count: rooms.reduce((sum, room) => sum + (room.unreadCount || 0), 0) });
-    }).catch(() => {}), 150);
+      if (active) setChatCount({ scope, rooms, count: rooms.reduce((sum, room) => sum + (room.unreadCount || 0), 0) });
+    }).catch(() => {
+      // End the initial loading state on failure, but preserve a valid snapshot on refresh.
+      if (active) setChatCount(previous => previous.scope === scope ? previous : { scope, count: 0, rooms: [] });
+    }), 150);
     return () => { active = false; clearTimeout(timer); };
   }, [scope, chatRefresh, user?.enabledModules]);
 
@@ -186,7 +191,10 @@ export function CommunicationProvider({ children }: React.PropsWithChildren) {
   const blogUnread = snapshot?.scope === scope && seen?.scope === scope && seen.ids !== null
     ? countBlogUnread(snapshot.posts, seen.ids, user?.uid || "") : 0;
   const chatUnread = chatCount.scope === scope && canUseModule(user, "chat") ? chatCount.count : 0;
-  return <Context.Provider value={{ blogUnread, chatUnread, blogRevision, chatRevision, markBlogSeen, setActiveChatRoom, refreshChat }}>
+  const chatRooms = chatCount.scope === scope && canUseModule(user, "chat") ? chatCount.rooms : null;
+  const value = useMemo(() => ({ chatRooms, blogUnread, chatUnread, blogRevision, chatRevision, markBlogSeen, setActiveChatRoom, refreshChat }),
+    [chatRooms, blogUnread, chatUnread, blogRevision, chatRevision, markBlogSeen, setActiveChatRoom, refreshChat]);
+  return <Context.Provider value={value}>
     {children}
     {banner?.scope === scope && user && (
       <RealtimeNotificationToast
