@@ -79,8 +79,7 @@ function Routes() {
       return (
         <SafeAreaView style={sessionExpiredStyles.container}>
           <StatusBar style="dark" />
-          <View style={sessionExpiredStyles.topSpacer} />
-          <View style={sessionExpiredStyles.lowerSection}>
+          <View style={sessionExpiredStyles.content}>
             <Image
               source={require("../public/het-phien.png")}
               style={sessionExpiredStyles.image}
@@ -154,25 +153,24 @@ const sessionExpiredStyles = StyleSheet.create({
     flex: 1,
     backgroundColor: "#ffffff",
   },
-  topSpacer: {
+  content: {
     flex: 1,
-  },
-  lowerSection: {
-    flex: 1.2,
+    backgroundColor: "#ffffff",
     alignItems: "center",
-    justifyContent: "flex-start",
+    justifyContent: "center",
     paddingHorizontal: 24,
-    paddingBottom: 32,
+    paddingBottom: 20,
   },
   image: {
     width: "100%",
-    maxWidth: 340,
+    maxWidth: 350,
+    maxHeight: 220,
     aspectRatio: 1672 / 941,
-    marginBottom: 24,
+    marginBottom: 28,
   },
   button: {
     width: "100%",
-    maxWidth: 320,
+    maxWidth: 300,
     backgroundColor: "#059669",
     paddingVertical: 15,
     paddingHorizontal: 24,
