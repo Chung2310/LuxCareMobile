@@ -1590,16 +1590,16 @@ const styles = StyleSheet.create({
     fontFamily: "Inter-Regular",
   },
   postCard: {
-    backgroundColor: "rgba(255, 255, 255, 0.65)", // Nền mờ kính mờ thấy rõ background blog-bg.png
+    backgroundColor: "#ecfdf5", // Xanh lá mint nhạt chuẩn LuxCare, đục 100% không bị xuyên background giúp chữ đen nét và dễ đọc
     borderRadius: 18,
     padding: 14,
     marginBottom: 12,
     borderWidth: 1,
-    borderColor: "rgba(255, 255, 255, 0.8)",
+    borderColor: "#a7f3d0",
     shadowColor: "#059669",
-    shadowOffset: { width: 0, height: 3 },
+    shadowOffset: { width: 0, height: 2 },
     shadowOpacity: 0.08,
-    shadowRadius: 8,
+    shadowRadius: 6,
     elevation: 3,
   },
   postHeaderRow: {
@@ -1637,12 +1637,12 @@ const styles = StyleSheet.create({
     fontFamily: "Inter-Bold",
   },
   editorRoleBadge: {
-    backgroundColor: "rgba(209, 250, 229, 0.8)",
+    backgroundColor: "#d1fae5",
     paddingHorizontal: 6,
     paddingVertical: 2,
     borderRadius: 6,
     borderWidth: 1,
-    borderColor: "rgba(167, 243, 208, 0.8)",
+    borderColor: "#a7f3d0",
   },
   editorRoleBadgeText: {
     fontSize: 10.5,
@@ -1663,10 +1663,10 @@ const styles = StyleSheet.create({
   },
   editorActionBtn: {
     padding: 4,
-    backgroundColor: "rgba(255, 255, 255, 0.7)",
+    backgroundColor: "#ffffff",
     borderRadius: 6,
     borderWidth: 1,
-    borderColor: "rgba(167, 243, 208, 0.6)",
+    borderColor: "#a7f3d0",
   },
   articleTitle: {
     fontSize: 14.5,
@@ -1686,13 +1686,13 @@ const styles = StyleSheet.create({
   urlBox: {
     flexDirection: "row",
     alignItems: "center",
-    backgroundColor: "rgba(255, 255, 255, 0.65)",
+    backgroundColor: "#ffffff",
     padding: 10,
     borderRadius: 8,
     gap: 6,
     marginBottom: 10,
     borderWidth: 1,
-    borderColor: "rgba(167, 243, 208, 0.7)",
+    borderColor: "#a7f3d0",
   },
   urlText: {
     flex: 1,
@@ -1703,18 +1703,18 @@ const styles = StyleSheet.create({
   webFileCard: {
     flexDirection: "row",
     alignItems: "center",
-    backgroundColor: "rgba(255, 255, 255, 0.65)",
+    backgroundColor: "#ffffff",
     borderRadius: 10,
     padding: 10,
     marginBottom: 8,
     borderWidth: 1,
-    borderColor: "rgba(167, 243, 208, 0.7)",
+    borderColor: "#a7f3d0",
   },
   webFileIconWrap: {
     width: 30,
     height: 30,
     borderRadius: 8,
-    backgroundColor: "rgba(209, 250, 229, 0.8)",
+    backgroundColor: "#d1fae5",
     alignItems: "center",
     justifyContent: "center",
     marginRight: 10,
@@ -1736,7 +1736,7 @@ const styles = StyleSheet.create({
     flexDirection: "row",
     alignItems: "center",
     gap: 4,
-    backgroundColor: "rgba(209, 250, 229, 0.8)",
+    backgroundColor: "#d1fae5",
     paddingHorizontal: 8,
     paddingVertical: 4,
     borderRadius: 8,
@@ -1754,15 +1754,15 @@ const styles = StyleSheet.create({
     marginTop: 6,
     paddingTop: 8,
     borderTopWidth: 1,
-    borderTopColor: "rgba(167, 243, 208, 0.5)",
+    borderTopColor: "#a7f3d0",
   },
   tagBadge: {
-    backgroundColor: "rgba(209, 250, 229, 0.8)",
+    backgroundColor: "#d1fae5",
     paddingHorizontal: 8,
     paddingVertical: 3,
     borderRadius: 8,
     borderWidth: 1,
-    borderColor: "rgba(167, 243, 208, 0.8)",
+    borderColor: "#a7f3d0",
   },
   tagBadgeText: {
     fontSize: 11,
@@ -1802,7 +1802,7 @@ const styles = StyleSheet.create({
 
   /* LIGHT BRIGHT WHITE EDITOR COMPOSER BAR */
   lightComposerContainer: {
-    backgroundColor: "rgba(255, 255, 255, 0.78)",
+    backgroundColor: "#ecfdf5",
     marginHorizontal: 10,
     marginBottom: 8,
     paddingHorizontal: 12,
@@ -1810,7 +1810,7 @@ const styles = StyleSheet.create({
     paddingBottom: 10,
     borderRadius: 18,
     borderWidth: 1,
-    borderColor: "rgba(255, 255, 255, 0.8)",
+    borderColor: "#a7f3d0",
     shadowColor: "#059669",
     shadowOffset: { width: 0, height: 2 },
     shadowOpacity: 0.08,
