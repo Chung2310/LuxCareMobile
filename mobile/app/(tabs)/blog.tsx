@@ -20,11 +20,12 @@ import {
 import * as DocumentPicker from "expo-document-picker";
 import * as ImagePicker from "expo-image-picker";
 import * as Sharing from "expo-sharing";
+import { File } from "expo-file-system";
 import { SafeAreaView } from "react-native-safe-area-context";
 import { useRouter } from "expo-router";
 import { Ionicons } from "@expo/vector-icons";
 import { useSession } from "../../src/auth/SessionProvider";
-import { blog } from "../../src/api/services";
+import { blog, kanbanMedia } from "../../src/api/services";
 import { isBlogEditorUser } from "../../../src/utils/permissionUtils";
 import {
   DEFAULT_BLOG_CHANNELS,
@@ -294,25 +295,87 @@ export default function BlogScreen() {
     setAttachments((prev) => prev.filter((a) => a.id !== id));
   };
 
+  const uploadAttachmentToCloudinary = async (att: {
+    name: string;
+    type: "file" | "image";
+    sizeBytes?: number;
+    localUri?: string;
+  }) => {
+    if (!att.localUri) return null;
+    const uri = att.localUri;
+    const fileName = att.name || (att.type === "image" ? `image_${Date.now()}.jpg` : `file_${Date.now()}`);
+    const mimeType = att.type === "image" ? "image/jpeg" : "application/octet-stream";
+
+    let base64 = "";
+    try {
+      const file = new File(uri);
+      base64 = await file.base64();
+    } catch {
+      const fs = await import("expo-file-system");
+      if (fs.readAsStringAsync) {
+        base64 = await fs.readAsStringAsync(uri, { encoding: "base64" as any });
+      }
+    }
+
+    if (base64) {
+      const dataUri = base64.startsWith("data:") ? base64 : `data:${mimeType};base64,${base64}`;
+      const uploadRes = await kanbanMedia.upload({
+        file: dataUri,
+        fileName,
+        mimeType,
+        size: att.sizeBytes || Math.round((base64.length * 3) / 4),
+      });
+      if (uploadRes.url) {
+        return {
+          name: fileName,
+          type: att.type,
+          url: uploadRes.url,
+          size: att.sizeBytes ?? 0,
+        };
+      }
+    }
+    return null;
+  };
+
   const handleCreatePost = async () => {
-    if (!newContent.trim()) {
-      showAlert("Thông báo", "Vui lòng nhập nội dung bài viết.");
+    if (!newContent.trim() && attachments.length === 0) {
+      showAlert("Thông báo", "Vui lòng nhập nội dung bài viết hoặc chọn tệp đính kèm.");
       return;
     }
     setPosting(true);
     try {
+      const uploadedAttachments: { name: string; type: string; url: string; size: number }[] = [];
+
+      // 1. Tải toàn bộ tệp và ảnh lên Cloudinary để mọi thiết bị và Website đều xem được
+      if (attachments.length > 0) {
+        for (const att of attachments) {
+          try {
+            const uploaded = await uploadAttachmentToCloudinary(att);
+            if (uploaded) {
+              uploadedAttachments.push(uploaded);
+            } else if (att.localUri && (att.localUri.startsWith("http://") || att.localUri.startsWith("https://"))) {
+              uploadedAttachments.push({
+                name: att.name,
+                type: att.type,
+                url: att.localUri,
+                size: att.sizeBytes ?? 0,
+              });
+            }
+          } catch (uploadErr) {
+            console.warn("[BlogScreen] Tải tệp lên Cloudinary thất bại:", uploadErr);
+          }
+        }
+      }
+
+      // 2. Tạo bài viết với các đường dẫn đám mây công khai
       await blog.createPost({
         title: newTitle.trim() || undefined,
         content: newContent.trim(),
         tags: [selectedTag],
-        attachments: attachments.map((a) => ({
-          name: a.name,
-          type: a.type,
-          url: a.localUri || "",
-          size: a.sizeBytes ?? 0,
-        })),
+        attachments: uploadedAttachments,
       });
-      showAlert("Thành công", "Đã đăng bài viết mới lên Kênh Blog!");
+
+      showAlert("Thành công", "Đã đăng bài viết mới lên Kênh Blog cho toàn hệ thống!");
       setNewTitle("");
       setNewContent("");
       setAttachments([]);
@@ -603,20 +666,50 @@ export default function BlogScreen() {
                   {/* Optional Title */}
                   {post.title && <Text style={styles.articleTitle}>{post.title}</Text>}
 
-                  {/* Post Content */}
-                  {isUrl ? (
-                    <Pressable
-                      style={styles.urlBox}
-                      onPress={() => handleOpenLink(post.content)}
-                    >
-                      <Ionicons name="link-outline" size={16} color="#2563eb" />
-                      <Text style={styles.urlText} numberOfLines={2}>
-                        {post.content}
+                  {/* Post Content with clickable links */}
+                  {(() => {
+                    const trimmed = (post.content || "").trim();
+                    const isPureUrl =
+                      (trimmed.startsWith("http://") || trimmed.startsWith("https://")) &&
+                      !trimmed.includes(" ") &&
+                      !trimmed.includes("\n");
+
+                    if (isPureUrl) {
+                      return (
+                        <Pressable
+                          style={styles.urlBox}
+                          onPress={() => handleOpenLink(trimmed)}
+                        >
+                          <Ionicons name="link-outline" size={16} color="#2563eb" />
+                          <Text style={styles.urlText} numberOfLines={2}>
+                            {trimmed}
+                          </Text>
+                        </Pressable>
+                      );
+                    }
+
+                    const urlRegex = /(https?:\/\/[^\s]+)/g;
+                    const parts = post.content.split(urlRegex);
+
+                    return (
+                      <Text style={styles.postContentText}>
+                        {parts.map((part, index) => {
+                          if (part.match(/^https?:\/\//i)) {
+                            return (
+                              <Text
+                                key={index}
+                                style={styles.inlineLinkText}
+                                onPress={() => handleOpenLink(part)}
+                              >
+                                {part}
+                              </Text>
+                            );
+                          }
+                          return part;
+                        })}
                       </Text>
-                    </Pressable>
-                  ) : (
-                    <Text style={styles.postContentText}>{post.content}</Text>
-                  )}
+                    );
+                  })()}
 
                   {/* Inline Images with tap-to-zoom + share button */}
                   {post.attachments?.filter((att: BlogAttachment) => att.type === "image" && att.url).map((att: BlogAttachment) => {
@@ -1963,4 +2056,10 @@ const styles = StyleSheet.create({
     color: "#ea580c",
     fontFamily: "Inter-Bold",
   },
+  inlineLinkText: {
+    color: "#0284c7",
+    textDecorationLine: "underline",
+    fontWeight: "600",
+  },
 });
+

@@ -120,13 +120,24 @@ export function createBlogService({ fetch, getAccessToken }: ServiceTransport) {
       content: rawContent,
       isPinned: Boolean(raw.isPinned || raw.pinned || raw.is_pinned),
       attachments: Array.isArray(rawAttachments)
-        ? rawAttachments.map((att: any, idx: number) => ({
-            id: String(att._id || att.id || `att-${idx}`),
-            type: att.type || (att.name?.endsWith(".pdf") ? "file" : "file"),
-            name: att.name || att.filename || "Tài liệu đính kèm.pdf",
-            size: typeof att.size === "number" ? `${(att.size / 1024).toFixed(1)} KB` : att.size || "831.5 KB",
-            url: att.url || att.uri || att.path,
-          }))
+        ? rawAttachments.map((att: any, idx: number) => {
+            const rawUrl = att.url || att.uri || att.path || "";
+            const rawName = att.name || att.filename || "";
+            const isImg =
+              att.type === "image" ||
+              att.type?.startsWith("image/") ||
+              rawName.match(/\.(jpeg|jpg|gif|png|webp|bmp|svg)$/i) ||
+              rawUrl.match(/\.(jpeg|jpg|gif|png|webp|bmp|svg)($|\?[^\s]*)/i) ||
+              rawUrl.includes("/image/upload/");
+
+            return {
+              id: String(att._id || att.id || `att-${idx}`),
+              type: (isImg ? "image" : "file") as "image" | "file",
+              name: rawName || (isImg ? "Hình ảnh đính kèm.jpg" : "Tài liệu đính kèm.pdf"),
+              size: typeof att.size === "number" ? `${(att.size / 1024).toFixed(1)} KB` : att.size || "",
+              url: rawUrl,
+            };
+          })
         : undefined,
       reactions: [
         {
@@ -156,7 +167,17 @@ export function createBlogService({ fetch, getAccessToken }: ServiceTransport) {
     getPosts: async (channelId = "all"): Promise<BlogPost[]> => {
       try {
         const queryParams = new URLSearchParams();
-        if (channelId && channelId !== "all") queryParams.set("tag", channelId);
+        if (channelId && channelId !== "all" && channelId !== "tat-ca") {
+          const tagMap: Record<string, string> = {
+            "thong-bao": "Thông báo",
+            "quy-dinh": "Quy trình",
+            "y-khoa": "Chuyên môn",
+            "vinh-danh": "Vinh danh",
+            "ban-tin": "Tin tức",
+          };
+          const mappedTag = tagMap[channelId] || channelId;
+          queryParams.set("tag", mappedTag);
+        }
         queryParams.set("limit", "50");
 
         const qs = queryParams.toString();
