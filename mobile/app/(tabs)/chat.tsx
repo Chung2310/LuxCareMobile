@@ -323,14 +323,14 @@ async function prepareAttachment(
         } else {
           const errBody = await uploadResponse.json().catch(() => ({}));
           console.warn("Upload chat.attachment thất bại:", uploadResponse.status, errBody);
-          showCustomAlert("Lỗi tải lên", errBody?.message || `Máy chủ từ chối tải tệp (Mã lỗi ${uploadResponse.status}).`);
+          Alert.alert("Lỗi tải lên", errBody?.message || `Máy chủ từ chối tải tệp (Mã lỗi ${uploadResponse.status}).`);
         }
       } catch (uploadErr: any) {
         console.warn("Lỗi kết nối upload Cloudinary:", uploadErr);
-        showCustomAlert("Lỗi mạng", uploadErr?.message || "Không thể kết nối máy chủ để tải tệp lên.");
+        Alert.alert("Lỗi mạng", uploadErr?.message || "Không thể kết nối máy chủ để tải tệp lên.");
       }
     } else {
-      showCustomAlert("Lỗi tệp", "Không thể đọc nội dung tệp tin này từ thiết bị. Vui lòng thử chọn tệp từ thư mục khác (như Tải về/Bộ nhớ máy).");
+      Alert.alert("Lỗi tệp", "Không thể đọc nội dung tệp tin này từ thiết bị. Vui lòng thử chọn tệp từ thư mục khác (như Tải về/Bộ nhớ máy).");
     }
   } catch (err) {
     console.warn("Lỗi prepareAttachment:", err);
@@ -1162,7 +1162,7 @@ export default function ChatScreen() {
         const hasNativeMediaLibrary = Boolean(
           (NativeModules as any)?.ExpoMediaLibrary ||
           (NativeModules as any)?.ExpoMediaLibraryNext ||
-          (global as any)?.expo?.modules?.ExpoMediaLibraryNext
+          (globalThis as any)?.expo?.modules?.ExpoMediaLibraryNext
         );
 
         if (hasNativeMediaLibrary) {
