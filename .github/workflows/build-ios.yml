@@ -1,0 +1,102 @@
+name: Build iOS IPA
+
+on:
+  workflow_dispatch:
+    inputs:
+      profile:
+        description: "preview: registered iPhones; production: TestFlight/App Store"
+        type: choice
+        required: true
+        default: preview
+        options:
+          - preview
+          - production
+
+permissions:
+  contents: read
+
+concurrency:
+  group: ios-ipa-${{ github.ref }}-${{ inputs.profile }}
+  cancel-in-progress: false
+
+jobs:
+  build:
+    runs-on: ubuntu-latest
+    timeout-minutes: 120
+    defaults:
+      run:
+        working-directory: mobile
+        shell: bash
+    env:
+      BUILD_PROFILE: ${{ inputs.profile }}
+      EXPO_PUBLIC_API_URL: ${{ vars.EXPO_PUBLIC_API_URL }}
+      EXPO_PUBLIC_EAS_PROJECT_ID: ${{ vars.EXPO_PUBLIC_EAS_PROJECT_ID }}
+      LUXCARE_IOS_BUNDLE_IDENTIFIER: ${{ vars.LUXCARE_IOS_BUNDLE_IDENTIFIER }}
+
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          persist-credentials: false
+
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22
+          cache: npm
+          cache-dependency-path: |
+            package-lock.json
+            mobile/package-lock.json
+
+      - name: Test build configuration helper
+        run: node --test scripts/prepare-ios-build.check.cjs
+
+      - name: Validate settings and pass public config to the EAS builder
+        env:
+          EXPO_TOKEN: ${{ secrets.EXPO_TOKEN }}
+        run: node scripts/prepare-ios-build.cjs
+
+      - name: Install root dependencies
+        working-directory: .
+        run: npm ci
+
+      - name: Install mobile dependencies
+        run: npm ci
+
+      - name: Typecheck
+        run: npm run typecheck
+
+      - name: Unit tests
+        working-directory: .
+        run: npm test
+
+      - name: Set up EAS
+        uses: expo/expo-github-action@v8
+        with:
+          eas-version: latest
+          token: ${{ secrets.EXPO_TOKEN }}
+
+      - name: Build signed IPA on EAS
+        run: eas build --platform ios --profile "$BUILD_PROFILE" --non-interactive --wait --json > "$RUNNER_TEMP/ios-build.json"
+
+      - name: Download and validate IPA
+        run: |
+          BUILD_URL="$(jq -er '.[0] | select(.status == "FINISHED") | .artifacts.buildUrl | select(type == "string" and startswith("https://"))' "$RUNNER_TEMP/ios-build.json")"
+          echo "::add-mask::$BUILD_URL"
+          mkdir -p "$RUNNER_TEMP/ios-artifacts"
+          curl --fail --location --retry 3 --proto '=https' --proto-redir '=https' "$BUILD_URL" --output "$RUNNER_TEMP/ios-artifacts/LuxCare.ipa"
+          unzip -tq "$RUNNER_TEMP/ios-artifacts/LuxCare.ipa"
+          unzip -Z1 "$RUNNER_TEMP/ios-artifacts/LuxCare.ipa" > "$RUNNER_TEMP/ipa-contents.txt"
+          grep -Eq '^Payload/[^/]+\.app/Info\.plist$' "$RUNNER_TEMP/ipa-contents.txt"
+
+      - name: Upload IPA
+        uses: actions/upload-artifact@v4
+        with:
+          name: LuxCare-ios-${{ inputs.profile }}-${{ github.run_number }}
+          path: ${{ runner.temp }}/ios-artifacts/LuxCare.ipa
+          if-no-files-found: error
+          retention-days: 7
+
+      - name: Installation note
+        run: |
+          echo '### Signed iOS IPA' >> "$GITHUB_STEP_SUMMARY"
+          echo "Profile: $BUILD_PROFILE. Download the IPA from this run's Artifacts." >> "$GITHUB_STEP_SUMMARY"
+          echo 'Preview installs only on devices included in the provisioning profile. Production requires TestFlight/App Store distribution. No automatic submission was performed.' >> "$GITHUB_STEP_SUMMARY"

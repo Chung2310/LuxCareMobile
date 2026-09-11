@@ -3,6 +3,8 @@ import React, {
   useCallback,
   useContext,
   useRef,
+  useEffect,
+  useMemo,
   useState,
 } from "react";
 import { router } from "expo-router";
@@ -83,9 +85,9 @@ export const LoadingProvider: React.FC<{ children: React.ReactNode }> = ({
     ) => {
       if (timerRef.current) clearTimeout(timerRef.current);
 
-      // 1. Hiển thị màn hình loading ngay lập tức
+      // Navigation is immediate; only explicitly requested overlays block input.
       setLoadingState({
-        visible: true,
+        visible: (options?.durationMs ?? 0) > 0,
         title: options?.title || "LuxCare",
         subtitle: options?.subtitle || "Đang mở phân hệ và nạp dữ liệu...",
         icon: options?.icon || "medical",
@@ -100,8 +102,9 @@ export const LoadingProvider: React.FC<{ children: React.ReactNode }> = ({
         router.replace(route as any);
       }
 
-      // 3. Giữ màn hình loading trong khoảng thời gian để màn hình mới mount và tải dữ liệu ban đầu
-      const duration = options?.durationMs ?? 750;
+      // Destination screens own their data-loading state, with no artificial wait.
+      const duration = options?.durationMs ?? 0;
+      if (duration <= 0) return;
       timerRef.current = setTimeout(() => {
         setLoadingState((prev) => ({ ...prev, visible: false }));
       }, duration);
@@ -109,9 +112,13 @@ export const LoadingProvider: React.FC<{ children: React.ReactNode }> = ({
     [],
   );
 
+  useEffect(() => () => { if (timerRef.current) clearTimeout(timerRef.current); }, []);
+  const value = useMemo(() => ({ showLoading, hideLoading, navigateWithLoading }),
+    [showLoading, hideLoading, navigateWithLoading]);
+
   return (
     <LoadingContext.Provider
-      value={{ showLoading, hideLoading, navigateWithLoading }}
+      value={value}
     >
       {children}
       <NavigationLoadingOverlay
