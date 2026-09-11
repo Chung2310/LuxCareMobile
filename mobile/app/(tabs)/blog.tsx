@@ -581,9 +581,10 @@ export default function BlogScreen() {
       // Pinned posts always appear first
       if (a.isPinned && !b.isPinned) return -1;
       if (!a.isPinned && b.isPinned) return 1;
-      // Within same pinned group, sort newest first
-      return new Date(b.createdAt).getTime() - new Date(a.createdAt).getTime();
+      // Within same group, sort newest first using raw timestamp
+      return (b.createdAtTs ?? 0) - (a.createdAtTs ?? 0);
     });
+
 
   return (
     <ImageBackground
