@@ -18,7 +18,6 @@ import {
   Image,
   Share,
   ImageBackground,
-  NativeModules,
 } from "react-native";
 import * as DocumentPicker from "expo-document-picker";
 import * as ImagePicker from "expo-image-picker";
@@ -28,6 +27,7 @@ import { File } from "expo-file-system";
 import { SafeAreaView } from "react-native-safe-area-context";
 import { useRouter, useFocusEffect } from "expo-router";
 import { useCommunication } from "../../src/features/notifications/CommunicationProvider";
+import { saveDownloadedMedia } from "../../src/features/blog/saveDownloadedMedia";
 import { Ionicons } from "@expo/vector-icons";
 import Svg, { Path } from "react-native-svg";
 import { useSession } from "../../src/auth/SessionProvider";
@@ -639,43 +639,58 @@ export default function BlogScreen() {
         }
       }
 
-      showAlert("Đang tải xuống...", `Đang tải "${fileName || safeName}" về thiết bị...`);
       const targetDir = FileSystem.documentDirectory || FileSystem.cacheDirectory;
+      if (!targetDir) throw new Error("Bộ nhớ ứng dụng chưa sẵn sàng. Vui lòng thử lại.");
       const destPath = `${targetDir}${safeName}`;
-      const res = await FileSystem.downloadAsync(url, destPath);
 
-      if (!res || res.status !== 200) {
-        showAlert("Tải xuống thất bại", "Không thể tải tệp. Vui lòng kiểm tra kết nối mạng.");
-        return;
+      let localUri = url;
+
+      if (url.startsWith("http://") || url.startsWith("https://")) {
+        showAlert("Đang tải xuống...", `Đang tải "${fileName || safeName}" về thiết bị...`);
+        const res = await FileSystem.downloadAsync(url, destPath);
+        if (!res || res.status !== 200) {
+          showAlert("Tải xuống thất bại", "Không thể tải tệp. Vui lòng kiểm tra kết nối mạng.");
+          return;
+        }
+        localUri = res.uri;
+      } else if (url.startsWith("file://") || url.startsWith("content://")) {
+        // Tệp cục bộ đã có sẵn trên máy
+        localUri = url;
+        try {
+          if (url !== destPath) {
+            await FileSystem.copyAsync({ from: url, to: destPath });
+            localUri = destPath;
+          }
+        } catch {
+          // nếu copy thất bại, vẫn sử dụng url ban đầu
+        }
+      } else if (url.startsWith("data:")) {
+        try {
+          const base64Data = url.includes(",") ? url.split(",")[1] : url;
+          await FileSystem.writeAsStringAsync(destPath, base64Data, {
+            encoding: "base64",
+          });
+          localUri = destPath;
+        } catch (b64Err) {
+          console.warn("Lỗi ghi file base64:", b64Err);
+        }
       }
 
-      // Kiểm tra native module MediaLibrary có thực sự tồn tại trong bản build này không
-      const hasNativeMediaLibrary = Boolean(
-        (globalThis as any)?.expo?.modules?.ExpoMediaLibraryNext ||
-        (globalThis as any)?.expo?.modules?.ExpoMediaLibrary ||
-        (NativeModules as any)?.ExpoMediaLibrary ||
-        (NativeModules as any)?.ExpoMediaLibraryNext
-      );
-
-      if ((isImg || isVid) && hasNativeMediaLibrary) {
+      if (isImg || isVid) {
         try {
-          const MediaLibrary = require("expo-media-library");
-          if (MediaLibrary?.requestPermissionsAsync && MediaLibrary?.saveToLibraryAsync) {
-            const perm = await MediaLibrary.requestPermissionsAsync();
-            if (perm.status === "granted" || perm.granted) {
-              await MediaLibrary.saveToLibraryAsync(res.uri);
+          const result = await saveDownloadedMedia(localUri, isVid ? "video" : "image");
+          if (result === "saved") {
               showAlert(
                 "Tải xuống thành công",
                 `Đã lưu ${isVid ? "video" : "hình ảnh"} vào Thư viện của thiết bị.`
               );
               return;
-            } else {
+          } else if (result === "denied") {
               showAlert(
                 "Quyền truy cập",
                 "Cần cấp quyền truy cập Thư viện ảnh để lưu tệp vào thiết bị."
               );
               return;
-            }
           }
         } catch (mediaErr) {
           console.warn("Lỗi MediaLibrary:", mediaErr);
@@ -688,8 +703,9 @@ export default function BlogScreen() {
         try {
           const saf = (FileSystem as any).StorageAccessFramework;
           const perm = await saf.requestDirectoryPermissionsAsync();
+          if (!perm.granted || !perm.directoryUri) return; // User cancelled; do not report a successful save.
           if (perm.granted && perm.directoryUri) {
-            const base64 = await FileSystem.readAsStringAsync(res.uri, {
+            const base64 = await FileSystem.readAsStringAsync(localUri, {
               encoding: "base64",
             });
             const mime = getMimeType(ext);
@@ -709,10 +725,14 @@ export default function BlogScreen() {
         }
       }
 
-      // Đã tải về bộ nhớ ứng dụng
+      if (await Sharing.isAvailableAsync()) {
+        await Sharing.shareAsync(res.uri, { mimeType: getMimeType(ext), dialogTitle: "Lưu tệp đã tải" });
+        return;
+      }
+      // The sandbox copy is not necessarily accessible in Photos/Downloads.
       showAlert(
-        "Tải xuống thành công",
-        `Đã lưu "${fileName || safeName}" vào bộ nhớ thiết bị.`
+        "Tệp đã tải vào ứng dụng",
+        `"${fileName || safeName}" mới được lưu trong bộ nhớ ứng dụng, chưa lưu vào Thư viện ảnh hoặc thư mục Tải xuống.`
       );
     } catch (err: any) {
       showAlert("Lỗi tải xuống", err?.message || "Có lỗi xảy ra khi tải tệp về thiết bị.");
