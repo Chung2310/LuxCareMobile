@@ -136,7 +136,7 @@ export default function Contracts() {
     return (
       <SafeAreaView edges={["top"]} style={styles.container}>
         <View style={styles.emptyCard}>
-          <Text style={styles.emptyIcon}>🔒</Text>
+          <Ionicons name="lock-closed-outline" size={42} color="#94a3b8" />
           <Text style={styles.emptyTitle}>Không có quyền truy cập</Text>
           <Text style={styles.emptyText}>
             Bạn cần phân hệ nhân sự và quyền xem hợp đồng lao động để truy cập mục này.
@@ -269,7 +269,7 @@ export default function Contracts() {
         <View style={styles.filterCard}>
           <View style={styles.searchRow}>
             <View style={styles.searchInputWrap}>
-              <Text style={styles.searchIcon}>🔍</Text>
+              <Ionicons name="search" size={16} color="#94a3b8" />
               <TextInput
                 style={styles.searchInput}
                 placeholder="Tìm tên nhân viên hoặc loại hợp đồng..."
@@ -289,7 +289,7 @@ export default function Contracts() {
                   }}
                   style={styles.clearBtn}
                 >
-                  <Text style={styles.clearBtnText}>✕</Text>
+                  <Ionicons name="close-circle" size={18} color="#94a3b8" />
                 </Pressable>
               )}
             </View>
@@ -308,7 +308,7 @@ export default function Contracts() {
               style={[styles.filterToggleBtn, filterExpanded && styles.filterToggleBtnActive]}
               onPress={() => setFilterExpanded((v) => !v)}
             >
-              <Text style={styles.filterToggleIcon}>⚙️</Text>
+              <Ionicons name="options-outline" size={16} color="#475569" />
               <Text style={styles.filterToggleText}>Lọc nhân sự & thời hạn</Text>
               {activeFiltersCount > 0 && (
                 <View style={styles.activeFiltersCountBadge}>
@@ -333,7 +333,7 @@ export default function Contracts() {
                 style={styles.employeeFilterSelectBtn}
                 onPress={() => setEmployeeModalOpen(true)}
               >
-                <Text style={styles.employeeFilterIcon}>👤</Text>
+                <Ionicons name="person-outline" size={15} color="#64748b" />
                 <Text style={styles.employeeFilterName} numberOfLines={1}>
                   {employee.value ? employee.label : "Tất cả nhân viên"}
                 </Text>
@@ -381,7 +381,8 @@ export default function Contracts() {
         {/* Error Banner */}
         {error && (
           <View style={styles.errorBanner}>
-            <Text style={styles.errorBannerText}>⚠️ {error}</Text>
+            <Ionicons name="alert-circle-outline" size={16} color="#e11d48" />
+            <Text style={styles.errorBannerText}>{error}</Text>
           </View>
         )}
 
@@ -401,7 +402,7 @@ export default function Contracts() {
 
             {rows.length === 0 ? (
               <View style={styles.emptyCard}>
-                <Text style={styles.emptyIcon}>📋</Text>
+                <Ionicons name="document-text-outline" size={44} color="#94a3b8" />
                 <Text style={styles.emptyTitle}>Không tìm thấy hợp đồng</Text>
                 <Text style={styles.emptyText}>
                   Không có hồ sơ hợp đồng nào phù hợp với điều kiện tìm kiếm. Hãy thử đổi từ khóa hoặc đặt lại bộ lọc.
@@ -544,7 +545,8 @@ export default function Contracts() {
                             });
                           }}
                         >
-                          <Text style={styles.extendBtnText}>⚡ Gia hạn</Text>
+                          <Ionicons name="time-outline" size={13} color="#b45309" />
+                          <Text style={styles.extendBtnText}>Gia hạn</Text>
                         </Pressable>
                       )}
 
@@ -970,8 +972,12 @@ const styles = StyleSheet.create({
     padding: 12,
     borderWidth: 1,
     borderColor: "#fecdd3",
+    flexDirection: "row",
+    alignItems: "center",
+    gap: 8,
   },
   errorBannerText: {
+    flex: 1,
     color: "#e11d48",
     fontSize: 13,
     fontWeight: "600",
@@ -1150,10 +1156,13 @@ const styles = StyleSheet.create({
   extendBtn: {
     backgroundColor: "#fef3c7",
     paddingVertical: 6,
-    paddingHorizontal: 12,
+    paddingHorizontal: 10,
     borderRadius: 8,
     borderWidth: 1,
     borderColor: "#fde68a",
+    flexDirection: "row",
+    alignItems: "center",
+    gap: 4,
   },
   extendBtnText: {
     fontSize: 12,

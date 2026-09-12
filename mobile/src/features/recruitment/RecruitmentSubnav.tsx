@@ -1,17 +1,18 @@
 import { Pressable, ScrollView, StyleSheet, Text, View } from "react-native";
 import { router } from "expo-router";
+import { Briefcase, Users, Calendar, type LucideIcon } from "lucide-react-native";
 
 type RecruitmentSection = "jobs" | "applicants" | "interviews" | "pipeline";
 
 const sections: Array<{
   key: RecruitmentSection;
   label: string;
-  icon: string;
+  Icon: LucideIcon;
   href: "/(tabs)/recruitment" | "/(tabs)/applicants" | "/(tabs)/interviews";
 }> = [
-  { key: "jobs", label: "Tin tuyển dụng", icon: "💼", href: "/(tabs)/recruitment" },
-  { key: "applicants", label: "Ứng viên", icon: "👥", href: "/(tabs)/applicants" },
-  { key: "interviews", label: "Lịch phỏng vấn", icon: "📅", href: "/(tabs)/interviews" },
+  { key: "jobs", label: "Tin tuyển dụng", Icon: Briefcase, href: "/(tabs)/recruitment" },
+  { key: "applicants", label: "Ứng viên", Icon: Users, href: "/(tabs)/applicants" },
+  { key: "interviews", label: "Lịch phỏng vấn", Icon: Calendar, href: "/(tabs)/interviews" },
 ];
 
 export function RecruitmentSubnav({ active }: { active: RecruitmentSection }) {
@@ -20,6 +21,7 @@ export function RecruitmentSubnav({ active }: { active: RecruitmentSection }) {
       <ScrollView horizontal showsHorizontalScrollIndicator={false} contentContainerStyle={subnavStyles.row}>
         {sections.map((section) => {
           const selected = section.key === active;
+          const Icon = section.Icon;
           return (
             <Pressable
               key={section.key}
@@ -34,7 +36,7 @@ export function RecruitmentSubnav({ active }: { active: RecruitmentSection }) {
                 pressed && { opacity: 0.78 },
               ]}
             >
-              <Text style={subnavStyles.itemIcon}>{section.icon}</Text>
+              <Icon size={14} color={selected ? "#047857" : "#64748b"} />
               <Text style={[subnavStyles.itemText, selected && subnavStyles.itemTextActive]}>
                 {section.label}
               </Text>
