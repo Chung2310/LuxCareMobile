@@ -1,11 +1,13 @@
+import { useAppAlert } from "../../components/AppAlert";
 import { useEffect, useRef, useState } from "react";
-import { Alert, Text } from "react-native";
+import { Text } from "react-native";
 import type { RecruitmentAttachment } from "../../../../src/types/recruitment";
 import { recruitment } from "../../api/services";
 import { messageOf } from "../../auth/SessionProvider";
 import { Button, Card, ErrorText, styles } from "../../ui";
 import { shareRecruitmentFile, uploadRecruitmentFile } from "./files";
 export function AttachmentPanel({ kind, id, manage }: { kind: "job" | "applicant"; id: string; manage: boolean }) {
+  const { showAlert, alertView } = useAppAlert();
   const [attachment, setAttachment] = useState<RecruitmentAttachment | null>(null);
   const [loading, setLoading] = useState(true);
   const [busy, setBusy] = useState(false);
@@ -78,7 +80,7 @@ export function AttachmentPanel({ kind, id, manage }: { kind: "job" | "applicant
               title="Gỡ tệp"
               disabled={busy || loading || blocked}
               onPress={() =>
-                Alert.alert("Gỡ tệp đính kèm?", attachment.originalName, [
+                showAlert("Gỡ tệp đính kèm?", attachment.originalName, [
                   { text: "Hủy", style: "cancel" },
                   { text: "Gỡ", style: "destructive", onPress: () => void run("delete") },
                 ])
@@ -93,7 +95,7 @@ export function AttachmentPanel({ kind, id, manage }: { kind: "job" | "applicant
           disabled={busy || loading || blocked}
           onPress={() =>
             attachment
-              ? Alert.alert("Thay tệp hiện tại?", attachment.originalName, [
+              ? showAlert("Thay tệp hiện tại?", attachment.originalName, [
                   { text: "Hủy", style: "cancel" },
                   { text: "Chọn tệp mới", onPress: () => void run("upload") },
                 ])
@@ -103,6 +105,7 @@ export function AttachmentPanel({ kind, id, manage }: { kind: "job" | "applicant
       )}
       <Button title="Tải lại tệp" disabled={busy || loading} onPress={() => setRevision((value) => value + 1)} />
       {blocked && <Text style={styles.muted}>Tải lại thông tin tệp trước khi thao tác ghi tiếp.</Text>}
+      {alertView}
     </Card>
   );
 }

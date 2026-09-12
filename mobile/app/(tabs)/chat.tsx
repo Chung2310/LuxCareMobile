@@ -1,3 +1,4 @@
+import { createDirectChatOpener } from "../../src/features/chat/openDirectChat";
 import { downloadRemoteFile } from "../../src/files/downloadRemoteFile";
 import { resolveFileFormat } from "../../src/files/fileFormat";
 import { resolveFileUrl, shareApiFile } from "../../src/files/shareFile";
@@ -1028,6 +1029,8 @@ function RoomAvatar({
 
 
 
+const openDirectChat = createDirectChatOpener(input => chat.createRoom(input));
+
 export default function ChatScreen() {
   const insets = useSafeAreaInsets();
   const { user } = useSession();
@@ -1051,7 +1054,11 @@ export default function ChatScreen() {
   const messageVersion = useRef(0);
   const roomsVersion = useRef(0);
   const { chatRooms, refreshChat, chatRevision, setActiveChatRoom } = useCommunication();
-  const { roomId: requestedRoom } = useLocalSearchParams<{ roomId?: string }>();
+  const { roomId: requestedRoom, peerId } = useLocalSearchParams<{ roomId?: string; peerId?: string | string[] }>();
+  const requestedPeer = (Array.isArray(peerId) ? peerId[0] : peerId)?.trim();
+  const directScope = JSON.stringify([currentUserId, user?.companyCode]);
+  const pendingDirectRoom = useRef<{ scope: string; room: ChatRoom } | null>(null);
+  const [openingPeer, setOpeningPeer] = useState(false);
 
 
   // Chat Rooms State
@@ -1069,13 +1076,13 @@ export default function ChatScreen() {
     return () => setActiveChatRoom(null);
   }, [focused, activeRoom?._id, setActiveChatRoom]);
   useEffect(() => {
-    if (!requestedRoom || !focused) return;
+    if (!requestedRoom || requestedPeer || !focused) return;
     const room = rooms.find((item) => item._id === requestedRoom);
     if (room) {
       setActiveRoom(room);
       router.setParams({ roomId: undefined });
     }
-  }, [requestedRoom, rooms, focused, router]);
+  }, [requestedRoom, requestedPeer, rooms, focused, router]);
 
   const [messages, setMessages] = useState<ChatMessage[]>([]);
   const [loadingMessages, setLoadingMessages] = useState(false);
@@ -1417,12 +1424,40 @@ export default function ChatScreen() {
       .catch(() => {});
   }, [currentUserId]);
 
+  useEffect(() => {
+    if (!requestedPeer || !focused || !currentUserId) { setOpeningPeer(false); return; }
+    let active = true;
+    setOpeningPeer(true);
+    setActiveRoom(null);
+    setMessages([]);
+    setInputText("");
+    pendingDirectRoom.current = null;
+    void openDirectChat(directScope, requestedPeer).then(room => {
+      if (!active || !focusedRef.current) return;
+      pendingDirectRoom.current = { scope: directScope, room };
+      setRooms(current => [room, ...current.filter(item => item._id !== room._id)]);
+      setActiveRoom(room);
+      setOpeningPeer(false);
+      router.setParams({ peerId: undefined, name: undefined, roomId: undefined });
+      refreshChat();
+    }).catch(error => {
+      if (!active || !focusedRef.current) return;
+      setOpeningPeer(false);
+      router.setParams({ peerId: undefined, name: undefined });
+      setCustomAlert({ visible: true, title: "Không thể mở tin nhắn",
+        message: error instanceof Error ? error.message : "Vui lòng thử lại.",
+        buttons: [{ text: "Đóng", style: "cancel" }, { text: "Thử lại", onPress: () => router.setParams({ peerId: requestedPeer }) }],
+      });
+    });
+    return () => { active = false; };
+  }, [requestedPeer, focused, currentUserId, directScope, router, refreshChat]);
   // Share the provider snapshot while retaining main's avatar/pinned-room enrichment.
   useEffect(() => { if (focused) refreshChat(); }, [focused, refreshChat]);
   useEffect(() => {
+    const pendingRoom = pendingDirectRoom.current?.scope === directScope ? pendingDirectRoom.current.room : null;
     if (!chatRooms) {
-      setRooms([]);
-      setActiveRoom(null);
+      setRooms(pendingRoom ? [pendingRoom] : []);
+      setActiveRoom(current => current?._id === pendingRoom?._id ? current : null);
       return;
     }
     const enriched = chatRooms.map(room => ({
@@ -1431,10 +1466,12 @@ export default function ChatScreen() {
       isPinned: isChatbotRoom(room) || isCloudRoom(room) ? true : isRoomPinned(room),
       avatarURL: getRoomAvatarUrl(room) || undefined,
     }));
-    setRooms(enriched);
-    setActiveRoom(current => current ? enriched.find(room => room._id === current._id) || null : null);
+    const awaitingSnapshot = pendingRoom && !enriched.some(room => room._id === pendingRoom._id);
+    if (!awaitingSnapshot) pendingDirectRoom.current = null;
+    setRooms(awaitingSnapshot ? [pendingRoom, ...enriched] : enriched);
+    setActiveRoom(current => current ? enriched.find(room => room._id === current._id) || (awaitingSnapshot && current._id === pendingRoom._id ? current : null) : null);
     setLoadingRooms(false);
-  }, [chatRooms, isChatbotRoom, isCloudRoom, isRoomPinned, getRoomAvatarUrl]);
+  }, [chatRooms, directScope, isChatbotRoom, isCloudRoom, isRoomPinned, getRoomAvatarUrl]);
 
   const onRefresh = useCallback(() => {
     setRefreshing(true);
@@ -3122,6 +3159,14 @@ export default function ChatScreen() {
   // RENDER CHAT ROOM SCREEN (DIRECT VIEW, NO MODAL OVERLAY)
   // Giúp Android và iOS hiển thị thanh nhập liệu ngay trên bàn phím chuẩn 100% như Zalo / Messenger
   // ==========================================
+  if (openingPeer) return (
+    <SafeAreaView style={{ flex: 1, backgroundColor: "#f8fafc", justifyContent: "center", alignItems: "center", gap: 16 }}>
+      <ActivityIndicator size="large" color="#059669" />
+      <Text style={{ color: "#475569", fontSize: 15 }}>Đang mở cuộc trò chuyện...</Text>
+      <Pressable onPress={() => router.back()} accessibilityRole="button" style={{ padding: 14 }}><Text style={{ color: "#059669", fontWeight: "600" }}>Quay lại</Text></Pressable>
+    </SafeAreaView>
+  );
+
   if (activeRoom) {
     return (
       <View

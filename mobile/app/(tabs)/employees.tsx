@@ -1,6 +1,6 @@
+import { useAppAlert } from "../../src/components/AppAlert";
 import { useCallback, useMemo, useRef, useState } from "react";
 import {
-  Alert,
   FlatList,
   KeyboardAvoidingView,
   Linking,
@@ -9,7 +9,6 @@ import {
   RefreshControl,
   ScrollView,
   StyleSheet,
-  Switch,
   Text,
   TextInput,
   TouchableOpacity,
@@ -46,7 +45,6 @@ const ROLE_OPTIONS: Array<{ value: UserProfile["role"]; label: string }> = [
   { value: "user", label: "Nhân viên" },
   { value: "manager", label: "Quản lý" },
   { value: "branch_owner", label: "Chủ chi nhánh" },
-  { value: "admin", label: "Quản trị viên" },
 ];
 
 function getAvatarColor(name?: string): string {
@@ -70,7 +68,78 @@ function formatSalary(amount?: number | null): string {
   return amount.toLocaleString("vi-VN") + " đ";
 }
 
+function normalizeDateInput(val?: any): string {
+  if (!val) return "";
+  const str = String(val).trim();
+  if (!str) return "";
+
+  if (str.includes("T")) {
+    const part = str.split("T")[0];
+    if (/^\d{4}-\d{2}-\d{2}$/.test(part)) return part;
+  }
+
+  if (/^\d{4}-\d{2}-\d{2}$/.test(str)) return str;
+
+  const dmyMatch = str.match(/^(\d{1,2})[/-](\d{1,2})[/-](\d{4})$/);
+  if (dmyMatch) {
+    const day = dmyMatch[1].padStart(2, "0");
+    const month = dmyMatch[2].padStart(2, "0");
+    const year = dmyMatch[3];
+    return `${year}-${month}-${day}`;
+  }
+
+  const d = new Date(str);
+  if (!isNaN(d.getTime())) {
+    const year = d.getFullYear();
+    const month = String(d.getMonth() + 1).padStart(2, "0");
+    const day = String(d.getDate()).padStart(2, "0");
+    return `${year}-${month}-${day}`;
+  }
+
+  return str.slice(0, 10);
+}
+
+function formatDate(dateStr?: any): string {
+  if (!dateStr) return "Chưa cập nhật";
+  try {
+    const d = new Date(dateStr);
+    if (isNaN(d.getTime())) return "Chưa cập nhật";
+    return d.toLocaleDateString("vi-VN", {
+      day: "2-digit",
+      month: "2-digit",
+      year: "numeric",
+    });
+  } catch {
+    return "Chưa cập nhật";
+  }
+}
+
+function normalizePhone(phone?: string | null): string {
+  if (!phone) return "";
+  const str = String(phone).trim();
+  const lower = str.toLowerCase();
+  if (
+    !str ||
+    lower === "chưa cập nhật" ||
+    lower === "chua cap nhat" ||
+    lower === "chưa có" ||
+    lower === "chua co" ||
+    lower === "không có" ||
+    lower === "khong co" ||
+    lower === "null" ||
+    lower === "undefined" ||
+    lower === "n/a" ||
+    lower === "none" ||
+    lower === "—" ||
+    lower === "-"
+  ) {
+    return "";
+  }
+  return str;
+}
+
 export default function Employees() {
+  const { showAlert, alertView } = useAppAlert();
   const { user, selectedBranch } = useSession();
   const params = useLocalSearchParams<{ from?: string }>();
   const allowed = canUseModule(user, "hr") && (hasPermission(user, "hr:read") || hasPermission(user, "user:read"));
@@ -98,14 +167,10 @@ export default function Employees() {
   const [formError, setFormError] = useState<string | null>(null);
 
   const handleCreateUser = async (data: CreateUserInput) => {
-    try {
-      await userManagementApi.createUser(data);
-      Alert.alert("Thành công", "Đã thêm nhân sự mới vào hệ thống.");
-      setCreateModalVisible(false);
-      setRevision((v) => v + 1);
-    } catch (err: any) {
-      Alert.alert("Lỗi", err?.message || "Không thể tạo tài khoản nhân sự.");
-    }
+    await userManagementApi.createUser(data);
+    showAlert("Thành công", "Đã thêm nhân sự mới vào hệ thống.", undefined, "success");
+    setCreateModalVisible(false);
+    setRevision((v) => v + 1);
   };
 
   const loadData = useCallback(
@@ -172,8 +237,8 @@ export default function Employees() {
     setDraft({
       displayName: u.displayName || "",
       email: u.email || "",
-      phone: sanitize(u.phone),
-      birthDate: sanitize(u.birthDate),
+      phone: normalizePhone(u.phone),
+      birthDate: normalizeDateInput(u.birthDate),
       department: sanitize(u.department),
       departmentId: u.departmentId || "",
       jobTitle: sanitize(u.jobTitle),
@@ -186,7 +251,6 @@ export default function Employees() {
       monthlySalary: u.monthlySalary || undefined,
       jobDescriptionLink: sanitize(u.jobDescriptionLink),
       level: u.level || undefined,
-      status: u.status || "online",
     });
     setEditTab("general");
     setFormError(null);
@@ -199,8 +263,28 @@ export default function Employees() {
     setFormError(null);
     try {
       if (!draft.displayName?.trim()) throw new Error("Vui lòng nhập họ tên nhân viên.");
-      await roster.update(selected.uid, draft);
-      const updatedUser: UserProfile = { ...selected, ...draft };
+      const normalizedBirthDate = draft.birthDate?.trim()
+        ? normalizeDateInput(draft.birthDate)
+        : undefined;
+      if (draft.birthDate?.trim() && !/^\d{4}-\d{2}-\d{2}$/.test(normalizedBirthDate || "")) {
+        throw new Error("Vui lòng nhập ngày sinh theo định dạng YYYY-MM-DD (Ví dụ: 1995-08-20).");
+      }
+      const cleanPhone = normalizePhone(draft.phone).replace(/[\s.\-()]/g, "");
+      if (cleanPhone) {
+        const phoneRegex = /^(\+84|84|0)[0-9]{8,11}$/;
+        if (!phoneRegex.test(cleanPhone)) {
+          throw new Error("Số điện thoại không đúng định dạng (Ví dụ: 0912345678 hoặc +84912345678).");
+        }
+      }
+      const payload: EmployeeProfileInput = {
+        ...draft,
+        phone: cleanPhone || undefined,
+        birthDate: normalizedBirthDate,
+      };
+      delete payload.status;
+      if (payload.role === selected.role) delete payload.role;
+      await roster.update(selected.uid, payload);
+      const updatedUser: UserProfile = { ...selected, ...payload };
       setSelected(updatedUser);
       setItems((curr) => curr.map((u) => (u.uid === selected.uid ? updatedUser : u)));
       setEditing(false);
@@ -211,6 +295,28 @@ export default function Employees() {
       lock.current = false;
       setBusy(false);
     }
+  };
+
+  const handleCallPhone = (phone?: string) => {
+    const clean = normalizePhone(phone).replace(/[\s.\-()]/g, "");
+    if (!clean) {
+      showAlert("Thông báo", "Nhân sự chưa cập nhật số điện thoại.", undefined, "info");
+      return;
+    }
+    Linking.openURL(`tel:${clean}`).catch(() => {
+      showAlert("Lỗi", "Không thể thực hiện cuộc gọi trên thiết bị này.", undefined, "error");
+    });
+  };
+
+  const handleSendSms = (phone?: string) => {
+    const clean = normalizePhone(phone).replace(/[\s.\-()]/g, "");
+    if (!clean) {
+      showAlert("Thông báo", "Nhân sự chưa cập nhật số điện thoại.", undefined, "info");
+      return;
+    }
+    Linking.openURL(`sms:${clean}`).catch(() => {
+      showAlert("Lỗi", "Không thể mở ứng dụng tin nhắn trên thiết bị này.", undefined, "error");
+    });
   };
 
   // Distinct departments for filter chips
@@ -264,6 +370,7 @@ export default function Employees() {
           <Text style={styles.emptyTitle}>Chưa được cấp quyền</Text>
           <Text style={styles.emptyDesc}>Bạn cần có quyền xem nhân sự để truy cập danh bạ công ty.</Text>
         </View>
+        {alertView}
       </Page>
     );
   }
@@ -505,18 +612,39 @@ export default function Employees() {
 
                 {/* Right Action Shortcuts */}
                 <View style={styles.actionShortcuts}>
+                  {!!item.phone && (
+                    <>
+                      <TouchableOpacity
+                        style={styles.phoneActionBtn}
+                        onPress={() => handleCallPhone(item.phone)}
+                        activeOpacity={0.7}
+                        hitSlop={{ top: 8, bottom: 8, left: 6, right: 6 }}
+                      >
+                        <Ionicons name="call" size={13} color="#059669" />
+                      </TouchableOpacity>
+                      <TouchableOpacity
+                        style={styles.smsActionBtn}
+                        onPress={() => handleSendSms(item.phone)}
+                        activeOpacity={0.7}
+                        hitSlop={{ top: 8, bottom: 8, left: 6, right: 6 }}
+                      >
+                        <Ionicons name="chatbox" size={13} color="#0284c7" />
+                      </TouchableOpacity>
+                    </>
+                  )}
                   <TouchableOpacity
                     style={styles.chatActionBtn}
-                    onPress={() => {
+                    onPress={(event) => {
+                      event.stopPropagation();
                       router.push({
                         pathname: "/(tabs)/chat",
                         params: { peerId: item.uid, name: item.displayName || item.email },
                       } as any);
                     }}
                     activeOpacity={0.7}
-                    hitSlop={{ top: 8, bottom: 8, left: 8, right: 8 }}
+                    hitSlop={{ top: 8, bottom: 8, left: 6, right: 6 }}
                   >
-                    <Ionicons name="chatbubble-ellipses" size={15} color="#0284c7" />
+                    <Ionicons name="chatbubble-ellipses" size={14} color="#6366f1" />
                   </TouchableOpacity>
                   <View style={styles.chevronBox}>
                     <Ionicons name="chevron-forward" size={16} color="#cbd5e1" />
@@ -703,56 +831,6 @@ export default function Employees() {
                         </ScrollView>
                       )}
                     </View>
-
-                    <View style={styles.fieldGroup}>
-                      <Text style={styles.fieldLabel}>Bộ phận / Khối chuyên môn</Text>
-                      <TextInput
-                        style={styles.formInput}
-                        placeholder="Ví dụ: Khối Lâm sàng, Hành chính tổng hợp..."
-                        placeholderTextColor="#94a3b8"
-                        value={draft.division || ""}
-                        onChangeText={(val) => setDraft((curr) => ({ ...curr, division: val }))}
-                      />
-                    </View>
-
-                    <View style={styles.fieldGroup}>
-                      <Text style={styles.fieldLabel}>Chức danh công việc</Text>
-                      <TextInput
-                        style={styles.formInput}
-                        placeholder="Ví dụ: Bác sĩ Trưởng khoa, Điều dưỡng viên..."
-                        placeholderTextColor="#94a3b8"
-                        value={draft.jobTitle || ""}
-                        onChangeText={(val) => setDraft((curr) => ({ ...curr, jobTitle: val }))}
-                      />
-                    </View>
-
-                    <View style={styles.fieldGroup}>
-                      <Text style={styles.fieldLabel}>Trình độ học vấn & Chuyên môn</Text>
-                      <TextInput
-                        style={styles.formInput}
-                        placeholder="Ví dụ: Thạc sĩ Y khoa, CKI, Cử nhân..."
-                        placeholderTextColor="#94a3b8"
-                        value={draft.qualification || ""}
-                        onChangeText={(val) => setDraft((curr) => ({ ...curr, qualification: val }))}
-                      />
-                    </View>
-
-                    <View style={styles.fieldGroup}>
-                      <Text style={styles.fieldLabel}>Cấp bậc / Level</Text>
-                      <TextInput
-                        style={styles.formInput}
-                        placeholder="Ví dụ: 1, 2, 3..."
-                        placeholderTextColor="#94a3b8"
-                        keyboardType="numeric"
-                        value={draft.level != null ? String(draft.level) : ""}
-                        onChangeText={(val) =>
-                          setDraft((curr) => ({
-                            ...curr,
-                            level: val.trim() ? parseInt(val.trim(), 10) || undefined : undefined,
-                          }))
-                        }
-                      />
-                    </View>
                   </View>
                 )}
 
@@ -764,6 +842,9 @@ export default function Employees() {
                     {/* Role options */}
                     <View style={styles.fieldGroup}>
                       <Text style={styles.fieldLabel}>Vai trò hệ thống</Text>
+                      {!ROLE_OPTIONS.some((option) => option.value === draft.role) && (
+                        <Text style={styles.fieldLabel}>{getRoleDisplayName(draft.role || "")}</Text>
+                      )}
                       <View style={styles.rolePickerRow}>
                         {ROLE_OPTIONS.map((opt) => {
                           const isSelected = draft.role === opt.value;
@@ -831,37 +912,6 @@ export default function Employees() {
                       )}
                     </View>
 
-                    {/* Switch: Trưởng nhóm / Leader */}
-                    <View style={styles.switchRowCard}>
-                      <View style={{ flex: 1 }}>
-                        <Text style={styles.switchTitle}>Trưởng nhóm / Trưởng bộ phận</Text>
-                        <Text style={styles.switchDesc}>Gắn huy hiệu lãnh đạo và ưu tiên điều phối công việc.</Text>
-                      </View>
-                      <Switch
-                        value={!!draft.isLeader}
-                        onValueChange={(val) => setDraft((curr) => ({ ...curr, isLeader: val }))}
-                        trackColor={{ true: "#a7f3d0" }}
-                        thumbColor={draft.isLeader ? "#059669" : "#f1f5f9"}
-                      />
-                    </View>
-
-                    {/* Trạng thái làm việc */}
-                    <View style={styles.switchRowCard}>
-                      <View style={{ flex: 1 }}>
-                        <Text style={styles.switchTitle}>Trạng thái hoạt động</Text>
-                        <Text style={styles.switchDesc}>
-                          {draft.status === "online" ? "Đang làm việc tại viện" : "Đã nghỉ / Tạm dừng"}
-                        </Text>
-                      </View>
-                      <Switch
-                        value={draft.status !== "offline"}
-                        onValueChange={(val) =>
-                          setDraft((curr) => ({ ...curr, status: val ? "online" : "offline" }))
-                        }
-                        trackColor={{ true: "#a7f3d0" }}
-                        thumbColor={draft.status !== "offline" ? "#059669" : "#f1f5f9"}
-                      />
-                    </View>
                   </View>
                 )}
 
@@ -943,16 +993,11 @@ export default function Employees() {
                   ]}
                 >
                   <Text style={styles.heroAvatarText}>{getInitials(selected?.displayName)}</Text>
-                  {selected?.isLeader && (
-                    <View style={styles.heroCrownBadge}>
-                      <Ionicons name="star" size={14} color="#ffffff" />
-                    </View>
-                  )}
                 </View>
 
                 <Text style={styles.heroNameText}>{selected?.displayName}</Text>
                 <Text style={styles.heroJobTitle}>
-                  {selected?.jobTitle || getRoleDisplayName(selected?.role || "")}
+                  {getRoleDisplayName(selected?.role || "")}
                 </Text>
 
                 <View style={styles.heroBadgeRow}>
@@ -962,18 +1007,36 @@ export default function Employees() {
                   <View style={styles.heroRoleBadge}>
                     <Text style={styles.heroRoleText}>{getRoleDisplayName(selected?.role || "")}</Text>
                   </View>
-                  {selected?.isLeader && (
-                    <View style={[styles.heroRoleBadge, { backgroundColor: "#fef3c7" }]}>
-                      <Text style={[styles.heroRoleText, { color: "#b45309" }]}>Trưởng bộ phận</Text>
-                    </View>
-                  )}
                 </View>
 
                 {/* Quick Action Shortcuts in Hero */}
                 <View style={styles.heroActionRow}>
+                  {!!selected?.phone && (
+                    <View style={styles.heroPhoneButtonsRow}>
+                      <TouchableOpacity
+                        style={styles.heroCallBtn}
+                        onPress={() => handleCallPhone(selected.phone)}
+                        activeOpacity={0.85}
+                      >
+                        <Ionicons name="call" size={15} color="#ffffff" />
+                        <Text style={styles.heroCallLabel}>Gọi điện</Text>
+                      </TouchableOpacity>
+
+                      <TouchableOpacity
+                        style={styles.heroSmsBtn}
+                        onPress={() => handleSendSms(selected.phone)}
+                        activeOpacity={0.85}
+                      >
+                        <Ionicons name="chatbox" size={15} color="#ffffff" />
+                        <Text style={styles.heroSmsLabel}>Nhắn tin SMS</Text>
+                      </TouchableOpacity>
+                    </View>
+                  )}
+
                   <TouchableOpacity
                     style={styles.heroInternalChatBtn}
-                    onPress={() => {
+                    onPress={(event) => {
+                      event.stopPropagation();
                       const peer = selected;
                       setSelected(null);
                       router.push({
@@ -983,7 +1046,7 @@ export default function Employees() {
                     }}
                     activeOpacity={0.85}
                   >
-                    <Ionicons name="chatbubble-ellipses" size={18} color="#ffffff" />
+                    <Ionicons name="chatbubble-ellipses" size={16} color="#ffffff" />
                     <Text style={styles.heroInternalChatLabel}>Nhắn tin nội bộ</Text>
                   </TouchableOpacity>
                 </View>
@@ -1000,54 +1063,54 @@ export default function Employees() {
                   <Text style={styles.infoLabel}>Phòng ban / Khoa</Text>
                   <Text style={styles.infoValue}>{selected?.department || "Chưa cập nhật"}</Text>
                 </View>
-                <View style={styles.infoRow}>
-                  <Text style={styles.infoLabel}>Chức danh công việc</Text>
-                  <Text style={styles.infoValue}>{selected?.jobTitle || "Chưa cập nhật"}</Text>
-                </View>
-                <View style={styles.infoRow}>
-                  <Text style={styles.infoLabel}>Khối / Bộ phận</Text>
-                  <Text style={styles.infoValue}>{selected?.division || "Chưa cập nhật"}</Text>
-                </View>
-                <View style={styles.infoRow}>
-                  <Text style={styles.infoLabel}>Cấp bậc / Level</Text>
-                  <Text style={styles.infoValue}>{selected?.level != null ? `Cấp ${selected.level}` : "Chưa cập nhật"}</Text>
-                </View>
-                <View style={styles.infoRow}>
+                <View style={[styles.infoRow, { borderBottomWidth: 0 }]}>
                   <Text style={styles.infoLabel}>Chi nhánh</Text>
                   <Text style={styles.infoValue}>{selected?.branchName || selectedBranch?.name || "Toàn công ty"}</Text>
                 </View>
-                <View style={[styles.infoRow, { borderBottomWidth: 0 }]}>
-                  <Text style={styles.infoLabel}>Cán bộ phụ trách</Text>
-                  <Text style={[styles.infoValue, { color: selected?.isLeader ? "#059669" : "#64748b", fontWeight: "700" }]}>
-                    {selected?.isLeader ? "★ Trưởng nhóm / Trưởng khoa" : "Nhân viên"}
-                  </Text>
-                </View>
               </View>
 
-              {/* Info Block: Liên hệ & Chuyên môn */}
+              {/* Info Block: Liên hệ & Cá nhân */}
               <View style={styles.infoSectionCard}>
                 <View style={styles.infoSectionHeader}>
                   <Ionicons name="person" size={16} color="#0284c7" />
-                  <Text style={styles.infoSectionTitle}>Thông tin cá nhân & Chuyên môn</Text>
+                  <Text style={styles.infoSectionTitle}>Thông tin cá nhân</Text>
                 </View>
 
                 <View style={styles.infoRow}>
                   <Text style={styles.infoLabel}>Số điện thoại</Text>
-                  <Text style={[styles.infoValue, { color: "#059669", fontWeight: "700" }]}>
-                    {selected?.phone || "Chưa cập nhật"}
-                  </Text>
+                  <View style={{ flexDirection: "row", alignItems: "center", gap: 8, flexWrap: "wrap", justifyContent: "flex-end" }}>
+                    <Text style={[styles.infoValue, { color: selected?.phone ? "#059669" : "#64748b", fontWeight: selected?.phone ? "700" : "500" }]}>
+                      {selected?.phone || "Chưa cập nhật"}
+                    </Text>
+                    {!!selected?.phone && (
+                      <View style={{ flexDirection: "row", gap: 5 }}>
+                        <TouchableOpacity
+                          style={styles.inlineActionBtn}
+                          onPress={() => handleCallPhone(selected.phone)}
+                          activeOpacity={0.7}
+                        >
+                          <Ionicons name="call" size={11} color="#059669" />
+                          <Text style={styles.inlineActionText}>Gọi</Text>
+                        </TouchableOpacity>
+                        <TouchableOpacity
+                          style={[styles.inlineActionBtn, { backgroundColor: "#eff6ff", borderColor: "#bfdbfe" }]}
+                          onPress={() => handleSendSms(selected.phone)}
+                          activeOpacity={0.7}
+                        >
+                          <Ionicons name="chatbox" size={11} color="#0284c7" />
+                          <Text style={[styles.inlineActionText, { color: "#0284c7" }]}>SMS</Text>
+                        </TouchableOpacity>
+                      </View>
+                    )}
+                  </View>
                 </View>
                 <View style={styles.infoRow}>
                   <Text style={styles.infoLabel}>Email nội bộ</Text>
                   <Text style={styles.infoValue}>{selected?.email || "Chưa cập nhật"}</Text>
                 </View>
-                <View style={styles.infoRow}>
-                  <Text style={styles.infoLabel}>Trình độ học vấn</Text>
-                  <Text style={styles.infoValue}>{selected?.qualification || "Chưa cập nhật"}</Text>
-                </View>
                 <View style={[styles.infoRow, { borderBottomWidth: 0 }]}>
                   <Text style={styles.infoLabel}>Ngày sinh</Text>
-                  <Text style={styles.infoValue}>{selected?.birthDate || "Chưa cập nhật"}</Text>
+                  <Text style={styles.infoValue}>{formatDate(selected?.birthDate)}</Text>
                 </View>
               </View>
 
@@ -1123,6 +1186,7 @@ export default function Employees() {
         companyName={user?.companyName}
         managers={items}
       />
+      {alertView}
     </>
   );
 }
@@ -1413,15 +1477,35 @@ const styles = StyleSheet.create({
     alignItems: "center",
     gap: 6,
   },
-  chatActionBtn: {
-    width: 32,
-    height: 32,
-    borderRadius: 16,
-    backgroundColor: "#f0f9ff",
+  phoneActionBtn: {
+    width: 30,
+    height: 30,
+    borderRadius: 15,
+    backgroundColor: "#ecfdf5",
     alignItems: "center",
     justifyContent: "center",
     borderWidth: 1,
-    borderColor: "#bae6fd",
+    borderColor: "#a7f3d0",
+  },
+  smsActionBtn: {
+    width: 30,
+    height: 30,
+    borderRadius: 15,
+    backgroundColor: "#eff6ff",
+    alignItems: "center",
+    justifyContent: "center",
+    borderWidth: 1,
+    borderColor: "#bfdbfe",
+  },
+  chatActionBtn: {
+    width: 30,
+    height: 30,
+    borderRadius: 15,
+    backgroundColor: "#f5f3ff",
+    alignItems: "center",
+    justifyContent: "center",
+    borderWidth: 1,
+    borderColor: "#ddd6fe",
   },
   chevronBox: {
     paddingLeft: 2,
@@ -1590,16 +1674,64 @@ const styles = StyleSheet.create({
     borderTopColor: "#f1f5f9",
     width: "100%",
   },
-  heroInternalChatBtn: {
+  heroPhoneButtonsRow: {
+    flexDirection: "row",
+    gap: 8,
+    width: "100%",
+    marginBottom: 8,
+  },
+  heroCallBtn: {
+    flex: 1,
+    flexDirection: "row",
+    alignItems: "center",
+    justifyContent: "center",
+    backgroundColor: "#059669",
+    paddingVertical: 10,
+    paddingHorizontal: 12,
+    borderRadius: 12,
+    gap: 6,
+    shadowColor: "#059669",
+    shadowOffset: { width: 0, height: 2 },
+    shadowOpacity: 0.2,
+    shadowRadius: 4,
+    elevation: 2,
+  },
+  heroCallLabel: {
+    fontSize: 13,
+    fontWeight: "700",
+    color: "#ffffff",
+  },
+  heroSmsBtn: {
+    flex: 1,
     flexDirection: "row",
     alignItems: "center",
     justifyContent: "center",
     backgroundColor: "#0284c7",
-    paddingVertical: 12,
+    paddingVertical: 10,
+    paddingHorizontal: 12,
+    borderRadius: 12,
+    gap: 6,
+    shadowColor: "#0284c7",
+    shadowOffset: { width: 0, height: 2 },
+    shadowOpacity: 0.2,
+    shadowRadius: 4,
+    elevation: 2,
+  },
+  heroSmsLabel: {
+    fontSize: 13,
+    fontWeight: "700",
+    color: "#ffffff",
+  },
+  heroInternalChatBtn: {
+    flexDirection: "row",
+    alignItems: "center",
+    justifyContent: "center",
+    backgroundColor: "#4f46e5",
+    paddingVertical: 11,
     paddingHorizontal: 20,
     borderRadius: 12,
     gap: 8,
-    shadowColor: "#0284c7",
+    shadowColor: "#4f46e5",
     shadowOffset: { width: 0, height: 2 },
     shadowOpacity: 0.2,
     shadowRadius: 4,
@@ -1607,9 +1739,25 @@ const styles = StyleSheet.create({
     width: "100%",
   },
   heroInternalChatLabel: {
-    fontSize: 14,
-    fontWeight: "800",
+    fontSize: 13.5,
+    fontWeight: "700",
     color: "#ffffff",
+  },
+  inlineActionBtn: {
+    flexDirection: "row",
+    alignItems: "center",
+    gap: 3,
+    backgroundColor: "#ecfdf5",
+    borderColor: "#a7f3d0",
+    borderWidth: 1,
+    paddingHorizontal: 7,
+    paddingVertical: 3,
+    borderRadius: 6,
+  },
+  inlineActionText: {
+    fontSize: 11,
+    fontWeight: "700",
+    color: "#059669",
   },
   heroActionBtn: {
     alignItems: "center",
@@ -1784,26 +1932,6 @@ const styles = StyleSheet.create({
   rolePickerTextActive: {
     color: "#059669",
     fontWeight: "700",
-  },
-  switchRowCard: {
-    flexDirection: "row",
-    alignItems: "center",
-    justifyContent: "space-between",
-    backgroundColor: "#f8fafc",
-    padding: 12,
-    borderRadius: 12,
-    borderWidth: 1,
-    borderColor: "#f1f5f9",
-  },
-  switchTitle: {
-    fontSize: 13,
-    fontWeight: "700",
-    color: "#0f172a",
-  },
-  switchDesc: {
-    fontSize: 11,
-    color: "#64748b",
-    marginTop: 2,
   },
   salaryPreviewText: {
     fontSize: 12,

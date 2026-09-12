@@ -95,12 +95,13 @@ export function SessionProvider({ children }: React.PropsWithChildren) {
   useEffect(() => {
     if (!user) return;
     let active = true;
-    const subscription = AppState.addEventListener("change", (state) => {
-      if (state === "active") {
+    let profileRequest = 0;
+    const refreshProfile = () => {
+        const request = ++profileRequest;
         const attempt = operation.current;
         void getMe()
           .then((profile) => {
-            if (active && attempt === operation.current) {
+            if (active && request === profileRequest && attempt === operation.current) {
               const isOwnerRole = ["admin", "superadmin", "branch_owner"].includes(profile.role || "");
               if (!isOwnerRole || profile.companyCode !== user.companyCode) {
                 api.setBranchId(null);
@@ -110,11 +111,15 @@ export function SessionProvider({ children }: React.PropsWithChildren) {
             }
           })
           .catch(() => {});
-      }
+    };
+    const subscription = AppState.addEventListener("change", state => { if (state === "active") refreshProfile(); });
+    const unsubscribeRole = socketService.subscribe("role_permissions_updated", data => {
+      if (!data?.userId || data.userId === user.uid) refreshProfile();
     });
     return () => {
       active = false;
       subscription.remove();
+      unsubscribeRole();
     };
   }, [user?.uid, user?.companyCode]);
   return (

@@ -1,5 +1,6 @@
+import { useAppAlert } from "../../components/AppAlert";
 import { useRef, useState } from "react";
-import { Alert, Switch, Text, View } from "react-native";
+import { Switch, Text, View } from "react-native";
 import * as Crypto from "expo-crypto";
 import type { RecruitmentPipeline, RecruitmentStage } from "../../../../src/types/recruitment";
 import { recruitment } from "../../api/services";
@@ -16,6 +17,7 @@ export function PipelineForm({
   onClose: () => void;
   setLocked: (value: boolean) => void;
 }) {
+  const { showAlert, alertView } = useAppAlert();
   const [stages, setStages] = useState(() =>
     pipeline.stages
       .slice()
@@ -107,7 +109,7 @@ export function PipelineForm({
             title="Bỏ giai đoạn"
             disabled={disabled}
             onPress={() =>
-              Alert.alert("Bỏ giai đoạn?", stage.name, [
+              showAlert("Bỏ giai đoạn?", stage.name, [
                 { text: "Hủy", style: "cancel" },
                 {
                   text: "Bỏ khỏi bản chỉnh sửa",
@@ -144,7 +146,7 @@ export function PipelineForm({
         onPress={() => {
           try {
             const input = pipelinePayload(stages);
-            Alert.alert(
+            showAlert(
               "Lưu quy trình tuyển dụng?",
               input.map((stage, index) => `${index + 1}. ${stage.name}${stage.isActive ? "" : " (tắt)"}`).join("\n"),
               [
@@ -158,6 +160,7 @@ export function PipelineForm({
         }}
       />
       <Button title="Đóng và tải lại" disabled={busy} onPress={onClose} />
+      {alertView}
     </Page>
   );
 }

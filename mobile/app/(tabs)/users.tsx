@@ -1,7 +1,9 @@
+import { useRoleOptions } from "../../src/features/roles/useRoleOptions";
+import { roleTitle } from "../../src/features/roles/model";
+import { useAppAlert } from "../../src/components/AppAlert";
 import React, { useCallback, useEffect, useMemo, useState } from "react";
 import {
   ActivityIndicator,
-  Alert,
   FlatList,
   Modal,
   RefreshControl,
@@ -45,7 +47,10 @@ const ROLE_FILTERS: Array<{ id: string; label: string }> = [
 ];
 
 export default function UsersScreen() {
+  const { showAlert, alertView } = useAppAlert();
   const { user: currentUser, selectedBranch } = useSession();
+
+  const roleOptions = useRoleOptions(true, currentUser?.companyCode);
 
   // Dữ liệu người dùng & thống kê
   const [users, setUsers] = useState<UserProfile[]>([]);
@@ -131,16 +136,16 @@ export default function UsersScreen() {
         setUsers(data);
         setStats(userManagementApi.calculateStats(data));
       } catch (err: any) {
-        Alert.alert(
+        showAlert(
           "Lỗi tải dữ liệu",
-          err.message || "Không thể tải danh sách người dùng từ hệ thống.",
+          err.message || "Không thể tải danh sách người dùng từ hệ thống.", undefined, "error",
         );
       } finally {
         setLoading(false);
         setRefreshing(false);
       }
     },
-    [branchFilter, selectedBranch, currentUser],
+    [branchFilter, selectedBranch, currentUser, showAlert],
   );
 
   useEffect(() => {
@@ -163,7 +168,8 @@ export default function UsersScreen() {
   // 4. Tạo người dùng mới
   const handleCreateUser = async (data: CreateUserInput) => {
     await userManagementApi.createUser(data);
-    Alert.alert("Thành công", `Đã tạo tài khoản cho "${data.displayName}".`);
+    setCreateModalVisible(false);
+    showAlert("Thành công", `Đã tạo tài khoản cho "${data.displayName}".`, undefined, "success");
     await loadUsers(true);
   };
 
@@ -203,7 +209,7 @@ export default function UsersScreen() {
       return remaining;
     });
     setDetailUser(null);
-    Alert.alert("Đã xóa", "Tài khoản người dùng đã được xóa khỏi hệ thống.");
+    showAlert("Đã xóa", "Tài khoản người dùng đã được xóa khỏi hệ thống.", undefined, "success");
   };
 
   // 7. Lọc người dùng theo từ khóa, vai trò, chi nhánh, phòng ban
@@ -410,7 +416,7 @@ export default function UsersScreen() {
           showsHorizontalScrollIndicator={false}
           contentContainerStyle={styles.roleChipsScroll}
         >
-          {ROLE_FILTERS.map((item) => {
+          {[...ROLE_FILTERS, ...roleOptions.roles.filter(role => !ROLE_FILTERS.some(item => item.id === role.role)).map(role => ({ id: role.role, label: roleTitle(role) }))].map((item) => {
             const isSelected = roleFilter === item.id;
             return (
               <TouchableOpacity
@@ -450,6 +456,7 @@ export default function UsersScreen() {
           renderItem={({ item }) => (
             <UserCard
               user={item}
+              roleName={roleOptions.roles.find(role => role.role === item.role)?.displayName}
               onPress={(u) => setDetailUser(u)}
             />
           )}
@@ -677,6 +684,7 @@ export default function UsersScreen() {
           </View>
         </TouchableOpacity>
       </Modal>
+      {alertView}
     </SafeAreaView>
   );
 }

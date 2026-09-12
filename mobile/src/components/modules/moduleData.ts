@@ -387,8 +387,8 @@ export const LUXCARE_MODULES: ServiceModule[] = [
   },
   {
     id: "communication",
-    title: "Truyền thông & Hệ thống",
-    shortTitle: "Truyền thông & Hệ thống",
+    title: "Hệ thống",
+    shortTitle: "Hệ thống",
     items: [
       {
         id: "comm-chat",
@@ -412,7 +412,7 @@ export const LUXCARE_MODULES: ServiceModule[] = [
       },
       {
         id: "comm-blog",
-        title: "Bảng tin\nBlog nội bộ",
+        title: "Bảng tin",
         icon: "newspaper",
         color: "#ea580c",
         bgColor: "#fff7ed",
@@ -422,7 +422,7 @@ export const LUXCARE_MODULES: ServiceModule[] = [
       },
       {
         id: "comm-broadcast",
-        title: "Thông báo\ntoàn viện",
+        title: "Thông báo",
         icon: "megaphone",
         color: "#d97706",
         bgColor: "#fffbeb",
@@ -432,7 +432,7 @@ export const LUXCARE_MODULES: ServiceModule[] = [
       },
       {
         id: "comm-knowledge",
-        title: "Kho tri thức\n& SOP y tế",
+        title: "Kho tri thức",
         icon: "library",
         color: "#7c3aed",
         bgColor: "#f5f3ff",
@@ -460,6 +460,26 @@ export const LUXCARE_MODULES: ServiceModule[] = [
         moduleId: "communication",
         status: "active",
       },
+      {
+        id: "sys-roles",
+        title: "Phân quyền\n& Vai trò",
+        icon: "shield-checkmark",
+        color: "#059669",
+        bgColor: "#ecfdf5",
+        route: "/(tabs)/roles",
+        moduleId: "communication",
+        status: "active",
+      },
+      {
+        id: "sys-settings",
+        title: "Cài đặt\nhệ thống",
+        icon: "settings",
+        color: "#64748b",
+        bgColor: "#f8fafc",
+        route: "/(tabs)/settings",
+        moduleId: "communication",
+        status: "coming_soon",
+      },
     ],
   },
 ];
@@ -472,7 +492,10 @@ export function isServiceAccessible(item: ServiceItem, user: UserProfile | null)
   // Route-based permission checks
   const baseRoute = item.route.split("?")[0];
   switch (baseRoute) {
+    case "/(tabs)/roles":
+      return user.role === "admin" || user.role === "superadmin";
     case "/(tabs)/users":
+    case "/(tabs)/settings":
       return isManager || hasPermission(user, "user:read");
 
     case "/(tabs)/recruitment":

@@ -1,7 +1,7 @@
+import { useAppAlert } from "../../src/components/AppAlert";
 import { useCallback, useState } from "react";
 import {
   ActivityIndicator,
-  Alert,
   Modal,
   Pressable,
   RefreshControl,
@@ -40,6 +40,7 @@ const defaultCelebrationConfig: CelebrationConfig = {
 };
 
 export default function CelebrationEmailScreen() {
+  const { showAlert, alertView } = useAppAlert();
   const router = useRouter();
   const params = useLocalSearchParams<{ from?: string }>();
   const { user } = useSession();
@@ -132,7 +133,7 @@ export default function CelebrationEmailScreen() {
       await companyEmail.saveCelebration(nextConfig);
     } catch (err: any) {
       setConfig(config);
-      Alert.alert("Lỗi", err.message || "Không thể cập nhật cấu hình.");
+      showAlert("Lỗi", err.message || "Không thể cập nhật cấu hình.", undefined, "error");
     }
   };
 
@@ -144,14 +145,14 @@ export default function CelebrationEmailScreen() {
       await companyEmail.saveCelebration(nextConfig);
     } catch (err: any) {
       setConfig(config);
-      Alert.alert("Lỗi", err.message || "Không thể cập nhật cấu hình.");
+      showAlert("Lỗi", err.message || "Không thể cập nhật cấu hình.", undefined, "error");
     }
   };
 
   const handleSaveSendTime = async (time: string) => {
     if (!config) return;
     if (!/^([01]\d|2[0-3]):[0-5]\d$/.test(time)) {
-      Alert.alert("Lỗi", "Giờ gửi phải đúng định dạng HH:mm (ví dụ 08:00).");
+      showAlert("Lỗi", "Giờ gửi phải đúng định dạng HH:mm (ví dụ 08:00).", undefined, "error");
       return;
     }
     const nextConfig: CelebrationConfig = { ...config, sendTime: time };
@@ -159,21 +160,21 @@ export default function CelebrationEmailScreen() {
     try {
       await companyEmail.saveCelebration(nextConfig);
       setTimePickerOpen(false);
-      Alert.alert("Thành công", `Đã đặt giờ gửi tự động là ${time}.`);
+      showAlert("Thành công", `Đã đặt giờ gửi tự động là ${time}.`, undefined, "success");
     } catch (err: any) {
       setConfig(config);
-      Alert.alert("Lỗi", err.message || "Không thể cập nhật giờ gửi.");
+      showAlert("Lỗi", err.message || "Không thể cập nhật giờ gửi.", undefined, "error");
     }
   };
 
   const handleSaveTemplate = async () => {
     if (!editingTemplate || !config) return;
     if (!editSubject.trim()) {
-      Alert.alert("Lỗi", "Tiêu đề thư không được để trống.");
+      showAlert("Lỗi", "Tiêu đề thư không được để trống.", undefined, "error");
       return;
     }
     if (!editHtml.trim()) {
-      Alert.alert("Lỗi", "Nội dung thư không được để trống.");
+      showAlert("Lỗi", "Nội dung thư không được để trống.", undefined, "error");
       return;
     }
     setSavingTemplate(true);
@@ -192,9 +193,9 @@ export default function CelebrationEmailScreen() {
       await companyEmail.saveCelebration(updatedConfig);
       setConfig(updatedConfig);
       setEditingTemplate(null);
-      Alert.alert("Thành công", "Đã lưu mẫu thư chúc mừng.");
+      showAlert("Thành công", "Đã lưu mẫu thư chúc mừng.", undefined, "success");
     } catch (err: any) {
-      Alert.alert("Lỗi", err.message || "Không thể lưu cấu hình mẫu thư.");
+      showAlert("Lỗi", err.message || "Không thể lưu cấu hình mẫu thư.", undefined, "error");
     } finally {
       setSavingTemplate(false);
     }
@@ -802,6 +803,7 @@ export default function CelebrationEmailScreen() {
           </View>
         </View>
       </Modal>
+      {alertView}
     </SafeAreaView>
   );
 }

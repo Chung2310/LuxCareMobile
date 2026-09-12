@@ -1,5 +1,6 @@
+import { useAppAlert } from "../../src/components/AppAlert";
 import { useCallback, useRef, useState } from "react";
-import { Alert, Modal, Text } from "react-native";
+import { Modal, Text } from "react-native";
 import { SafeAreaView } from "react-native-safe-area-context";
 import { useFocusEffect } from "expo-router";
 import type { WorkShift, ShiftEmployee } from "../../../src/services/attendanceService";
@@ -11,6 +12,7 @@ import { ChoiceField } from "../../src/features/leave/ChoiceField";
 import { ShiftForm } from "../../src/features/shifts/ShiftForm";
 import { assignmentDates } from "../../src/features/shifts/model";
 export default function Shifts() {
+  const { showAlert, alertView } = useAppAlert();
   const { user } = useSession();
   const allowed = canUseModule(user, "hr") && hasPermission(user, "timekeeping:manage");
   const [shifts, setShifts] = useState<WorkShift[]>([]);
@@ -86,6 +88,7 @@ export default function Shifts() {
     return (
       <Page title="Quản lý ca">
         <Text style={styles.text}>Bạn chưa có quyền quản lý ca làm việc.</Text>
+        {alertView}
       </Page>
     );
   const disabled = busy || loading || uncertain;
@@ -115,7 +118,7 @@ export default function Shifts() {
               title="Xóa ca"
               disabled={disabled}
               onPress={() =>
-                Alert.alert(
+                showAlert(
                   "Xóa ca?",
                   `${shift.name}. Ca đã được phân cho nhân viên có thể bị backend từ chối xóa; hãy ngừng hoạt động nếu cần.`,
                   [
@@ -191,7 +194,7 @@ export default function Shifts() {
                 const dates = assignmentDates(start.trim(), end.trim());
                 const shift = shifts.find((item) => item._id === target && item.isActive);
                 if (!shift) throw new Error("Chọn ca đang hoạt động.");
-                Alert.alert(
+                showAlert(
                   "Phân ca",
                   `Gán ca ${shift.name} cho ${selected.length} nhân viên từ ${dates.effectiveFrom}${dates.effectiveTo ? ` đến ${dates.effectiveTo}` : ""}, theo các ngày làm việc của ca.`,
                   [
@@ -239,6 +242,7 @@ export default function Shifts() {
           )}
         </SafeAreaView>
       </Modal>
+      {alertView}
     </>
   );
 }

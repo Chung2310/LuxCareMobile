@@ -1,5 +1,6 @@
+import { useAppAlert } from "../../components/AppAlert";
 import { useEffect, useRef, useState } from "react";
-import { Alert, Text } from "react-native";
+import { Text } from "react-native";
 import type { AttendanceLog, AttendanceAdjustment } from "../../../../src/services/attendanceService";
 import { attendance } from "../../api/services";
 import { messageOf } from "../../auth/SessionProvider";
@@ -15,6 +16,7 @@ export function AdjustmentForm({
   onClose: () => void;
   setLocked: (value: boolean) => void;
 }) {
+  const { showAlert, alertView } = useAppAlert();
   const [status, setStatus] = useState(log.status || "");
   const [note, setNote] = useState(log.note || "");
   const [reason, setReason] = useState("");
@@ -96,7 +98,7 @@ export function AdjustmentForm({
           try {
             adjustmentPayload(status, note, reason);
             setError(null);
-            Alert.alert(
+            showAlert(
               "Xác nhận chỉnh công",
               `${log.date}: ${label(log.status)} → ${label(status)}\nGhi chú: ${note.trim() || "(trống)"}\nLý do: ${reason.trim()}`,
               [
@@ -130,6 +132,7 @@ export function AdjustmentForm({
       ))}
       <Button title="Tải lại lịch sử" disabled={loading || busy} onPress={() => setRevision((value) => value + 1)} />
       <Button title="Đóng và tải lại" disabled={busy} onPress={onClose} />
+      {alertView}
     </Page>
   );
 }

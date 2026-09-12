@@ -1,9 +1,11 @@
+import { useAppAlert } from "../../components/AppAlert";
 import { useState } from "react";
-import { Alert, Linking, Text } from "react-native";
+import { Linking, Text } from "react-native";
 import { Button, Card, ErrorText, styles } from "../../ui";
 import { messageOf } from "../../auth/SessionProvider";
 import { validatePublicLink } from "./publicLink";
 export function PublicDocumentLink({ title, url }: { title: string; url?: string }) {
+  const { showAlert, alertView } = useAppAlert();
   const [error, setError] = useState<string | null>(null);
   if (!url) return null;
   return (
@@ -19,7 +21,7 @@ export function PublicDocumentLink({ title, url }: { title: string; url?: string
           try {
             const target = validatePublicLink(url);
             setError(null);
-            Alert.alert("Mở liên kết tài liệu?", new URL(target).hostname, [
+            showAlert("Mở liên kết tài liệu?", new URL(target).hostname, [
               { text: "Hủy", style: "cancel" },
               { text: "Mở", onPress: () => void Linking.openURL(target).catch((error) => setError(messageOf(error))) },
             ]);
@@ -28,6 +30,7 @@ export function PublicDocumentLink({ title, url }: { title: string; url?: string
           }
         }}
       />
+      {alertView}
     </Card>
   );
 }

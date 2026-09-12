@@ -1,6 +1,7 @@
+import { useAppAlert } from "../../src/components/AppAlert";
 import { shareApiFile } from "../../src/files/shareFile";
 import { useCallback, useRef, useState, type MutableRefObject } from "react";
-import { Alert, Linking, Modal, Pressable, Text, View } from "react-native";
+import { Linking, Modal, Pressable, Text, View } from "react-native";
 import { router, useFocusEffect } from "expo-router";
 import type { TaskAttachment, Workflow, WorkflowEdge, WorkflowStep } from "../../../src/types/hr";
 import { workflow } from "../../src/api/services";
@@ -10,6 +11,7 @@ import { WorkflowForm } from "../../src/features/workflow/WorkflowForm";
 import { Button, Card, EmptyState, ErrorText, Loading, Page, styles } from "../../src/ui";
 
 export default function WorkflowPage() {
+  const { showAlert, alertView } = useAppAlert();
   const { user, selectedBranch } = useSession();
   const access = workflowAccess(user);
   const scopeReady = !!user?.companyCode || !!selectedBranch?._id || !!user?.branchId || user?.role === "superadmin";
@@ -77,7 +79,7 @@ export default function WorkflowPage() {
   };
 
   const deleteWorkflow = (item: Workflow) => {
-    Alert.alert("Xóa quy trình?", `Bạn có chắc muốn xóa “${item.name}”? Thao tác này không thể hoàn tác.`, [
+    showAlert("Xóa quy trình?", `Bạn có chắc muốn xóa “${item.name}”? Thao tác này không thể hoàn tác.`, [
       { text: "Hủy", style: "cancel" },
       {
         text: "Xóa quy trình",
@@ -102,6 +104,7 @@ export default function WorkflowPage() {
       <Page title="Quy trình làm việc">
         <HeaderBack />
         <Text style={styles.text}>Cần quyền xem quy trình và một chi nhánh hợp lệ để sử dụng chức năng này.</Text>
+        {alertView}
       </Page>
     );
   }
@@ -163,6 +166,7 @@ export default function WorkflowPage() {
           formLock={formLock}
           onClose={closeEditor}
         />
+        {alertView}
       </>
     );
   }
@@ -212,6 +216,7 @@ export default function WorkflowPage() {
         formLock={formLock}
         onClose={closeEditor}
       />
+      {alertView}
     </>
   );
 }
@@ -303,27 +308,31 @@ function InfoRow({ label, value }: { label: string; value: string }) {
 }
 
 function AttachmentRow({ attachment }: { attachment: TaskAttachment }) {
+  const { showAlert, alertView } = useAppAlert();
   return (
-    <Pressable
-      accessibilityRole="button"
-      style={detailStyles.attachment}
-      onPress={() => {
-        try {
-          const url = new URL(attachment.url);
-          if (!["http:", "https:"].includes(url.protocol)) throw new Error("Đường dẫn không được hỗ trợ.");
-          if (attachment.type === "link") void Linking.openURL(url.toString());
-          else void shareApiFile(attachment.url, attachment.name).catch((error) => {
-            Alert.alert("Không thể tải tệp", error instanceof Error ? error.message : "Vui lòng thử lại.");
-          });
-        } catch {
-          Alert.alert("Không thể mở tệp", "Đường dẫn đính kèm không hợp lệ.");
-        }
-      }}
-    >
-      <Text style={detailStyles.attachmentIcon}>{attachment.type === "link" ? "↗" : "▣"}</Text>
-      <View style={{ flex: 1 }}><Text style={styles.text} numberOfLines={1}>{attachment.name}</Text><Text style={styles.muted} numberOfLines={1}>{attachment.url}</Text></View>
-      <Text style={detailStyles.open}>Mở</Text>
-    </Pressable>
+    <>
+      <Pressable
+        accessibilityRole="button"
+        style={detailStyles.attachment}
+        onPress={() => {
+          try {
+            const url = new URL(attachment.url);
+            if (!["http:", "https:"].includes(url.protocol)) throw new Error("Đường dẫn không được hỗ trợ.");
+            if (attachment.type === "link") void Linking.openURL(url.toString());
+            else void shareApiFile(attachment.url, attachment.name).catch((error) => {
+              showAlert("Không thể tải tệp", error instanceof Error ? error.message : "Vui lòng thử lại.", undefined, "error");
+            });
+          } catch {
+            showAlert("Không thể mở tệp", "Đường dẫn đính kèm không hợp lệ.", undefined, "error");
+          }
+        }}
+      >
+        <Text style={detailStyles.attachmentIcon}>{attachment.type === "link" ? "↗" : "▣"}</Text>
+        <View style={{ flex: 1 }}><Text style={styles.text} numberOfLines={1}>{attachment.name}</Text><Text style={styles.muted} numberOfLines={1}>{attachment.url}</Text></View>
+        <Text style={detailStyles.open}>Mở</Text>
+      </Pressable>
+      {alertView}
+    </>
   );
 }
 

@@ -1,5 +1,6 @@
+import { useAppAlert } from "../../src/components/AppAlert";
 import { useCallback, useRef, useState } from "react";
-import { Alert, Modal, Text } from "react-native";
+import { Modal, Text } from "react-native";
 import { SafeAreaView } from "react-native-safe-area-context";
 import { useFocusEffect } from "expo-router";
 import type {
@@ -14,6 +15,7 @@ import { ChoiceField } from "../../src/features/leave/ChoiceField";
 import { calendarAccess, calendarInput, calendarToggle, DAY_TYPES } from "../../src/features/calendar/model";
 import { HolidayForm } from "../../src/features/calendar/HolidayForm";
 export default function WorkCalendar() {
+  const { showAlert, alertView } = useAppAlert();
   const { user } = useSession();
   const access = calendarAccess(user);
   const [year, setYear] = useState(new Date().getFullYear());
@@ -89,6 +91,7 @@ export default function WorkCalendar() {
     return (
       <Page title="Lịch doanh nghiệp">
         <Text style={styles.text}>Chỉ Admin/Superadmin thuộc doanh nghiệp được xem lịch này.</Text>
+        {alertView}
       </Page>
     );
   const open = (day: WorkCalendarDay | "new") => {
@@ -126,7 +129,7 @@ export default function WorkCalendar() {
               title="Đồng bộ ngày lễ hệ thống"
               disabled={disabled}
               onPress={() =>
-                Alert.alert("Đồng bộ lịch?", `Đồng bộ lịch nghỉ lễ năm ${year} cho doanh nghiệp.`, [
+                showAlert("Đồng bộ lịch?", `Đồng bộ lịch nghỉ lễ năm ${year} cho doanh nghiệp.`, [
                   { text: "Hủy", style: "cancel" },
                   { text: "Đồng bộ", onPress: () => void run(() => workCalendar.sync(year)) },
                 ])
@@ -164,7 +167,7 @@ export default function WorkCalendar() {
                       title="Xóa ngày"
                       disabled={disabled}
                       onPress={() =>
-                        Alert.alert("Xóa ngày?", `${day.date} · ${day.name}. Thay đổi có thể cập nhật công nghỉ lễ.`, [
+                        showAlert("Xóa ngày?", `${day.date} · ${day.name}. Thay đổi có thể cập nhật công nghỉ lễ.`, [
                           { text: "Hủy", style: "cancel" },
                           {
                             text: "Xóa",
@@ -267,6 +270,7 @@ export default function WorkCalendar() {
           )}
         </SafeAreaView>
       </Modal>
+      {alertView}
     </>
   );
 }

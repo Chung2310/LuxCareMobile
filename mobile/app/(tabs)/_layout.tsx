@@ -194,20 +194,20 @@ export default function TabLayout() {
         tabBarStyle: isEditor
           ? { display: "none" }
           : {
-              backgroundColor: "#ffffff",
-              borderTopColor: "rgba(226, 232, 240, 0.8)",
-              borderTopWidth: 1,
-              borderTopLeftRadius: 22,
-              borderTopRightRadius: 22,
-              height: tabHeight,
-              paddingBottom: bottomPadding,
-              paddingTop: 6,
-              elevation: 12,
-              shadowColor: "#0f172a",
-              shadowOffset: { width: 0, height: -4 },
-              shadowOpacity: 0.07,
-              shadowRadius: 12,
-            },
+            backgroundColor: "#ffffff",
+            borderTopColor: "rgba(226, 232, 240, 0.8)",
+            borderTopWidth: 1,
+            borderTopLeftRadius: 22,
+            borderTopRightRadius: 22,
+            height: tabHeight,
+            paddingBottom: bottomPadding,
+            paddingTop: 6,
+            elevation: 12,
+            shadowColor: "#0f172a",
+            shadowOffset: { width: 0, height: -4 },
+            shadowOpacity: 0.07,
+            shadowRadius: 12,
+          },
         tabBarLabelStyle: {
           fontSize: 10.5,
           fontWeight: "700",
@@ -289,6 +289,7 @@ export default function TabLayout() {
       <Tabs.Screen name="modules" options={{ title: "Chức năng", href: null }} />
       <Tabs.Screen name="customers" options={{ title: "Khách hàng", href: null }} />
       <Tabs.Screen name="inventory" options={{ title: "Vật tư & Dược phẩm", href: null }} />
+      <Tabs.Screen name="roles" options={{ title: "Phân quyền & Vai trò", href: null }} />
       <Tabs.Screen name="users" options={{ title: "Quản lý người dùng", href: null }} />
       <Tabs.Screen name="attendance" options={{ title: "Chấm công", href: null }} />
       <Tabs.Screen name="leave" options={{ title: "Đơn từ", href: null }} />
@@ -311,11 +312,13 @@ export default function TabLayout() {
       <Tabs.Screen name="attendance-history" options={{ title: "Lịch sử chấm công", href: null }} />
       <Tabs.Screen name="kpi" options={{ title: "KPI tháng", href: null }} />
       <Tabs.Screen name="org-chart" options={{ title: "Sơ đồ tổ chức", href: null }} />
-      <Tabs.Screen name="blog" options={{ title: "Blog nội bộ & Thảo luận", href: isEditor ? undefined : null,
-        tabBarBadge: blogUnread > 0 ? (blogUnread > 99 ? "99+" : blogUnread) : undefined }} />
+      <Tabs.Screen name="blog" options={{
+        title: "Blog & Thảo luận", href: isEditor ? undefined : null,
+        tabBarBadge: blogUnread > 0 ? (blogUnread > 99 ? "99+" : blogUnread) : undefined
+      }} />
       <Tabs.Screen name="training" options={{ title: "Đào tạo", href: null }} />
       <Tabs.Screen name="celebration-email" options={{ title: "Email chúc mừng", href: null }} />
-      <Tabs.Screen name="knowledge" options={{ title: "Kho tri thức & SOP", href: null }} />
+      <Tabs.Screen name="knowledge" options={{ title: "Kho tri thức", href: null }} />
     </Tabs>
   );
 }

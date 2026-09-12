@@ -20,7 +20,13 @@ export function availableModules(user: UserProfile | null) {
 
   return [
     {
-      title: "Kho tri thức & SOP",
+      title: "Phân quyền & Vai trò",
+      description: "Quản lý vai trò, cấp bậc và quyền truy cập",
+      href: "/(tabs)/roles" as const,
+      visible: user?.role === "admin" || user?.role === "superadmin",
+    },
+    {
+      title: "Kho tri thức",
       description: "Phác đồ điều trị, quy chuẩn chuyên môn và chính sách y tế",
       href: "/(tabs)/knowledge" as const,
       visible: canReadKnowledge,
@@ -146,7 +152,7 @@ export function availableModules(user: UserProfile | null) {
       visible: !!user,
     },
     {
-      title: "Bản tin & Blog nội bộ",
+      title: "Bản tin",
       description: "Bản tin công ty, chia sẻ kiến thức & thảo luận",
       href: "/(tabs)/blog" as const,
       visible: !!user,

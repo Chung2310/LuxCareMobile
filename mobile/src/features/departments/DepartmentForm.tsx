@@ -1,7 +1,7 @@
+import { useAppAlert } from "../../components/AppAlert";
 import React, { useState } from "react";
 import {
   ActivityIndicator,
-  Alert,
   KeyboardAvoidingView,
   Modal,
   Platform,
@@ -58,6 +58,7 @@ export function DepartmentForm({
   onDelete?: (id: string) => void;
   canManage: boolean;
 }) {
+  const { showAlert, alertView } = useAppAlert();
   const isNew = editing === "new";
   const [code, setCode] = useState(isNew ? "" : editing.code);
   const [name, setName] = useState(isNew ? "" : editing.name);
@@ -127,7 +128,7 @@ export function DepartmentForm({
 
   const handleDeleteConfirm = () => {
     if (isNew || !onDelete) return;
-    Alert.alert(
+    showAlert(
       "Xác nhận xóa phòng ban?",
       `Bạn có chắc chắn muốn xóa phòng ban "${editing.name}"? Các nhân sự đang thuộc phòng ban này sẽ cần được phân bổ lại.`,
       [
@@ -533,6 +534,7 @@ export function DepartmentForm({
           </ScrollView>
         </SafeAreaView>
       </Modal>
+      {alertView}
     </SafeAreaView>
   );
 }

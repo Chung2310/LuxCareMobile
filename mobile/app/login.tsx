@@ -16,17 +16,18 @@ import { StatusBar } from "expo-status-bar";
 import { SafeAreaView } from "react-native-safe-area-context";
 import { Redirect } from "expo-router";
 import { messageOf, useSession } from "../src/auth/SessionProvider";
-import { ErrorText, colors } from "../src/ui";
+import { colors } from "../src/ui";
+import { useAppAlert } from "../src/components/AppAlert";
 
 export default function Login() {
   const session = useSession();
+  const { showAlert, alertView } = useAppAlert();
   const { width } = useWindowDimensions();
   const scrollViewRef = useRef<ScrollView>(null);
   const [email, setEmail] = useState("");
   const [password, setPassword] = useState("");
   const [showPassword, setShowPassword] = useState(false);
   const [busy, setBusy] = useState(false);
-  const [error, setError] = useState<string | null>(null);
   const [keyboardSpace, setKeyboardSpace] = useState(0);
 
   useEffect(() => {
@@ -60,12 +61,12 @@ export default function Login() {
   const submit = async () => {
     if (busy || !email.trim() || !password) return;
     setBusy(true);
-    setError(null);
+    Keyboard.dismiss();
     try {
       await session.login(email, password);
       setPassword("");
     } catch (error) {
-      setError(messageOf(error));
+      showAlert("Đăng nhập thất bại", messageOf(error), undefined, "error");
     } finally {
       setBusy(false);
     }
@@ -172,8 +173,6 @@ export default function Login() {
                 </View>
               </View>
 
-              <ErrorText message={error} />
-
               {/* Submit button with matching rounded corners */}
               <Pressable
                 accessibilityRole="button"
@@ -194,6 +193,7 @@ export default function Login() {
           </ScrollView>
         </KeyboardAvoidingView>
       </SafeAreaView>
+      {alertView}
     </View>
   );
 }

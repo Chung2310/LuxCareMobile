@@ -1,6 +1,8 @@
+import { useRoleOptions } from "../../features/roles/useRoleOptions";
+import { roleTitle } from "../../features/roles/model";
+import { useAppAlert } from "../AppAlert";
 import React, { useEffect, useMemo, useState } from "react";
 import {
-  Alert,
   KeyboardAvoidingView,
   Modal,
   Platform,
@@ -40,11 +42,30 @@ interface UserCreateModalProps {
   managers?: ManagerOption[];
 }
 
-const ROLES_LIST: Array<{ id: UserRole; label: string; desc: string }> = [
-  { id: "user", label: "Nhân viên", desc: "Nhân viên tác nghiệp chuyên môn / điều dưỡng / CSKH" },
-  { id: "manager", label: "Quản lý", desc: "Trưởng khoa / Trưởng bộ phận phụ trách công việc" },
-  { id: "branch_owner", label: "Chủ chi nhánh", desc: "Giám đốc / Phụ trách toàn diện cơ sở chi nhánh" },
-];
+
+const normalizePhone = (phone?: string | null): string => {
+  if (!phone) return "";
+  const str = String(phone).trim();
+  const lower = str.toLowerCase();
+  if (
+    !str ||
+    lower === "chưa cập nhật" ||
+    lower === "chua cap nhat" ||
+    lower === "chưa có" ||
+    lower === "chua co" ||
+    lower === "không có" ||
+    lower === "khong co" ||
+    lower === "null" ||
+    lower === "undefined" ||
+    lower === "n/a" ||
+    lower === "none" ||
+    lower === "—" ||
+    lower === "-"
+  ) {
+    return "";
+  }
+  return str;
+};
 
 export const UserCreateModal: React.FC<UserCreateModalProps> = ({
   visible,
@@ -57,6 +78,10 @@ export const UserCreateModal: React.FC<UserCreateModalProps> = ({
   companyName,
   managers,
 }) => {
+  const { showAlert, alertView } = useAppAlert();
+  const roleOptions = useRoleOptions(visible, companyCode);
+  const availableRoles = roleOptions.assignable.filter(item => !["admin", "superadmin"].includes(item.role))
+    .map(item => ({ id: item.role, label: roleTitle(item), desc: "Cấp bậc " + item.level }));
   const [displayName, setDisplayName] = useState("");
   const [email, setEmail] = useState("");
   const [password, setPassword] = useState("");
@@ -146,31 +171,37 @@ export const UserCreateModal: React.FC<UserCreateModalProps> = ({
     const trimmedPassword = password.trim();
 
     if (!trimmedName || trimmedName.length < 2) {
-      Alert.alert("Thiếu thông tin", "Vui lòng nhập họ và tên thành viên (tối thiểu 2 ký tự).");
+      showAlert("Thiếu thông tin", "Vui lòng nhập họ và tên thành viên (tối thiểu 2 ký tự).", undefined, "error");
       return;
     }
 
     if (!trimmedEmail) {
-      Alert.alert("Thiếu thông tin", "Vui lòng nhập địa chỉ email đăng nhập.");
+      showAlert("Thiếu thông tin", "Vui lòng nhập địa chỉ email đăng nhập.", undefined, "error");
       return;
     }
 
     const emailRegex = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
     if (!emailRegex.test(trimmedEmail)) {
-      Alert.alert("Email không hợp lệ", "Vui lòng nhập đúng định dạng email (ví dụ: user@luxcare.vn).");
+      showAlert("Email không hợp lệ", "Vui lòng nhập đúng định dạng email (ví dụ: user@luxcare.vn).", undefined, "error");
       return;
     }
 
     if (!trimmedPassword || trimmedPassword.length < 6) {
-      Alert.alert("Mật khẩu yếu", "Mật khẩu khởi tạo phải có ít nhất 6 ký tự.");
+      showAlert("Mật khẩu yếu", "Mật khẩu khởi tạo phải có ít nhất 6 ký tự.", undefined, "error");
       return;
     }
 
-    const trimmedPhone = phone.trim().replace(/[\s.-]/g, "");
-    if (trimmedPhone) {
-      const phoneRegex = /^(0|\+84)[0-9]{8,11}$/;
-      if (!phoneRegex.test(trimmedPhone)) {
-        Alert.alert("Số điện thoại không hợp lệ", "Số điện thoại không đúng định dạng (Ví dụ: 0912345678).");
+    const rawPhone = normalizePhone(phone);
+    const cleanedPhone = rawPhone.replace(/[\s.\-()]/g, "");
+    if (cleanedPhone) {
+      const phoneRegex = /^(\+84|84|0)[0-9]{8,11}$/;
+      if (!phoneRegex.test(cleanedPhone)) {
+        showAlert(
+          "Số điện thoại không hợp lệ",
+          "Số điện thoại không đúng định dạng (Ví dụ: 0912345678 hoặc +84912345678).",
+          undefined,
+          "error",
+        );
         return;
       }
     }
@@ -179,16 +210,16 @@ export const UserCreateModal: React.FC<UserCreateModalProps> = ({
     if (trimmedBirthDate) {
       const dateRegex = /^\d{4}-\d{2}-\d{2}$/;
       if (!dateRegex.test(trimmedBirthDate)) {
-        Alert.alert(
+        showAlert(
           "Ngày sinh không hợp lệ",
-          "Vui lòng nhập ngày sinh theo định dạng YYYY-MM-DD (Ví dụ: 1995-08-20)."
+          "Vui lòng nhập ngày sinh theo định dạng YYYY-MM-DD (Ví dụ: 1995-08-20).", undefined, "error"
         );
         return;
       }
     }
 
     if (role === "admin" || (role as string) === "superadmin") {
-      Alert.alert("Không được phép", "Không được phép tạo nhân sự mới với vai trò Quản trị viên (Admin).");
+      showAlert("Không được phép", "Không được phép tạo nhân sự mới với vai trò Quản trị viên (Admin).", undefined, "error");
       return;
     }
 
@@ -202,7 +233,7 @@ export const UserCreateModal: React.FC<UserCreateModalProps> = ({
         email: trimmedEmail,
         password: trimmedPassword,
         role,
-        phone: trimmedPhone || undefined,
+        phone: cleanedPhone || undefined,
         branchId: branchId || undefined,
         department: department || undefined,
         birthDate: trimmedBirthDate || undefined,
@@ -215,13 +246,13 @@ export const UserCreateModal: React.FC<UserCreateModalProps> = ({
       resetForm();
       onClose();
     } catch (err: any) {
-      Alert.alert("Lỗi", err.message || "Không thể tạo tài khoản người dùng.");
+      showAlert("Lỗi", err.message || "Không thể tạo tài khoản người dùng.", undefined, "error");
     } finally {
       setLoading(false);
     }
   };
 
-  const selectedRoleConfig = ROLE_MAP[role] || ROLE_MAP.user;
+  const selectedRoleConfig = { ...(ROLE_MAP[role] || ROLE_MAP.user), label: availableRoles.find(item => item.id === role)?.label || ROLE_MAP[role]?.label || role };
   const selectedBranchName =
     branches.find((b) => b._id === branchId)?.name || "Toàn viện / Chưa gán";
 
@@ -456,8 +487,9 @@ export const UserCreateModal: React.FC<UserCreateModalProps> = ({
             <View style={styles.pickerCard}>
               <Text style={styles.pickerTitle}>Phân quyền vai trò</Text>
               <ScrollView style={{ maxHeight: 320 }}>
-                {ROLES_LIST.map((r) => {
-                  const cfg = ROLE_MAP[r.id];
+                {!!roleOptions.error && <Text style={{ color: "#b91c1c", padding: 16 }}>{roleOptions.error}</Text>}
+                {availableRoles.map((r) => {
+                  const cfg = ROLE_MAP[r.id] || ROLE_MAP.user;
                   const isSelected = role === r.id;
                   return (
                     <TouchableOpacity
@@ -701,6 +733,7 @@ export const UserCreateModal: React.FC<UserCreateModalProps> = ({
             </View>
           </TouchableOpacity>
         </Modal>
+        {alertView}
       </SafeAreaView>
     </Modal>
   );

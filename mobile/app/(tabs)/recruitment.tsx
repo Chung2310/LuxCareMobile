@@ -1,6 +1,6 @@
+import { useAppAlert } from "../../src/components/AppAlert";
 import { useCallback, useMemo, useRef, useState } from "react";
 import {
-  Alert,
   Modal,
   Pressable,
   RefreshControl,
@@ -31,6 +31,7 @@ const WORKPLACE_LABELS: Record<string, string> = {
 };
 
 export default function Recruitment() {
+  const { showAlert, alertView } = useAppAlert();
   const { user, selectedBranch } = useSession();
   const isOwner = ["admin", "superadmin", "branch_owner"].includes(user?.role || "");
   const access = recruitmentAccess(user);
@@ -223,7 +224,7 @@ export default function Recruitment() {
   };
 
   const confirm = (job: RecruitmentJob, action: string, title: string) => {
-    Alert.alert(title, `Mã: ${job.code} · ${job.title}`, [
+    showAlert(title, `Mã: ${job.code} · ${job.title}`, [
       { text: "Hủy", style: "cancel" },
       {
         text: "Xác nhận",
@@ -308,6 +309,7 @@ export default function Recruitment() {
             Tài khoản của bạn cần thuộc doanh nghiệp và có quyền đọc phân hệ HR / Tuyển dụng.
           </Text>
         </View>
+        {alertView}
       </Page>
     );
   }
@@ -324,6 +326,7 @@ export default function Recruitment() {
               : "Hồ sơ của bạn chưa được liên kết với chi nhánh làm việc."}
           </Text>
         </View>
+        {alertView}
       </Page>
     );
   }
@@ -957,6 +960,7 @@ export default function Recruitment() {
           )}
         </SafeAreaView>
       </Modal>
+      {alertView}
     </>
   );
 }

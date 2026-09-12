@@ -1,7 +1,7 @@
+import { useAppAlert } from "../../components/AppAlert";
 import React, { useEffect, useRef, useState } from "react";
 import {
   ActivityIndicator,
-  Alert,
   Pressable,
   ScrollView,
   StyleSheet,
@@ -20,6 +20,7 @@ export function LegacyForm({
   onClose: () => void;
   setLocked: (value: boolean) => void;
 }) {
+  const { showAlert, alertView } = useAppAlert();
   const [items, setItems] = useState<{ name: string; count: number }[]>([]);
   const [targets, setTargets] = useState<DepartmentRecord[]>([]);
   const [selected, setSelected] = useState<string[]>([]);
@@ -94,7 +95,7 @@ export function LegacyForm({
 
   const handleConfirmMerge = () => {
     const targetDept = targets.find((t) => t._id === target);
-    Alert.alert(
+    showAlert(
       "Xác nhận chuẩn hóa?",
       `Chuyển toàn bộ hồ sơ nhân sự có tên phòng ban cũ:\n${selected.join(", ")}\n\nSang phòng ban chuẩn: "${targetDept?.name}" (${targetDept?.code}). Thao tác này không thể hoàn tác.`,
       [
@@ -282,6 +283,7 @@ export function LegacyForm({
           </>
         )}
       </ScrollView>
+      {alertView}
     </SafeAreaView>
   );
 }

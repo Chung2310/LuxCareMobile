@@ -1,3 +1,4 @@
+import { isAdministrativeRole } from "../../../src/utils/userRolePolicy";
 import { api } from "./services";
 import type { UserProfile } from "../../../src/types/common";
 
@@ -6,7 +7,8 @@ export type UserRole =
   | "branch_owner"
   | "manager"
   | "user"
-  | "superadmin";
+  | "superadmin"
+  | (string & {});
 
 export interface UserStats {
   total: number;
@@ -55,6 +57,30 @@ export interface UserListParams {
   search?: string;
 }
 
+export const normalizePhone = (phone?: string | null): string => {
+  if (!phone) return "";
+  const str = String(phone).trim();
+  const lower = str.toLowerCase();
+  if (
+    !str ||
+    lower === "chưa cập nhật" ||
+    lower === "chua cap nhat" ||
+    lower === "chưa có" ||
+    lower === "chua co" ||
+    lower === "không có" ||
+    lower === "khong co" ||
+    lower === "null" ||
+    lower === "undefined" ||
+    lower === "n/a" ||
+    lower === "none" ||
+    lower === "—" ||
+    lower === "-"
+  ) {
+    return "";
+  }
+  return str;
+};
+
 export const userManagementApi = {
   // 1. Lấy danh sách thành viên
   async getUsers(params?: UserListParams): Promise<UserProfile[]> {
@@ -75,6 +101,7 @@ export const userManagementApi = {
     const normalized: UserProfile[] = rawList.map((item) => ({
       ...item,
       uid: item._id || item.uid,
+      phone: normalizePhone(item.phone),
     }));
 
     return normalized;
@@ -116,10 +143,22 @@ export const userManagementApi = {
 
   // 3. Cập nhật thông tin thành viên
   async updateUser(id: string, input: UpdateUserInput): Promise<{ success: boolean; message?: string }> {
+    if (isAdministrativeRole(input.role)) {
+      throw new Error("Không được phép nâng quyền lên Quản trị viên.");
+    }
+    const payload = { ...input };
+    if (payload.birthDate) {
+      const val = String(payload.birthDate).trim();
+      payload.birthDate = val.includes("T") ? val.split("T")[0] : val.slice(0, 10);
+    }
+    if (payload.phone !== undefined) {
+      const p = normalizePhone(payload.phone).replace(/[\s.\-()]/g, "");
+      payload.phone = p || undefined;
+    }
     const res = await api.transport.fetch(`/api/v1/auth/users/${encodeURIComponent(id)}`, {
       method: "PATCH",
       headers: { "Content-Type": "application/json" },
-      body: JSON.stringify(input),
+      body: JSON.stringify(payload),
     });
     const json = await res.json();
     if (!res.ok) throw new Error(json.message || "Không thể cập nhật thông tin người dùng.");

@@ -1,6 +1,6 @@
+import { useAppAlert } from "../../src/components/AppAlert";
 import React, { useCallback, useEffect, useMemo, useState } from "react";
 import {
-  Alert,
   FlatList,
   RefreshControl,
   ScrollView,
@@ -52,6 +52,7 @@ const ROOM_TYPE_FILTER_OPTIONS: Array<{ id: string; label: string }> = [
 ];
 
 export default function DepartmentsScreen() {
+  const { showAlert, alertView } = useAppAlert();
   const { user, selectedBranch } = useSession();
   const params = useLocalSearchParams<{ from?: string }>();
   const { navigateWithLoading } = useAppLoading();
@@ -133,12 +134,12 @@ export default function DepartmentsScreen() {
       const data = await deptService.list();
       setDeptList(data || []);
     } catch (err: any) {
-      Alert.alert("Lỗi tải phòng ban", err.message || "Không thể tải danh sách phòng ban.");
+      showAlert("Lỗi tải phòng ban", err.message || "Không thể tải danh sách phòng ban.", undefined, "error");
     } finally {
       setDeptLoading(false);
       setRefreshing(false);
     }
-  }, []);
+  }, [showAlert]);
 
   // 3. Tải danh sách Phòng chức năng
   const loadRooms = useCallback(
@@ -150,13 +151,13 @@ export default function DepartmentsScreen() {
         });
         setRoomList(data || []);
       } catch (err: any) {
-        Alert.alert("Lỗi tải phòng chức năng", err.message || "Không thể tải danh sách phòng.");
+        showAlert("Lỗi tải phòng chức năng", err.message || "Không thể tải danh sách phòng.", undefined, "error");
       } finally {
         setRoomLoading(false);
         setRefreshing(false);
       }
     },
-    [selectedBranchId],
+    [selectedBranchId, showAlert],
   );
 
   // Focus effect: nạp dữ liệu ban đầu
@@ -675,6 +676,7 @@ export default function DepartmentsScreen() {
         onSave={handleSaveRoom}
         onDelete={handleDeleteRoom}
       />
+      {alertView}
     </SafeAreaView>
   );
 }

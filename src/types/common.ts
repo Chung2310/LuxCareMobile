@@ -26,7 +26,7 @@ export interface UserProfile {
   email: string;
   displayName: string;
   photoURL?: string;
-  role: "user" | "manager" | "branch_owner" | "admin" | "superadmin" | "blog_editor" | "blog_author";
+  role: "user" | "manager" | "branch_owner" | "admin" | "superadmin" | "blog_editor" | "blog_author" | (string & {});
   permissions?: string[];
   createdAt: any;
   birthDate?: string;
