@@ -12,8 +12,8 @@ import {
   TextInput,
   View,
 } from "react-native";
-import { SafeAreaView, useSafeAreaInsets } from "react-native-safe-area-context";
-import { router, useFocusEffect, useNavigation } from "expo-router";
+import { SafeAreaView } from "react-native-safe-area-context";
+import { router, useFocusEffect } from "expo-router";
 import type { UserProfile } from "../../../src/types/common";
 import type { BranchRecord } from "../../../src/services/branchService";
 import type { DepartmentRecord } from "../../../src/services/departmentService";
@@ -35,9 +35,7 @@ import {
   Folder,
   FolderTree,
   Mail,
-  Maximize,
   MessageSquare,
-  Minimize,
   Pencil,
   Phone,
   RefreshCw,
@@ -1299,8 +1297,6 @@ function OrgListView({
    ========================================================================== */
 export default function OrgChart() {
   const { showAlert, alertView } = useAppAlert();
-  const insets = useSafeAreaInsets();
-  const navigation = useNavigation();
   const { user, selectedBranch } = useSession();
   const branchId = selectedBranch?._id || user?.branchId || undefined;
   const [empList, setEmpList] = useState<UserProfile[]>([]);
@@ -1314,28 +1310,7 @@ export default function OrgChart() {
   const [movingEmp, setMovingEmp] = useState<UserProfile | null>(null);
   const [viewMode, setViewMode] = useState<"tree" | "list">("tree");
   const [zoomScale, setZoomScale] = useState<number>(1.0);
-  const [isFullscreen, setIsFullscreen] = useState(false);
   const [createModalVisible, setCreateModalVisible] = useState(false);
-
-  // Ẩn / hiện tab bar dưới đáy khi vào chế độ toàn màn hình
-  React.useEffect(() => {
-    try {
-      const parent = navigation.getParent();
-      if (parent) {
-        parent.setOptions({
-          tabBarStyle: isFullscreen ? { display: "none" } : undefined,
-        });
-      }
-    } catch {}
-    return () => {
-      try {
-        const parent = navigation.getParent();
-        if (parent) {
-          parent.setOptions({ tabBarStyle: undefined });
-        }
-      } catch {}
-    };
-  }, [isFullscreen, navigation]);
   const [deptList, setDeptList] = useState<DepartmentRecord[]>([]);
   const [branchList, setBranchList] = useState<BranchRecord[]>([]);
   const canManage =
@@ -1633,11 +1608,11 @@ export default function OrgChart() {
   }
 
   return (
-    <SafeAreaView edges={isFullscreen ? [] : ["top"]} style={s.root}>
-      {!isFullscreen && <Header />}
+    <SafeAreaView edges={["top"]} style={s.root}>
+      <Header />
 
       {/* Drag & Drop Sticky Banner */}
-      {!isFullscreen && movingEmp && (
+      {movingEmp && (
         <View style={s.dragBanner}>
           <View style={s.dragBannerRow}>
             <View style={{ flex: 1 }}>
@@ -1666,60 +1641,51 @@ export default function OrgChart() {
       )}
 
       {/* Control Toolbar: Search + Quick Expand/Collapse + Zoom */}
-      {!isFullscreen && (
-        <View style={s.toolbar}>
-          <View style={s.searchBox}>
-            <Search size={14} color="#94a3b8" style={{ marginRight: 6 }} />
-            <TextInput
-              style={s.searchInput}
-              placeholder="Tìm tên, chức danh, phòng ban…"
-              placeholderTextColor="#94a3b8"
-              value={search}
-              onChangeText={setSearch}
-            />
-            {!!search && (
-              <Pressable onPress={() => setSearch("")} hitSlop={6}>
-                <X size={14} color="#94a3b8" style={{ marginHorizontal: 4 }} />
-              </Pressable>
-            )}
-          </View>
-
-          {viewMode === "tree" && (
-            <View style={s.treeToolRow}>
-              <View style={s.expandGroup}>
-                <Pressable style={s.toolBtn} onPress={expandAll}>
-                  <Text style={s.toolBtnTxt}>Mở hết</Text>
-                </Pressable>
-                <Pressable style={s.toolBtn} onPress={collapseAll}>
-                  <Text style={s.toolBtnTxt}>Thu gọn</Text>
-                </Pressable>
-              </View>
-
-              <View style={s.zoomGroup}>
-                <Pressable style={s.zoomBtn} onPress={zoomOut}>
-                  <Text style={s.zoomBtnTxt}>−</Text>
-                </Pressable>
-                <Pressable style={s.zoomLabelBtn} onPress={zoomReset}>
-                  <Text style={s.zoomLabelTxt}>{Math.round(zoomScale * 100)}%</Text>
-                </Pressable>
-                <Pressable style={s.zoomBtn} onPress={zoomIn}>
-                  <Text style={s.zoomBtnTxt}>+</Text>
-                </Pressable>
-                <Pressable style={s.floatingFitBtn} onPress={zoomFit}>
-                  <Text style={s.floatingFitBtnTxt}>Fit</Text>
-                </Pressable>
-                <Pressable
-                  style={s.zoomFullscreenBtn}
-                  onPress={() => setIsFullscreen(true)}
-                  accessibilityLabel="Toàn màn hình"
-                >
-                  <Maximize size={13} color="#4f46e5" />
-                </Pressable>
-              </View>
-            </View>
+      <View style={s.toolbar}>
+        <View style={s.searchBox}>
+          <Search size={14} color="#94a3b8" style={{ marginRight: 6 }} />
+          <TextInput
+            style={s.searchInput}
+            placeholder="Tìm tên, chức danh, phòng ban…"
+            placeholderTextColor="#94a3b8"
+            value={search}
+            onChangeText={setSearch}
+          />
+          {!!search && (
+            <Pressable onPress={() => setSearch("")} hitSlop={6}>
+              <X size={14} color="#94a3b8" style={{ marginHorizontal: 4 }} />
+            </Pressable>
           )}
         </View>
-      )}
+
+        {viewMode === "tree" && (
+          <View style={s.treeToolRow}>
+            <View style={s.expandGroup}>
+              <Pressable style={s.toolBtn} onPress={expandAll}>
+                <Text style={s.toolBtnTxt}>Mở hết</Text>
+              </Pressable>
+              <Pressable style={s.toolBtn} onPress={collapseAll}>
+                <Text style={s.toolBtnTxt}>Thu gọn</Text>
+              </Pressable>
+            </View>
+
+            <View style={s.zoomGroup}>
+              <Pressable style={s.zoomBtn} onPress={zoomOut}>
+                <Text style={s.zoomBtnTxt}>−</Text>
+              </Pressable>
+              <Pressable style={s.zoomLabelBtn} onPress={zoomReset}>
+                <Text style={s.zoomLabelTxt}>{Math.round(zoomScale * 100)}%</Text>
+              </Pressable>
+              <Pressable style={s.zoomBtn} onPress={zoomIn}>
+                <Text style={s.zoomBtnTxt}>+</Text>
+              </Pressable>
+              <Pressable style={s.floatingFitBtn} onPress={zoomFit}>
+                <Text style={s.floatingFitBtnTxt}>Fit</Text>
+              </Pressable>
+            </View>
+          </View>
+        )}
+      </View>
 
       {/* Main Content Area */}
       {viewMode === "list" ? (
@@ -1782,41 +1748,21 @@ export default function OrgChart() {
             </ScrollView>
           </ScrollView>
 
-          {/* Floating Zoom Action Controls (FAB) - chỉ hiện khi ở chế độ xem thông thường */}
-          {!isFullscreen && (
-            <View style={s.floatingZoomBar}>
-              <Pressable style={s.floatingZoomBtn} onPress={zoomIn}>
-                <Text style={s.floatingZoomBtnTxt}>+</Text>
-              </Pressable>
-              <Pressable style={s.floatingZoomLabelBtn} onPress={zoomReset}>
-                <Text style={s.floatingZoomLabelTxt}>{Math.round(zoomScale * 100)}%</Text>
-              </Pressable>
-              <Pressable style={s.floatingZoomBtn} onPress={zoomOut}>
-                <Text style={s.floatingZoomBtnTxt}>−</Text>
-              </Pressable>
-              <Pressable style={s.floatingFitBtn} onPress={zoomFit}>
-                <Text style={s.floatingFitBtnTxt}>Fit</Text>
-              </Pressable>
-              <Pressable style={s.floatingFullscreenBtn} onPress={() => setIsFullscreen(true)}>
-                <Maximize size={15} color="#4f46e5" />
-              </Pressable>
-            </View>
-          )}
-
-          {/* Chế độ Toàn màn hình: CHỈ HIỂN THỊ DUY NHẤT 1 NÚT ĐỂ TẮT CHẾ ĐỘ */}
-          {isFullscreen && (
-            <Pressable
-              style={[
-                s.exitFullscreenBtn,
-                { top: Math.max((insets?.top || 0) + 12, 24) },
-              ]}
-              onPress={() => setIsFullscreen(false)}
-              hitSlop={{ top: 12, bottom: 12, left: 12, right: 12 }}
-            >
-              <Minimize size={16} color="#ffffff" />
-              <Text style={s.exitFullscreenBtnTxt}>Thoát toàn màn hình</Text>
+          {/* Floating Zoom Action Controls (FAB) */}
+          <View style={s.floatingZoomBar}>
+            <Pressable style={s.floatingZoomBtn} onPress={zoomIn}>
+              <Text style={s.floatingZoomBtnTxt}>+</Text>
             </Pressable>
-          )}
+            <Pressable style={s.floatingZoomLabelBtn} onPress={zoomReset}>
+              <Text style={s.floatingZoomLabelTxt}>{Math.round(zoomScale * 100)}%</Text>
+            </Pressable>
+            <Pressable style={s.floatingZoomBtn} onPress={zoomOut}>
+              <Text style={s.floatingZoomBtnTxt}>−</Text>
+            </Pressable>
+            <Pressable style={s.floatingFitBtn} onPress={zoomFit}>
+              <Text style={s.floatingFitBtnTxt}>Fit</Text>
+            </Pressable>
+          </View>
         </View>
       )}
 
@@ -2039,45 +1985,6 @@ const s = StyleSheet.create({
     fontSize: 10,
     fontWeight: "800",
     color: "#4f46e5",
-  },
-  zoomFullscreenBtn: {
-    paddingHorizontal: 8,
-    paddingVertical: 4,
-    alignItems: "center",
-    justifyContent: "center",
-    borderLeftWidth: 1,
-    borderLeftColor: "#e2e8f0",
-  },
-  floatingFullscreenBtn: {
-    width: 38,
-    height: 34,
-    alignItems: "center",
-    justifyContent: "center",
-    backgroundColor: "#eef2ff",
-    borderTopWidth: 1,
-    borderColor: "#c7d2fe",
-  },
-  exitFullscreenBtn: {
-    position: "absolute",
-    right: 16,
-    flexDirection: "row",
-    alignItems: "center",
-    gap: 6,
-    backgroundColor: "rgba(15, 23, 42, 0.85)",
-    paddingVertical: 8,
-    paddingHorizontal: 14,
-    borderRadius: 24,
-    shadowColor: "#000000",
-    shadowOffset: { width: 0, height: 4 },
-    shadowOpacity: 0.3,
-    shadowRadius: 6,
-    elevation: 8,
-    zIndex: 999,
-  },
-  exitFullscreenBtnTxt: {
-    color: "#ffffff",
-    fontSize: 12,
-    fontWeight: "700",
   },
 
   /* Drag & Drop / Reassign Mode Banner */
