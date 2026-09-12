@@ -1,5 +1,6 @@
 import React from "react";
 import { StyleSheet, Text, View } from "react-native";
+import { useSafeAreaInsets } from "react-native-safe-area-context";
 import { AppButton } from "../common";
 
 export interface BatchStockFooterProps {
@@ -9,6 +10,7 @@ export interface BatchStockFooterProps {
   submitting: boolean;
   onClose: () => void;
   onSubmit: () => void;
+  keyboardVisible?: boolean;
 }
 
 export const BatchStockFooter: React.FC<BatchStockFooterProps> = ({
@@ -18,9 +20,13 @@ export const BatchStockFooter: React.FC<BatchStockFooterProps> = ({
   submitting,
   onClose,
   onSubmit,
+  keyboardVisible = false,
 }) => {
+  const insets = useSafeAreaInsets();
+  const bottomPadding = keyboardVisible ? 10 : Math.max(insets.bottom, 12);
+
   return (
-    <View style={styles.footer}>
+    <View style={[styles.footer, { paddingBottom: bottomPadding }]}>
       <View style={styles.footerSummary}>
         <Text style={styles.footerSummaryText}>
           Tổng cộng: <Text style={styles.footerSummaryBold}>{totalItemsCount} mặt hàng</Text>
@@ -59,7 +65,7 @@ const styles = StyleSheet.create({
     borderTopWidth: 1,
     borderTopColor: "#e2e8f0",
     paddingHorizontal: 16,
-    paddingVertical: 12,
+    paddingTop: 12,
     gap: 10,
   },
   footerSummary: {

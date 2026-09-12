@@ -1,7 +1,10 @@
-import React, { useEffect, useMemo, useState } from "react";
+import React, { useEffect, useMemo, useRef, useState } from "react";
 import {
   Alert,
+  Keyboard,
+  KeyboardAvoidingView,
   Modal,
+  Platform,
   ScrollView,
   StyleSheet,
   Text,
@@ -89,6 +92,76 @@ export const BatchStockModal: React.FC<BatchStockModalProps> = ({
 
   // Bộ lọc mặt hàng: "current" (theo NCC nếu nhập kho, hoặc theo Kho nếu xuất kho) | "all" (tất cả sản phẩm)
   const [supplyFilterMode, setSupplyFilterMode] = useState<"current" | "all">("current");
+
+  // Ref cuộn và vị trí các trường input để tự động đẩy lên khi bàn phím xuất hiện
+  const scrollViewRef = useRef<ScrollView>(null);
+  const sectionBoxY = useRef(350);
+  const lineOffsets = useRef<{ [tempId: string]: number }>({});
+  const activeFocusedField = useRef<{
+    tempId?: string;
+    field: string;
+  } | null>(null);
+
+  // Theo dõi trạng thái & chiều cao bàn phím để co giãn footer và cuộn hợp lý
+  const [keyboardVisible, setKeyboardVisible] = useState(false);
+  const [keyboardHeight, setKeyboardHeight] = useState(0);
+
+  const scrollToLineField = (
+    tempId: string,
+    field: "quantity" | "batchNumber" | "unitPrice"
+  ) => {
+    activeFocusedField.current = { tempId, field };
+    const baseY = sectionBoxY.current || 320;
+    const lineY = lineOffsets.current[tempId] ?? 0;
+    const extra = field === "unitPrice" ? 60 : 0;
+    const targetY = Math.max(0, baseY + lineY + extra - 40);
+
+    scrollViewRef.current?.scrollTo({ y: targetY, animated: true });
+
+    setTimeout(() => {
+      scrollViewRef.current?.scrollTo({ y: targetY, animated: true });
+    }, 150);
+  };
+
+  const handleFocusReason = () => {
+    activeFocusedField.current = { field: "reason" };
+    scrollViewRef.current?.scrollTo({ y: 130, animated: true });
+    setTimeout(() => {
+      scrollViewRef.current?.scrollTo({ y: 130, animated: true });
+    }, 150);
+  };
+
+  useEffect(() => {
+    const showSub = Keyboard.addListener(
+      Platform.OS === "ios" ? "keyboardWillShow" : "keyboardDidShow",
+      (e) => {
+        setKeyboardVisible(true);
+        const kh = e?.endCoordinates?.height || 300;
+        setKeyboardHeight(kh);
+
+        if (activeFocusedField.current) {
+          const { tempId, field } = activeFocusedField.current;
+          if (tempId) {
+            scrollToLineField(tempId, field as any);
+          } else if (field === "reason") {
+            handleFocusReason();
+          }
+        }
+      }
+    );
+    const hideSub = Keyboard.addListener(
+      Platform.OS === "ios" ? "keyboardWillHide" : "keyboardDidHide",
+      () => {
+        setKeyboardVisible(false);
+        setKeyboardHeight(0);
+        activeFocusedField.current = null;
+      }
+    );
+    return () => {
+      showSub.remove();
+      hideSub.remove();
+    };
+  }, []);
 
   // Khởi tạo form khi modal mở
   useEffect(() => {
@@ -567,7 +640,10 @@ export const BatchStockModal: React.FC<BatchStockModalProps> = ({
   return (
     <Modal visible={visible} animationType="slide" transparent onRequestClose={onClose}>
       <View style={styles.overlay}>
-        <View style={styles.container}>
+        <KeyboardAvoidingView
+          behavior={Platform.OS === "ios" ? "padding" : undefined}
+          style={styles.container}
+        >
           {/* Header */}
           <View style={styles.header}>
             <View style={styles.headerLeft}>
@@ -636,10 +712,17 @@ export const BatchStockModal: React.FC<BatchStockModalProps> = ({
 
           {/* Form Content */}
           <ScrollView
+            ref={scrollViewRef}
             style={styles.body}
-            contentContainerStyle={styles.bodyContent}
+            contentContainerStyle={[
+              styles.bodyContent,
+              keyboardVisible && {
+                paddingBottom: keyboardHeight > 0 ? keyboardHeight + 80 : 340,
+              },
+            ]}
             showsVerticalScrollIndicator={false}
             keyboardShouldPersistTaps="handled"
+            keyboardDismissMode="on-drag"
           >
             {/* Thông báo lỗi nếu có */}
             {errorMsg ? (
@@ -725,12 +808,18 @@ export const BatchStockModal: React.FC<BatchStockModalProps> = ({
                   placeholderTextColor="#94a3b8"
                   value={reason}
                   onChangeText={setReason}
+                  onFocus={handleFocusReason}
                 />
               </View>
             </View>
 
             {/* DANH SÁCH MẶT HÀNG (Line items) */}
-            <View style={styles.sectionBox}>
+            <View
+              style={styles.sectionBox}
+              onLayout={(e) => {
+                sectionBoxY.current = e.nativeEvent.layout.y;
+              }}
+            >
               <View style={styles.sectionHeaderRow}>
                 <View style={{ flex: 1, marginRight: 10 }}>
                   <Text style={styles.sectionTitle}>
@@ -779,20 +868,27 @@ export const BatchStockModal: React.FC<BatchStockModalProps> = ({
               ) : (
                 <View style={styles.linesList}>
                   {lines.map((line, idx) => (
-                    <BatchStockLineCard
+                    <View
                       key={line.tempId}
-                      line={line}
-                      index={idx}
-                      isIn={isIn}
-                      selectedSupplier={selectedSupplier}
-                      selectedWarehouse={selectedWarehouse}
-                      warehouses={warehouses}
-                      onRemove={handleRemoveLine}
-                      onUpdateQuantity={handleUpdateQuantity}
-                      onUpdateBatchNumber={handleUpdateBatchNumber}
-                      onUpdateUnitPrice={handleUpdateUnitPrice}
-                      onOpenExpiryPicker={setActiveExpiryLineId}
-                    />
+                      onLayout={(e) => {
+                        lineOffsets.current[line.tempId] = e.nativeEvent.layout.y;
+                      }}
+                    >
+                      <BatchStockLineCard
+                        line={line}
+                        index={idx}
+                        isIn={isIn}
+                        selectedSupplier={selectedSupplier}
+                        selectedWarehouse={selectedWarehouse}
+                        warehouses={warehouses}
+                        onRemove={handleRemoveLine}
+                        onUpdateQuantity={handleUpdateQuantity}
+                        onUpdateBatchNumber={handleUpdateBatchNumber}
+                        onUpdateUnitPrice={handleUpdateUnitPrice}
+                        onOpenExpiryPicker={setActiveExpiryLineId}
+                        onFocusInput={scrollToLineField}
+                      />
+                    </View>
                   ))}
                 </View>
               )}
@@ -807,8 +903,9 @@ export const BatchStockModal: React.FC<BatchStockModalProps> = ({
             submitting={submitting}
             onClose={onClose}
             onSubmit={handleSubmit}
+            keyboardVisible={keyboardVisible}
           />
-        </View>
+        </KeyboardAvoidingView>
       </View>
 
       {/* TÁI SỬ DỤNG: InventorySelectModal cho Nhà cung cấp */}
@@ -965,6 +1062,7 @@ const styles = StyleSheet.create({
     borderTopRightRadius: 24,
     maxHeight: "92%",
     flex: 1,
+    overflow: "hidden",
   },
   header: {
     flexDirection: "row",
@@ -1047,6 +1145,7 @@ const styles = StyleSheet.create({
   bodyContent: {
     padding: 16,
     gap: 14,
+    paddingBottom: 28,
   },
   errorBox: {
     flexDirection: "row",
@@ -1094,8 +1193,9 @@ const styles = StyleSheet.create({
     height: 44,
     borderWidth: 1,
     borderColor: "#cbd5e1",
-    borderRadius: 10,
+    borderRadius: 12,
     paddingHorizontal: 12,
+    paddingVertical: 0,
     fontSize: 13,
     color: "#0f172a",
     backgroundColor: "#f8fafc",

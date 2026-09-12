@@ -21,6 +21,8 @@ import {
   CustomerDetailModal,
   CustomerQrModal,
   CustomerStatCards,
+  CustomerAlertModal,
+  type CustomerAlertType,
   SOURCE_LABELS,
   STATUS_MAP,
 } from "../../src/components/customers";
@@ -89,6 +91,31 @@ export default function CustomersScreen() {
   const [showBranchPicker, setShowBranchPicker] = useState(false);
   const [showSourcePicker, setShowSourcePicker] = useState(false);
 
+  // Rounded Alert Modal state
+  const [alertConfig, setAlertConfig] = useState<{
+    visible: boolean;
+    type?: CustomerAlertType;
+    title: string;
+    message: string;
+    confirmText?: string;
+    cancelText?: string;
+    isDestructive?: boolean;
+    onConfirm?: () => void;
+    onCancel?: () => void;
+  }>({
+    visible: false,
+    title: "",
+    message: "",
+  });
+
+  const showAlert = (config: Omit<typeof alertConfig, "visible">) => {
+    setAlertConfig({ ...config, visible: true });
+  };
+
+  const closeAlert = () => {
+    setAlertConfig((prev) => ({ ...prev, visible: false }));
+  };
+
   // Load danh sách chi nhánh
   useEffect(() => {
     let active = true;
@@ -148,7 +175,13 @@ export default function CustomersScreen() {
         setLeads(loadedLeads);
         setStats(statRes);
       } catch (err: any) {
-        Alert.alert("Lỗi tải dữ liệu", err.message || "Không thể tải danh sách khách hàng.");
+        showAlert({
+          type: "error",
+          title: "Lỗi tải dữ liệu",
+          message: err.message || "Không thể tải danh sách khách hàng.",
+          confirmText: "Đóng",
+          onConfirm: closeAlert,
+        });
       } finally {
         setLoading(false);
         setRefreshing(false);
@@ -177,7 +210,13 @@ export default function CustomersScreen() {
   // Tạo mới khách hàng
   const handleCreateLead = async (data: CreateCustomerLeadInput) => {
     const created = await customerLeadApi.createLead(data);
-    Alert.alert("Thành công", `Đã tiếp nhận khách hàng "${created.fullName}".`);
+    showAlert({
+      type: "success",
+      title: "Tiếp nhận thành công",
+      message: `Đã tiếp nhận khách hàng "${created.fullName}" thành công.`,
+      confirmText: "Đồng ý",
+      onConfirm: closeAlert,
+    });
     await loadData(true);
   };
 
@@ -206,7 +245,13 @@ export default function CustomersScreen() {
   const handleDeleteLead = async (id: string) => {
     await customerLeadApi.deleteLead(id);
     setLeads((prev) => prev.filter((l) => l._id !== id));
-    Alert.alert("Đã xóa", "Thông tin khách hàng đã được đưa vào lưu trữ.");
+    showAlert({
+      type: "success",
+      title: "Xóa khách hàng thành công",
+      message: "Khách hàng đã được xóa khỏi hệ thống thành công.",
+      confirmText: "Đồng ý",
+      onConfirm: closeAlert,
+    });
     void (async () => {
       try {
         const effectiveBranch =
@@ -603,6 +648,19 @@ export default function CustomersScreen() {
           </View>
         </TouchableOpacity>
       </Modal>
+
+      {/* Popup thông báo bo góc */}
+      <CustomerAlertModal
+        visible={alertConfig.visible}
+        type={alertConfig.type}
+        title={alertConfig.title}
+        message={alertConfig.message}
+        confirmText={alertConfig.confirmText}
+        cancelText={alertConfig.cancelText}
+        isDestructive={alertConfig.isDestructive}
+        onConfirm={alertConfig.onConfirm || closeAlert}
+        onCancel={alertConfig.onCancel || closeAlert}
+      />
     </SafeAreaView>
   );
 }
@@ -819,13 +877,13 @@ const styles = StyleSheet.create({
   pickerCard: {
     width: "100%",
     backgroundColor: "#ffffff",
-    borderRadius: 16,
-    padding: 16,
+    borderRadius: 24,
+    padding: 20,
     shadowColor: "#000",
-    shadowOffset: { width: 0, height: 4 },
-    shadowOpacity: 0.1,
-    shadowRadius: 8,
-    elevation: 5,
+    shadowOffset: { width: 0, height: 6 },
+    shadowOpacity: 0.12,
+    shadowRadius: 14,
+    elevation: 8,
   },
   pickerTitle: {
     fontSize: 15,
@@ -844,7 +902,7 @@ const styles = StyleSheet.create({
   },
   pickerItemActive: {
     backgroundColor: "#f0fdf4",
-    borderRadius: 8,
+    borderRadius: 12,
   },
   pickerItemText: {
     fontSize: 13.5,

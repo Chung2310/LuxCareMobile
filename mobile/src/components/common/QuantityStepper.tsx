@@ -17,6 +17,7 @@ export interface QuantityStepperProps {
   step?: number;
   disabled?: boolean;
   style?: StyleProp<ViewStyle>;
+  onFocus?: () => void;
 }
 
 export const QuantityStepper: React.FC<QuantityStepperProps> = ({
@@ -27,6 +28,7 @@ export const QuantityStepper: React.FC<QuantityStepperProps> = ({
   step = 1,
   disabled = false,
   style,
+  onFocus,
 }) => {
   const handleDecrease = () => {
     const next = Math.max(value - step, min);
@@ -66,6 +68,7 @@ export const QuantityStepper: React.FC<QuantityStepperProps> = ({
         value={String(value)}
         onChangeText={handleTextChange}
         editable={!disabled}
+        onFocus={onFocus}
       />
 
       <TouchableOpacity

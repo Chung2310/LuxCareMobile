@@ -1,7 +1,6 @@
 import React, { useState } from "react";
 import {
   ActivityIndicator,
-  Alert,
   KeyboardAvoidingView,
   Linking,
   Modal,
@@ -17,6 +16,7 @@ import { SafeAreaView } from "react-native-safe-area-context";
 import { Ionicons } from "@expo/vector-icons";
 import { AppButton } from "../common/AppButton";
 import { STATUS_MAP, SOURCE_LABELS } from "./CustomerCard";
+import { CustomerAlertModal, type CustomerAlertType } from "./CustomerAlertModal";
 import type {
   CustomerLeadItem,
   CustomerLeadStatus,
@@ -54,6 +54,31 @@ export const CustomerDetailModal: React.FC<CustomerDetailModalProps> = ({
   const [updatingStatus, setUpdatingStatus] = useState(false);
   const [deleting, setDeleting] = useState(false);
 
+  // Custom rounded alert state
+  const [alertConfig, setAlertConfig] = useState<{
+    visible: boolean;
+    type?: CustomerAlertType;
+    title: string;
+    message: string;
+    confirmText?: string;
+    cancelText?: string;
+    isDestructive?: boolean;
+    onConfirm?: () => void;
+    onCancel?: () => void;
+  }>({
+    visible: false,
+    title: "",
+    message: "",
+  });
+
+  const showAlert = (config: Omit<typeof alertConfig, "visible">) => {
+    setAlertConfig({ ...config, visible: true });
+  };
+
+  const closeAlert = () => {
+    setAlertConfig((prev) => ({ ...prev, visible: false }));
+  };
+
   // Sync state when prop lead changes
   React.useEffect(() => {
     if (lead) setCurrentLead(lead);
@@ -64,14 +89,26 @@ export const CustomerDetailModal: React.FC<CustomerDetailModalProps> = ({
   const handleCall = () => {
     if (!currentLead.phone) return;
     Linking.openURL(`tel:${currentLead.phone}`).catch(() => {
-      Alert.alert("Lỗi", "Không thể thực hiện cuộc gọi trên thiết bị này.");
+      showAlert({
+        type: "warning",
+        title: "Không thể gọi",
+        message: "Thiết bị không hỗ trợ tính năng cuộc gọi trực tiếp.",
+        confirmText: "Đã hiểu",
+        onConfirm: closeAlert,
+      });
     });
   };
 
   const handleSms = () => {
     if (!currentLead.phone) return;
     Linking.openURL(`sms:${currentLead.phone}`).catch(() => {
-      Alert.alert("Lỗi", "Không thể gửi tin nhắn trên thiết bị này.");
+      showAlert({
+        type: "warning",
+        title: "Không thể gửi tin nhắn",
+        message: "Thiết bị không hỗ trợ ứng dụng nhắn tin SMS.",
+        confirmText: "Đã hiểu",
+        onConfirm: closeAlert,
+      });
     });
   };
 
@@ -82,7 +119,13 @@ export const CustomerDetailModal: React.FC<CustomerDetailModalProps> = ({
       const updated = await onUpdate(currentLead._id, { status: newStatus });
       setCurrentLead(updated);
     } catch (err: any) {
-      Alert.alert("Lỗi cập nhật", err.message || "Không thể cập nhật trạng thái.");
+      showAlert({
+        type: "error",
+        title: "Lỗi cập nhật",
+        message: err.message || "Không thể cập nhật trạng thái khách hàng.",
+        confirmText: "Đóng",
+        onConfirm: closeAlert,
+      });
     } finally {
       setUpdatingStatus(false);
     }
@@ -91,7 +134,13 @@ export const CustomerDetailModal: React.FC<CustomerDetailModalProps> = ({
   const handleAddNote = async () => {
     const trimmed = newNote.trim();
     if (!trimmed) {
-      Alert.alert("Lỗi", "Vui lòng nhập nội dung ghi chú chăm sóc.");
+      showAlert({
+        type: "warning",
+        title: "Thông báo",
+        message: "Vui lòng nhập nội dung ghi chú chăm sóc trước khi lưu.",
+        confirmText: "Đã hiểu",
+        onConfirm: closeAlert,
+      });
       return;
     }
 
@@ -101,35 +150,46 @@ export const CustomerDetailModal: React.FC<CustomerDetailModalProps> = ({
       setCurrentLead(updated);
       setNewNote("");
     } catch (err: any) {
-      Alert.alert("Lỗi", err.message || "Không thể thêm ghi chú.");
+      showAlert({
+        type: "error",
+        title: "Lỗi lưu ghi chú",
+        message: err.message || "Không thể thêm ghi chú.",
+        confirmText: "Đóng",
+        onConfirm: closeAlert,
+      });
     } finally {
       setSubmittingNote(false);
     }
   };
 
   const handleDelete = () => {
-    Alert.alert(
-      "Xác nhận xóa",
-      `Bạn có chắc chắn muốn xóa thông tin khách hàng "${currentLead.fullName}" không?`,
-      [
-        { text: "Hủy", style: "cancel" },
-        {
-          text: "Xóa",
-          style: "destructive",
-          onPress: async () => {
-            setDeleting(true);
-            try {
-              await onDelete(currentLead._id);
-              onClose();
-            } catch (err: any) {
-              Alert.alert("Lỗi", err.message || "Không thể xóa khách hàng.");
-            } finally {
-              setDeleting(false);
-            }
-          },
-        },
-      ],
-    );
+    showAlert({
+      type: "confirm",
+      title: "Xác nhận xóa khách hàng",
+      message: `Bạn có chắc chắn muốn xóa khách hàng "${currentLead.fullName}" không? Thao tác này sẽ gỡ khách hàng khỏi danh sách làm việc.`,
+      cancelText: "Hủy",
+      confirmText: "Xóa khách hàng",
+      isDestructive: true,
+      onCancel: closeAlert,
+      onConfirm: async () => {
+        closeAlert();
+        setDeleting(true);
+        try {
+          await onDelete(currentLead._id);
+          onClose();
+        } catch (err: any) {
+          showAlert({
+            type: "error",
+            title: "Không thể xóa khách hàng",
+            message: err.message || "Đã có lỗi xảy ra khi xóa khách hàng.",
+            confirmText: "Đóng",
+            onConfirm: closeAlert,
+          });
+        } finally {
+          setDeleting(false);
+        }
+      },
+    });
   };
 
   const formatDateTime = (dateStr?: string | Date) => {
@@ -448,6 +508,20 @@ export const CustomerDetailModal: React.FC<CustomerDetailModalProps> = ({
           </ScrollView>
         </KeyboardAvoidingView>
       </SafeAreaView>
+
+      {/* Popup thông báo bo góc */}
+      <CustomerAlertModal
+        visible={alertConfig.visible}
+        type={alertConfig.type}
+        title={alertConfig.title}
+        message={alertConfig.message}
+        confirmText={alertConfig.confirmText}
+        cancelText={alertConfig.cancelText}
+        isDestructive={alertConfig.isDestructive}
+        loading={deleting}
+        onConfirm={alertConfig.onConfirm || closeAlert}
+        onCancel={alertConfig.onCancel || closeAlert}
+      />
     </Modal>
   );
 };
@@ -504,7 +578,7 @@ const styles = StyleSheet.create({
   },
   profileCard: {
     backgroundColor: "#ffffff",
-    borderRadius: 16,
+    borderRadius: 22,
     padding: 16,
     borderWidth: 1,
     borderColor: "#e2e8f0",
@@ -562,7 +636,7 @@ const styles = StyleSheet.create({
     alignItems: "center",
     justifyContent: "center",
     paddingVertical: 10,
-    borderRadius: 10,
+    borderRadius: 14,
     gap: 6,
   },
   callBtn: {
@@ -594,7 +668,7 @@ const styles = StyleSheet.create({
   },
   sectionCard: {
     backgroundColor: "#ffffff",
-    borderRadius: 14,
+    borderRadius: 20,
     padding: 14,
     borderWidth: 1,
     borderColor: "#e2e8f0",
@@ -617,7 +691,7 @@ const styles = StyleSheet.create({
   statusChip: {
     paddingHorizontal: 10,
     paddingVertical: 6,
-    borderRadius: 8,
+    borderRadius: 12,
     borderWidth: 1,
   },
   statusChipText: {
@@ -629,7 +703,7 @@ const styles = StyleSheet.create({
     backgroundColor: "#f8fafc",
     borderWidth: 1,
     borderColor: "#cbd5e1",
-    borderRadius: 10,
+    borderRadius: 14,
     paddingHorizontal: 12,
     paddingTop: 8,
     textAlignVertical: "top",

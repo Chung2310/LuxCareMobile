@@ -396,26 +396,78 @@ export const supplyApi = {
     if (!res.ok) throw new Error(json.message || "Không thể tải lịch sử giao dịch.");
 
     const rawList = Array.isArray(json.data) ? json.data : (json.data?.transactions || []);
-    const items: InventoryTransaction[] = rawList.map((raw: any) => ({
-      id: raw._id || raw.id,
-      voucherCode: raw.voucherId || raw.voucherCode || `PH-${(raw._id || "").slice(-6).toUpperCase()}`,
-      type: raw.type === "in" ? "in" : "out",
-      supplyId: raw.supplyId || "",
-      supplyCode: raw.supplyCode || "N/A",
-      supplyName: raw.supplyName || "Vật tư",
-      unit: raw.unit || "Đơn vị",
-      quantity: Number(raw.quantity) || 0,
-      balanceBefore: Number(raw.balanceBefore) || 0,
-      balanceAfter: Number(raw.balanceAfter) || 0,
-      batchNumber: raw.batchNumber || "N/A",
-      expiryDate: raw.expiryDate ? new Date(raw.expiryDate).toISOString().slice(0, 10) : undefined,
-      recipientDepartment: raw.recipientDepartment || "Kho tổng",
-      performerName: raw.performerName || "Người vận hành",
-      reason: raw.reason || (raw.type === "in" ? "Nhập kho" : "Xuất cấp"),
-      createdAt: raw.createdAt ? new Date(raw.createdAt).toLocaleString("vi-VN") : "Hôm nay",
-      rawCreatedAt: raw.createdAt || "",
-      status: raw.status === "completed" ? "completed" : "pending",
-    }));
+    const items: InventoryTransaction[] = [];
+
+    for (const raw of rawList) {
+      const voucherCode =
+        raw.batchCode ||
+        raw.voucherCode ||
+        raw.voucherId ||
+        `PH-${String(raw._id || "").replace(/^[^:]*:/, "").slice(-6).toUpperCase()}`;
+
+      const docType: "in" | "out" = raw.type === "in" ? "in" : "out";
+      const docCreatedAt = raw.createdAt ? new Date(raw.createdAt).toLocaleString("vi-VN") : "Hôm nay";
+      const docRawCreatedAt = raw.createdAt ? String(raw.createdAt) : "";
+      const docStatus = raw.status === "completed" ? "completed" : "pending";
+      const docPerformer = raw.performerName || "Người vận hành";
+      const docDept =
+        raw.recipientDepartment ||
+        (docType === "in" ? (raw.supplier || "Kho Dược") : "Khoa phòng");
+      const docReason = raw.reason || (docType === "in" ? "Nhập kho" : "Xuất cấp");
+
+      const lineItems = Array.isArray(raw.items) && raw.items.length > 0 ? raw.items : null;
+
+      if (lineItems) {
+        for (let i = 0; i < lineItems.length; i++) {
+          const sub = lineItems[i];
+          const subQty = Number(sub.quantity) || 0;
+          items.push({
+            id: String(sub._id || `${raw._id || voucherCode}-${sub.supplyId || i}`),
+            voucherCode,
+            type: sub.type === "in" || sub.type === "out" ? sub.type : docType,
+            supplyId: String(sub.supplyId || sub._id || ""),
+            supplyCode: String(sub.supplyCode || sub.code || "N/A"),
+            supplyName: String(sub.supplyName || sub.name || "Vật tư"),
+            unit: String(sub.unit || "Đơn vị"),
+            quantity: subQty,
+            balanceBefore: typeof sub.balanceBefore === "number" ? sub.balanceBefore : undefined,
+            balanceAfter: typeof sub.balanceAfter === "number" ? sub.balanceAfter : undefined,
+            batchNumber: String(sub.batchNumber || sub.lotNumber || raw.batchNumber || ""),
+            expiryDate: sub.expiryDate
+              ? new Date(sub.expiryDate).toISOString().slice(0, 10)
+              : (raw.expiryDate ? new Date(raw.expiryDate).toISOString().slice(0, 10) : undefined),
+            recipientDepartment: String(sub.recipientDepartment || docDept),
+            performerName: String(sub.performerName || docPerformer),
+            reason: String(sub.reason || docReason),
+            createdAt: sub.createdAt ? new Date(sub.createdAt).toLocaleString("vi-VN") : docCreatedAt,
+            rawCreatedAt: sub.createdAt ? String(sub.createdAt) : docRawCreatedAt,
+            status: sub.status === "completed" ? "completed" : docStatus,
+          });
+        }
+      } else {
+        const totalQty = Number(raw.totalQuantity) || Number(raw.quantity) || 0;
+        items.push({
+          id: String(raw._id || raw.id || voucherCode),
+          voucherCode,
+          type: docType,
+          supplyId: String(raw.supplyId || ""),
+          supplyCode: String(raw.supplyCode || "N/A"),
+          supplyName: String(raw.supplyName || (raw.totalItems ? `${raw.totalItems} mặt hàng` : "Vật tư")),
+          unit: String(raw.unit || "Đơn vị"),
+          quantity: totalQty,
+          balanceBefore: typeof raw.balanceBefore === "number" ? raw.balanceBefore : undefined,
+          balanceAfter: typeof raw.balanceAfter === "number" ? raw.balanceAfter : undefined,
+          batchNumber: String(raw.batchNumber || ""),
+          expiryDate: raw.expiryDate ? new Date(raw.expiryDate).toISOString().slice(0, 10) : undefined,
+          recipientDepartment: docDept,
+          performerName: docPerformer,
+          reason: docReason,
+          createdAt: docCreatedAt,
+          rawCreatedAt: docRawCreatedAt,
+          status: docStatus,
+        });
+      }
+    }
 
     return { data: items, total: json.total || items.length };
   },
