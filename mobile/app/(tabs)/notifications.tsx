@@ -177,7 +177,7 @@ export default function Notifications() {
     { id: "attendance", label: "Chấm công", icon: "time-outline" },
     { id: "task", label: "Công việc", icon: "briefcase-outline" },
     { id: "training", label: "Đào tạo", icon: "school-outline" },
-    { id: "kho", label: "Kho & Thiết bị", icon: "cube-outline" },
+    { id: "kho", label: "Vật tư & Dược phẩm", icon: "cube-outline" },
     { id: "he-thong", label: "Hệ thống", icon: "settings-outline" },
   ];
 
@@ -663,9 +663,9 @@ const styles = StyleSheet.create({
   },
   card: {
     backgroundColor: "#ffffff",
-    borderRadius: 12,
-    paddingVertical: 9,
-    paddingHorizontal: 11,
+    borderRadius: 16,
+    paddingVertical: 10,
+    paddingHorizontal: 12,
     borderWidth: 1,
     borderColor: "#f1f5f9",
     shadowColor: "#0f172a",
@@ -673,6 +673,7 @@ const styles = StyleSheet.create({
     shadowOpacity: 0.03,
     shadowRadius: 3,
     elevation: 1,
+    overflow: "hidden",
   },
   cardUnread: {
     borderColor: "#bbf7d0",
@@ -714,7 +715,7 @@ const styles = StyleSheet.create({
   typeIconBox: {
     width: 34,
     height: 34,
-    borderRadius: 9,
+    borderRadius: 11,
     alignItems: "center",
     justifyContent: "center",
     marginTop: 1,
