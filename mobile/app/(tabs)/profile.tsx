@@ -1,7 +1,6 @@
 import React, { useRef, useState } from "react";
 import {
   ActivityIndicator,
-  Alert,
   Image,
   Modal,
   Pressable,
@@ -16,6 +15,7 @@ import { AccountForm } from "../../src/features/account/AccountForm";
 import { getRoleDisplayName } from "../../../src/utils/permissionUtils";
 import { messageOf, useSession } from "../../src/auth/SessionProvider";
 import { BranchSelector } from "../../src/features/branches/BranchSelector";
+import { LogoutConfirmModal } from "../../src/components/common";
 
 const bannerSource = require("../../public/pfp-banner.png");
 
@@ -26,21 +26,22 @@ export default function Profile() {
   const { user, selectedBranch, logout } = useSession();
   const [busy, setBusy] = useState(false);
   const [error, setError] = useState<string | null>(null);
+  const [showLogoutModal, setShowLogoutModal] = useState(false);
 
-  const handleLogout = () =>
-    Alert.alert("Đăng xuất tài khoản", "Bạn có chắc chắn muốn đăng xuất khỏi thiết bị này?", [
-      { text: "Hủy", style: "cancel" },
-      {
-        text: "Đăng xuất",
-        style: "destructive",
-        onPress: () => {
-          setBusy(true);
-          void logout()
-            .catch((err) => setError(messageOf(err)))
-            .finally(() => setBusy(false));
-        },
-      },
-    ]);
+  const handleLogoutPress = () => setShowLogoutModal(true);
+
+  const handleConfirmLogout = async () => {
+    setBusy(true);
+    try {
+      await logout();
+      setShowLogoutModal(false);
+    } catch (err) {
+      setError(messageOf(err));
+      setShowLogoutModal(false);
+    } finally {
+      setBusy(false);
+    }
+  };
 
   const roleName = getRoleDisplayName(user?.role || "");
 
@@ -251,7 +252,7 @@ export default function Profile() {
             pressed && { opacity: 0.88 },
           ]}
           disabled={busy}
-          onPress={handleLogout}
+          onPress={handleLogoutPress}
         >
           {busy ? (
             <ActivityIndicator size="small" color="#dc2626" />
@@ -263,6 +264,15 @@ export default function Profile() {
           )}
         </Pressable>
       </ScrollView>
+
+      {/* Logout Confirmation Modal */}
+      <LogoutConfirmModal
+        visible={showLogoutModal}
+        onClose={() => setShowLogoutModal(false)}
+        onConfirm={handleConfirmLogout}
+        user={user}
+        busy={busy}
+      />
 
       {/* Account Form Modal */}
       <Modal
