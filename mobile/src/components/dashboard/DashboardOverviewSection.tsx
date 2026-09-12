@@ -18,6 +18,7 @@ const { width: SCREEN_WIDTH } = Dimensions.get("window");
 
 interface DashboardOverviewSectionProps {
   summary: DashboardSummary | null;
+  attendanceSummary?: DashboardSummary["timekeeping"] | null;
   actionItems: DashboardActionItems | null;
   loading: boolean;
   filter: DashboardDateFilter;
@@ -35,6 +36,7 @@ const DATE_FILTERS: Array<{ id: DashboardDateFilter; label: string }> = [
 
 export const DashboardOverviewSection: React.FC<DashboardOverviewSectionProps> = ({
   summary,
+  attendanceSummary = summary?.timekeeping ?? null,
   actionItems,
   loading,
   filter,
@@ -44,9 +46,9 @@ export const DashboardOverviewSection: React.FC<DashboardOverviewSectionProps> =
   onNavigate,
 }) => {
   // 1. Số liệu chấm công
-  const totalEmployees = summary?.timekeeping?.totalEmployees || 0;
-  const checkedInToday = summary?.timekeeping?.checkedInToday || 0;
-  const lateToday = summary?.timekeeping?.lateToday || 0;
+  const totalEmployees = attendanceSummary?.totalEmployees ?? 0;
+  const checkedInToday = attendanceSummary?.checkedInToday ?? 0;
+  const lateToday = attendanceSummary?.lateToday ?? 0;
   const onTimeToday = Math.max(0, checkedInToday - lateToday);
   const notCheckedInToday = Math.max(0, totalEmployees - checkedInToday);
 
@@ -230,13 +232,13 @@ export const DashboardOverviewSection: React.FC<DashboardOverviewSectionProps> =
             </View>
             <View>
               <Text style={styles.cardTitle}>Chấm công & Đi làm</Text>
-              <Text style={styles.cardSubtitle}>Tỷ lệ nhân sự có mặt hôm nay</Text>
+              <Text style={styles.cardSubtitle}>{loading ? "Đang tải chấm công hôm nay..." : !canViewExecutive ? "Bạn chưa có quyền xem tổng hợp chấm công" : attendanceSummary ? "Tỷ lệ nhân sự đã chấm công hôm nay" : "Chưa tải được chấm công hôm nay"}</Text>
             </View>
           </View>
 
           <View style={styles.statusPillGreen}>
             <Text style={styles.statusPillGreenText}>
-              {checkedInToday}/{totalEmployees} ({checkedInPercent}%)
+              {loading ? "…" : attendanceSummary ? `${checkedInToday}/${totalEmployees} (${checkedInPercent}%)` : "—"}
             </Text>
             <Ionicons name="chevron-forward" size={13} color="#059669" />
           </View>
@@ -260,7 +262,7 @@ export const DashboardOverviewSection: React.FC<DashboardOverviewSectionProps> =
               ]}
             />
           )}
-          {notCheckedPercent > 0 && (
+          {attendanceSummary && notCheckedPercent > 0 && (
             <View
               style={[
                 styles.segmentPart,
@@ -278,7 +280,7 @@ export const DashboardOverviewSection: React.FC<DashboardOverviewSectionProps> =
               <Text style={styles.metricLabel}>Đúng giờ</Text>
             </View>
             <Text style={[styles.metricValue, { color: "#059669" }]}>
-              {onTimeToday}
+              {attendanceSummary ? onTimeToday : "—"}
             </Text>
           </View>
 
@@ -290,7 +292,7 @@ export const DashboardOverviewSection: React.FC<DashboardOverviewSectionProps> =
               <Text style={styles.metricLabel}>Đi muộn</Text>
             </View>
             <Text style={[styles.metricValue, { color: "#f59e0b" }]}>
-              {lateToday}
+              {attendanceSummary ? lateToday : "—"}
             </Text>
           </View>
 
@@ -302,7 +304,7 @@ export const DashboardOverviewSection: React.FC<DashboardOverviewSectionProps> =
               <Text style={styles.metricLabel}>Chưa chấm</Text>
             </View>
             <Text style={[styles.metricValue, { color: "#64748b" }]}>
-              {notCheckedInToday}
+              {attendanceSummary ? notCheckedInToday : "—"}
             </Text>
           </View>
         </View>

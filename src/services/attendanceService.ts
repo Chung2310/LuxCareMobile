@@ -75,6 +75,11 @@ export function createAttendanceService({ fetch, getAccessToken }: ServiceTransp
       const rows = await get<AttendanceLog[]>(`/api/v1/crud/timekeeping-logs?${query}`);
       return rows.filter((row) => row.uid === uid);
     },
+    todayCompanyLogs: async (startDate: string, endDate?: string) => {
+      const query = new URLSearchParams({ startDate, endDate: endDate || startDate, limit: "10000" });
+      const rows = await get<AttendanceLog[]>(`/api/v1/crud/timekeeping-logs?${query}`).catch(() => []);
+      return Array.isArray(rows) ? rows : [];
+    },
     shifts: () => get<WorkShift[]>("/api/v1/timekeeping/shifts"),
     createShift: (input: ShiftInput) =>
       get<WorkShift>("/api/v1/timekeeping/shifts", { method: "POST", body: JSON.stringify(input) }),

@@ -7,3 +7,4 @@ export * from "./DropdownSelectField";
 export * from "./QuantityStepper";
 export * from "./AppButton";
 export * from "./LoadingScreen";
+export * from "./LogoutConfirmModal";

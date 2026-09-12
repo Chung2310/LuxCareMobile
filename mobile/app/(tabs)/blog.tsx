@@ -36,6 +36,7 @@ import { selectBlogFeed } from "../../src/features/blog/blogFeed";
 import { Ionicons } from "@expo/vector-icons";
 import Svg, { Path } from "react-native-svg";
 import { useSession } from "../../src/auth/SessionProvider";
+import { LogoutConfirmModal } from "../../src/components/common";
 import { blog, kanbanMedia } from "../../src/api/services";
 import { isBlogEditorUser } from "../../../src/utils/permissionUtils";
 import {
@@ -108,6 +109,8 @@ export default function BlogScreen() {
   const jumpAttempts = useRef(0);
   const isSharingRef = useRef(false);
   const [viewImageUrl, setViewImageUrl] = useState<string | null>(null);
+  const [showLogoutModal, setShowLogoutModal] = useState(false);
+  const [logoutBusy, setLogoutBusy] = useState(false);
 
   const pinnedPosts = useMemo(
     () => postsScope === feedScope && loadedChannel === selectedChannel.id ? posts.filter((p) => p.isPinned) : [],
@@ -486,21 +489,21 @@ export default function BlogScreen() {
   };
 
   const handleLogout = () => {
-    showAlert("Đăng xuất", "Bạn có chắc chắn muốn đăng xuất và trở về màn hình đăng nhập không?", [
-      { text: "Hủy", style: "cancel" },
-      {
-        text: "Đăng xuất",
-        style: "destructive",
-        onPress: async () => {
-          try {
-            await logout();
-            router.replace("/login");
-          } catch {
-            router.replace("/login");
-          }
-        },
-      },
-    ]);
+    setShowLogoutModal(true);
+  };
+
+  const handleConfirmLogout = async () => {
+    setLogoutBusy(true);
+    try {
+      await logout();
+      setShowLogoutModal(false);
+      router.replace("/login");
+    } catch {
+      setShowLogoutModal(false);
+      router.replace("/login");
+    } finally {
+      setLogoutBusy(false);
+    }
   };
 
   const handleInputFocus = () => {
@@ -1396,6 +1399,15 @@ export default function BlogScreen() {
             </Pressable>
           </Pressable>
         </Modal>
+
+        {/* Logout Confirmation Modal */}
+        <LogoutConfirmModal
+          visible={showLogoutModal}
+          onClose={() => setShowLogoutModal(false)}
+          onConfirm={handleConfirmLogout}
+          user={user}
+          busy={logoutBusy}
+        />
 
         {/* Fullscreen Image Viewer Modal */}
         <Modal
