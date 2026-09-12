@@ -5,7 +5,8 @@ import type { PayrollPayment } from "../../../../src/types/payrollPayment";
 import type { PayrollRunLine } from "../../../../src/types/payrollRun";
 import { payroll } from "../../api/services";
 import { useSession, messageOf } from "../../auth/SessionProvider";
-import { Button, Card, ErrorText, Field, styles } from "../../ui";
+import { useAppAlert } from "../../components/AppAlert";
+import { Button, Card, Field, styles } from "../../ui";
 import { payslipMoney } from "./model";
 import { canConfirmPayment, validateConfirmedPayment } from "./confirmPaymentModel";
 import { canUndoPayment, validateUndonePayment, type UndoPaymentAction } from "./undoPaymentModel";
@@ -50,6 +51,8 @@ export function ConfirmPayrollPayment({
   const [evidence, setEvidence] = useState("");
   const [note, setNote] = useState("");
   const [metadata, setMetadata] = useState<ReturnType<typeof paymentMetadataInput> | null>(null);
+  const { showAlert, alertView } = useAppAlert();
+
   useFocusEffect(
     useCallback(() => {
       active.current = true;
@@ -58,10 +61,12 @@ export function ConfirmPayrollPayment({
       };
     }, []),
   );
+
   const confirm = async () => {
     if (!allowed || attempted.current || !metadata) return;
     attempted.current = true;
     setBusy(true);
+    setError(null);
     try {
       const result = await (action === "cancel"
         ? payroll.cancelPayment(payment._id, metadata)
@@ -71,14 +76,41 @@ export function ConfirmPayrollPayment({
       if (action === "confirm") validateConfirmedPayment(result, payment);
       else validateUndonePayment(result, payment, action);
       validatePaymentMetadata(result, metadata);
-      if (active.current) setDone(true);
-    } catch (error) {
-      if (active.current) setError(`${messageOf(error)} Tải lại trước khi thao tác tiếp.`);
+      if (active.current) {
+        setDone(true);
+        showAlert(
+          "Thành công",
+          action === "cancel"
+            ? "Đã hủy khoản thanh toán nháp thành công."
+            : action === "reverse"
+              ? "Đã đảo khoản thanh toán thành công."
+              : "Đã xác nhận thanh toán thành công.",
+          [{ text: "Đã hiểu", onPress: onChanged }],
+          "success",
+        );
+      }
+    } catch (err) {
+      const msg = messageOf(err);
+      if (active.current) {
+        setError(msg);
+        attempted.current = false;
+        showAlert(
+          "Thao tác không thành công",
+          msg,
+          [
+            { text: "Tải lại", onPress: onChanged },
+            { text: "Đã hiểu", style: "cancel" },
+          ],
+          "error",
+        );
+      }
     } finally {
       if (active.current) setBusy(false);
     }
   };
+
   if (!allowed) return null;
+
   return (
     <Card>
       <Text style={styles.heading}>
@@ -127,8 +159,10 @@ export function ConfirmPayrollPayment({
               try {
                 setMetadata(paymentMetadataInput(action === "confirm" ? date : "", evidence, note));
                 setError(null);
-              } catch (error) {
-                setError(messageOf(error));
+              } catch (err) {
+                const msg = messageOf(err);
+                setError(msg);
+                showAlert("Lỗi thông tin thanh toán", msg, [{ text: "Đã hiểu" }], "error");
               }
             }}
           />
@@ -143,7 +177,6 @@ export function ConfirmPayrollPayment({
             : "Chỉ xác nhận sau khi đã chi trả thực tế. Thao tác ghi nhận đã trả lương trong LuxCare; không thực hiện chuyển tiền ngân hàng. Nếu không nhập ngày mới, giữ ngày khoản nháp hoặc dùng thời điểm xác nhận khi chưa có."}
       </Text>
       {done && <Text style={styles.text}>Đã hoàn tất. Tải lại để xem tổng đã trả và trạng thái kỳ lương.</Text>}
-      <ErrorText message={error} />
       {!attempted.current && <Button title="Quay lại" onPress={onClose} />}
       {metadata && !done && (
         <Button
@@ -156,11 +189,12 @@ export function ConfirmPayrollPayment({
                   ? "Xác nhận đảo thanh toán"
                   : "Xác nhận đã chi trả"
           }
-          disabled={busy || attempted.current}
+          disabled={busy}
           onPress={() => void confirm()}
         />
       )}
-      {attempted.current && <Button title="Tải lại kỳ và thanh toán" disabled={busy} onPress={onChanged} />}
+      {(attempted.current || error) && <Button title="Tải lại kỳ và thanh toán" disabled={busy} onPress={onChanged} />}
+      {alertView}
     </Card>
   );
 }

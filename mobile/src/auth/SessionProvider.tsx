@@ -20,8 +20,79 @@ type Session = {
   selectBranch: (branch: BranchRecord | null) => void;
 };
 const Context = createContext<Session | null>(null);
-export const messageOf = (error: unknown) =>
-  error instanceof Error ? error.message : "Không thể kết nối. Vui lòng thử lại.";
+const ERROR_CODE_TRANSLATIONS: Record<string, string> = {
+  PAYROLL_REVISION_MISSING: "Kỳ lương chưa có bản tính toán hợp lệ. Vui lòng thực hiện tính lương trước khi thao tác tiếp.",
+  PAYROLL_CHECKSUM_MISMATCH: "Dữ liệu lương đã thay đổi sau khi tính toán. Vui lòng tính lại kỳ lương.",
+  PAYROLL_EFFECTIVE_CHECKSUM_MISMATCH: "Dữ liệu hiệu lực của kỳ lương đã thay đổi sau khi duyệt. Vui lòng kiểm tra lại.",
+  PAYROLL_PAID_RUN_IMMUTABLE: "Kỳ lương đã thanh toán hoàn tất không thể thay đổi.",
+  PAYROLL_SEPARATION_OF_DUTIES: "Người tạo kỳ lương không thể tự duyệt kỳ lương của mình.",
+  PAYROLL_BLOCKING_ISSUES: "Vui lòng xử lý tất cả các vấn đề chặn trước khi tiếp tục.",
+  PAYROLL_CONFIRMED_PAYMENTS_EXIST: "Vui lòng hoàn tác tất cả các khoản thanh toán đã xác nhận trước khi mở lại kỳ lương.",
+  PAYROLL_REOPEN_REASON_REQUIRED: "Cần nhập lý do để mở lại kỳ lương.",
+  PAYROLL_VERSION_CONFLICT: "Xung đột phiên bản dữ liệu. Vui lòng tải lại trạng thái mới nhất.",
+  PAYROLL_RUN_NOT_FOUND: "Không tìm thấy bảng lương.",
+  PAYROLL_RUN_NOT_PAYABLE: "Không thể thanh toán bảng lương ở trạng thái hiện tại.",
+  PAYROLL_PAYMENT_INVALID_AMOUNT: "Số tiền thanh toán hoặc phân bổ dòng lương không hợp lệ.",
+  PAYROLL_PAYMENT_UNKNOWN_EMPLOYEE: "Nhân viên nhận thanh toán không nằm trong kỳ lương này.",
+  PAYROLL_PAYMENT_EXCEEDS_NET: "Số tiền thanh toán vượt quá số dư còn lại của kỳ lương.",
+  PAYROLL_PAYMENT_ALLOCATION_MISMATCH: "Tổng tiền phân bổ không khớp với tổng tiền thanh toán.",
+  PAYROLL_PAYMENT_NOT_FOUND: "Không tìm thấy khoản thanh toán.",
+  PAYROLL_INVALID_TRANSITION: "Trạng thái kỳ lương hiện tại không hợp lệ cho thao tác này.",
+  PAYROLL_PAYMENT_INVALID_TRANSITION: "Trạng thái thanh toán hiện tại không hợp lệ cho thao tác này.",
+  SESSION_REPLACED: "Tài khoản của bạn đã được đăng nhập trên một thiết bị khác.",
+  UNAUTHORIZED: "Phiên đăng nhập đã hết hạn. Vui lòng đăng nhập lại.",
+  FORBIDDEN: "Bạn không có quyền thực hiện thao tác này.",
+  NOT_FOUND: "Không tìm thấy dữ liệu yêu cầu.",
+};
+
+const PHRASE_TRANSLATIONS: Array<[RegExp | string, string]> = [
+  ["The payroll run has no active calculation revision", "Kỳ lương chưa có bản tính toán hợp lệ. Vui lòng thực hiện tính lương trước khi thao tác tiếp."],
+  ["The active calculation revision is not available", "Bản tính toán đang hoạt động không khả dụng hoặc chưa hoàn thành."],
+  ["Payroll results changed after calculation; recalculate the run", "Dữ liệu lương đã thay đổi sau khi tính toán. Vui lòng tính lại kỳ lương."],
+  ["A paid payroll run can no longer be changed", "Kỳ lương đã thanh toán hoàn tất không thể thay đổi."],
+  ["The payroll run creator cannot approve their own run", "Người tạo kỳ lương không thể tự duyệt kỳ lương của mình."],
+  ["Resolve every blocking issue before continuing", "Vui lòng xử lý tất cả các vấn đề chặn trước khi tiếp tục."],
+  ["Reverse every confirmed payroll payment before reopening the run", "Vui lòng hoàn tác tất cả các khoản thanh toán đã xác nhận trước khi mở lại kỳ lương."],
+  ["A reason is required to reopen a payroll run", "Cần nhập lý do để mở lại kỳ lương."],
+  ["Pinned effective payroll results changed after review", "Dữ liệu hiệu lực của kỳ lương đã thay đổi sau khi duyệt. Vui lòng kiểm tra lại."],
+  ["Network request failed", "Không thể kết nối máy chủ. Vui lòng kiểm tra mạng và thử lại."],
+  ["Failed to fetch", "Không thể kết nối máy chủ. Vui lòng kiểm tra kết nối mạng và thử lại."],
+  ["Aborted", "Yêu cầu đã bị hủy hoặc quá thời gian chờ. Vui lòng thử lại."],
+  ["Timeout", "Yêu cầu quá thời gian chờ. Vui lòng thử lại."],
+  ["Payment must allocate at least one employee line", "Khoản thanh toán phải phân bổ cho ít nhất một nhân viên."],
+  ["Payment employee is not in the payroll run", "Nhân viên nhận thanh toán không nằm trong kỳ lương này."],
+  ["Every payment line must be a positive integer", "Số tiền mỗi dòng thanh toán phải là số nguyên dương."],
+  ["Payment amount exceeds the remaining payroll balance", "Số tiền thanh toán vượt quá số dư còn lại của kỳ lương."],
+  ["Payment allocation does not match the payment amount", "Tổng tiền phân bổ không khớp với tổng tiền thanh toán."],
+  ["Payment not found", "Không tìm thấy khoản thanh toán."],
+  [/Cannot (\w+) a payroll run in status (\w+)/i, "Không thể thực hiện thao tác trên kỳ lương ở trạng thái này."],
+  [/Cannot (\w+) a payment in status (\w+)/i, "Không thể thực hiện thao tác trên khoản thanh toán ở trạng thái này."],
+];
+
+export const messageOf = (error: unknown): string => {
+  if (!error) return "Đã xảy ra lỗi không xác định. Vui lòng thử lại.";
+  const errObj = error as any;
+  const code = errObj?.code;
+  if (code && ERROR_CODE_TRANSLATIONS[code]) {
+    return ERROR_CODE_TRANSLATIONS[code];
+  }
+  const rawMessage = typeof errObj?.message === "string"
+    ? errObj.message
+    : typeof error === "string"
+      ? error
+      : "";
+  if (!rawMessage.trim()) {
+    return "Không thể kết nối hoặc thực hiện thao tác. Vui lòng thử lại.";
+  }
+  for (const [target, vietnamese] of PHRASE_TRANSLATIONS) {
+    if (typeof target === "string") {
+      if (rawMessage.includes(target)) return vietnamese;
+    } else if (target instanceof RegExp && target.test(rawMessage)) {
+      return vietnamese;
+    }
+  }
+  return rawMessage;
+};
 
 export function SessionProvider({ children }: React.PropsWithChildren) {
   const [user, setUser] = useState<UserProfile | null>(null);
