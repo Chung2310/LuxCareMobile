@@ -1,6 +1,8 @@
+import { attendanceDay, loadDashboardSnapshot } from "../../src/features/dashboard/snapshot";
 import React, { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import {
   Alert,
+  AppState,
   Animated,
   Dimensions,
   Image,
@@ -22,7 +24,8 @@ import type {
   DashboardDateFilter,
 } from "../../../src/types/dashboard";
 import type { DashboardSummaryParams } from "../../../src/services/dashboardService";
-import { dashboard } from "../../src/api/services";
+import { dashboard, attendance } from "../../src/api/services";
+import type { TodayAttendance } from "../../../src/services/attendanceService";
 import { messageOf, useSession } from "../../src/auth/SessionProvider";
 import { useCommunication, communicationBadge } from "../../src/features/notifications/CommunicationProvider";
 import { canUseModule } from "../../src/auth/access";
@@ -72,10 +75,10 @@ export default function Home() {
     return parts[0].slice(0, 2).toUpperCase();
   }, [user?.displayName]);
 
-  if (isEditor) {
-    return <Redirect href="/(tabs)/blog" />;
-  }
   const [data, setData] = useState<DashboardSummary | null>(null);
+  const [attendanceSummary, setAttendanceSummary] = useState<DashboardSummary["timekeeping"] | null>(null);
+  const [myAttendance, setMyAttendance] = useState<TodayAttendance | null>(null);
+  const dashboardRequest = useRef(0);
   const [params, setParams] = useState<DashboardSummaryParams>({ filter: "day" });
   const [actions, setActions] = useState<DashboardActionItems | null>(null);
   const [searchQuery, setSearchQuery] = useState("");
@@ -131,24 +134,58 @@ export default function Home() {
   const [loadingDashboard, setLoadingDashboard] = useState(false);
 
   const loadDashboardData = useCallback(async () => {
-    if (!allowed) return;
+    const request = ++dashboardRequest.current;
+    setData(null);
+    setActions(null);
+    setAttendanceSummary(null);
+    setMyAttendance(null);
+    setLoadingDashboard(false);
+    if (isEditor) return;
     setLoadingDashboard(true);
     try {
-      const [summaryRes, actionsRes] = await Promise.all([
-        dashboard.getSummary(params).catch(() => null),
-        dashboard.getActionItems().catch(() => null),
-      ]);
-      if (summaryRes) setData(summaryRes);
-      if (actionsRes) setActions(actionsRes);
+      if (allowed) {
+        const snapshot = await loadDashboardSnapshot(
+          dashboard,
+          params,
+          new Date(),
+          attendance,
+          user?.companyCode,
+        );
+        if (request !== dashboardRequest.current) return;
+        setData(snapshot.summary);
+        setActions(snapshot.actions);
+        setAttendanceSummary(snapshot.attendance);
+        setMyAttendance(snapshot.myAttendance);
+      } else {
+        const myToday = await attendance.today().catch(() => null);
+        if (request !== dashboardRequest.current) return;
+        setMyAttendance(myToday);
+      }
     } finally {
-      setLoadingDashboard(false);
+      if (request === dashboardRequest.current) setLoadingDashboard(false);
     }
-  }, [allowed, params]);
+  }, [allowed, isEditor, params, user?.uid, user?.companyCode, selectedBranch?._id]);
 
   useFocusEffect(
     useCallback(() => {
       void loadDashboardData();
       refreshNotifications();
+      let day = attendanceDay();
+      const appState = AppState.addEventListener("change", (state) => {
+        if (state === "active") void loadDashboardData();
+      });
+      const timer = setInterval(() => {
+        const nextDay = attendanceDay();
+        if (nextDay !== day) {
+          day = nextDay;
+          void loadDashboardData();
+        }
+      }, 60000);
+      return () => {
+        dashboardRequest.current++;
+        appState.remove();
+        clearInterval(timer);
+      };
     }, [loadDashboardData, refreshNotifications]),
   );
 
@@ -289,6 +326,8 @@ export default function Home() {
   );
 
   const pendingCount = (actions?.overdueTasks.length || 0) + (actions?.pendingApprovals.length || 0);
+
+  if (isEditor) return <Redirect href="/(tabs)/blog" />;
 
   return (
     <View style={uiStyles.screen}>
@@ -514,8 +553,21 @@ export default function Home() {
                   style={uiStyles.colValueRow}
                   onPress={() => router.push("/(tabs)/attendance")}
                 >
-                  <Text style={uiStyles.colValueBig}>
-                    {data?.timekeeping?.checkedInToday || 0} người
+                  <Text
+                    style={[
+                      uiStyles.colValueBig,
+                      myAttendance?.log?.checkIn && { color: "#059669" },
+                    ]}
+                  >
+                    {loadingDashboard
+                      ? "…"
+                      : myAttendance?.log?.checkIn
+                      ? "Đã chấm"
+                      : isOwner && attendanceSummary
+                      ? `${attendanceSummary.checkedInToday}/${attendanceSummary.totalEmployees} người`
+                      : attendanceSummary
+                      ? `${attendanceSummary.checkedInToday} người`
+                      : "Chưa chấm"}
                   </Text>
                   <Ionicons name="chevron-forward" size={13} color="#64748b" />
                 </Pressable>
@@ -706,6 +758,7 @@ export default function Home() {
         {!isSearching && allowed && (
           <DashboardOverviewSection
             summary={data}
+            attendanceSummary={attendanceSummary}
             actionItems={actions}
             loading={loadingDashboard}
             filter={params.filter}
