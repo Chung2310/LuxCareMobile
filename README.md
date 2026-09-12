@@ -39,3 +39,15 @@ Các nguồn dùng chung là bản sao tại thời điểm tách repository, kh
 ## Kiểm tra repository
 
 Ngày 2026-09-08: 371/371 kiểm thử trong 65 file qua; TypeScript và export Hermes Android/iOS qua trong repository độc lập. Chưa kiểm thử thiết bị/staging thật.
+
+## Build IPA và APK trên GitHub Actions
+
+Workflow **Build IPA & APK** (`.github/workflows/build-ios-sideloadly.yml`) chạy khi push vào `develop` hoặc chọn **Run workflow**. Hai job chạy song song: IPA trên macOS và APK trên Ubuntu.
+
+- Biến repository `EXPO_PUBLIC_API_URL`: địa chỉ HTTPS của backend.
+- `LUXCARE_ANDROID_PACKAGE`: mã ứng dụng Android, ví dụ `com.yourcompany.luxcare`. Nếu không đặt, job dùng `LUXCARE_IOS_BUNDLE_IDENTIFIER`; mã này phải hợp lệ với Android (các phần ngăn bằng dấu chấm, không có dấu gạch ngang).
+- `EXPO_PUBLIC_EAS_PROJECT_ID`: dùng chung cấu hình EAS hiện có nếu được đặt.
+
+Khi job Android thành công, tải artifact `LuxCare-android-apk-<run_number>`, giải nén và cài `LuxCare.apk` trên điện thoại. APK là bản Release có sẵn JavaScript, không cần Metro. Artifact và log build được giữ 7 ngày; log Android nằm trong `LuxCare-android-build-log-<run_number>`.
+
+APK dùng khóa debug có sẵn trong template Expo để cài thử nội bộ, chưa phải bản ký bằng khóa phát hành Google Play. Workflow IPA đã ký qua EAS (`build-ios.yml`) vẫn chạy thủ công riêng.

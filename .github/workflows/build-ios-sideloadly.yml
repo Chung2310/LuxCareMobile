@@ -1,4 +1,4 @@
-name: Build iOS IPA for Sideloadly
+name: Build IPA & APK
 
 on:
   push:
@@ -105,3 +105,118 @@ jobs:
           echo '### IPA for Sideloadly' >> "$GITHUB_STEP_SUMMARY"
           echo 'Download LuxCare-unsigned.ipa from Artifacts and sign/install it with Sideloadly on your computer. Apple credentials are not used by this workflow.' >> "$GITHUB_STEP_SUMMARY"
           echo 'Release build for physical iPhone (not Simulator); Metro is not required. Remote push is not guaranteed with personal/free signing.' >> "$GITHUB_STEP_SUMMARY"
+
+  build-apk:
+    name: Android APK
+    runs-on: ubuntu-24.04
+    timeout-minutes: 90
+    defaults:
+      run:
+        working-directory: mobile
+        shell: bash
+    env:
+      CI: "1"
+      EXPO_NO_TELEMETRY: "1"
+      EXPO_PUBLIC_API_URL: ${{ vars.EXPO_PUBLIC_API_URL }}
+      LUXCARE_ANDROID_PACKAGE: ${{ vars.LUXCARE_ANDROID_PACKAGE || vars.LUXCARE_IOS_BUNDLE_IDENTIFIER }}
+      EXPO_PUBLIC_EAS_PROJECT_ID: ${{ vars.EXPO_PUBLIC_EAS_PROJECT_ID }}
+
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          persist-credentials: false
+
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22
+          cache: npm
+          cache-dependency-path: |
+            package-lock.json
+            mobile/package-lock.json
+
+      - uses: actions/setup-java@v4
+        with:
+          distribution: temurin
+          java-version: "17"
+
+      - uses: android-actions/setup-android@v3
+
+      - uses: gradle/actions/setup-gradle@v4
+
+      - name: Validate Android app settings
+        run: |
+          node <<'NODE'
+          const env = process.env;
+          if (!env.EXPO_PUBLIC_API_URL) throw Error("Missing repository variable EXPO_PUBLIC_API_URL");
+          const url = new URL(env.EXPO_PUBLIC_API_URL);
+          if (url.protocol !== "https:" || url.username || url.password ||
+              ["localhost", "127.0.0.1", "[::1]"].includes(url.hostname)) {
+            throw Error("Backend must use HTTPS and be reachable from the Android device, without URL credentials");
+          }
+          if (!/^[A-Za-z][A-Za-z0-9_]*(\.[A-Za-z][A-Za-z0-9_]*)+$/.test(env.LUXCARE_ANDROID_PACKAGE || "")) {
+            throw Error("Set repository variable LUXCARE_ANDROID_PACKAGE, e.g. com.yourcompany.luxcare (defaults to the iOS bundle identifier)");
+          }
+          NODE
+
+      - name: Install root dependencies
+        working-directory: .
+        run: npm ci
+
+      - name: Install mobile dependencies
+        run: npm ci
+
+      - name: Typecheck
+        run: npm run typecheck
+
+      - name: Unit tests
+        working-directory: .
+        run: npm test
+
+      - name: Generate native Android project
+        run: npx --no-install expo prebuild --platform android --no-install
+
+      - name: Build release APK
+        working-directory: mobile/android
+        run: |
+          set -o pipefail
+          bash ./gradlew :app:assembleRelease --no-daemon --max-workers=2 --stacktrace \
+            -PreactNativeArchitectures=arm64-v8a,armeabi-v7a,x86_64 \
+            2>&1 | tee "$RUNNER_TEMP/luxcare-gradle.log"
+
+      - name: Validate and package APK
+        run: |
+          APK="android/app/build/outputs/apk/release/app-release.apk"
+          test -s "$APK"
+          unzip -tq "$APK"
+          unzip -Z1 "$APK" > "$RUNNER_TEMP/luxcare-apk-contents.txt"
+          grep -Fx 'AndroidManifest.xml' "$RUNNER_TEMP/luxcare-apk-contents.txt"
+          grep -Fx 'assets/index.android.bundle' "$RUNNER_TEMP/luxcare-apk-contents.txt"
+          grep -Eq '^lib/arm64-v8a/[^/]+\.so$' "$RUNNER_TEMP/luxcare-apk-contents.txt"
+          APKSIGNER="$(find "$ANDROID_HOME/build-tools" -name apksigner -type f | sort -V | tail -n 1)"
+          test -n "$APKSIGNER"
+          "$APKSIGNER" verify --verbose "$APK"
+          mkdir -p "$RUNNER_TEMP/luxcare-android-artifacts"
+          cp "$APK" "$RUNNER_TEMP/luxcare-android-artifacts/LuxCare.apk"
+
+      - name: Upload APK
+        uses: actions/upload-artifact@v4
+        with:
+          name: LuxCare-android-apk-${{ github.run_number }}
+          path: ${{ runner.temp }}/luxcare-android-artifacts/LuxCare.apk
+          if-no-files-found: error
+          retention-days: 7
+
+      - name: Upload Android build log
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: LuxCare-android-build-log-${{ github.run_number }}
+          path: ${{ runner.temp }}/luxcare-gradle.log
+          if-no-files-found: ignore
+          retention-days: 7
+
+      - name: Installation note
+        run: |
+          echo '### Android APK' >> "$GITHUB_STEP_SUMMARY"
+          echo 'Download LuxCare.apk from Artifacts and install it directly on Android. This Release build includes its JavaScript bundle and does not need Metro.' >> "$GITHUB_STEP_SUMMARY"
+          echo 'Internal testing APK, signed with the Expo template debug keystore. Store distribution requires a dedicated release signing key.' >> "$GITHUB_STEP_SUMMARY"
