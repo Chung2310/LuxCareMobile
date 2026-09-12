@@ -111,6 +111,66 @@ export async function pickWorkAttachment(): Promise<TaskAttachment | null> {
 }
 
 /**
+ * Chọn nhiều tệp tài liệu cùng lúc từ thiết bị
+ */
+export async function pickMultipleWorkAttachments(): Promise<TaskAttachment[]> {
+  const hasPermission = await requestFileReadPermission();
+  if (!hasPermission) return [];
+
+  const result = await DocumentPicker.getDocumentAsync({
+    type: "*/*",
+    multiple: true,
+    copyToCacheDirectory: true,
+  });
+  if (result.canceled || !result.assets || result.assets.length === 0) return [];
+
+  const attachments: TaskAttachment[] = [];
+  for (const asset of result.assets) {
+    const file = new File(asset.uri);
+    try {
+      let size: number | undefined = asset.size;
+      if (!Number.isFinite(size) || (size as number) <= 0) {
+        try {
+          if (Number.isFinite(file.size) && (file.size as number) > 0) {
+            size = file.size;
+          }
+        } catch {}
+      }
+      if (size !== undefined && (size <= 0 || size > 20 * 1024 * 1024)) {
+        continue;
+      }
+
+      const base64 = await readPickedFileAsBase64(asset.uri, asset.name);
+      if (!size || size <= 0) {
+        size = Math.round((base64.length * 3) / 4);
+      }
+      if (!Number.isFinite(size) || size <= 0 || size > 20 * 1024 * 1024) {
+        continue;
+      }
+
+      const mimeType = asset.mimeType || "application/octet-stream";
+      const fileData = `data:${mimeType};base64,${base64}`;
+      const uploaded = await kanbanMedia.upload({ file: fileData, fileName: asset.name, mimeType, size });
+      const type: TaskAttachment["type"] = mimeType.startsWith("image/")
+        ? "image"
+        : mimeType.startsWith("video/")
+          ? "video"
+          : mimeType.startsWith("audio/")
+            ? "audio"
+            : "file";
+      attachments.push({ id: randomUUID(), name: asset.name, type, mimeType, size, ...uploaded });
+    } catch {
+      // bỏ qua file lỗi, tiếp tục các file khác
+    } finally {
+      try {
+        if (asset.uri.startsWith(Paths.cache.uri) && file.exists) file.delete();
+      } catch {}
+    }
+  }
+  return attachments;
+}
+
+/**
  * Chọn ảnh hoặc video từ thư viện ảnh thiết bị
  */
 export async function pickImageAttachment(): Promise<TaskAttachment | null> {
@@ -146,5 +206,52 @@ export async function pickImageAttachment(): Promise<TaskAttachment | null> {
     size,
     ...uploaded,
   };
+}
+
+/**
+ * Chọn nhiều ảnh hoặc video cùng lúc từ thư viện ảnh thiết bị
+ */
+export async function pickMultipleImageAttachments(): Promise<TaskAttachment[]> {
+  const hasPermission = await requestFileReadPermission();
+  if (!hasPermission) return [];
+
+  const result = await ImagePicker.launchImageLibraryAsync({
+    mediaTypes: ["images", "videos"],
+    allowsMultipleSelection: true,
+    quality: 0.8,
+    base64: true,
+  });
+
+  if (result.canceled || !result.assets || result.assets.length === 0) return [];
+
+  const attachments: TaskAttachment[] = [];
+  for (const asset of result.assets) {
+    try {
+      const mimeType = asset.mimeType || (asset.type === "video" ? "video/mp4" : "image/jpeg");
+      const fileName =
+        asset.fileName ||
+        `media_${Date.now()}_${Math.random().toString(36).slice(2, 6)}.${mimeType.split("/")[1] || "jpg"}`;
+      const size = asset.fileSize || 1024 * 100;
+
+      if (size > 20 * 1024 * 1024) continue;
+
+      const base64Data = asset.base64
+        ? `data:${mimeType};base64,${asset.base64}`
+        : asset.uri;
+
+      const uploaded = await kanbanMedia.upload({ file: base64Data, fileName, mimeType, size });
+      attachments.push({
+        id: randomUUID(),
+        name: fileName,
+        type: asset.type === "video" ? "video" : "image",
+        mimeType,
+        size,
+        ...uploaded,
+      });
+    } catch {
+      // bỏ qua file lỗi
+    }
+  }
+  return attachments;
 }
 
