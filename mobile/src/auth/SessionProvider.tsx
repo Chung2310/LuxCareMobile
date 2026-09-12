@@ -56,6 +56,7 @@ const PHRASE_TRANSLATIONS: Array<[RegExp | string, string]> = [
   ["A reason is required to reopen a payroll run", "Cần nhập lý do để mở lại kỳ lương."],
   ["Pinned effective payroll results changed after review", "Dữ liệu hiệu lực của kỳ lương đã thay đổi sau khi duyệt. Vui lòng kiểm tra lại."],
   ["Network request failed", "Không thể kết nối máy chủ. Vui lòng kiểm tra mạng và thử lại."],
+  ["Unsupported FormDataPart implementation", "Không thể xử lý định dạng tệp tin. Vui lòng thử lại."],
   ["Failed to fetch", "Không thể kết nối máy chủ. Vui lòng kiểm tra kết nối mạng và thử lại."],
   ["Aborted", "Yêu cầu đã bị hủy hoặc quá thời gian chờ. Vui lòng thử lại."],
   ["Timeout", "Yêu cầu quá thời gian chờ. Vui lòng thử lại."],

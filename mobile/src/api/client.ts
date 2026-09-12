@@ -8,6 +8,14 @@ export interface TokenStorage {
   clear(): Promise<void>;
 }
 
+function isFormData(body: unknown): boolean {
+  if (!body || typeof body !== "object") return false;
+  if (typeof FormData !== "undefined" && body instanceof FormData) return true;
+  if (Array.isArray((body as any)._parts)) return true;
+  if (typeof (body as any).append === "function") return true;
+  return false;
+}
+
 export class MobileApi {
   private accessToken: string | null = null;
   private refreshToken: string | null = null;
@@ -72,9 +80,89 @@ export class MobileApi {
       input.startsWith("/api/v1/hr/leave-files/upload") ||
       input === "/api/v1/media/upload" ||
       input.startsWith("/api/v1/media/download?") ||
+      input === "/api/v1/assistant/knowledge/files" ||
+      input.startsWith("/api/v1/assistant/knowledge/") ||
       input === "/api/v1/supplies/upload-files";
     const timeout = setTimeout(cancel, isFileTransfer ? 120000 : 20000);
     try {
+      if (isFormData(init.body) && typeof XMLHttpRequest !== "undefined") {
+        return await new Promise<Response>((resolve, reject) => {
+          const xhr = new XMLHttpRequest();
+          const method = (init.method || "POST").toUpperCase();
+          xhr.open(method, `${this.origin}${input}`);
+
+          const headers = new Headers(init.headers);
+          headers.set("x-luxcare-client", "native");
+          // Do not set Content-Type header on XMLHttpRequest when sending FormData in React Native,
+          // so OkHttp automatically generates the multipart boundary
+          headers.delete("content-type");
+          headers.delete("Content-Type");
+
+          headers.forEach((val, key) => {
+            if (key.toLowerCase() !== "content-type") {
+              xhr.setRequestHeader(key, val);
+            }
+          });
+
+          xhr.timeout = isFileTransfer ? 120000 : 20000;
+
+          const onAbort = () => {
+            try {
+              xhr.abort();
+            } catch {}
+            reject(new Error("Yêu cầu đã bị hủy hoặc quá thời gian chờ."));
+          };
+
+          if (controller.signal.aborted) {
+            onAbort();
+            return;
+          }
+          controller.signal.addEventListener("abort", onAbort);
+
+          xhr.onload = () => {
+            controller.signal.removeEventListener("abort", onAbort);
+            const resHeaders = new Headers();
+            const rawHeaders = xhr.getAllResponseHeaders() || "";
+            rawHeaders
+              .trim()
+              .split(/[\r\n]+/)
+              .forEach((line) => {
+                const idx = line.indexOf(":");
+                if (idx > 0) {
+                  resHeaders.append(line.slice(0, idx).trim(), line.slice(idx + 1).trim());
+                }
+              });
+
+            const status = xhr.status || 200;
+            const statusText = xhr.statusText || (status >= 200 && status < 300 ? "OK" : "Error");
+            resolve(
+              new Response(xhr.responseText, {
+                status,
+                statusText,
+                headers: resHeaders,
+              }),
+            );
+          };
+
+          xhr.onerror = () => {
+            controller.signal.removeEventListener("abort", onAbort);
+            reject(new Error("Không thể kết nối máy chủ khi tải tệp. Vui lòng kiểm tra kết nối mạng."));
+          };
+
+          xhr.ontimeout = () => {
+            controller.signal.removeEventListener("abort", onAbort);
+            reject(new Error("Yêu cầu tải tệp đã hết thời gian chờ (timeout). Vui lòng thử lại."));
+          };
+
+          try {
+            xhr.send(init.body as any);
+          } catch (err) {
+            controller.signal.removeEventListener("abort", onAbort);
+            reject(err);
+          }
+        });
+      }
+
       const headers = new Headers(init.headers);
       headers.set("x-luxcare-client", "native");
       return await this.network(`${this.origin}${input}`, {
