@@ -144,6 +144,27 @@ export function PipelineForm({
         title="Lưu quy trình"
         disabled={disabled}
         onPress={() => {
+          const emptyStages = stages.filter((s) => !s.name.trim());
+          if (emptyStages.length > 0) {
+            showAlert(
+              "Thiếu thông tin bắt buộc",
+              `Có ${emptyStages.length} giai đoạn chưa có tên. Vui lòng nhập tên cho tất cả các giai đoạn trong quy trình.`,
+              undefined,
+              "error",
+            );
+            setError("Vui lòng nhập tên cho tất cả các giai đoạn.");
+            return;
+          }
+          if (!stages.some((stage) => stage.isActive)) {
+            showAlert(
+              "Thiếu thông tin bắt buộc",
+              "Quy trình tuyển dụng cần ít nhất một giai đoạn đang hoạt động.",
+              undefined,
+              "error",
+            );
+            setError("Cần ít nhất một giai đoạn đang hoạt động.");
+            return;
+          }
           try {
             const input = pipelinePayload(stages);
             showAlert(
@@ -155,7 +176,9 @@ export function PipelineForm({
               ],
             );
           } catch (error) {
-            setError(messageOf(error));
+            const msg = messageOf(error);
+            showAlert("Thông tin chưa hợp lệ", msg, undefined, "error");
+            setError(msg);
           }
         }}
       />

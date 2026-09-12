@@ -4,6 +4,7 @@ import type { RecruitmentApplicant, RecruitmentInterview, RecruitmentJob } from 
 import type { UserProfile } from "../../../../src/types/common";
 import { recruitment } from "../../api/services";
 import { messageOf } from "../../auth/SessionProvider";
+import { useAppAlert } from "../../components/AppAlert";
 import { Button, ErrorText, Field, styles } from "../../ui";
 import { ChoiceField } from "../leave/ChoiceField";
 import { RecruitmentModal } from "./RecruitmentModal";
@@ -60,6 +61,7 @@ export function InterviewForm({
   onSaved?: () => Promise<void> | void;
   setLocked?: (value: boolean) => void;
 }) {
+  const { showAlert, alertView } = useAppAlert();
   const [draft, setDraft] = useState(() => draftOf(interview, applicantId, jobId));
   const [busy, setBusy] = useState(false);
   const [error, setError] = useState<string | null>(null);
@@ -68,13 +70,28 @@ export function InterviewForm({
 
   const save = async () => {
     if (busy) return;
+    const missing: string[] = [];
+    if (!draft.applicantId) missing.push("• Ứng viên tham gia");
+    const applicant = applicants.find((item) => item._id === draft.applicantId);
+    const selectedJobId = draft.jobId || applicant?.jobId;
+    if (!selectedJobId) missing.push("• Tin tuyển dụng của ứng viên");
+    if (!draft.scheduledStart.trim()) missing.push("• Thời gian bắt đầu (YYYY-MM-DD HH:mm)");
+    if (!draft.scheduledEnd.trim()) missing.push("• Thời gian kết thúc (YYYY-MM-DD HH:mm)");
+
+    if (missing.length > 0) {
+      showAlert(
+        "Thiếu thông tin bắt buộc",
+        `Vui lòng nhập đầy đủ các trường sau trước khi lên lịch phỏng vấn:\n\n${missing.join("\n")}`,
+        undefined,
+        "error",
+      );
+      setError("Vui lòng bổ sung các trường bắt buộc.");
+      return;
+    }
+
     setBusy(true);
     setError(null);
     try {
-      if (!draft.applicantId) throw new Error("Vui lòng chọn ứng viên.");
-      const applicant = applicants.find((item) => item._id === draft.applicantId);
-      const selectedJobId = draft.jobId || applicant?.jobId;
-      if (!selectedJobId) throw new Error("Ứng viên chưa có tin tuyển dụng.");
       const payload = {
         applicantId: draft.applicantId,
         jobId: selectedJobId,
@@ -93,7 +110,9 @@ export function InterviewForm({
       if (onSaved) await onSaved();
       else onClose();
     } catch (err) {
-      setError(messageOf(err));
+      const msg = messageOf(err);
+      showAlert("Thông tin chưa hợp lệ", msg, undefined, "error");
+      setError(msg);
     } finally {
       setBusy(false);
     }
@@ -149,6 +168,7 @@ export function InterviewForm({
       <ErrorText message={error} />
       <Button title={busy ? "Đang lưu..." : "Lưu lịch phỏng vấn"} disabled={busy} onPress={() => void save()} />
       <Button title="Hủy" disabled={busy} onPress={onClose} />
+      {alertView}
     </RecruitmentModal>
   );
 }

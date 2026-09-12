@@ -69,11 +69,24 @@ export function ApplicantForm({
 
   const save = async (confirmDuplicate = false) => {
     if (busy) return;
+    const missing: string[] = [];
+    if (!draft.jobId) missing.push("• Tin tuyển dụng");
+    if (!draft.fullName.trim()) missing.push("• Họ tên ứng viên");
+
+    if (missing.length > 0) {
+      showAlert(
+        "Thiếu thông tin bắt buộc",
+        `Vui lòng nhập đầy đủ các trường sau trước khi lưu hồ sơ ứng viên:\n\n${missing.join("\n")}`,
+        undefined,
+        "error",
+      );
+      setError("Vui lòng bổ sung các trường bắt buộc.");
+      return;
+    }
+
     setBusy(true);
     setError(null);
     try {
-      if (!draft.jobId) throw new Error("Vui lòng chọn tin tuyển dụng.");
-      if (!draft.fullName.trim()) throw new Error("Vui lòng nhập họ tên ứng viên.");
       const payload = {
         jobId: draft.jobId,
         fullName: draft.fullName.trim(),
@@ -113,7 +126,9 @@ export function ApplicantForm({
         onClose();
       }
     } catch (err) {
-      setError(messageOf(err));
+      const msg = messageOf(err);
+      showAlert("Thông tin chưa hợp lệ", msg, undefined, "error");
+      setError(msg);
     } finally {
       setBusy(false);
     }

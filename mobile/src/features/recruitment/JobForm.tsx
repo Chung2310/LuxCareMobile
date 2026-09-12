@@ -3,6 +3,7 @@ import { Switch, Text, View } from "react-native";
 import type { RecruitmentJob } from "../../../../src/types/recruitment";
 import { recruitment } from "../../api/services";
 import { messageOf } from "../../auth/SessionProvider";
+import { useAppAlert } from "../../components/AppAlert";
 import { Button, ErrorText, Field, Page, styles } from "../../ui";
 import { ChoiceField } from "../leave/ChoiceField";
 import { jobDraft, jobPayload } from "./jobModel";
@@ -16,6 +17,7 @@ export function JobForm({
   onClose: () => void;
   setLocked: (value: boolean) => void;
 }) {
+  const { showAlert, alertView } = useAppAlert();
   const [draft, setDraft] = useState(() => jobDraft(job));
   const [busy, setBusy] = useState(false);
   const [blocked, setBlocked] = useState(false);
@@ -41,12 +43,36 @@ export function JobForm({
   };
   const save = async () => {
     if (lock.current) return;
+    const missing: string[] = [];
+    if (!draft.code.trim()) missing.push("• Mã tin tuyển dụng");
+    if (!draft.title.trim()) missing.push("• Tiêu đề tin tuyển dụng");
+    if (!draft.headcount.trim()) {
+      missing.push("• Số lượng tuyển");
+    } else {
+      const hc = Number(draft.headcount);
+      if (!Number.isInteger(hc) || hc < 1) missing.push("• Số lượng tuyển (phải là số nguyên dương)");
+    }
+    if (!draft.employmentType.trim()) missing.push("• Loại hợp đồng");
+
+    if (missing.length > 0) {
+      showAlert(
+        "Thiếu thông tin bắt buộc",
+        `Vui lòng nhập đầy đủ các trường sau trước khi lưu tin tuyển dụng:\n\n${missing.join("\n")}`,
+        undefined,
+        "error",
+      );
+      setError("Vui lòng bổ sung các trường bắt buộc.");
+      return;
+    }
+
     let payload: Partial<RecruitmentJob>;
     try {
       payload = jobPayload(draft, job);
       Object.assign(payload, publicFile.uploads.patch("job", draft.jdFileUrl));
     } catch (error) {
-      setError(messageOf(error));
+      const msg = messageOf(error);
+      showAlert("Thông tin chưa hợp lệ", msg, undefined, "error");
+      setError(msg);
       return;
     }
     lock.current = true;
@@ -133,6 +159,7 @@ export function JobForm({
       <Button title="Chọn và tải JD công khai" disabled={disabled} onPress={() => void upload()} />
       <Button title={busy ? "Đang lưu…" : "Lưu tin"} disabled={disabled} onPress={() => void save()} />
       <Button title="Đóng và tải lại" disabled={busy} onPress={onClose} />
+      {alertView}
     </Page>
   );
 }
