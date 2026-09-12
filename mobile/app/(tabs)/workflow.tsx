@@ -1,3 +1,4 @@
+import { shareApiFile } from "../../src/files/shareFile";
 import { useCallback, useRef, useState, type MutableRefObject } from "react";
 import { Alert, Linking, Modal, Pressable, Text, View } from "react-native";
 import { router, useFocusEffect } from "expo-router";
@@ -310,7 +311,10 @@ function AttachmentRow({ attachment }: { attachment: TaskAttachment }) {
         try {
           const url = new URL(attachment.url);
           if (!["http:", "https:"].includes(url.protocol)) throw new Error("Đường dẫn không được hỗ trợ.");
-          void Linking.openURL(url.toString());
+          if (attachment.type === "link") void Linking.openURL(url.toString());
+          else void shareApiFile(attachment.url, attachment.name).catch((error) => {
+            Alert.alert("Không thể tải tệp", error instanceof Error ? error.message : "Vui lòng thử lại.");
+          });
         } catch {
           Alert.alert("Không thể mở tệp", "Đường dẫn đính kèm không hợp lệ.");
         }

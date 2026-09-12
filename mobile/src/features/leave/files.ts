@@ -2,7 +2,7 @@ import * as DocumentPicker from "expo-document-picker";
 import { File, Paths } from "expo-file-system";
 import { leave } from "../../api/services";
 import { readPickedFileAsBase64 } from "../../files/readBase64";
-export { shareApiFile as shareLeaveFile } from "../../files/shareFile";
+export { resolveFileUrl, shareApiFile as shareLeaveFile, downloadApiFile as downloadLeaveFile } from "../../files/shareFile";
 import type { LeaveAttachment } from "../../../../src/types/leave";
 
 export const MAX_LEAVE_FILE_BYTES = 20 * 1024 * 1024;

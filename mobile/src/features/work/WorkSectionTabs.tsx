@@ -1,11 +1,16 @@
 import { Pressable, ScrollView, StyleSheet, Text, View } from "react-native";
+import { ClipboardList, Folder, BarChart3 } from "lucide-react-native";
 
 export type WorkSection = "tasks" | "projects" | "kpi";
 
-const sections: Array<{ value: WorkSection; label: string; icon: string }> = [
-  { value: "tasks", label: "Công việc", icon: "📋" },
-  { value: "projects", label: "Dự án", icon: "📁" },
-  { value: "kpi", label: "KPI tháng", icon: "📊" },
+const sections: Array<{
+  value: WorkSection;
+  label: string;
+  icon: React.ComponentType<{ size?: number; color?: string }>;
+}> = [
+  { value: "tasks", label: "Công việc", icon: ClipboardList },
+  { value: "projects", label: "Dự án", icon: Folder },
+  { value: "kpi", label: "KPI tháng", icon: BarChart3 },
 ];
 
 export function WorkSectionTabs({
@@ -28,6 +33,7 @@ export function WorkSectionTabs({
           .filter((section) => section.value !== "kpi" || canViewKpi)
           .map((section) => {
             const active = section.value === value;
+            const IconComponent = section.icon;
             return (
               <Pressable
                 key={section.value}
@@ -40,7 +46,10 @@ export function WorkSectionTabs({
                   pressed && { opacity: 0.8 },
                 ]}
               >
-                <Text style={styles.tabIcon}>{section.icon}</Text>
+                <IconComponent
+                  size={14}
+                  color={active ? "#ffffff" : "#475569"}
+                />
                 <Text
                   style={[
                     styles.tabLabel,

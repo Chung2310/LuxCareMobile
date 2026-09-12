@@ -302,10 +302,12 @@ export default function Employees() {
                 </TouchableOpacity>
 
                 <View style={styles.headerLeft}>
-                  <Text style={styles.headerTitle}>Danh bạ nhân sự</Text>
+                  <Text style={styles.headerTitle} numberOfLines={1}>
+                    Danh bạ nhân sự
+                  </Text>
                   <View style={styles.branchRow}>
                     <View style={styles.branchDot} />
-                    <Text style={styles.branchName}>
+                    <Text style={styles.branchName} numberOfLines={1}>
                       {selectedBranch?.name || user?.branchName || user?.companyName || "Toàn công ty"} · {items.length} nhân viên
                     </Text>
                   </View>
@@ -331,16 +333,22 @@ export default function Employees() {
                   >
                     <Ionicons name="reload" size={16} color="#475569" />
                   </TouchableOpacity>
-
-                  <TouchableOpacity
-                    style={styles.orgChartBtn}
-                    onPress={() => router.push("/(tabs)/org-chart" as any)}
-                    activeOpacity={0.8}
-                  >
-                    <Ionicons name="git-network-outline" size={15} color="#2563eb" />
-                    <Text style={styles.orgChartText}>Sơ đồ tổ chức</Text>
-                  </TouchableOpacity>
                 </View>
+              </View>
+
+              {/* Sub-action: Sơ đồ tổ chức */}
+              <View style={styles.subActionBar}>
+                <TouchableOpacity
+                  style={styles.orgChartBtn}
+                  onPress={() => router.push("/(tabs)/org-chart" as any)}
+                  activeOpacity={0.8}
+                >
+                  <View style={styles.orgChartIconBox}>
+                    <Ionicons name="git-network-outline" size={16} color="#2563eb" />
+                  </View>
+                  <Text style={styles.orgChartText}>Sơ đồ tổ chức doanh nghiệp</Text>
+                  <Ionicons name="chevron-forward" size={15} color="#3b82f6" />
+                </TouchableOpacity>
               </View>
 
               {/* Stats overview banner */}
@@ -1139,6 +1147,7 @@ const styles = StyleSheet.create({
     flexDirection: "row",
     alignItems: "center",
     justifyContent: "space-between",
+    gap: 10,
   },
   backBtn: {
     width: 36,
@@ -1149,13 +1158,14 @@ const styles = StyleSheet.create({
     borderColor: "#e2e8f0",
     alignItems: "center",
     justifyContent: "center",
-    marginRight: 10,
   },
   headerLeft: {
     flex: 1,
+    minWidth: 0,
+    justifyContent: "center",
   },
   headerTitle: {
-    fontSize: 22,
+    fontSize: 20,
     fontWeight: "800",
     color: "#0f172a",
     letterSpacing: -0.3,
@@ -1167,9 +1177,9 @@ const styles = StyleSheet.create({
     marginTop: 2,
   },
   branchDot: {
-    width: 7,
-    height: 7,
-    borderRadius: 4,
+    width: 6,
+    height: 6,
+    borderRadius: 3,
     backgroundColor: "#059669",
   },
   branchName: {
@@ -1181,6 +1191,7 @@ const styles = StyleSheet.create({
     flexDirection: "row",
     alignItems: "center",
     gap: 8,
+    flexShrink: 0,
   },
   addEmployeeBtn: {
     flexDirection: "row",
@@ -1211,21 +1222,33 @@ const styles = StyleSheet.create({
     alignItems: "center",
     justifyContent: "center",
   },
+  subActionBar: {
+    marginTop: 2,
+  },
   orgChartBtn: {
     flexDirection: "row",
     alignItems: "center",
-    gap: 5,
     backgroundColor: "#eff6ff",
     borderColor: "#bfdbfe",
     borderWidth: 1,
-    borderRadius: 12,
-    paddingHorizontal: 11,
-    paddingVertical: 8,
+    borderRadius: 14,
+    paddingHorizontal: 12,
+    paddingVertical: 9,
+    gap: 10,
+  },
+  orgChartIconBox: {
+    width: 28,
+    height: 28,
+    borderRadius: 8,
+    backgroundColor: "#dbeafe",
+    alignItems: "center",
+    justifyContent: "center",
   },
   orgChartText: {
-    color: "#2563eb",
+    flex: 1,
+    color: "#1d4ed8",
     fontWeight: "700",
-    fontSize: 12,
+    fontSize: 13,
   },
 
   // Stats

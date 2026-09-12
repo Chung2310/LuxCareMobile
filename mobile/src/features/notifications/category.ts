@@ -76,6 +76,12 @@ export function detectNotificationCategory(
     combined.includes("vào ca") ||
     combined.includes("ra ca") ||
     combined.includes("ca làm") ||
+    combined.includes("check-in") ||
+    combined.includes("check-out") ||
+    combined.includes("quên chấm") ||
+    combined.includes("đi muộn") ||
+    combined.includes("về sớm") ||
+    combined.includes("giờ công") ||
     combined.includes("attendance")
   ) {
     return {

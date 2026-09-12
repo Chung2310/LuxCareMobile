@@ -208,7 +208,7 @@ export function RealtimeNotificationToast({
       ]}
       {...panResponder.panHandlers}
     >
-      <View style={s.card}>
+      <View style={[s.card, categoryInfo.category === "attendance" && s.attendanceCard]}>
         {/* Top Header Row */}
         <View style={s.headerRow}>
           <View style={s.brandGroup}>
@@ -278,8 +278,18 @@ export function RealtimeNotificationToast({
 
           {/* Action Footer */}
           <View style={s.footerRow}>
-            <Text style={s.actionText}>Chạm để xem chi tiết</Text>
-            <Ionicons name="chevron-forward" size={13} color="#059669" />
+            {categoryInfo.category === "attendance" ? (
+              <View style={s.attendanceActionBadge}>
+                <Ionicons name="time" size={13} color="#0891b2" />
+                <Text style={s.attendanceActionText}>Mở bảng Chấm công</Text>
+                <Ionicons name="chevron-forward" size={12} color="#0891b2" />
+              </View>
+            ) : (
+              <>
+                <Text style={s.actionText}>Chạm để xem chi tiết</Text>
+                <Ionicons name="chevron-forward" size={13} color="#059669" />
+              </>
+            )}
           </View>
         </Pressable>
 
@@ -319,6 +329,14 @@ const s = StyleSheet.create({
     shadowOpacity: 0.16,
     shadowRadius: 22,
     elevation: 16,
+  },
+  attendanceCard: {
+    borderRadius: 22,
+    borderWidth: 1.5,
+    borderColor: "#a5f3fc",
+    shadowColor: "#0891b2",
+    shadowOpacity: 0.18,
+    backgroundColor: "#ffffff",
   },
   headerRow: {
     flexDirection: "row",
@@ -422,6 +440,22 @@ const s = StyleSheet.create({
     fontSize: 11.5,
     fontWeight: "700",
     color: "#059669",
+  },
+  attendanceActionBadge: {
+    flexDirection: "row",
+    alignItems: "center",
+    gap: 5,
+    backgroundColor: "#ecfeff",
+    borderWidth: 1,
+    borderColor: "#a5f3fc",
+    paddingHorizontal: 10,
+    paddingVertical: 5,
+    borderRadius: 12,
+  },
+  attendanceActionText: {
+    fontSize: 11.5,
+    fontWeight: "700",
+    color: "#0891b2",
   },
   progressTrack: {
     height: 3,

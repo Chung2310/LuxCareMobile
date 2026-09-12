@@ -45,6 +45,29 @@ import { PayrollAuditHistory } from "../../src/features/payroll/PayrollAuditHist
 import { canReadRunPayments } from "../../src/features/payroll/paymentModel";
 import { PayrollPeriodInputs } from "../../src/features/payroll/PayrollPeriodInputs";
 import { PayrollVariables } from "../../src/features/payroll/PayrollVariables";
+import {
+  Lock,
+  Unlock,
+  Building2,
+  FileText,
+  ChevronLeft,
+  ChevronRight,
+  BarChart3,
+  Check,
+  Zap,
+  Search,
+  CreditCard,
+  RefreshCw,
+  Send,
+  Download,
+  History,
+  Settings,
+  X,
+  ClipboardList,
+  Calendar,
+  Sparkles,
+  Info,
+} from "lucide-react-native";
 
 export interface PayrollRunsProps {
   initialTab?: "my_payslip" | "company_run";
@@ -237,7 +260,7 @@ export default function PayrollRuns({ initialTab }: PayrollRunsProps = {}) {
     return (
       <SafeAreaView edges={["top"]} style={payrollStyles.container}>
         <View style={payrollStyles.accessCard}>
-          <Text style={payrollStyles.emptyIcon}>🔒</Text>
+          <Lock size={40} color="#94a3b8" style={{ marginBottom: 10 }} />
           <Text style={payrollStyles.emptyTitle}>Không có quyền truy cập</Text>
           <Text style={payrollStyles.emptyText}>
             Cần tài khoản doanh nghiệp có phân hệ nhân sự để xem bảng lương hoặc phiếu lương.
@@ -251,7 +274,7 @@ export default function PayrollRuns({ initialTab }: PayrollRunsProps = {}) {
     return (
       <SafeAreaView edges={["top"]} style={payrollStyles.container}>
         <View style={payrollStyles.accessCard}>
-          <Text style={payrollStyles.emptyIcon}>🏢</Text>
+          <Building2 size={40} color="#94a3b8" style={{ marginBottom: 10 }} />
           <Text style={payrollStyles.emptyTitle}>Chưa chọn chi nhánh</Text>
           <Text style={payrollStyles.emptyText}>
             Chọn chi nhánh trong tài khoản để tra cứu bảng lương và phiếu lương.
@@ -450,32 +473,42 @@ export default function PayrollRuns({ initialTab }: PayrollRunsProps = {}) {
               style={[
                 payrollStyles.tabSegmentButton,
                 activeTab === "company_run" && payrollStyles.tabSegmentButtonActive,
+                { flexDirection: "row", alignItems: "center", justifyContent: "center", gap: 6 },
               ]}
               onPress={() => setActiveTab("company_run")}
             >
+              <Building2
+                size={14}
+                color={activeTab === "company_run" ? "#047857" : "#64748b"}
+              />
               <Text
                 style={[
                   payrollStyles.tabSegmentText,
                   activeTab === "company_run" && payrollStyles.tabSegmentTextActive,
                 ]}
               >
-                🏢 Bảng tính lương
+                Bảng tính lương
               </Text>
             </Pressable>
             <Pressable
               style={[
                 payrollStyles.tabSegmentButton,
                 activeTab === "my_payslip" && payrollStyles.tabSegmentButtonActive,
+                { flexDirection: "row", alignItems: "center", justifyContent: "center", gap: 6 },
               ]}
               onPress={() => setActiveTab("my_payslip")}
             >
+              <FileText
+                size={14}
+                color={activeTab === "my_payslip" ? "#047857" : "#64748b"}
+              />
               <Text
                 style={[
                   payrollStyles.tabSegmentText,
                   activeTab === "my_payslip" && payrollStyles.tabSegmentTextActive,
                 ]}
               >
-                📄 Phiếu lương của tôi
+                Phiếu lương của tôi
               </Text>
             </Pressable>
           </View>
@@ -492,7 +525,7 @@ export default function PayrollRuns({ initialTab }: PayrollRunsProps = {}) {
                 style={({ pressed }) => [payrollStyles.navArrowBtn, pressed && { opacity: 0.6 }]}
                 onPress={goToPrevMonth}
               >
-                <Text style={payrollStyles.navArrowText}>◀</Text>
+                <ChevronLeft size={18} color="#475569" />
               </Pressable>
 
               <Pressable
@@ -507,7 +540,7 @@ export default function PayrollRuns({ initialTab }: PayrollRunsProps = {}) {
                 style={({ pressed }) => [payrollStyles.navArrowBtn, pressed && { opacity: 0.6 }]}
                 onPress={goToNextMonth}
               >
-                <Text style={payrollStyles.navArrowText}>▶</Text>
+                <ChevronRight size={18} color="#475569" />
               </Pressable>
             </View>
 
@@ -574,7 +607,7 @@ export default function PayrollRuns({ initialTab }: PayrollRunsProps = {}) {
             {/* Trạng thái chưa có bảng lương */}
             {missing && !loading && (
               <View style={payrollStyles.emptyCard}>
-                <Text style={payrollStyles.emptyIcon}>📊</Text>
+                <BarChart3 size={40} color="#94a3b8" style={{ marginBottom: 10 }} />
                 <Text style={payrollStyles.emptyTitle}>Chưa có bảng lương kỳ {period}</Text>
                 <Text style={payrollStyles.emptyText}>
                   Kỳ này chưa được khởi tạo. Bạn có thể nhấn nút bên dưới để tạo kỳ lương mới.
@@ -622,7 +655,7 @@ export default function PayrollRuns({ initialTab }: PayrollRunsProps = {}) {
                             currentStage > 1 && payrollStyles.stepCircleTextDone,
                           ]}
                         >
-                          {currentStage > 1 ? "✓" : "1"}
+                          {currentStage > 1 ? <Check size={14} color="#ffffff" strokeWidth={3} /> : "1"}
                         </Text>
                       </View>
                       <Text
@@ -660,7 +693,7 @@ export default function PayrollRuns({ initialTab }: PayrollRunsProps = {}) {
                             currentStage > 2 && payrollStyles.stepCircleTextDone,
                           ]}
                         >
-                          {currentStage > 2 ? "✓" : "2"}
+                          {currentStage > 2 ? <Check size={14} color="#ffffff" strokeWidth={3} /> : "2"}
                         </Text>
                       </View>
                       <Text
@@ -698,7 +731,7 @@ export default function PayrollRuns({ initialTab }: PayrollRunsProps = {}) {
                             currentStage > 3 && payrollStyles.stepCircleTextDone,
                           ]}
                         >
-                          {currentStage > 3 ? "✓" : "3"}
+                          {currentStage > 3 ? <Check size={14} color="#ffffff" strokeWidth={3} /> : "3"}
                         </Text>
                       </View>
                       <Text
@@ -736,7 +769,7 @@ export default function PayrollRuns({ initialTab }: PayrollRunsProps = {}) {
                             isPaid && payrollStyles.stepCircleTextDone,
                           ]}
                         >
-                          {isPaid ? "✓" : "4"}
+                          {isPaid ? <Check size={14} color="#ffffff" strokeWidth={3} /> : "4"}
                         </Text>
                       </View>
                       <Text
@@ -751,16 +784,23 @@ export default function PayrollRuns({ initialTab }: PayrollRunsProps = {}) {
                     </View>
                   </View>
 
-                  <Text style={payrollStyles.stepperDesc}>
-                    {currentStage === 1 &&
-                      "💡 Bước 1 (Nháp): Thực hiện 'Tính lương' từ dữ liệu chấm công và chuyển sang 'Kiểm tra'."}
-                    {currentStage === 2 &&
-                      "💡 Bước 2 (Kiểm tra): Rà soát bảng lương của từng nhân viên và bấm 'Chốt kỳ' khi số liệu chuẩn xác."}
-                    {currentStage === 3 &&
-                      "💡 Bước 3 (Chốt): Bảng lương đã chốt và khóa dữ liệu an toàn. Chuyển sang Bước 4 'Thanh toán' để lập phiếu chi."}
-                    {currentStage === 4 &&
-                      "🎉 Bước 4 (Thanh toán): Kỳ lương đã hoàn tất chi trả và thanh toán toàn bộ cho nhân viên."}
-                  </Text>
+                  <View style={{ flexDirection: "row", alignItems: "flex-start", gap: 6, marginTop: 8 }}>
+                    {currentStage === 4 ? (
+                      <Sparkles size={14} color="#059669" style={{ marginTop: 2 }} />
+                    ) : (
+                      <Info size={14} color="#64748b" style={{ marginTop: 2 }} />
+                    )}
+                    <Text style={[payrollStyles.stepperDesc, { marginTop: 0, flex: 1 }]}>
+                      {currentStage === 1 &&
+                        "Bước 1 (Nháp): Thực hiện 'Tính lương' từ dữ liệu chấm công và chuyển sang 'Kiểm tra'."}
+                      {currentStage === 2 &&
+                        "Bước 2 (Kiểm tra): Rà soát bảng lương của từng nhân viên và bấm 'Chốt kỳ' khi số liệu chuẩn xác."}
+                      {currentStage === 3 &&
+                        "Bước 3 (Chốt): Bảng lương đã chốt và khóa dữ liệu an toàn. Chuyển sang Bước 4 'Thanh toán' để lập phiếu chi."}
+                      {currentStage === 4 &&
+                        "Bước 4 (Thanh toán): Kỳ lương đã hoàn tất chi trả và thanh toán toàn bộ cho nhân viên."}
+                    </Text>
+                  </View>
                 </View>
 
                 {/* 4 Thao tác cốt lõi dạng Grid 2x2 */}
@@ -781,7 +821,7 @@ export default function PayrollRuns({ initialTab }: PayrollRunsProps = {}) {
                           currentStage === 1 && payrollStyles.coreActionIconBoxActive,
                         ]}
                       >
-                        <Text style={payrollStyles.coreActionIcon}>⚡</Text>
+                        <Zap size={15} color={currentStage === 1 ? "#047857" : "#64748b"} />
                       </View>
                       <View
                         style={[
@@ -821,7 +861,7 @@ export default function PayrollRuns({ initialTab }: PayrollRunsProps = {}) {
                           currentStage === 2 && payrollStyles.coreActionIconBoxActive,
                         ]}
                       >
-                        <Text style={payrollStyles.coreActionIcon}>🔍</Text>
+                        <Search size={15} color={currentStage === 2 ? "#1d4ed8" : "#64748b"} />
                       </View>
                       <View
                         style={[
@@ -867,7 +907,7 @@ export default function PayrollRuns({ initialTab }: PayrollRunsProps = {}) {
                           isClosed && payrollStyles.coreActionIconBoxClosed,
                         ]}
                       >
-                        <Text style={payrollStyles.coreActionIcon}>🔒</Text>
+                        <Lock size={15} color={isClosed ? "#4338ca" : "#64748b"} />
                       </View>
                       <View
                         style={[
@@ -889,7 +929,7 @@ export default function PayrollRuns({ initialTab }: PayrollRunsProps = {}) {
                                 : payrollStyles.badgeMutedText,
                           ]}
                         >
-                          {isClosed ? "Đã chốt ✓" : currentStage === 2 ? "Sẵn sàng" : "Chờ duyệt"}
+                          {isClosed ? "Đã chốt" : currentStage === 2 ? "Sẵn sàng" : "Chờ duyệt"}
                         </Text>
                       </View>
                     </View>
@@ -913,7 +953,7 @@ export default function PayrollRuns({ initialTab }: PayrollRunsProps = {}) {
                           run.status === "paid" && payrollStyles.coreActionIconBoxSuccess,
                         ]}
                       >
-                        <Text style={payrollStyles.coreActionIcon}>💵</Text>
+                        <CreditCard size={15} color={run.status === "paid" ? "#b45309" : "#64748b"} />
                       </View>
                       <View
                         style={[
@@ -935,7 +975,7 @@ export default function PayrollRuns({ initialTab }: PayrollRunsProps = {}) {
                                 : payrollStyles.badgeMutedText,
                           ]}
                         >
-                          {run.status === "paid" ? "Đã trả ✓" : isClosed ? "Chi trả" : "Chờ chốt"}
+                          {run.status === "paid" ? "Đã trả" : isClosed ? "Chi trả" : "Chờ chốt"}
                         </Text>
                       </View>
                     </View>
@@ -956,7 +996,7 @@ export default function PayrollRuns({ initialTab }: PayrollRunsProps = {}) {
                       style={({ pressed }) => [payrollStyles.auxChip, pressed && { opacity: 0.7 }]}
                       onPress={() => setActiveModal("sync")}
                     >
-                      <Text style={payrollStyles.auxChipIcon}>🔄</Text>
+                      <RefreshCw size={12} color="#475569" />
                       <Text style={payrollStyles.auxChipText}>Đồng bộ công</Text>
                     </Pressable>
 
@@ -965,7 +1005,7 @@ export default function PayrollRuns({ initialTab }: PayrollRunsProps = {}) {
                         style={({ pressed }) => [payrollStyles.auxChip, pressed && { opacity: 0.7 }]}
                         onPress={() => setActiveModal("reopen")}
                       >
-                        <Text style={payrollStyles.auxChipIcon}>🔓</Text>
+                        <Unlock size={12} color="#475569" />
                         <Text style={payrollStyles.auxChipText}>Mở lại kỳ (Nháp)</Text>
                       </Pressable>
                     )}
@@ -974,7 +1014,7 @@ export default function PayrollRuns({ initialTab }: PayrollRunsProps = {}) {
                       style={({ pressed }) => [payrollStyles.auxChip, pressed && { opacity: 0.7 }]}
                       onPress={() => setActiveModal("publish")}
                     >
-                      <Text style={payrollStyles.auxChipIcon}>📤</Text>
+                      <Send size={12} color="#475569" />
                       <Text style={payrollStyles.auxChipText}>Phát hành</Text>
                     </Pressable>
 
@@ -982,7 +1022,7 @@ export default function PayrollRuns({ initialTab }: PayrollRunsProps = {}) {
                       style={({ pressed }) => [payrollStyles.auxChip, pressed && { opacity: 0.7 }]}
                       onPress={() => setActiveModal("export")}
                     >
-                      <Text style={payrollStyles.auxChipIcon}>📥</Text>
+                      <Download size={12} color="#475569" />
                       <Text style={payrollStyles.auxChipText}>Xuất file</Text>
                     </Pressable>
 
@@ -991,7 +1031,7 @@ export default function PayrollRuns({ initialTab }: PayrollRunsProps = {}) {
                         style={({ pressed }) => [payrollStyles.auxChip, pressed && { opacity: 0.7 }]}
                         onPress={() => setActiveModal("history")}
                       >
-                        <Text style={payrollStyles.auxChipIcon}>📋</Text>
+                        <History size={12} color="#475569" />
                         <Text style={payrollStyles.auxChipText}>Lịch sử chi</Text>
                       </Pressable>
                     )}
@@ -1000,7 +1040,7 @@ export default function PayrollRuns({ initialTab }: PayrollRunsProps = {}) {
                       style={({ pressed }) => [payrollStyles.auxChip, pressed && { opacity: 0.7 }]}
                       onPress={() => setActiveModal("advanced")}
                     >
-                      <Text style={payrollStyles.auxChipIcon}>⚙️</Text>
+                      <Settings size={12} color="#475569" />
                       <Text style={payrollStyles.auxChipText}>Cấu hình & Nhật ký</Text>
                     </Pressable>
                   </ScrollView>
@@ -1019,7 +1059,7 @@ export default function PayrollRuns({ initialTab }: PayrollRunsProps = {}) {
 
                 {/* Thanh tìm kiếm nhanh */}
                 <View style={payrollStyles.searchContainer}>
-                  <Text style={payrollStyles.searchIcon}>🔍</Text>
+                  <Search size={15} color="#94a3b8" />
                   <TextInput
                     style={payrollStyles.searchInput}
                     value={searchDraft}
@@ -1042,14 +1082,14 @@ export default function PayrollRuns({ initialTab }: PayrollRunsProps = {}) {
                       hitSlop={8}
                       style={payrollStyles.searchClearBtn}
                     >
-                      <Text style={payrollStyles.searchClearText}>✕</Text>
+                      <X size={14} color="#94a3b8" />
                     </Pressable>
                   )}
                 </View>
 
                 {!rows.length ? (
                   <View style={payrollStyles.emptyCard}>
-                    <Text style={payrollStyles.emptyIcon}>📋</Text>
+                    <ClipboardList size={40} color="#94a3b8" style={{ marginBottom: 10 }} />
                     <Text style={payrollStyles.emptyTitle}>Không tìm thấy nhân viên</Text>
                     <Text style={payrollStyles.emptyText}>
                       Không có nhân viên nào phù hợp với từ khóa &ldquo;{search}&rdquo;.
@@ -1082,11 +1122,16 @@ export default function PayrollRuns({ initialTab }: PayrollRunsProps = {}) {
                               {line.employeeName || "Nhân viên"}
                             </Text>
                             <View style={payrollStyles.empMetaRow}>
-                              <Text style={payrollStyles.empWorkDays}>
-                                {workedDays !== undefined
-                                  ? `📅 ${workedDays}/${standardDays || "—"} ngày công`
-                                  : "Nhân viên"}
-                              </Text>
+                              {workedDays !== undefined ? (
+                                <View style={{ flexDirection: "row", alignItems: "center", gap: 3 }}>
+                                  <Calendar size={11} color="#64748b" />
+                                  <Text style={payrollStyles.empWorkDays}>
+                                    {workedDays}/{standardDays || "—"} ngày công
+                                  </Text>
+                                </View>
+                              ) : (
+                                <Text style={payrollStyles.empWorkDays}>Nhân viên</Text>
+                              )}
                             </View>
                           </View>
 
@@ -1237,7 +1282,7 @@ export default function PayrollRuns({ initialTab }: PayrollRunsProps = {}) {
             <View style={payrollStyles.personalFilterSection}>
               {/* Thanh tìm kiếm tháng/năm */}
               <View style={payrollStyles.searchContainer}>
-                <Text style={payrollStyles.searchIcon}>🔍</Text>
+                <Search size={15} color="#94a3b8" />
                 <TextInput
                   style={payrollStyles.searchInput}
                   value={personalSearch}
@@ -1261,7 +1306,10 @@ export default function PayrollRuns({ initialTab }: PayrollRunsProps = {}) {
                     hitSlop={8}
                     style={payrollStyles.searchClearBtn}
                   >
-                    <Text style={payrollStyles.searchClearText}>✕ Đặt lại</Text>
+                    <View style={{ flexDirection: "row", alignItems: "center", gap: 3 }}>
+                      <X size={12} color="#dc2626" />
+                      <Text style={[payrollStyles.searchClearText, { color: "#dc2626" }]}>Đặt lại</Text>
+                    </View>
                   </Pressable>
                 )}
               </View>
@@ -1371,7 +1419,7 @@ export default function PayrollRuns({ initialTab }: PayrollRunsProps = {}) {
 
             {!personalLoading && !personalError && personalRows.length === 0 && (
               <View style={payrollStyles.emptyCard}>
-                <Text style={payrollStyles.emptyIcon}>💳</Text>
+                <CreditCard size={40} color="#94a3b8" style={{ marginBottom: 10 }} />
                 <Text style={payrollStyles.emptyTitle}>Chưa có phiếu lương</Text>
                 <Text style={payrollStyles.emptyText}>
                   Chưa có phiếu lương cá nhân nào được phát hành trong kỳ đã chọn.
@@ -1386,7 +1434,7 @@ export default function PayrollRuns({ initialTab }: PayrollRunsProps = {}) {
                 <View key={key} style={payrollStyles.employeeCard}>
                   <View style={payrollStyles.empHeaderRow}>
                     <View style={payrollStyles.avatarCircle}>
-                      <Text style={payrollStyles.avatarText}>📄</Text>
+                      <FileText size={16} color="#047857" />
                     </View>
                     <View style={{ flex: 1, paddingRight: 8 }}>
                       <Text style={payrollStyles.employeeName}>
@@ -1467,25 +1515,38 @@ export default function PayrollRuns({ initialTab }: PayrollRunsProps = {}) {
             <View style={payrollStyles.modalDragHandle} />
 
             <View style={payrollStyles.modalHeader}>
-              <Text style={payrollStyles.modalTitle}>
-                {activeModal === "calculate" && "⚡ 1. Tính lương kỳ " + period}
-                {activeModal === "review" && "🔍 2. Kiểm tra bảng lương kỳ " + period}
-                {activeModal === "close" && "🔒 3. Chốt kỳ lương kỳ " + period}
-                {activeModal === "payment" && "💵 4. Thanh toán lương kỳ " + period}
-                {activeModal === "reopen" && "🔓 Mở lại kỳ lương " + period}
-                {activeModal === "sync" && "🔄 Đồng bộ chấm công kỳ " + period}
-                {activeModal === "publish" && "📤 Phát hành phiếu lương " + period}
-                {activeModal === "export" && "📥 Xuất bảng lương " + period}
-                {activeModal === "history" && "📋 Lịch sử chi trả kỳ " + period}
-                {activeModal === "advanced" && "⚙️ Quản trị & Điều chỉnh lương"}
-                {activeModal === "custom_period" && "📅 Chọn kỳ lương tra cứu"}
-              </Text>
+              <View style={{ flex: 1, flexDirection: "row", alignItems: "center", gap: 8, paddingRight: 8 }}>
+                {activeModal === "calculate" && <Zap size={18} color="#047857" />}
+                {activeModal === "review" && <Search size={18} color="#1d4ed8" />}
+                {activeModal === "close" && <Lock size={18} color="#047857" />}
+                {activeModal === "payment" && <CreditCard size={18} color="#047857" />}
+                {activeModal === "reopen" && <Unlock size={18} color="#d97706" />}
+                {activeModal === "sync" && <RefreshCw size={18} color="#0284c7" />}
+                {activeModal === "publish" && <Send size={18} color="#047857" />}
+                {activeModal === "export" && <Download size={18} color="#0284c7" />}
+                {activeModal === "history" && <History size={18} color="#64748b" />}
+                {activeModal === "advanced" && <Settings size={18} color="#64748b" />}
+                {activeModal === "custom_period" && <Calendar size={18} color="#047857" />}
+                <Text style={payrollStyles.modalTitle} numberOfLines={1}>
+                  {activeModal === "calculate" && "1. Tính lương kỳ " + period}
+                  {activeModal === "review" && "2. Kiểm tra bảng lương kỳ " + period}
+                  {activeModal === "close" && "3. Chốt kỳ lương kỳ " + period}
+                  {activeModal === "payment" && "4. Thanh toán lương kỳ " + period}
+                  {activeModal === "reopen" && "Mở lại kỳ lương " + period}
+                  {activeModal === "sync" && "Đồng bộ chấm công kỳ " + period}
+                  {activeModal === "publish" && "Phát hành phiếu lương " + period}
+                  {activeModal === "export" && "Xuất bảng lương " + period}
+                  {activeModal === "history" && "Lịch sử chi trả kỳ " + period}
+                  {activeModal === "advanced" && "Quản trị & Điều chỉnh lương"}
+                  {activeModal === "custom_period" && "Chọn kỳ lương tra cứu"}
+                </Text>
+              </View>
               <Pressable
                 onPress={() => setActiveModal(null)}
                 hitSlop={10}
                 style={payrollStyles.modalCloseButton}
               >
-                <Text style={payrollStyles.modalCloseText}>✕</Text>
+                <X size={18} color="#64748b" />
               </Pressable>
             </View>
 

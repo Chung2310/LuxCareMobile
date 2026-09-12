@@ -1,4 +1,4 @@
-import React, { useCallback, useRef, useState } from "react";
+import React, { useCallback, useMemo, useRef, useState } from "react";
 import {
   ActivityIndicator,
   Alert,
@@ -156,6 +156,8 @@ export default function Notifications() {
   const totalPages = data ? Math.ceil(data.total / data.limit) || 1 : 1;
   const unreadCount = data?.unreadCount || 0;
 
+  const [selectedCategory, setSelectedCategory] = useState<string>("");
+
   const filterTabs: Array<{
     id: string;
     label: string;
@@ -163,13 +165,14 @@ export default function Notifications() {
   }> = [
     { id: "all", label: "Tất cả", icon: "apps-outline" },
     { id: "unread", label: unreadCount > 0 ? `Chưa đọc (${unreadCount})` : "Chưa đọc", icon: "mail-unread-outline" },
+    { id: "attendance", label: "Chấm công", icon: "time-outline" },
     { id: "task", label: "Công việc", icon: "checkbox-outline" },
     { id: "training", label: "Đào tạo", icon: "school-outline" },
     { id: "kho", label: "Kho & Thiết bị", icon: "cube-outline" },
     { id: "he-thong", label: "Hệ thống", icon: "settings-outline" },
   ];
 
-  const currentTab = unreadOnly ? "unread" : type || "all";
+  const currentTab = unreadOnly ? "unread" : selectedCategory || type || "all";
 
   const handleSelectTab = (tabId: string) => {
     if (busy) return;
@@ -177,22 +180,47 @@ export default function Notifications() {
     if (tabId === "all") {
       setUnreadOnly(false);
       setType("");
+      setSelectedCategory("");
     } else if (tabId === "unread") {
       setUnreadOnly(true);
       setType("");
+      setSelectedCategory("");
+    } else if (tabId === "attendance") {
+      setUnreadOnly(false);
+      setType("");
+      setSelectedCategory("attendance");
     } else {
       setUnreadOnly(false);
+      setSelectedCategory("");
       setType(tabId as NotifType);
     }
   };
+
+  const displayList = useMemo(() => {
+    if (!data?.data) return [];
+    if (selectedCategory === "attendance") {
+      return data.data.filter(
+        (item) => detectNotificationCategory(item.title, item.body, item.action).category === "attendance"
+      );
+    }
+    return data.data;
+  }, [data?.data, selectedCategory]);
 
   const renderItem = ({ item }: { item: WebNotification }) => {
     const categoryInfo = detectNotificationCategory(item.title, item.body, item.action);
     const destination = item.action ? notificationTarget(item, user) : null;
     const isUnread = !item.read;
+    const isAttendance = categoryInfo.category === "attendance";
 
     return (
-      <View style={[styles.card, isUnread ? styles.cardUnread : styles.cardRead]}>
+      <View
+        style={[
+          styles.card,
+          isAttendance
+            ? [styles.attendanceCard, isUnread && styles.attendanceCardUnread]
+            : [isUnread ? styles.cardUnread : styles.cardRead],
+        ]}
+      >
         {/* Type Icon and Status Header */}
         <View style={styles.cardHeader}>
           <View style={styles.typeBadgeRow}>
@@ -237,19 +265,42 @@ export default function Notifications() {
           {!!item.body && <Text style={styles.itemBody}>{item.body}</Text>}
         </View>
 
-        {/* Action Link button if target is valid */}
-        {destination?.target && (
+        {/* Action Link button if target is valid or attendance notification */}
+        {(destination?.target || isAttendance) && (
           <Pressable
             style={({ pressed }) => [
-              styles.targetBtn,
+              isAttendance ? styles.attendanceTargetBtn : styles.targetBtn,
               pressed && { opacity: 0.8 },
               busy && { opacity: 0.5 },
             ]}
             disabled={busy}
-            onPress={() => void openNotification(item)}
+            onPress={() => {
+              if (destination?.target) {
+                void openNotification(item);
+              } else {
+                router.push("/(tabs)/attendance");
+              }
+            }}
           >
-            <Text style={styles.targetBtnText}>{destination.target.label}</Text>
-            <Ionicons name="arrow-forward" size={14} color="#15803d" />
+            <Ionicons
+              name={isAttendance ? "finger-print" : "arrow-forward"}
+              size={15}
+              color={isAttendance ? "#0891b2" : "#15803d"}
+            />
+            <Text
+              style={
+                isAttendance
+                  ? styles.attendanceTargetBtnText
+                  : styles.targetBtnText
+              }
+            >
+              {destination?.target?.label || "Mở màn hình Chấm công"}
+            </Text>
+            <Ionicons
+              name="chevron-forward"
+              size={13}
+              color={isAttendance ? "#0891b2" : "#15803d"}
+            />
           </Pressable>
         )}
 
@@ -375,7 +426,7 @@ export default function Notifications() {
       <FlatList
         style={styles.list}
         contentContainerStyle={styles.listContent}
-        data={data?.data || []}
+        data={displayList}
         keyExtractor={(item) => item._id}
         refreshControl={
           <RefreshControl
@@ -572,25 +623,39 @@ const styles = StyleSheet.create({
   },
   card: {
     backgroundColor: "#ffffff",
-    borderRadius: 16,
+    borderRadius: 18,
     padding: 16,
-    borderWidth: 1,
+    borderWidth: 1.2,
     borderColor: "#e2e8f0",
     gap: 10,
     shadowColor: "#0f172a",
-    shadowOffset: { width: 0, height: 1 },
-    shadowOpacity: 0.04,
-    shadowRadius: 4,
-    elevation: 1,
+    shadowOffset: { width: 0, height: 2 },
+    shadowOpacity: 0.05,
+    shadowRadius: 5,
+    elevation: 2,
   },
   cardUnread: {
     borderColor: "#a7f3d0",
-    borderLeftWidth: 4,
-    borderLeftColor: "#059669",
     backgroundColor: "#ffffff",
+    borderWidth: 1.5,
   },
   cardRead: {
     opacity: 0.88,
+  },
+  attendanceCard: {
+    borderRadius: 18,
+    borderWidth: 1.5,
+    borderColor: "#a5f3fc",
+    backgroundColor: "#ffffff",
+    shadowColor: "#0891b2",
+    shadowOffset: { width: 0, height: 2 },
+    shadowOpacity: 0.08,
+    shadowRadius: 6,
+    elevation: 2,
+  },
+  attendanceCardUnread: {
+    backgroundColor: "#f0fdfa",
+    borderColor: "#22d3ee",
   },
   cardHeader: {
     flexDirection: "row",
@@ -689,6 +754,23 @@ const styles = StyleSheet.create({
   targetBtnArrow: {
     color: "#15803d",
     fontSize: 15,
+    fontWeight: "700",
+  },
+  attendanceTargetBtn: {
+    flexDirection: "row",
+    alignItems: "center",
+    justifyContent: "space-between",
+    backgroundColor: "#ecfeff",
+    borderWidth: 1,
+    borderColor: "#a5f3fc",
+    paddingVertical: 9,
+    paddingHorizontal: 12,
+    borderRadius: 12,
+    marginTop: 2,
+  },
+  attendanceTargetBtnText: {
+    color: "#0891b2",
+    fontSize: 13,
     fontWeight: "700",
   },
   cardActionsRow: {

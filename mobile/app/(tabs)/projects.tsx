@@ -23,6 +23,7 @@ import { AttachmentsForm } from "../../src/features/work/AttachmentsForm";
 import { PROJECT_PRIORITIES, PROJECT_STATUSES } from "../../src/features/work/project";
 import { EmptyState, Page } from "../../src/ui";
 import { WorkSectionTabs, type WorkSection } from "../../src/features/work/WorkSectionTabs";
+import { Search, X, AlertCircle, Calendar, Paperclip, Pencil, Trash2 } from "lucide-react-native";
 
 const STATUS_MAP: Record<string, { label: string; color: string; bg: string }> = {
   not_started: { label: "Chưa bắt đầu", color: "#475569", bg: "#f1f5f9" },
@@ -171,7 +172,7 @@ export default function Projects({ onSectionChange }: ProjectsProps = {}) {
       {/* Search & Status Filter Bar */}
       <View style={styles.filterSection}>
         <View style={styles.searchBox}>
-          <Text style={styles.searchIcon}>🔍</Text>
+          <Search size={15} color="#94a3b8" style={{ marginRight: 6 }} />
           <TextInput
             style={styles.searchInput}
             placeholder="Tìm kiếm dự án..."
@@ -181,7 +182,7 @@ export default function Projects({ onSectionChange }: ProjectsProps = {}) {
           />
           {search.length > 0 && (
             <Pressable onPress={() => setSearch("")} style={styles.searchClearBtn}>
-              <Text style={styles.searchClearText}>✕</Text>
+              <X size={14} color="#94a3b8" />
             </Pressable>
           )}
         </View>
@@ -230,8 +231,9 @@ export default function Projects({ onSectionChange }: ProjectsProps = {}) {
 
       {/* Error Banner */}
       {!!error && (
-        <View style={styles.errorBox}>
-          <Text style={styles.errorText}>⚠️ {error}</Text>
+        <View style={[styles.errorBox, { flexDirection: "row", alignItems: "center", gap: 6 }]}>
+          <AlertCircle size={15} color="#b91c1c" />
+          <Text style={[styles.errorText, { flex: 1 }]}>{error}</Text>
         </View>
       )}
 
@@ -270,9 +272,10 @@ export default function Projects({ onSectionChange }: ProjectsProps = {}) {
                 </View>
 
                 {item.dueAt && (
-                  <View style={styles.dueBadge}>
+                  <View style={[styles.dueBadge, { flexDirection: "row", alignItems: "center", gap: 4 }]}>
+                    <Calendar size={11} color="#64748b" />
                     <Text style={styles.dueBadgeText}>
-                      📅 {new Date(item.dueAt).toLocaleDateString("vi-VN")}
+                      {new Date(item.dueAt).toLocaleDateString("vi-VN")}
                     </Text>
                   </View>
                 )}
@@ -305,11 +308,11 @@ export default function Projects({ onSectionChange }: ProjectsProps = {}) {
               {/* Actions Footer */}
               <View style={styles.cardFooter}>
                 <Pressable
-                  style={styles.attachmentBtn}
+                  style={[styles.attachmentBtn, { flexDirection: "row", alignItems: "center", gap: 4 }]}
                   disabled={busy}
                   onPress={() => setAttachmentProject(item)}
                 >
-                  <Text style={styles.attachmentBtnIcon}>📎</Text>
+                  <Paperclip size={13} color="#2563eb" />
                   <Text style={styles.attachmentBtnText}>
                     Tệp đính kèm ({item.attachments?.length || 0})
                   </Text>
@@ -318,15 +321,16 @@ export default function Projects({ onSectionChange }: ProjectsProps = {}) {
                 {manage && (
                   <View style={styles.manageBtnGroup}>
                     <Pressable
-                      style={styles.editBtn}
+                      style={[styles.editBtn, { flexDirection: "row", alignItems: "center", gap: 4 }]}
                       disabled={busy}
                       onPress={() => setEditing(item)}
                     >
-                      <Text style={styles.editBtnText}>✏️ Sửa</Text>
+                      <Pencil size={12} color="#2563eb" />
+                      <Text style={styles.editBtnText}>Sửa</Text>
                     </Pressable>
 
                     <Pressable
-                      style={styles.deleteBtn}
+                      style={[styles.deleteBtn, { alignItems: "center", justifyContent: "center" }]}
                       disabled={busy}
                       onPress={() =>
                         Alert.alert(
@@ -343,7 +347,7 @@ export default function Projects({ onSectionChange }: ProjectsProps = {}) {
                         )
                       }
                     >
-                      <Text style={styles.deleteBtnText}>🗑️</Text>
+                      <Trash2 size={13} color="#dc2626" />
                     </Pressable>
                   </View>
                 )}

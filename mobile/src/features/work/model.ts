@@ -212,7 +212,7 @@ export function evaluateTaskKpi(
         color: "#b91c1c",
         bg: "#fef2f2",
         borderColor: "#fca5a5",
-        icon: "⚠️",
+        icon: "alert-triangle" as const,
       };
     }
     if (diff < 0) {
@@ -223,7 +223,7 @@ export function evaluateTaskKpi(
         color: "#047857",
         bg: "#ecfdf5",
         borderColor: "#a7f3d0",
-        icon: "🌟",
+        icon: "star" as const,
       };
     }
     return {
@@ -233,7 +233,7 @@ export function evaluateTaskKpi(
       color: "#059669",
       bg: "#ecfdf5",
       borderColor: "#6ee7b7",
-      icon: "🎯",
+      icon: "target" as const,
     };
   }
 
@@ -266,7 +266,7 @@ export function evaluateTaskKpi(
           color: "#b91c1c",
           bg: "#fef2f2",
           borderColor: "#fca5a5",
-          icon: "⚠️",
+          icon: "alert-triangle" as const,
         };
       }
       return {
@@ -276,7 +276,7 @@ export function evaluateTaskKpi(
         color: "#059669",
         bg: "#ecfdf5",
         borderColor: "#a7f3d0",
-        icon: "🎯",
+        icon: "target" as const,
       };
     }
   }
@@ -290,7 +290,7 @@ export function evaluateTaskKpi(
       color: "#1d4ed8",
       bg: "#eff6ff",
       borderColor: "#bfdbfe",
-      icon: "⏱️",
+      icon: "clock" as const,
     };
   }
 

@@ -1,3 +1,6 @@
+import { downloadRemoteFile } from "../../src/files/downloadRemoteFile";
+import { shareApiFile, resolveFileUrl } from "../../src/files/shareFile";
+import { resolveFileFormat } from "../../src/files/fileFormat";
 import React, { useState, useEffect, useCallback, useMemo, useRef } from "react";
 import {
   View,
@@ -24,7 +27,6 @@ import * as DocumentPicker from "expo-document-picker";
 import * as ImagePicker from "expo-image-picker";
 import * as Sharing from "expo-sharing";
 import { useVideoPlayer, VideoView } from "expo-video";
-import { File as FSFile, Paths } from "expo-file-system";
 import * as FileSystem from "expo-file-system/legacy";
 import { useSession } from "../../src/auth/SessionProvider";
 import { api, resources } from "../../src/api/services";
@@ -309,7 +311,7 @@ function ResourceViewerModal({
     if (localUri && (localUri.startsWith("file://") || localUri.startsWith("content://"))) {
       try {
         if (await Sharing.isAvailableAsync()) {
-          await Sharing.shareAsync(localUri);
+          await Sharing.shareAsync(localUri, { mimeType: resolveFileFormat({ name: item.name, url: localUri }).mimeType });
           return;
         }
       } catch {
@@ -321,15 +323,15 @@ function ResourceViewerModal({
     const targetUrl = remoteUrl || (localUri?.startsWith("http") ? localUri : undefined);
     if (targetUrl) {
       try {
-        const downloaded = await FSFile.downloadFileAsync(targetUrl, Paths.cache);
-        if (await Sharing.isAvailableAsync()) {
-          await Sharing.shareAsync(downloaded.uri);
-          return;
+        if (Platform.OS === "web") await shareApiFile(targetUrl, item.name);
+        else {
+          if (!(await Sharing.isAvailableAsync())) throw new Error("Thiết bị chưa hỗ trợ chia sẻ tệp.");
+          const downloaded = await downloadRemoteFile(resolveFileUrl(targetUrl), item.name);
+          await Sharing.shareAsync(downloaded.uri, { mimeType: downloaded.mimeType, dialogTitle: downloaded.name });
         }
-      } catch {
-        // fallback: mở trong trình duyệt
+      } catch (error) {
+        Alert.alert("Không thể tải tệp", error instanceof Error ? error.message : "Vui lòng thử lại.");
       }
-      await handleOpenInBrowser(targetUrl);
       return;
     }
 

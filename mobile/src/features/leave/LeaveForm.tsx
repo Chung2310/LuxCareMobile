@@ -1,7 +1,9 @@
+import { useAppAlert } from "../../components/AppAlert";
 import React, { useEffect, useMemo, useRef, useState } from "react";
 import {
   ActivityIndicator,
   KeyboardAvoidingView,
+  Linking,
   Modal,
   Platform,
   Pressable,
@@ -22,7 +24,7 @@ import type {
 import { REQUEST_KIND_OPTIONS } from "../../../../src/types/leave";
 import { leave } from "../../api/services";
 import { messageOf, useSession } from "../../auth/SessionProvider";
-import { pickLeaveAttachment } from "./files";
+import { pickLeaveAttachment, resolveFileUrl, shareLeaveFile, downloadLeaveFile } from "./files";
 import { leaveDateRange, localDay } from "./model";
 
 interface LeaveFormProps {
@@ -114,6 +116,7 @@ export function LeaveForm({
   onSubmitted,
   setLocked,
 }: LeaveFormProps) {
+  const { showAlert, alertView } = useAppAlert();
   const { user } = useSession();
   const [templateId, setTemplateId] = useState("");
   const [kind, setKind] = useState<RequestKind>("leave");
@@ -456,10 +459,58 @@ export function LeaveForm({
 
             {selectedTemplate && (
               <View style={s.templateSelectedBanner}>
-                <Ionicons name="information-circle" size={18} color="#0284c7" />
-                <Text style={s.templateBannerText}>
-                  Đang áp dụng mẫu: <Text style={{ fontWeight: "700" }}>{selectedTemplate.name}</Text> ({selectedTemplate.fileName})
-                </Text>
+                <View style={{ flexDirection: "row", alignItems: "flex-start", gap: 8, flex: 1 }}>
+                  <Ionicons name="information-circle" size={18} color="#0284c7" style={{ marginTop: 2 }} />
+                  <View style={{ flex: 1 }}>
+                    <Text style={s.templateBannerText}>
+                      Đang áp dụng mẫu: <Text style={{ fontWeight: "700" }}>{selectedTemplate.name}</Text>
+                    </Text>
+                    <Text style={s.templateBannerSubText} numberOfLines={1}>
+                      {selectedTemplate.fileName}
+                    </Text>
+                  </View>
+                </View>
+                <View style={s.templateBannerBtns}>
+                  <Pressable
+                    style={({ pressed }) => [s.templateDownloadBtn, pressed && { opacity: 0.7 }]}
+                    onPress={() => {
+                      void downloadLeaveFile(selectedTemplate.fileUrl, selectedTemplate.fileName).then((saved) => {
+                        if (saved) showAlert("Đã lưu tệp", saved.name + " đã được lưu vào thư mục bạn chọn.", undefined, "success");
+                      }).catch((err) => {
+                        showAlert("Lỗi tải tệp", messageOf(err), undefined, "error");
+                      });
+                    }}
+                  >
+                    <Ionicons name="download-outline" size={13} color="#0284c7" />
+                    <Text style={s.templateDownloadBtnText}>Tải về</Text>
+                  </Pressable>
+                  <Pressable
+                    style={({ pressed }) => [s.templateShareBtn, pressed && { opacity: 0.7 }]}
+                    onPress={() => {
+                      void shareLeaveFile(selectedTemplate.fileUrl, selectedTemplate.fileName).catch((err) => {
+                        const resolved = resolveFileUrl(selectedTemplate.fileUrl);
+                        showAlert(
+                          "Không thể chia sẻ trực tiếp",
+                          `${messageOf(err)}\n\nBạn có muốn mở tệp trên trình duyệt để tải về không?`,
+                          [
+                            { text: "Đóng", style: "cancel" },
+                            {
+                              text: "Mở trình duyệt",
+                              onPress: () => {
+                                void Linking.openURL(resolved).catch(() => {
+                                  showAlert("Lỗi", "Không thể mở liên kết trình duyệt.", undefined, "error");
+                                });
+                              },
+                            },
+                          ]
+                        );
+                      });
+                    }}
+                  >
+                    <Ionicons name="share-social-outline" size={13} color="#059669" />
+                    <Text style={s.templateShareBtnText}>Chia sẻ</Text>
+                  </Pressable>
+                </View>
               </View>
             )}
           </View>
@@ -877,6 +928,7 @@ export function LeaveForm({
           </View>
         </View>
       </Modal>
+      {alertView}
     </KeyboardAvoidingView>
   );
 }
@@ -1097,7 +1149,49 @@ const s = StyleSheet.create({
   templateBannerText: {
     fontSize: 12,
     color: "#0369a1",
-    flex: 1,
+  },
+  templateBannerSubText: {
+    fontSize: 11,
+    color: "#64748b",
+    marginTop: 2,
+  },
+  templateBannerBtns: {
+    flexDirection: "row",
+    alignItems: "center",
+    gap: 6,
+    marginLeft: 6,
+  },
+  templateDownloadBtn: {
+    flexDirection: "row",
+    alignItems: "center",
+    gap: 4,
+    backgroundColor: "#ffffff",
+    borderWidth: 1,
+    borderColor: "#bae6fd",
+    paddingHorizontal: 8,
+    paddingVertical: 5,
+    borderRadius: 7,
+  },
+  templateDownloadBtnText: {
+    fontSize: 11,
+    fontWeight: "700",
+    color: "#0284c7",
+  },
+  templateShareBtn: {
+    flexDirection: "row",
+    alignItems: "center",
+    gap: 3,
+    backgroundColor: "#ffffff",
+    borderWidth: 1,
+    borderColor: "#a7f3d0",
+    paddingHorizontal: 7,
+    paddingVertical: 5,
+    borderRadius: 7,
+  },
+  templateShareBtnText: {
+    fontSize: 11,
+    fontWeight: "600",
+    color: "#059669",
   },
   inputWrap: {
     flexDirection: "row",

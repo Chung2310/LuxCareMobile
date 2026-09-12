@@ -1,7 +1,7 @@
+import { useAppAlert } from "../../src/components/AppAlert";
 import React, { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import {
   ActivityIndicator,
-  Alert,
   FlatList,
   Modal,
   Pressable,
@@ -27,7 +27,7 @@ import { canUseModule, hasPermission } from "../../src/auth/access";
 import { ChoiceField } from "../../src/features/leave/ChoiceField";
 import { LeaveForm } from "../../src/features/leave/LeaveForm";
 import { LeaveTemplates } from "../../src/features/leave/LeaveTemplates";
-import { shareLeaveFile } from "../../src/features/leave/files";
+import { downloadLeaveFile } from "../../src/features/leave/files";
 import { canDeleteLeave, filterLeavePage } from "../../src/features/leave/model";
 
 const KIND_THEMES: Record<
@@ -41,6 +41,7 @@ const KIND_THEMES: Record<
 };
 
 export default function LeaveScreen() {
+  const { showAlert, alertView } = useAppAlert();
   const { user } = useSession();
   const params = useLocalSearchParams<{ create?: string; from?: string }>();
   const allowed = canUseModule(user, "hr");
@@ -451,7 +452,10 @@ export default function LeaveScreen() {
                     <Pressable
                       key={`${file.url}-${i}`}
                       style={({ pressed }) => [s.attachPill, pressed && { opacity: 0.7 }]}
-                      onPress={() => void run(() => shareLeaveFile(file.url, file.name))}
+                      onPress={() => void run(async () => {
+                        const saved = await downloadLeaveFile(file.url, file.name);
+                        if (saved) showAlert("Đã lưu tệp", saved.name + " đã được lưu vào thư mục bạn chọn.", undefined, "success");
+                      })}
                       disabled={busy}
                     >
                       <Ionicons name="attach" size={14} color="#0284c7" />
@@ -505,7 +509,7 @@ export default function LeaveScreen() {
                     style={({ pressed }) => [s.deleteBtn, pressed && { opacity: 0.7 }]}
                     disabled={busy}
                     onPress={() =>
-                      Alert.alert("Xóa đơn đang chờ duyệt?", item.type, [
+                      showAlert("Xóa đơn đang chờ duyệt?", item.type, [
                         { text: "Hủy", style: "cancel" },
                         {
                           text: "Xóa",
@@ -740,6 +744,7 @@ export default function LeaveScreen() {
           </SafeAreaView>
         </View>
       </Modal>
+      {alertView}
     </SafeAreaView>
   );
 }

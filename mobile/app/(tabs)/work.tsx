@@ -27,6 +27,53 @@ import Projects from "./projects";
 import Kpi from "./kpi";
 import { WorkSectionTabs, type WorkSection } from "../../src/features/work/WorkSectionTabs";
 import {
+  Search,
+  X,
+  User,
+  Folder,
+  AlertCircle,
+  Paperclip,
+  Calendar,
+  Play,
+  Flag,
+  Clock,
+  Sparkles,
+  Check,
+  Link as LinkIcon,
+  Image as ImageIcon,
+  Video as VideoIcon,
+  Music as MusicIcon,
+  FileText,
+  Pencil,
+  Trash2,
+  RotateCw,
+  AlertTriangle,
+  Target,
+  Star,
+} from "lucide-react-native";
+
+function KpiIcon({ icon, color, size = 12 }: { icon: string; color: string; size?: number }) {
+  switch (icon) {
+    case "alert-triangle":
+      return <AlertTriangle size={size} color={color} />;
+    case "star":
+      return <Star size={size} color={color} />;
+    case "clock":
+      return <Clock size={size} color={color} />;
+    case "target":
+    default:
+      return <Target size={size} color={color} />;
+  }
+}
+
+function AttachmentTypeIcon({ type }: { type?: string }) {
+  if (type === "link") return <LinkIcon size={16} color="#2563eb" />;
+  if (type === "image") return <ImageIcon size={16} color="#059669" />;
+  if (type === "video") return <VideoIcon size={16} color="#d97706" />;
+  if (type === "audio") return <MusicIcon size={16} color="#8b5cf6" />;
+  return <FileText size={16} color="#64748b" />;
+}
+import {
   canUpdateTask,
   evaluateTaskKpi,
   normalizePriority,
@@ -375,7 +422,7 @@ export default function Work() {
       <View style={styles.filterSection}>
         {/* Search Input */}
         <View style={styles.searchBox}>
-          <Text style={styles.searchIcon}>🔍</Text>
+          <Search size={15} color="#94a3b8" style={{ marginRight: 6 }} />
           <TextInput
             style={styles.searchInput}
             placeholder="Tìm tên công việc, người thực hiện..."
@@ -385,7 +432,7 @@ export default function Work() {
           />
           {search.length > 0 && (
             <Pressable onPress={() => setSearch("")} style={styles.searchClearBtn}>
-              <Text style={styles.searchClearText}>✕</Text>
+              <X size={14} color="#94a3b8" />
             </Pressable>
           )}
         </View>
@@ -398,11 +445,12 @@ export default function Work() {
         >
           {/* Mine vs All Pill */}
           <Pressable
-            style={[styles.filterPill, mine && styles.filterPillActive]}
+            style={[styles.filterPill, mine && styles.filterPillActive, { flexDirection: "row", alignItems: "center", gap: 5 }]}
             onPress={() => setMine((v) => !v)}
           >
+            <User size={13} color={mine ? "#ffffff" : "#475569"} />
             <Text style={[styles.filterPillText, mine && styles.filterPillTextActive]}>
-              👤 Việc của tôi
+              Việc của tôi
             </Text>
           </Pressable>
 
@@ -468,11 +516,12 @@ export default function Work() {
               return (
                 <Pressable
                   key={p.id}
-                  style={[styles.projectChip, active && styles.projectChipActive]}
+                  style={[styles.projectChip, active && styles.projectChipActive, { flexDirection: "row", alignItems: "center", gap: 4 }]}
                   onPress={() => setProjectId(active ? "" : p.id)}
                 >
+                  <Folder size={12} color={active ? "#1d4ed8" : "#475569"} />
                   <Text style={[styles.projectChipText, active && styles.projectChipTextActive]}>
-                    📁 {p.name}
+                    {p.name}
                   </Text>
                 </Pressable>
               );
@@ -483,8 +532,9 @@ export default function Work() {
 
       {/* Error Notices */}
       {!!error && (
-        <View style={styles.errorBox}>
-          <Text style={styles.errorText}>⚠️ {error}</Text>
+        <View style={[styles.errorBox, { flexDirection: "row", alignItems: "center", gap: 6 }]}>
+          <AlertCircle size={15} color="#b91c1c" />
+          <Text style={[styles.errorText, { flex: 1 }]}>{error}</Text>
         </View>
       )}
 
@@ -550,11 +600,12 @@ export default function Work() {
                       <View
                         style={[
                           styles.kpiCardBadge,
-                          { backgroundColor: cardKpi.bg, borderColor: cardKpi.borderColor },
+                          { backgroundColor: cardKpi.bg, borderColor: cardKpi.borderColor, flexDirection: "row", alignItems: "center", gap: 3 },
                         ]}
                       >
+                        <KpiIcon icon={cardKpi.icon} color={cardKpi.color} size={11} />
                         <Text style={[styles.kpiCardBadgeText, { color: cardKpi.color }]}>
-                          {cardKpi.icon} {cardKpi.status === "ontime" ? "Đúng hạn" : cardKpi.status === "ahead" ? "Sớm hạn" : "Trễ hạn"}
+                          {cardKpi.status === "ontime" ? "Đúng hạn" : cardKpi.status === "ahead" ? "Sớm hạn" : "Trễ hạn"}
                         </Text>
                       </View>
                     );
@@ -647,14 +698,16 @@ export default function Work() {
 
                 <View style={styles.taskFooterRight}>
                   {!!item.attachments?.length && (
-                    <View style={styles.cardAttachmentBadge}>
-                      <Text style={styles.cardAttachmentText}>📎 {item.attachments.length}</Text>
+                    <View style={[styles.cardAttachmentBadge, { flexDirection: "row", alignItems: "center", gap: 3 }]}>
+                      <Paperclip size={11} color="#64748b" />
+                      <Text style={styles.cardAttachmentText}>{item.attachments.length}</Text>
                     </View>
                   )}
                   {projectName && (
-                    <View style={styles.projectTag}>
+                    <View style={[styles.projectTag, { flexDirection: "row", alignItems: "center", gap: 3 }]}>
+                      <Folder size={11} color="#475569" />
                       <Text style={styles.projectTagText} numberOfLines={1}>
-                        📁 {projectName}
+                        {projectName}
                       </Text>
                     </View>
                   )}
@@ -716,9 +769,18 @@ export default function Work() {
               <View style={styles.modalHeader}>
                 <View style={{ flex: 1, gap: 4 }}>
                   <Text style={styles.modalTitle}>{selected.title}</Text>
-                  <Text style={styles.modalSub}>
-                    {selected.projectId ? `📁 ${projectMap.get(selected.projectId) || "Dự án"}` : "Công việc độc lập"}
-                  </Text>
+                  <View style={{ flexDirection: "row", alignItems: "center", gap: 4, marginTop: 3 }}>
+                    {selected.projectId ? (
+                      <>
+                        <Folder size={13} color="#64748b" />
+                        <Text style={[styles.modalSub, { marginTop: 0 }]}>
+                          {projectMap.get(selected.projectId) || "Dự án"}
+                        </Text>
+                      </>
+                    ) : (
+                      <Text style={[styles.modalSub, { marginTop: 0 }]}>Công việc độc lập</Text>
+                    )}
+                  </View>
                   {!!selected.tags?.length && (
                     <View style={styles.detailTagsWrap}>
                       {selected.tags.map((tag) => (
@@ -739,7 +801,7 @@ export default function Work() {
                   style={styles.modalCloseBtn}
                   onPress={() => setSelected(null)}
                 >
-                  <Text style={styles.modalCloseBtnText}>✕</Text>
+                  <X size={16} color="#64748b" />
                 </Pressable>
               </View>
 
@@ -786,41 +848,56 @@ export default function Work() {
 
                   <View style={styles.detailGridItem}>
                     <Text style={styles.detailGridLabel}>Người thực hiện</Text>
-                    <Text style={styles.detailGridVal}>
-                      👤 {selected.assignee || "Chưa phân công"}
-                    </Text>
+                    <View style={{ flexDirection: "row", alignItems: "center", gap: 4 }}>
+                      <User size={13} color="#475569" />
+                      <Text style={styles.detailGridVal}>
+                        {selected.assignee || "Chưa phân công"}
+                      </Text>
+                    </View>
                   </View>
 
                   <View style={styles.detailGridItem}>
                     <Text style={styles.detailGridLabel}>Hạn chót (Deadline)</Text>
-                    <Text style={[styles.detailGridVal, { color: "#b91c1c" }]}>
-                      📅 {formatDetailDateTime(selected.dueDate)}
-                    </Text>
+                    <View style={{ flexDirection: "row", alignItems: "center", gap: 4 }}>
+                      <Calendar size={13} color="#b91c1c" />
+                      <Text style={[styles.detailGridVal, { color: "#b91c1c" }]}>
+                        {formatDetailDateTime(selected.dueDate)}
+                      </Text>
+                    </View>
                   </View>
 
                   {!!selected.startTime && (
                     <View style={styles.detailGridItem}>
                       <Text style={styles.detailGridLabel}>Bắt đầu</Text>
-                      <Text style={styles.detailGridVal}>
-                        🚀 {formatDetailDateTime(selected.startTime)}
-                      </Text>
+                      <View style={{ flexDirection: "row", alignItems: "center", gap: 4 }}>
+                        <Play size={13} color="#475569" />
+                        <Text style={styles.detailGridVal}>
+                          {formatDetailDateTime(selected.startTime)}
+                        </Text>
+                      </View>
                     </View>
                   )}
 
                   {!!selected.endTime && (
                     <View style={styles.detailGridItem}>
                       <Text style={styles.detailGridLabel}>Kết thúc</Text>
-                      <Text style={styles.detailGridVal}>
-                        🏁 {formatDetailDateTime(selected.endTime)}
-                      </Text>
+                      <View style={{ flexDirection: "row", alignItems: "center", gap: 4 }}>
+                        <Flag size={13} color="#475569" />
+                        <Text style={styles.detailGridVal}>
+                          {formatDetailDateTime(selected.endTime)}
+                        </Text>
+                      </View>
                     </View>
                   )}
 
                   <View style={styles.detailGridItem}>
                     <Text style={styles.detailGridLabel}>Dự tính / Thực tế</Text>
-                    <Text style={styles.detailGridVal}>
-                      ⏱️ {selected.estTime || 0}h / {selected.actualTime || 0}h
-                    </Text>
+                    <View style={{ flexDirection: "row", alignItems: "center", gap: 4 }}>
+                      <Clock size={13} color="#475569" />
+                      <Text style={styles.detailGridVal}>
+                        {selected.estTime || 0}h / {selected.actualTime || 0}h
+                      </Text>
+                    </View>
                   </View>
 
                   {/* KPI Evaluation in Detail */}
@@ -836,9 +913,12 @@ export default function Work() {
                             { backgroundColor: detailKpi.bg, borderColor: detailKpi.borderColor },
                           ]}
                         >
-                          <Text style={[styles.detailKpiTitle, { color: detailKpi.color }]}>
-                            {detailKpi.icon} {detailKpi.label}
-                          </Text>
+                          <View style={{ flexDirection: "row", alignItems: "center", gap: 5 }}>
+                            <KpiIcon icon={detailKpi.icon} color={detailKpi.color} size={13} />
+                            <Text style={[styles.detailKpiTitle, { color: detailKpi.color }]}>
+                              {detailKpi.label}
+                            </Text>
+                          </View>
                           <Text style={[styles.detailKpiDetail, { color: detailKpi.color }]}>
                             {detailKpi.detail}
                           </Text>
@@ -850,9 +930,12 @@ export default function Work() {
                   {!!selected.completedAt && (
                     <View style={styles.detailGridItem}>
                       <Text style={styles.detailGridLabel}>Hoàn thành lúc</Text>
-                      <Text style={[styles.detailGridVal, { color: "#059669" }]}>
-                        🎉 {formatDetailDateTime(selected.completedAt)}
-                      </Text>
+                      <View style={{ flexDirection: "row", alignItems: "center", gap: 4 }}>
+                        <Sparkles size={13} color="#059669" />
+                        <Text style={[styles.detailGridVal, { color: "#059669" }]}>
+                          {formatDetailDateTime(selected.completedAt)}
+                        </Text>
+                      </View>
                     </View>
                   )}
                 </View>
@@ -911,7 +994,7 @@ export default function Work() {
                             {isUpdatingThis ? (
                               <ActivityIndicator size="small" color={sub.completed ? "#ffffff" : "#059669"} />
                             ) : sub.completed ? (
-                              <Text style={styles.detailCheckmark}>✓</Text>
+                              <Check size={13} color="#ffffff" strokeWidth={3} />
                             ) : null}
                           </View>
                           <View style={{ flex: 1 }}>
@@ -924,7 +1007,10 @@ export default function Work() {
                               {sub.title}
                             </Text>
                             {!!sub.assignee && (
-                              <Text style={styles.subtaskAssignee}>👤 {sub.assignee}</Text>
+                              <View style={{ flexDirection: "row", alignItems: "center", gap: 4, marginTop: 2 }}>
+                                <User size={11} color="#64748b" />
+                                <Text style={styles.subtaskAssignee}>{sub.assignee}</Text>
+                              </View>
                             )}
                           </View>
                         </Pressable>
@@ -946,16 +1032,6 @@ export default function Work() {
                 {selected.attachments && selected.attachments.length > 0 ? (
                   <View style={styles.attachmentsList}>
                     {selected.attachments.map((file) => {
-                      const icon =
-                        file.type === "link"
-                          ? "🔗"
-                          : file.type === "image"
-                          ? "🖼"
-                          : file.type === "video"
-                          ? "🎬"
-                          : file.type === "audio"
-                          ? "🎵"
-                          : "📄";
                       return (
                         <Pressable
                           key={file.id}
@@ -971,7 +1047,7 @@ export default function Work() {
                             })
                           }
                         >
-                          <Text style={styles.attachmentIcon}>{icon}</Text>
+                          <AttachmentTypeIcon type={file.type} />
                           <View style={{ flex: 1 }}>
                             <Text style={styles.attachmentName} numberOfLines={1}>
                               {file.name}
@@ -1025,21 +1101,23 @@ export default function Work() {
                 {canUpdateTask(user, selected) && (
                   <View style={styles.modalBtnRow}>
                     <Pressable
-                      style={[styles.modalActionBtn, styles.modalActionBtnPrimary, { flex: 1 }]}
+                      style={[styles.modalActionBtn, styles.modalActionBtnPrimary, { flex: 1, flexDirection: "row", gap: 6 }]}
                       onPress={() => {
                         setEditing(selected);
                         setSelected(null);
                       }}
                     >
-                      <Text style={styles.modalActionBtnTextPrimary}>✏️ Sửa công việc</Text>
+                      <Pencil size={14} color="#ffffff" />
+                      <Text style={styles.modalActionBtnTextPrimary}>Sửa công việc</Text>
                     </Pressable>
 
                     {selected.status !== "Done" && (
                       <Pressable
-                        style={[styles.modalActionBtn, styles.modalActionBtnSuccess]}
+                        style={[styles.modalActionBtn, styles.modalActionBtnSuccess, { flexDirection: "row", gap: 6 }]}
                         onPress={() => void handleQuickStatusChange("Done")}
                       >
-                        <Text style={styles.modalActionBtnTextSuccess}>✓ Hoàn thành</Text>
+                        <Check size={14} color="#047857" strokeWidth={2.5} />
+                        <Text style={styles.modalActionBtnTextSuccess}>Hoàn thành</Text>
                       </Pressable>
                     )}
                   </View>
@@ -1047,7 +1125,7 @@ export default function Work() {
 
                 {manage && (
                   <Pressable
-                    style={styles.modalDeleteBtn}
+                    style={[styles.modalDeleteBtn, { flexDirection: "row", justifyContent: "center", gap: 6 }]}
                     onPress={() =>
                       Alert.alert("Xóa công việc?", `Bạn có chắc muốn xóa "${selected.title}"?`, [
                         { text: "Hủy", style: "cancel" },
@@ -1063,16 +1141,20 @@ export default function Work() {
                       ])
                     }
                   >
-                    <Text style={styles.modalDeleteBtnText}>🗑️ Xóa công việc này</Text>
+                    <Trash2 size={14} color="#dc2626" />
+                    <Text style={styles.modalDeleteBtnText}>Xóa công việc này</Text>
                   </Pressable>
                 )}
               </View>
 
               {!!detailError && (
                 <View style={styles.errorBox}>
-                  <Text style={styles.errorText}>⚠️ {detailError}</Text>
+                  <View style={{ flexDirection: "row", alignItems: "center", gap: 6 }}>
+                    <AlertCircle size={15} color="#b91c1c" />
+                    <Text style={[styles.errorText, { flex: 1 }]}>{detailError}</Text>
+                  </View>
                   <Pressable
-                    style={styles.errorReloadBtn}
+                    style={[styles.errorReloadBtn, { flexDirection: "row", alignItems: "center", gap: 6 }]}
                     onPress={async () => {
                       setDetailError(null);
                       try {
@@ -1088,7 +1170,8 @@ export default function Work() {
                       }
                     }}
                   >
-                    <Text style={styles.errorReloadBtnText}>🔄 Tải lại dữ liệu công việc</Text>
+                    <RotateCw size={13} color="#b91c1c" />
+                    <Text style={styles.errorReloadBtnText}>Tải lại dữ liệu công việc</Text>
                   </Pressable>
                 </View>
               )}

@@ -28,6 +28,38 @@ import { EmptyState, Page } from "../../src/ui";
 import { WorkSectionTabs, type WorkSection } from "../../src/features/work/WorkSectionTabs";
 import { BranchSelector } from "../../src/features/branches/BranchSelector";
 import {
+  MapPin,
+  Globe,
+  Calendar,
+  Search,
+  X,
+  AlertCircle,
+  ClipboardList,
+  Target,
+  AlertTriangle,
+  Clock,
+  Check,
+  Circle,
+  User,
+  Flag,
+} from "lucide-react-native";
+
+function KpiStatusIcon({ status, color, size = 12 }: { status: string; color: string; size?: number }) {
+  switch (status) {
+    case "completed_late":
+      return <AlertTriangle size={size} color={color} />;
+    case "completed_ontime":
+      return <Target size={size} color={color} />;
+    case "overdue":
+      return <AlertCircle size={size} color={color} />;
+    case "in_progress":
+      return <Clock size={size} color={color} />;
+    case "todo":
+    default:
+      return <Circle size={size} color={color} />;
+  }
+}
+import {
   normalizePriority,
   normalizeTaskStatus,
 } from "../../src/features/work/model";
@@ -130,7 +162,7 @@ function getTaskKpiDetail(task: HRTask) {
         color: "#d97706",
         bg: "#fffbeb",
         borderColor: "#fde68a",
-        icon: "⚠️",
+        icon: "alert-triangle",
       };
     }
     return {
@@ -141,7 +173,7 @@ function getTaskKpiDetail(task: HRTask) {
       color: "#059669",
       bg: "#ecfdf5",
       borderColor: "#a7f3d0",
-      icon: "🎯",
+      icon: "target",
     };
   }
 
@@ -154,7 +186,7 @@ function getTaskKpiDetail(task: HRTask) {
       color: "#dc2626",
       bg: "#fef2f2",
       borderColor: "#fca5a5",
-      icon: "🔴",
+      icon: "alert-circle",
     };
   }
 
@@ -167,7 +199,7 @@ function getTaskKpiDetail(task: HRTask) {
       color: "#2563eb",
       bg: "#eff6ff",
       borderColor: "#bfdbfe",
-      icon: "⏳",
+      icon: "clock",
     };
   }
 
@@ -179,7 +211,7 @@ function getTaskKpiDetail(task: HRTask) {
     color: "#64748b",
     bg: "#f1f5f9",
     borderColor: "#e2e8f0",
-    icon: "⚪",
+    icon: "circle",
   };
 }
 
@@ -484,9 +516,10 @@ export default function Kpi({ onSectionChange }: KpiProps = {}) {
               <BranchSelector
                 renderCustomTrigger={(open) => (
                   <Pressable onPress={open} style={{ flexDirection: "row", alignItems: "center", gap: 5, marginTop: 2 }}>
-                    <View style={{ backgroundColor: "#ecfdf5", borderColor: "#a7f3d0", borderWidth: 1, paddingHorizontal: 6, paddingVertical: 1.5, borderRadius: 6 }}>
+                    <View style={{ backgroundColor: "#ecfdf5", borderColor: "#a7f3d0", borderWidth: 1, paddingHorizontal: 6, paddingVertical: 1.5, borderRadius: 6, flexDirection: "row", alignItems: "center", gap: 3 }}>
+                      <MapPin size={11} color="#059669" />
                       <Text style={{ fontSize: 11, color: "#059669", fontWeight: "700" }}>
-                        📍 {selectedBranch?.name || "Toàn hệ thống"} ▾
+                        {selectedBranch?.name || "Toàn hệ thống"} ▾
                       </Text>
                     </View>
                     <Text style={styles.headerSub}>· {totalEmployees} nhân sự</Text>
@@ -523,11 +556,16 @@ export default function Kpi({ onSectionChange }: KpiProps = {}) {
             Tháng {monthStr}/{yearStr}
           </Text>
           <Pressable
-            style={[styles.periodModeToggle, viewAllPeriods && styles.periodModeToggleActive]}
+            style={[styles.periodModeToggle, viewAllPeriods && styles.periodModeToggleActive, { flexDirection: "row", alignItems: "center", gap: 4 }]}
             onPress={() => setViewAllPeriods(!viewAllPeriods)}
           >
+            {viewAllPeriods ? (
+              <Globe size={11} color={viewAllPeriods ? "#ffffff" : "#1d4ed8"} />
+            ) : (
+              <Calendar size={11} color="#1d4ed8" />
+            )}
             <Text style={[styles.periodModeText, viewAllPeriods && styles.periodModeTextActive]}>
-              {viewAllPeriods ? "🌐 Đang xem: Tất cả các kỳ" : "📅 Đang xem: Tháng này"}
+              {viewAllPeriods ? "Đang xem: Tất cả các kỳ" : "Đang xem: Tháng này"}
             </Text>
           </Pressable>
         </View>
@@ -569,7 +607,7 @@ export default function Kpi({ onSectionChange }: KpiProps = {}) {
       {/* Search Input Bar + Expand All Toggle */}
       <View style={styles.searchSection}>
         <View style={styles.searchBox}>
-          <Text style={styles.searchIcon}>🔍</Text>
+          <Search size={15} color="#94a3b8" style={{ marginRight: 6 }} />
           <TextInput
             style={styles.searchInput}
             placeholder="Tìm tên nhân sự trong báo cáo..."
@@ -579,7 +617,7 @@ export default function Kpi({ onSectionChange }: KpiProps = {}) {
           />
           {search.length > 0 && (
             <Pressable onPress={() => setSearch("")} style={styles.searchClearBtn}>
-              <Text style={styles.searchClearText}>✕</Text>
+              <X size={14} color="#94a3b8" />
             </Pressable>
           )}
         </View>
@@ -598,8 +636,9 @@ export default function Kpi({ onSectionChange }: KpiProps = {}) {
 
       {/* Error Notice */}
       {!!error && (
-        <View style={styles.errorBox}>
-          <Text style={styles.errorText}>⚠️ {error}</Text>
+        <View style={[styles.errorBox, { flexDirection: "row", alignItems: "center", gap: 6 }]}>
+          <AlertCircle size={15} color="#b91c1c" />
+          <Text style={[styles.errorText, { flex: 1 }]}>{error}</Text>
         </View>
       )}
 
@@ -707,7 +746,7 @@ export default function Kpi({ onSectionChange }: KpiProps = {}) {
                 onPress={() => toggleEmployeeExpand(item.employeeId)}
               >
                 <View style={{ flexDirection: "row", alignItems: "center", gap: 6 }}>
-                  <Text style={{ fontSize: 13 }}>📋</Text>
+                  <ClipboardList size={14} color="#059669" />
                   <Text style={styles.expandToggleText}>
                     {isExpanded
                       ? `Thu gọn danh sách việc (${empTasks.length})`
@@ -739,34 +778,36 @@ export default function Kpi({ onSectionChange }: KpiProps = {}) {
                     </Pressable>
 
                     <Pressable
-                      style={[styles.filterChip, currentFilter === "ontime" && styles.filterChipActive]}
+                      style={[styles.filterChip, currentFilter === "ontime" && styles.filterChipActive, { flexDirection: "row", alignItems: "center", gap: 4 }]}
                       onPress={() =>
                         setTaskFilterMap((prev) => ({ ...prev, [item.employeeId]: "ontime" }))
                       }
                     >
+                      <Target size={12} color={currentFilter === "ontime" ? "#ffffff" : "#059669"} />
                       <Text
                         style={[
                           styles.filterChipText,
                           currentFilter === "ontime" && styles.filterChipTextActive,
                         ]}
                       >
-                        🎯 Đạt KPI ({ontimeTasks.length})
+                        Đạt KPI ({ontimeTasks.length})
                       </Text>
                     </Pressable>
 
                     <Pressable
-                      style={[styles.filterChip, currentFilter === "pending" && styles.filterChipActive]}
+                      style={[styles.filterChip, currentFilter === "pending" && styles.filterChipActive, { flexDirection: "row", alignItems: "center", gap: 4 }]}
                       onPress={() =>
                         setTaskFilterMap((prev) => ({ ...prev, [item.employeeId]: "pending" }))
                       }
                     >
+                      <AlertTriangle size={12} color={currentFilter === "pending" ? "#ffffff" : "#dc2626"} />
                       <Text
                         style={[
                           styles.filterChipText,
                           currentFilter === "pending" && styles.filterChipTextActive,
                         ]}
                       >
-                        ⚠️ Chưa đạt ({pendingTasks.length})
+                        Chưa đạt ({pendingTasks.length})
                       </Text>
                     </Pressable>
                   </View>
@@ -795,10 +836,13 @@ export default function Kpi({ onSectionChange }: KpiProps = {}) {
                                 {
                                   backgroundColor: kpiDetail.bg,
                                   borderColor: kpiDetail.borderColor,
+                                  flexDirection: "row",
+                                  alignItems: "center",
+                                  gap: 4,
                                 },
                               ]}
                             >
-                              <Text style={{ fontSize: 10 }}>{kpiDetail.icon}</Text>
+                              <KpiStatusIcon status={kpiDetail.status} color={kpiDetail.color} size={10} />
                               <Text style={[styles.taskKpiBadgeText, { color: kpiDetail.color }]}>
                                 {kpiDetail.label}
                               </Text>
@@ -813,20 +857,29 @@ export default function Kpi({ onSectionChange }: KpiProps = {}) {
                           </Text>
 
                           <View style={styles.taskItemMeta}>
-                            <Text style={styles.taskDueDateText}>
-                              📅 {formatTaskDueDate(task.dueDate, task.status === "Done" || task.status === "done").text}
-                            </Text>
+                            <View style={{ flexDirection: "row", alignItems: "center", gap: 3 }}>
+                              <Calendar size={11} color="#64748b" />
+                              <Text style={styles.taskDueDateText}>
+                                {formatTaskDueDate(task.dueDate, task.status === "Done" || task.status === "done").text}
+                              </Text>
+                            </View>
 
                             {!!(task.estTime || task.actualTime) && (
-                              <Text style={styles.taskTimeText}>
-                                ⏱️ {task.actualTime || 0}h / {task.estTime || 0}h
-                              </Text>
+                              <View style={{ flexDirection: "row", alignItems: "center", gap: 3 }}>
+                                <Clock size={11} color="#64748b" />
+                                <Text style={styles.taskTimeText}>
+                                  {task.actualTime || 0}h / {task.estTime || 0}h
+                                </Text>
+                              </View>
                             )}
 
                             {task.subtasks && task.subtasks.length > 0 && (
-                              <Text style={styles.taskSubtasksText}>
-                                ✓ {task.subtasks.filter((s) => s.completed).length}/{task.subtasks.length}
-                              </Text>
+                              <View style={{ flexDirection: "row", alignItems: "center", gap: 3 }}>
+                                <Check size={11} color="#059669" strokeWidth={2.5} />
+                                <Text style={styles.taskSubtasksText}>
+                                  {task.subtasks.filter((s) => s.completed).length}/{task.subtasks.length}
+                                </Text>
+                              </View>
                             )}
                           </View>
 
@@ -899,7 +952,7 @@ export default function Kpi({ onSectionChange }: KpiProps = {}) {
                   style={styles.modalCloseBtn}
                   onPress={() => setSelectedTask(null)}
                 >
-                  <Text style={{ fontSize: 16, color: "#64748b", fontWeight: "700" }}>✕</Text>
+                  <X size={16} color="#64748b" />
                 </Pressable>
               </View>
 
@@ -915,10 +968,13 @@ export default function Kpi({ onSectionChange }: KpiProps = {}) {
                           {
                             backgroundColor: detail.bg,
                             borderColor: detail.borderColor,
+                            flexDirection: "row",
+                            alignItems: "center",
+                            gap: 10,
                           },
                         ]}
                       >
-                        <Text style={{ fontSize: 18 }}>{detail.icon}</Text>
+                        <KpiStatusIcon status={detail.status} color={detail.color} size={18} />
                         <View style={{ flex: 1 }}>
                           <Text style={[styles.modalKpiTitle, { color: detail.color }]}>
                             {detail.label}
@@ -942,14 +998,20 @@ export default function Kpi({ onSectionChange }: KpiProps = {}) {
                   )}
 
                   <View style={styles.detailRow}>
-                    <Text style={styles.detailLabel}>👤 Phụ trách:</Text>
+                    <View style={{ flexDirection: "row", alignItems: "center", gap: 4 }}>
+                      <User size={12} color="#64748b" />
+                      <Text style={styles.detailLabel}>Phụ trách:</Text>
+                    </View>
                     <Text style={styles.detailValue}>
                       {selectedTask.assignee || "Chưa gán"}
                     </Text>
                   </View>
 
                   <View style={styles.detailRow}>
-                    <Text style={styles.detailLabel}>📅 Hạn hoàn thành:</Text>
+                    <View style={{ flexDirection: "row", alignItems: "center", gap: 4 }}>
+                      <Calendar size={12} color="#64748b" />
+                      <Text style={styles.detailLabel}>Hạn hoàn thành:</Text>
+                    </View>
                     <Text style={styles.detailValue}>
                       {selectedTask.dueDate || "Chưa đặt deadline"}
                     </Text>
@@ -957,7 +1019,10 @@ export default function Kpi({ onSectionChange }: KpiProps = {}) {
 
                   {!!selectedTask.completedAt && (
                     <View style={styles.detailRow}>
-                      <Text style={styles.detailLabel}>🏁 Hoàn thành lúc:</Text>
+                      <View style={{ flexDirection: "row", alignItems: "center", gap: 4 }}>
+                        <Flag size={12} color="#64748b" />
+                        <Text style={styles.detailLabel}>Hoàn thành lúc:</Text>
+                      </View>
                       <Text style={styles.detailValue}>
                         {new Date(selectedTask.completedAt).toLocaleString("vi-VN")}
                       </Text>
@@ -965,7 +1030,10 @@ export default function Kpi({ onSectionChange }: KpiProps = {}) {
                   )}
 
                   <View style={styles.detailRow}>
-                    <Text style={styles.detailLabel}>⏱️ Thời lượng:</Text>
+                    <View style={{ flexDirection: "row", alignItems: "center", gap: 4 }}>
+                      <Clock size={12} color="#64748b" />
+                      <Text style={styles.detailLabel}>Thời lượng:</Text>
+                    </View>
                     <Text style={styles.detailValue}>
                       {selectedTask.actualTime || 0}h thực tế / {selectedTask.estTime || 0}h kế hoạch
                     </Text>
@@ -979,10 +1047,12 @@ export default function Kpi({ onSectionChange }: KpiProps = {}) {
                         {selectedTask.subtasks.length}):
                       </Text>
                       {selectedTask.subtasks.map((st) => (
-                        <View key={st.id} style={styles.subtaskRow}>
-                          <Text style={{ fontSize: 13, color: st.completed ? "#059669" : "#64748b" }}>
-                            {st.completed ? "✓" : "○"}
-                          </Text>
+                        <View key={st.id} style={[styles.subtaskRow, { alignItems: "center" }]}>
+                          {st.completed ? (
+                            <Check size={13} color="#059669" strokeWidth={2.5} />
+                          ) : (
+                            <Circle size={11} color="#94a3b8" />
+                          )}
                           <Text
                             style={[
                               styles.subtaskText,
