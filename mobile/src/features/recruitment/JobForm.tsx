@@ -1,17 +1,16 @@
+import { RecruitmentDepartmentField } from "./RecruitmentDepartmentField";
 import { RecruitmentDateField } from "./RecruitmentDateField";
 import { useRef, useState } from "react";
 import {
   ActivityIndicator,
   Pressable,
   StyleSheet,
-  Switch,
   Text,
   View,
 } from "react-native";
 import {
   Briefcase,
   Check,
-  DollarSign,
   FileText,
   Info,
   MapPin,
@@ -38,7 +37,7 @@ function getFileNameFromUrl(url?: string | null): string {
     return decoded.replace(/^[0-9a-fA-F-]{36}-?/, "") || decoded;
   } catch {
     const clean = url.split("/").pop()?.split("?")[0] || "";
-    return decodeURIComponent(clean) || url;
+    try { return decodeURIComponent(clean) || url; } catch { return clean || url; }
   }
 }
 
@@ -56,7 +55,6 @@ export function JobForm({
   const { showAlert, alertView } = useAppAlert();
   const [draft, setDraft] = useState(() => jobDraft(job));
   const [jdFileName, setJdFileName] = useState(() => getFileNameFromUrl(job?.jdFileUrl));
-  const [showManualUrl, setShowManualUrl] = useState(false);
   const [busy, setBusy] = useState(false);
   const [blocked, setBlocked] = useState(false);
   const lock = useRef(false);
@@ -83,7 +81,7 @@ export function JobForm({
   };
 
   const save = async () => {
-    if (lock.current) return;
+    if (lock.current || blocked) return;
     const missing: string[] = [];
     if (!draft.code.trim()) missing.push("• Mã tin tuyển dụng");
     if (!draft.title.trim()) missing.push("• Tiêu đề tin tuyển dụng");
@@ -93,7 +91,6 @@ export function JobForm({
       const hc = Number(draft.headcount);
       if (!Number.isInteger(hc) || hc < 1) missing.push("• Số lượng tuyển (phải là số nguyên dương)");
     }
-    if (!draft.employmentType.trim()) missing.push("• Loại hợp đồng");
 
     if (missing.length > 0) {
       showAlert(
@@ -178,29 +175,60 @@ export function JobForm({
         </View>
 
         <Field
-          label="Mã tin tuyển dụng *"
+          label="Mã tin *"
           value={draft.code}
-          editable={!disabled}
+          editable={!disabled && !job}
           onChangeText={(value) => setDraft((c) => ({ ...c, code: value }))}
         />
         <Field
-          label="Tiêu đề công việc *"
+          label="Tên vị trí *"
           value={draft.title}
           editable={!disabled}
           onChangeText={(value) => setDraft((c) => ({ ...c, title: value }))}
         />
+        <RecruitmentDepartmentField value={draft.department} disabled={disabled}
+          onChange={(value) => setDraft((c) => ({ ...c, department: value }))} />
         <Field
-          label="Phòng ban / Khoa"
-          value={draft.department}
-          editable={!disabled}
-          onChangeText={(value) => setDraft((c) => ({ ...c, department: value }))}
-        />
-        <Field
-          label="Số lượng cần tuyển *"
+          label="Số lượng *"
           value={draft.headcount}
           keyboardType="numeric"
           editable={!disabled}
           onChangeText={(value) => setDraft((c) => ({ ...c, headcount: value }))}
+        />
+      </View>
+
+      {/* Section 4: Thời gian & Địa điểm */}
+      <View style={formStyles.sectionCard}>
+        <View style={formStyles.sectionHeader}>
+          <View style={formStyles.sectionIconBox}>
+            <MapPin size={15} color="#059669" />
+          </View>
+          <Text style={formStyles.sectionTitle}>Thời gian & Địa điểm</Text>
+        </View>
+
+        <ChoiceField
+          label="Hình thức nơi làm việc"
+          value={draft.workplaceType}
+          choices={[
+            { value: "onsite", label: "Tại văn phòng" },
+            { value: "hybrid", label: "Kết hợp" },
+            { value: "remote", label: "Từ xa" },
+          ]}
+          disabled={disabled}
+          onChange={(value) => setDraft((c) => ({ ...c, workplaceType: value }))}
+        />
+
+        <Field
+          label="Địa điểm"
+          value={draft.location}
+          editable={!disabled}
+          onChangeText={(value) => setDraft((c) => ({ ...c, location: value }))}
+        />
+        <RecruitmentDateField
+          label="Hạn ứng tuyển"
+          value={draft.deadline}
+          disabled={disabled}
+          onChange={(value) => setDraft((c) => ({ ...c, deadline: value }))}
         />
       </View>
 
@@ -214,119 +242,25 @@ export function JobForm({
         </View>
 
         <Field
-          label="Mô tả công việc"
+          label="Mô tả"
           value={draft.description}
           multiline
           editable={!disabled}
           onChangeText={(value) => setDraft((c) => ({ ...c, description: value }))}
         />
         <Field
-          label="Yêu cầu ứng viên"
+          label="Yêu cầu"
           value={draft.requirements}
           multiline
           editable={!disabled}
           onChangeText={(value) => setDraft((c) => ({ ...c, requirements: value }))}
         />
         <Field
-          label="Quyền lợi & đãi ngộ"
+          label="Quyền lợi"
           value={draft.benefits}
           multiline
           editable={!disabled}
           onChangeText={(value) => setDraft((c) => ({ ...c, benefits: value }))}
-        />
-      </View>
-
-      {/* Section 3: Lương & Hợp đồng */}
-      <View style={formStyles.sectionCard}>
-        <View style={formStyles.sectionHeader}>
-          <View style={formStyles.sectionIconBox}>
-            <DollarSign size={15} color="#059669" />
-          </View>
-          <Text style={formStyles.sectionTitle}>Mức lương & Hợp đồng</Text>
-        </View>
-
-        <View style={{ flexDirection: "row", gap: 10 }}>
-          <View style={{ flex: 1 }}>
-            <Field
-              label="Lương tối thiểu (VNĐ)"
-              value={draft.salaryMin}
-              keyboardType="numeric"
-              editable={!disabled}
-              onChangeText={(value) => setDraft((c) => ({ ...c, salaryMin: value }))}
-            />
-          </View>
-          <View style={{ flex: 1 }}>
-            <Field
-              label="Lương tối đa (VNĐ)"
-              value={draft.salaryMax}
-              keyboardType="numeric"
-              editable={!disabled}
-              onChangeText={(value) => setDraft((c) => ({ ...c, salaryMax: value }))}
-            />
-          </View>
-        </View>
-
-        <View style={formStyles.switchRow}>
-          <View style={{ flex: 1 }}>
-            <Text style={formStyles.switchLabel}>Công khai mức lương</Text>
-            <Text style={formStyles.switchDesc}>Cho phép ứng viên nhìn thấy dải lương</Text>
-          </View>
-          <Switch
-            value={draft.showSalary}
-            disabled={disabled}
-            onValueChange={(value) => setDraft((c) => ({ ...c, showSalary: value }))}
-            trackColor={{ false: "#cbd5e1", true: "#a7f3d0" }}
-            thumbColor={draft.showSalary ? "#059669" : "#f8fafc"}
-          />
-        </View>
-
-        <ChoiceField
-          label="Loại hợp đồng *"
-          value={draft.employmentType}
-          disabled={disabled}
-          choices={[
-            { value: "full_time", label: "Toàn thời gian (Full-time)" },
-            { value: "part_time", label: "Bán thời gian (Part-time)" },
-            { value: "contract", label: "Hợp đồng (Contract)" },
-            { value: "internship", label: "Thực tập (Internship)" },
-            { value: "seasonal", label: "Thời vụ" },
-          ]}
-          onChange={(value) => setDraft((c) => ({ ...c, employmentType: value }))}
-        />
-
-        <ChoiceField
-          label="Hình thức làm việc"
-          value={draft.workplaceType}
-          choices={[
-            { value: "onsite", label: "Tại văn phòng / Cơ sở" },
-            { value: "hybrid", label: "Kết hợp linh hoạt (Hybrid)" },
-            { value: "remote", label: "Từ xa (Remote)" },
-          ]}
-          disabled={disabled}
-          onChange={(value) => setDraft((c) => ({ ...c, workplaceType: value }))}
-        />
-      </View>
-
-      {/* Section 4: Thời gian & Địa điểm */}
-      <View style={formStyles.sectionCard}>
-        <View style={formStyles.sectionHeader}>
-          <View style={formStyles.sectionIconBox}>
-            <MapPin size={15} color="#059669" />
-          </View>
-          <Text style={formStyles.sectionTitle}>Thời gian & Địa điểm</Text>
-        </View>
-
-        <Field
-          label="Địa điểm làm việc"
-          value={draft.location}
-          editable={!disabled}
-          onChangeText={(value) => setDraft((c) => ({ ...c, location: value }))}
-        />
-        <RecruitmentDateField
-          label="Hạn nộp hồ sơ" withTime
-          value={draft.deadline}
-          disabled={disabled}
-          onChange={(value) => setDraft((c) => ({ ...c, deadline: value }))}
         />
       </View>
 
@@ -390,26 +324,19 @@ export function JobForm({
               <Text style={formStyles.uploadBtnText}>Chọn và tải tệp JD lên</Text>
             </Pressable>
 
-            {!showManualUrl ? (
-              <Pressable
-                style={formStyles.manualLinkToggle}
-                onPress={() => setShowManualUrl(true)}
-              >
-                <Text style={formStyles.manualLinkToggleText}>+ Hoặc nhập liên kết JD thủ công</Text>
-              </Pressable>
-            ) : (
-              <Field
-                label="Liên kết JD công khai"
-                value={draft.jdFileUrl}
-                editable={!disabled}
-                onChangeText={(value) => {
-                  setDraft((c) => ({ ...c, jdFileUrl: value }));
-                  setJdFileName(getFileNameFromUrl(value));
-                }}
-              />
-            )}
           </View>
         )}
+        <Field
+          label="Link JD"
+          value={draft.jdFileUrl}
+          editable={!disabled}
+          autoCapitalize="none"
+          keyboardType="url"
+          onChangeText={(value) => {
+            setDraft((c) => ({ ...c, jdFileUrl: value }));
+            setJdFileName(getFileNameFromUrl(value));
+          }}
+        />
       </View>
 
       {/* Action Buttons */}

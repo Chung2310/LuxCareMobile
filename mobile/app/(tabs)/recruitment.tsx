@@ -20,8 +20,7 @@ import { BranchSelector } from "../../src/features/branches/BranchSelector";
 import { RecruitmentSubnav } from "../../src/features/recruitment/RecruitmentSubnav";
 import { JOB_STATUSES, recruitmentAccess } from "../../src/features/recruitment/access";
 import { JobForm } from "../../src/features/recruitment/JobForm";
-import { AttachmentPanel } from "../../src/features/recruitment/AttachmentPanel";
-import { PublicDocumentLink } from "../../src/features/recruitment/PublicDocumentLink";
+import { JobDetail } from "../../src/features/recruitment/JobDetail";
 import { EmptyState, ErrorText, Loading, Page, styles as baseStyles } from "../../src/ui";
 
 import {
@@ -37,6 +36,7 @@ import {
   ChevronRight,
   ChevronUp,
   Clock,
+  Eye,
   FileEdit,
   FileText,
   Gift,
@@ -78,7 +78,7 @@ export default function Recruitment() {
   const [search, setSearch] = useState("");
   const [status, setStatus] = useState("");
   const [deleted, setDeleted] = useState(false);
-  const [expanded, setExpanded] = useState<string | null>(null);
+  const [viewingJob, setViewingJob] = useState<RecruitmentJob | null>(null);
 
   const [loading, setLoading] = useState(false);
   const [refreshing, setRefreshing] = useState(false);
@@ -152,7 +152,7 @@ export default function Recruitment() {
     useCallback(() => {
       let active = true;
       setJobs([]);
-      setExpanded(null);
+      setViewingJob(null);
       setError(null);
       setPagination(emptyPagination);
 
@@ -574,7 +574,6 @@ export default function Recruitment() {
           {/* Job Cards List */}
           {jobs.map((job) => {
             const badge = getStatusBadge(job.status, deleted);
-            const isExpanded = expanded === job._id;
             const deadline = formatDeadline(job.applicationDeadline);
             const workplace = WORKPLACE_LABELS[job.workplaceType] || job.workplaceType || "Tại chỗ";
 
@@ -733,118 +732,15 @@ export default function Recruitment() {
 
                   <Pressable
                     style={({ pressed }) => [
-                      uiStyles.expandBtn,
-                      isExpanded && uiStyles.expandBtnActive,
+                      uiStyles.detailBtn,
                       pressed && { opacity: 0.8 },
                     ]}
-                    onPress={() => setExpanded(isExpanded ? null : job._id)}
+                    onPress={() => setViewingJob(job)}
                   >
-                    <View style={{ flexDirection: "row", alignItems: "center", gap: 3 }}>
-                      {isExpanded ? (
-                        <>
-                          <ChevronUp size={13} color="#059669" />
-                          <Text style={[uiStyles.expandBtnText, uiStyles.expandBtnTextActive]}>Thu gọn</Text>
-                        </>
-                      ) : (
-                        <>
-                          <ChevronDown size={13} color="#64748b" />
-                          <Text style={uiStyles.expandBtnText}>Chi tiết</Text>
-                        </>
-                      )}
-                    </View>
+                    <Eye size={13} color="#0284c7" />
+                    <Text style={uiStyles.detailBtnText}>Chi tiết</Text>
                   </Pressable>
                 </View>
-
-                {/* Collapsible Expanded Details */}
-                {isExpanded && (
-                  <View style={uiStyles.expandedSection}>
-                    {/* JD and Attachments */}
-                    <PublicDocumentLink title="Mô tả công việc (JD File)" url={job.jdFileUrl} />
-                    {!deleted && <AttachmentPanel kind="job" id={job._id} manage={access.manage} />}
-
-                    {/* Detailed Content Blocks */}
-                    {job.description ? (
-                      <View style={uiStyles.detailBlock}>
-                        <View style={{ flexDirection: "row", alignItems: "center", gap: 6 }}>
-                          <FileText size={15} color="#0284c7" />
-                          <Text style={uiStyles.detailBlockTitle}>Mô tả công việc</Text>
-                        </View>
-                        <Text style={uiStyles.detailBlockContent}>{job.description}</Text>
-                      </View>
-                    ) : null}
-
-                    {job.requirements ? (
-                      <View style={uiStyles.detailBlock}>
-                        <View style={{ flexDirection: "row", alignItems: "center", gap: 6 }}>
-                          <Target size={15} color="#0284c7" />
-                          <Text style={uiStyles.detailBlockTitle}>Yêu cầu ứng viên</Text>
-                        </View>
-                        <Text style={uiStyles.detailBlockContent}>{job.requirements}</Text>
-                      </View>
-                    ) : null}
-
-                    {job.benefits ? (
-                      <View style={uiStyles.detailBlock}>
-                        <View style={{ flexDirection: "row", alignItems: "center", gap: 6 }}>
-                          <Gift size={15} color="#0284c7" />
-                          <Text style={uiStyles.detailBlockTitle}>Quyền lợi đãi ngộ</Text>
-                        </View>
-                        <Text style={uiStyles.detailBlockContent}>{job.benefits}</Text>
-                      </View>
-                    ) : null}
-
-                    {/* Management Action Buttons */}
-                    {access.manage && (
-                      <View style={uiStyles.manageSection}>
-                        <View style={{ flexDirection: "row", alignItems: "center", gap: 6, marginBottom: 2 }}>
-                          <Settings size={14} color="#475569" />
-                          <Text style={uiStyles.manageSectionTitle}>Thao tác quản lý tin</Text>
-                        </View>
-                        {deleted ? (
-                          <Pressable
-                            style={({ pressed }) => [
-                              uiStyles.restoreActionBtn,
-                              disabled && uiStyles.btnDisabled,
-                              pressed && { opacity: 0.8 },
-                            ]}
-                            disabled={disabled || uncertain}
-                            onPress={() => confirm(job, "restore", "Khôi phục tin tuyển dụng này?")}
-                          >
-                            <RotateCcw size={14} color="#047857" />
-                            <Text style={uiStyles.restoreActionBtnText}>Khôi phục tin</Text>
-                          </Pressable>
-                        ) : (
-                          <>
-                            <View style={uiStyles.statusChangeRow}>
-                              {JOB_STATUSES.filter((item) => item.value !== job.status).map((item) => (
-                                <Pressable
-                                  key={item.value}
-                                  style={({ pressed }) => [
-                                    uiStyles.statusChangeBtn,
-                                    disabled && uiStyles.btnDisabled,
-                                    pressed && { opacity: 0.75 },
-                                  ]}
-                                  disabled={disabled || uncertain}
-                                  onPress={() =>
-                                    confirm(job, item.value, `Chuyển trạng thái sang "${item.label}"?`)
-                                  }
-                                >
-                                  {item.value === "open" && <CheckCircle2 size={12} color="#047857" />}
-                                  {item.value === "draft" && <FileEdit size={12} color="#b45309" />}
-                                  {item.value === "paused" && <PauseCircle size={12} color="#c2410c" />}
-                                  {item.value === "closed" && <Lock size={12} color="#475569" />}
-                                  <Text style={uiStyles.statusChangeBtnText}>
-                                    {item.label}
-                                  </Text>
-                                </Pressable>
-                              ))}
-                            </View>
-                          </>
-                        )}
-                      </View>
-                    )}
-                  </View>
-                )}
               </View>
             );
           })}
@@ -930,6 +826,43 @@ export default function Recruitment() {
           )}
         </ScrollView>
       </SafeAreaView>
+
+      {/* Modal for Job Details */}
+      {viewingJob && (
+        <JobDetail
+          job={viewingJob}
+          deleted={deleted}
+          canManage={access.manage}
+          disabled={disabled || uncertain}
+          onClose={() => setViewingJob(null)}
+          onEdit={(jobToEdit) => {
+            setViewingJob(null);
+            setEditing(jobToEdit);
+          }}
+          onViewApplicants={(jobToView) => {
+            setViewingJob(null);
+            router.push({
+              pathname: "/(tabs)/applicants",
+              params: { jobId: jobToView._id },
+            });
+          }}
+          onChangeStatus={(jobToUpdate, newStatus) => {
+            const item = JOB_STATUSES.find((s) => s.value === newStatus);
+            confirm(jobToUpdate, newStatus, `Chuyển trạng thái sang "${item?.label || newStatus}"?`);
+            setViewingJob((prev) =>
+              prev && prev._id === jobToUpdate._id ? { ...prev, status: newStatus } : prev,
+            );
+          }}
+          onDelete={(jobToDelete) => {
+            setViewingJob(null);
+            confirm(jobToDelete, "delete", "Xóa tin tuyển dụng?");
+          }}
+          onRestore={(jobToRestore) => {
+            setViewingJob(null);
+            confirm(jobToRestore, "restore", "Khôi phục tin tuyển dụng này?");
+          }}
+        />
+      )}
 
       {/* Modal for Creating / Editing Job */}
       {editing && access.manage && (
@@ -1356,6 +1289,22 @@ const uiStyles = StyleSheet.create({
     fontSize: 12,
     fontWeight: "600",
     color: "#334155",
+  },
+  detailBtn: {
+    paddingHorizontal: 12,
+    paddingVertical: 9,
+    borderRadius: 10,
+    backgroundColor: "#f0f9ff",
+    borderWidth: 1,
+    borderColor: "#bae6fd",
+    flexDirection: "row",
+    alignItems: "center",
+    gap: 4,
+  },
+  detailBtnText: {
+    fontSize: 12,
+    fontWeight: "600",
+    color: "#0284c7",
   },
   expandBtn: {
     paddingHorizontal: 12,
