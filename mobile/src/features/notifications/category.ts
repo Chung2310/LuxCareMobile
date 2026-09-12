@@ -109,12 +109,14 @@ export function detectNotificationCategory(
     combined.includes("kho") ||
     combined.includes("vật tư") ||
     combined.includes("thiết bị") ||
+    combined.includes("dược phẩm") ||
+    combined.includes("thuốc") ||
     combined.includes("nhập kho") ||
     combined.includes("xuất kho")
   ) {
     return {
       category: "warehouse",
-      label: "Kho & Thiết bị",
+      label: "Vật tư & Dược phẩm",
       iconName: "cube-outline",
       color: "#ea580c",
       bg: "#fff7ed",

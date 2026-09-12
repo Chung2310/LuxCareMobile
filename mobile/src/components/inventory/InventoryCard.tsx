@@ -207,7 +207,7 @@ const styles = StyleSheet.create({
     backgroundColor: "#f1f5f9",
     paddingHorizontal: 8,
     paddingVertical: 3,
-    borderRadius: 6,
+    borderRadius: 8,
   },
   codeText: {
     fontSize: 11,
@@ -218,7 +218,7 @@ const styles = StyleSheet.create({
     backgroundColor: "#f0fdfa",
     paddingHorizontal: 8,
     paddingVertical: 3,
-    borderRadius: 6,
+    borderRadius: 8,
     flex: 1,
   },
   categoryText: {

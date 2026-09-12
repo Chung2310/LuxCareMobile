@@ -2,18 +2,19 @@ import React, { useRef, useState } from "react";
 import {
   ActivityIndicator,
   Modal,
+  Platform,
   Pressable,
   ScrollView,
+  StatusBar,
   StyleSheet,
   Text,
   View,
 } from "react-native";
-import { SafeAreaView } from "react-native-safe-area-context";
+import { useSafeAreaInsets } from "react-native-safe-area-context";
 import type { BranchRecord } from "../../../../src/services/branchService";
 import { branches } from "../../api/services";
 import { useSession, messageOf } from "../../auth/SessionProvider";
 import { Ionicons } from "@expo/vector-icons";
-
 
 export function BranchSelector({
   triggerStyle,
@@ -23,6 +24,10 @@ export function BranchSelector({
   renderCustomTrigger?: (open: () => void, currentName: string) => React.ReactNode;
 } = {}) {
   const { user, selectedBranch, selectBranch } = useSession();
+  const insets = useSafeAreaInsets();
+  const topInset = Math.max(insets.top, Platform.OS === "ios" ? 48 : (StatusBar.currentHeight || 0));
+  const bottomInset = Math.max(insets.bottom, 20);
+
   const [visible, setVisible] = useState(false);
   const [items, setItems] = useState<BranchRecord[]>([]);
   const [error, setError] = useState<string | null>(null);
@@ -95,112 +100,187 @@ export function BranchSelector({
       <Modal
         visible={visible}
         animationType="slide"
+        transparent={true}
+        statusBarTranslucent={true}
         onRequestClose={() => {
           setVisible(false);
           revision.current++;
         }}
       >
-        <SafeAreaView edges={["top", "bottom"]} style={styles.modalSafeArea}>
-          {/* Header Bar */}
-          <View style={styles.modalHeader}>
-            <Pressable
-              style={styles.modalCloseBtn}
-              onPress={() => {
-                setVisible(false);
-                revision.current++;
-              }}
-            >
-              <Text style={styles.modalCloseBtnText}>✕</Text>
-            </Pressable>
+        <View style={styles.modalOverlay}>
+          {/* Backdrop Dismiss */}
+          <Pressable
+            style={StyleSheet.absoluteFill}
+            onPress={() => {
+              setVisible(false);
+              revision.current++;
+            }}
+          />
 
-            <View style={{ flex: 1, alignItems: "center" }}>
-              <Text style={styles.modalTitle}>Chọn chi nhánh làm việc</Text>
-              <Text style={styles.modalSub}>Phạm vi dữ liệu sẽ thay đổi theo chi nhánh</Text>
+          {/* Bottom Sheet Modal Sheet */}
+          <View
+            style={[
+              styles.sheetContainer,
+              {
+                paddingBottom: bottomInset + 10,
+                marginTop: topInset + 24,
+              },
+            ]}
+          >
+            {/* Top Drag Handle */}
+            <View style={styles.dragHandleContainer}>
+              <View style={styles.dragHandle} />
             </View>
 
-            <View style={{ width: 36 }} />
-          </View>
+            {/* Header Bar */}
+            <View style={styles.modalHeader}>
+              <Pressable
+                style={({ pressed }) => [
+                  styles.modalCloseBtn,
+                  pressed && { opacity: 0.7, backgroundColor: "#e2e8f0" },
+                ]}
+                hitSlop={{ top: 16, bottom: 16, left: 16, right: 16 }}
+                onPress={() => {
+                  setVisible(false);
+                  revision.current++;
+                }}
+              >
+                <Ionicons name="close" size={20} color="#475569" />
+              </Pressable>
 
-          <ScrollView
-            style={{ flex: 1 }}
-            contentContainerStyle={styles.modalScrollContent}
-            keyboardShouldPersistTaps="handled"
-          >
-            {/* Option: Toàn hệ thống (Tất cả chi nhánh) */}
-            <Pressable
-              style={[
-                styles.branchCard,
-                !selectedBranch && styles.branchCardSelected,
-              ]}
-              onPress={() => choose(null)}
+              <View style={{ flex: 1, alignItems: "center", paddingHorizontal: 6 }}>
+                <Text style={styles.modalTitle} numberOfLines={1}>
+                  Chọn chi nhánh làm việc
+                </Text>
+                <Text style={styles.modalSub} numberOfLines={1}>
+                  Phạm vi dữ liệu sẽ thay đổi theo chi nhánh
+                </Text>
+              </View>
+
+              <View style={{ width: 36 }} />
+            </View>
+
+            <ScrollView
+              style={{ flexGrow: 0 }}
+              contentContainerStyle={styles.modalScrollContent}
+              keyboardShouldPersistTaps="handled"
+              showsVerticalScrollIndicator={false}
             >
-              <View style={[styles.codeBadge, { backgroundColor: "#ecfdf5", borderColor: "#a7f3d0", borderWidth: 1, flexDirection: "row", alignItems: "center", gap: 4 }]}>
-                <Ionicons name="globe-outline" size={12} color="#047857" />
-                <Text style={[styles.codeBadgeText, { color: "#047857" }]}>TẤT CẢ</Text>
-              </View>
+              {/* Option: Toàn hệ thống (Tất cả chi nhánh) */}
+              <Pressable
+                style={({ pressed }) => [
+                  styles.branchCard,
+                  !selectedBranch && styles.branchCardSelected,
+                  pressed && { opacity: 0.85 },
+                ]}
+                onPress={() => choose(null)}
+              >
+                <View
+                  style={[
+                    styles.codeBadge,
+                    {
+                      backgroundColor: "#ecfdf5",
+                      borderColor: "#a7f3d0",
+                      borderWidth: 1,
+                      flexDirection: "row",
+                      alignItems: "center",
+                      gap: 4,
+                    },
+                  ]}
+                >
+                  <Ionicons name="globe-outline" size={13} color="#047857" />
+                  <Text style={[styles.codeBadgeText, { color: "#047857" }]}>TẤT CẢ</Text>
+                </View>
 
-              <View style={{ flex: 1 }}>
-                <Text style={[styles.branchName, !selectedBranch && { color: "#047857", fontWeight: "800" }]}>
-                  Toàn hệ thống (Tất cả chi nhánh)
-                </Text>
-                <Text style={styles.branchAddress}>
-                  Xem dữ liệu tổng hợp toàn doanh nghiệp
-                </Text>
-              </View>
-
-              <View style={[styles.radioCircle, !selectedBranch && styles.radioCircleActive]}>
-                {!selectedBranch && <View style={styles.radioDot} />}
-              </View>
-            </Pressable>
-
-            {loading && (
-              <View style={styles.loadingBox}>
-                <ActivityIndicator size="large" color="#059669" />
-                <Text style={styles.loadingText}>Đang tải danh sách chi nhánh...</Text>
-              </View>
-            )}
-
-            {!!error && (
-              <View style={styles.errorBox}>
-                <Ionicons name="alert-circle-outline" size={16} color="#e11d48" />
-                <Text style={styles.errorText}>{error}</Text>
-                <Pressable style={styles.retryBtn} onPress={() => void load()}>
-                  <Text style={styles.retryBtnText}>Thử lại</Text>
-                </Pressable>
-              </View>
-            )}
-
-            {!loading &&
-              items.map((item) => {
-                const isSelected = selectedBranch?._id === item._id;
-
-                return (
-                  <Pressable
-                    key={item._id}
-                    style={[styles.branchCard, isSelected && styles.branchCardSelected]}
-                    onPress={() => choose(item)}
+                <View style={{ flex: 1 }}>
+                  <Text
+                    style={[
+                      styles.branchName,
+                      !selectedBranch && { color: "#047857", fontWeight: "800" },
+                    ]}
                   >
-                    <View style={styles.codeBadge}>
-                      <Text style={styles.codeBadgeText}>{item.code}</Text>
-                    </View>
+                    Toàn hệ thống (Tất cả chi nhánh)
+                  </Text>
+                  <Text style={styles.branchAddress}>
+                    Xem dữ liệu tổng hợp toàn doanh nghiệp
+                  </Text>
+                </View>
 
-                    <View style={{ flex: 1 }}>
-                      <Text style={styles.branchName}>{item.name}</Text>
-                      {!!item.address && (
-                        <Text style={styles.branchAddress} numberOfLines={2}>
-                          {item.address}
-                        </Text>
-                      )}
-                    </View>
+                <View
+                  style={[
+                    styles.radioCircle,
+                    !selectedBranch && styles.radioCircleActive,
+                  ]}
+                >
+                  {!selectedBranch && <View style={styles.radioDot} />}
+                </View>
+              </Pressable>
 
-                    <View style={[styles.radioCircle, isSelected && styles.radioCircleActive]}>
-                      {isSelected && <View style={styles.radioDot} />}
-                    </View>
+              {loading && (
+                <View style={styles.loadingBox}>
+                  <ActivityIndicator size="large" color="#059669" />
+                  <Text style={styles.loadingText}>Đang tải danh sách chi nhánh...</Text>
+                </View>
+              )}
+
+              {!!error && (
+                <View style={styles.errorBox}>
+                  <Ionicons name="alert-circle-outline" size={16} color="#e11d48" />
+                  <Text style={styles.errorText}>{error}</Text>
+                  <Pressable style={styles.retryBtn} onPress={() => void load()}>
+                    <Text style={styles.retryBtnText}>Thử lại</Text>
                   </Pressable>
-                );
-              })}
-          </ScrollView>
-        </SafeAreaView>
+                </View>
+              )}
+
+              {!loading &&
+                items.map((item) => {
+                  const isSelected = selectedBranch?._id === item._id;
+
+                  return (
+                    <Pressable
+                      key={item._id}
+                      style={({ pressed }) => [
+                        styles.branchCard,
+                        isSelected && styles.branchCardSelected,
+                        pressed && { opacity: 0.85 },
+                      ]}
+                      onPress={() => choose(item)}
+                    >
+                      <View style={styles.codeBadge}>
+                        <Text style={styles.codeBadgeText}>{item.code}</Text>
+                      </View>
+
+                      <View style={{ flex: 1 }}>
+                        <Text
+                          style={[
+                            styles.branchName,
+                            isSelected && { color: "#047857", fontWeight: "800" },
+                          ]}
+                        >
+                          {item.name}
+                        </Text>
+                        {!!item.address && (
+                          <Text style={styles.branchAddress} numberOfLines={2}>
+                            {item.address}
+                          </Text>
+                        )}
+                      </View>
+
+                      <View
+                        style={[
+                          styles.radioCircle,
+                          isSelected && styles.radioCircleActive,
+                        ]}
+                      >
+                        {isSelected && <View style={styles.radioDot} />}
+                      </View>
+                    </Pressable>
+                  );
+                })}
+            </ScrollView>
+          </View>
+        </View>
       </Modal>
     </>
   );
@@ -251,19 +331,45 @@ const styles = StyleSheet.create({
     fontWeight: "700",
     color: "#059669",
   },
-  modalSafeArea: {
+  modalOverlay: {
     flex: 1,
-    backgroundColor: "#f8fafc",
+    backgroundColor: "rgba(15, 23, 42, 0.6)",
+    justifyContent: "flex-end",
+  },
+  sheetContainer: {
+    backgroundColor: "#ffffff",
+    borderTopLeftRadius: 28,
+    borderTopRightRadius: 28,
+    maxHeight: "88%",
+    shadowColor: "#000",
+    shadowOffset: { width: 0, height: -4 },
+    shadowOpacity: 0.15,
+    shadowRadius: 16,
+    elevation: 24,
+  },
+  dragHandleContainer: {
+    alignItems: "center",
+    paddingTop: 10,
+    paddingBottom: 6,
+    backgroundColor: "#ffffff",
+    borderTopLeftRadius: 28,
+    borderTopRightRadius: 28,
+  },
+  dragHandle: {
+    width: 40,
+    height: 4,
+    borderRadius: 2,
+    backgroundColor: "#cbd5e1",
   },
   modalHeader: {
     flexDirection: "row",
     alignItems: "center",
     justifyContent: "space-between",
     paddingHorizontal: 16,
-    paddingVertical: 12,
+    paddingVertical: 10,
     backgroundColor: "#ffffff",
     borderBottomWidth: 1,
-    borderBottomColor: "#e2e8f0",
+    borderBottomColor: "#f1f5f9",
   },
   modalCloseBtn: {
     width: 36,
@@ -273,23 +379,21 @@ const styles = StyleSheet.create({
     alignItems: "center",
     justifyContent: "center",
   },
-  modalCloseBtnText: {
-    fontSize: 14,
-    fontWeight: "700",
-    color: "#475569",
-  },
   modalTitle: {
     fontSize: 16,
     fontWeight: "800",
     color: "#0f172a",
+    textAlign: "center",
   },
   modalSub: {
-    fontSize: 11,
+    fontSize: 12,
     color: "#64748b",
-    marginTop: 1,
+    marginTop: 2,
+    textAlign: "center",
   },
   modalScrollContent: {
     padding: 16,
+    paddingBottom: 24,
     gap: 10,
   },
   branchCard: {

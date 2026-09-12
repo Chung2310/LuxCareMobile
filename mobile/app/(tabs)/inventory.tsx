@@ -527,6 +527,59 @@ export default function InventoryScreen() {
                   </TouchableOpacity>
                 </View>
 
+                {/* Thông báo cảnh báo tồn kho / cận hạn */}
+                {(stats.lowStockCount > 0 || stats.expiredCount > 0 || stats.expiringSoonCount > 0) && (
+                  <View
+                    style={[
+                      styles.alertNoticeBanner,
+                      stats.expiredCount > 0
+                        ? styles.alertNoticeBannerDanger
+                        : styles.alertNoticeBannerWarning,
+                    ]}
+                  >
+                    <View
+                      style={[
+                        styles.alertNoticeIconBox,
+                        stats.expiredCount > 0
+                          ? styles.alertNoticeIconBoxDanger
+                          : styles.alertNoticeIconBoxWarning,
+                      ]}
+                    >
+                      <Ionicons
+                        name={stats.expiredCount > 0 ? "alert-circle" : "warning"}
+                        size={16}
+                        color={stats.expiredCount > 0 ? "#dc2626" : "#d97706"}
+                      />
+                    </View>
+                    <View style={styles.alertNoticeContent}>
+                      <Text
+                        style={[
+                          styles.alertNoticeTitle,
+                          stats.expiredCount > 0
+                            ? styles.alertNoticeTitleDanger
+                            : styles.alertNoticeTitleWarning,
+                        ]}
+                      >
+                        {stats.expiredCount > 0
+                          ? `Cảnh báo: Có ${stats.expiredCount} mặt hàng đã hết hạn!`
+                          : `Thông báo: Có ${stats.lowStockCount} mặt hàng sắp hết tồn kho!`}
+                      </Text>
+                      <Text style={styles.alertNoticeSubtitle} numberOfLines={2}>
+                        {stats.expiringSoonCount > 0
+                          ? `Có ${stats.expiringSoonCount} mặt hàng cận hạn. Hãy ưu tiên xuất lô cận hạn trước theo quy tắc FEFO.`
+                          : "Kiểm tra danh sách để chủ động lập phiếu nhập kho hoặc điều chuyển kịp thời."}
+                      </Text>
+                    </View>
+                    <TouchableOpacity
+                      style={styles.alertNoticeActionBtn}
+                      onPress={() => setSelectedCategory(stats.expiredCount > 0 ? "expiring" : "low-stock")}
+                      activeOpacity={0.8}
+                    >
+                      <Text style={styles.alertNoticeActionText}>Xem</Text>
+                    </TouchableOpacity>
+                  </View>
+                )}
+
                 {/* Bộ lọc ngang danh mục lấy từ dữ liệu thật */}
                 <FlatList
                   horizontal
@@ -947,6 +1000,68 @@ const styles = StyleSheet.create({
     gap: 10,
     marginTop: 12,
     marginBottom: 4,
+  },
+  alertNoticeBanner: {
+    flexDirection: "row",
+    alignItems: "center",
+    padding: 10,
+    borderRadius: 14,
+    borderWidth: 1,
+    marginTop: 10,
+    gap: 10,
+  },
+  alertNoticeBannerDanger: {
+    backgroundColor: "#fff5f5",
+    borderColor: "#fecdd3",
+  },
+  alertNoticeBannerWarning: {
+    backgroundColor: "#fffbeb",
+    borderColor: "#fde68a",
+  },
+  alertNoticeIconBox: {
+    width: 32,
+    height: 32,
+    borderRadius: 16,
+    alignItems: "center",
+    justifyContent: "center",
+  },
+  alertNoticeIconBoxDanger: {
+    backgroundColor: "#fee2e2",
+  },
+  alertNoticeIconBoxWarning: {
+    backgroundColor: "#fef3c7",
+  },
+  alertNoticeContent: {
+    flex: 1,
+  },
+  alertNoticeTitle: {
+    fontSize: 12.5,
+    fontWeight: "700",
+  },
+  alertNoticeTitleDanger: {
+    color: "#b91c1c",
+  },
+  alertNoticeTitleWarning: {
+    color: "#b45309",
+  },
+  alertNoticeSubtitle: {
+    fontSize: 11,
+    color: "#64748b",
+    marginTop: 2,
+    lineHeight: 15,
+  },
+  alertNoticeActionBtn: {
+    backgroundColor: "#ffffff",
+    paddingHorizontal: 10,
+    paddingVertical: 6,
+    borderRadius: 10,
+    borderWidth: 1,
+    borderColor: "#e2e8f0",
+  },
+  alertNoticeActionText: {
+    fontSize: 11.5,
+    fontWeight: "700",
+    color: "#0f172a",
   },
   quickVoucherBtnIn: {
     flex: 1,
