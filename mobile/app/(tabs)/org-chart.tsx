@@ -24,6 +24,30 @@ import { userManagementApi, type CreateUserInput } from "../../src/api/userManag
 import { branches as branchService, departments as departmentService, roster } from "../../src/api/services";
 import { messageOf, useSession } from "../../src/auth/SessionProvider";
 import { hasPermission } from "../../src/auth/access";
+import {
+  Building,
+  Briefcase,
+  Calendar,
+  ChevronUp,
+  CircleDollarSign,
+  Crown,
+  FileText,
+  Folder,
+  FolderTree,
+  Mail,
+  MessageSquare,
+  Pencil,
+  Phone,
+  RefreshCw,
+  RotateCw,
+  Search,
+  Table,
+  User,
+  UserCheck,
+  UserPlus,
+  Users,
+  X,
+} from "lucide-react-native";
 
 /* ==========================================================================
    1. FUNCTIONAL CATEGORIES (Theo chuẩn LuxCare Web)
@@ -162,7 +186,15 @@ function getCategoryByDivision(divisionOrDept?: string): FunctionalCategory {
   return FUNCTIONAL_CATEGORIES[5];
 }
 
-function getRoleIcon(roleTitle?: string): string {
+function RoleIcon({
+  roleTitle,
+  size = 12,
+  color = "#64748b",
+}: {
+  roleTitle?: string;
+  size?: number;
+  color?: string;
+}) {
   const r = (roleTitle || "").toLowerCase();
   if (
     r.includes("ceo") ||
@@ -175,7 +207,7 @@ function getRoleIcon(roleTitle?: string): string {
     r.includes("giám đốc") ||
     r.includes("tổng")
   ) {
-    return "👑";
+    return <Crown size={size} color="#d97706" />;
   }
   if (
     r.includes("trưởng phòng") ||
@@ -184,9 +216,9 @@ function getRoleIcon(roleTitle?: string): string {
     r.includes("trưởng nhóm") ||
     r.includes("phó")
   ) {
-    return "💼";
+    return <Briefcase size={size} color="#4f46e5" />;
   }
-  return "👤";
+  return <User size={size} color={color} />;
 }
 
 type RoleBadge = { label: string; bg: string; text: string; border: string; rank: number };
@@ -319,10 +351,10 @@ function Avatar({
   );
 }
 
-function IRow({ icon, label, value }: { icon: string; label: string; value: string }) {
+function IRow({ icon, label, value }: { icon: React.ReactNode; label: string; value: string }) {
   return (
     <View style={s.iRow}>
-      <Text style={s.iIco}>{icon}</Text>
+      <View style={s.iIco}>{icon}</View>
       <Text style={s.iLbl}>{label}</Text>
       <Text style={s.iVal} numberOfLines={1}>
         {value}
@@ -348,14 +380,16 @@ function OrgEditModal({
 }) {
   if (!emp) return null;
 
-  const [displayName, setDisplayName] = useState(emp.displayName || "");
-  const [jobTitle, setJobTitle] = useState(emp.jobTitle || "");
-  const [department, setDepartment] = useState(emp.department || "");
+  const clean = (val?: string) => (val && val.trim() !== "Chưa cập nhật" ? val.trim() : "");
+
+  const [displayName, setDisplayName] = useState(clean(emp.displayName));
+  const [jobTitle, setJobTitle] = useState(clean(emp.jobTitle));
+  const [department, setDepartment] = useState(clean(emp.department));
   const [parentId, setParentId] = useState(emp.parentId || "");
-  const [phone, setPhone] = useState(emp.phone || "");
-  const [birthDate, setBirthDate] = useState(emp.birthDate || "");
+  const [phone, setPhone] = useState(clean(emp.phone));
+  const [birthDate, setBirthDate] = useState(clean(emp.birthDate));
   const [monthlySalary, setMonthlySalary] = useState(emp.monthlySalary ? String(emp.monthlySalary) : "");
-  const [jobDescriptionLink, setJobDescriptionLink] = useState(emp.jobDescriptionLink || "");
+  const [jobDescriptionLink, setJobDescriptionLink] = useState(clean(emp.jobDescriptionLink));
   const [isLeader, setIsLeader] = useState(!!emp.isLeader);
 
   const [showDeptPicker, setShowDeptPicker] = useState(false);
@@ -365,14 +399,14 @@ function OrgEditModal({
 
   React.useEffect(() => {
     if (emp) {
-      setDisplayName(emp.displayName || "");
-      setJobTitle(emp.jobTitle || "");
-      setDepartment(emp.department || "");
+      setDisplayName(clean(emp.displayName));
+      setJobTitle(clean(emp.jobTitle));
+      setDepartment(clean(emp.department));
       setParentId(emp.parentId || "");
-      setPhone(emp.phone || "");
-      setBirthDate(emp.birthDate || "");
+      setPhone(clean(emp.phone));
+      setBirthDate(clean(emp.birthDate));
       setMonthlySalary(emp.monthlySalary ? String(emp.monthlySalary) : "");
-      setJobDescriptionLink(emp.jobDescriptionLink || "");
+      setJobDescriptionLink(clean(emp.jobDescriptionLink));
       setIsLeader(!!emp.isLeader);
     }
   }, [emp]);
@@ -445,7 +479,7 @@ function OrgEditModal({
               <Text style={s.editHeaderSub}>{emp.displayName}</Text>
             </View>
             <Pressable onPress={onClose} hitSlop={8} style={s.editCloseBtn} disabled={loading}>
-              <Text style={{ fontSize: 16, color: "#64748b", fontWeight: "700" }}>✕</Text>
+              <X size={18} color="#64748b" />
             </Pressable>
           </View>
 
@@ -487,7 +521,10 @@ function OrgEditModal({
             {/* Trưởng nhóm Leader */}
             <View style={s.formLeaderRow}>
               <View style={{ flex: 1 }}>
-                <Text style={s.formLeaderLabel}>👑 Chỉ định Trưởng nhóm / Leader</Text>
+                <View style={{ flexDirection: "row", alignItems: "center", gap: 6 }}>
+                  <Crown size={15} color="#d97706" />
+                  <Text style={s.formLeaderLabel}>Chỉ định Trưởng nhóm / Leader</Text>
+                </View>
                 <Text style={s.formLeaderSub}>Hiển thị huy hiệu Leader nổi bật trên sơ đồ tổ chức</Text>
               </View>
               <Pressable
@@ -503,7 +540,7 @@ function OrgEditModal({
             {/* Số điện thoại */}
             <View style={s.formGroup}>
               <Text style={s.formLabel}>Số điện thoại</Text>
-              <TextInput style={s.formInput} value={phone} onChangeText={setPhone} keyboardType="phone-pad" placeholder="VD: 0912345678" placeholderTextColor="#94a3b8" />
+              <TextInput style={s.formInput} value={phone && phone !== "Chưa cập nhật" ? phone : ""} onChangeText={setPhone} keyboardType="phone-pad" placeholder="Chưa cập nhật" placeholderTextColor="#94a3b8" />
             </View>
 
             {/* Ngày sinh */}
@@ -576,7 +613,7 @@ function OrgEditModal({
             <Pressable style={[s.pickerCard, { maxHeight: "80%" }]} onPress={() => {}}>
               <Text style={s.pickerTitle}>Chọn quản lý trực tiếp</Text>
               <View style={s.searchBox}>
-                <Text style={{ marginRight: 6 }}>🔍</Text>
+                <Search size={14} color="#94a3b8" style={{ marginRight: 6 }} />
                 <TextInput
                   style={s.searchInput}
                   placeholder="Tìm theo tên hoặc chức vụ..."
@@ -643,7 +680,6 @@ function ProfileModal({
   if (!emp) return null;
   const b = roleBadge(emp.role);
   const cat = getCategoryByDivision(emp.department || emp.division);
-  const roleIcon = getRoleIcon(emp.jobTitle || emp.role);
 
   return (
     <Modal visible animationType="slide" transparent onRequestClose={onClose}>
@@ -659,13 +695,15 @@ function ProfileModal({
               col={cat.text}
             />
             <Text style={s.mName}>{emp.displayName}</Text>
-            <Text style={s.mSub}>
-              {roleIcon} {emp.jobTitle || b.label}
-            </Text>
+            <View style={{ flexDirection: "row", alignItems: "center", gap: 4, marginTop: 2 }}>
+              <RoleIcon roleTitle={emp.jobTitle || emp.role} size={13} color="#64748b" />
+              <Text style={s.mSub}>{emp.jobTitle || b.label}</Text>
+            </View>
             <View style={{ flexDirection: "row", gap: 6, marginTop: 8 }}>
               {emp.isLeader && (
                 <View style={s.leaderBadgeLarge}>
-                  <Text style={s.leaderTextLarge}>👑 Leader</Text>
+                  <Crown size={11} color="#b45309" />
+                  <Text style={s.leaderTextLarge}>Leader</Text>
                 </View>
               )}
               <View style={[s.pill, { backgroundColor: cat.bg, borderColor: cat.color }]}>
@@ -675,28 +713,64 @@ function ProfileModal({
           </View>
 
           <View style={s.infoBlock}>
-            {!!emp.department && <IRow icon="🏢" label="Phòng ban" value={emp.department} />}
+            {!!emp.department && (
+              <IRow
+                icon={<Building size={14} color="#64748b" />}
+                label="Phòng ban"
+                value={emp.department}
+              />
+            )}
             <IRow
-              icon="👤"
+              icon={<User size={14} color="#64748b" />}
               label="Quản lý"
               value={managerName || "Cấp cao nhất / Không có"}
             />
-            {!!emp.email && <IRow icon="✉️" label="Email" value={emp.email} />}
-            {!!emp.phone && <IRow icon="📱" label="Điện thoại" value={emp.phone} />}
-            {!!emp.birthDate && <IRow icon="🎂" label="Ngày sinh" value={emp.birthDate} />}
+            {!!emp.email && (
+              <IRow
+                icon={<Mail size={14} color="#64748b" />}
+                label="Email"
+                value={emp.email}
+              />
+            )}
+            {!!emp.phone && (
+              <IRow
+                icon={<Phone size={14} color="#64748b" />}
+                label="Điện thoại"
+                value={emp.phone}
+              />
+            )}
+            {!!emp.birthDate && (
+              <IRow
+                icon={<Calendar size={14} color="#64748b" />}
+                label="Ngày sinh"
+                value={emp.birthDate}
+              />
+            )}
             {emp.monthlySalary != null && emp.monthlySalary > 0 && (
-              <IRow icon="💰" label="Lương tháng" value={`${emp.monthlySalary.toLocaleString("vi-VN")} đ`} />
+              <IRow
+                icon={<CircleDollarSign size={14} color="#64748b" />}
+                label="Lương tháng"
+                value={`${emp.monthlySalary.toLocaleString("vi-VN")} đ`}
+              />
             )}
             {!!emp.jobDescriptionLink && (
               <View style={s.iRow}>
-                <Text style={s.iIco}>📄</Text>
+                <View style={s.iIco}>
+                  <FileText size={14} color="#64748b" />
+                </View>
                 <Text style={s.iLbl}>Mô tả công việc</Text>
                 <Pressable onPress={() => Linking.openURL(emp.jobDescriptionLink!)}>
                   <Text style={[s.iVal, { color: "#0284c7", textDecorationLine: "underline" }]}>Xem link JD</Text>
                 </Pressable>
               </View>
             )}
-            {!!emp.division && <IRow icon="📁" label="Khối" value={emp.division} />}
+            {!!emp.division && (
+              <IRow
+                icon={<Folder size={14} color="#64748b" />}
+                label="Khối"
+                value={emp.division}
+              />
+            )}
           </View>
 
           <View style={s.actionRow}>
@@ -710,7 +784,9 @@ function ProfileModal({
                 } as any);
               }}
             >
-              <Text style={s.actionIco}>💬</Text>
+              <View style={s.actionIco}>
+                <MessageSquare size={18} color="#0284c7" />
+              </View>
               <Text style={s.actionLbl}>Nhắn tin</Text>
             </Pressable>
 
@@ -723,7 +799,9 @@ function ProfileModal({
                     onEdit?.(emp);
                   }}
                 >
-                  <Text style={s.actionIco}>✏️</Text>
+                  <View style={s.actionIco}>
+                    <Pencil size={18} color="#059669" />
+                  </View>
                   <Text style={[s.actionLbl, { color: "#059669" }]}>Sửa thông tin</Text>
                 </Pressable>
 
@@ -734,7 +812,9 @@ function ProfileModal({
                     onStartMove?.(emp);
                   }}
                 >
-                  <Text style={s.actionIco}>🔄</Text>
+                  <View style={s.actionIco}>
+                    <RefreshCw size={18} color="#1d4ed8" />
+                  </View>
                   <Text style={[s.actionLbl, { color: "#1d4ed8" }]}>Đổi quản lý</Text>
                 </Pressable>
               </>
@@ -781,7 +861,6 @@ function TreeBranchView({
   const isHighlighted = highlighted ? highlighted.has(emp.uid) : false;
   const dimmed = highlighted !== null && !isHighlighted;
   const cat = getCategoryByDivision(emp.department || emp.division);
-  const roleIcon = getRoleIcon(emp.jobTitle || emp.role);
   const directReports = children.length;
 
   const isMoving = movingEmp?.uid === emp.uid;
@@ -823,12 +902,14 @@ function TreeBranchView({
         {/* Moving / Target Banner Badge */}
         {isMoving && (
           <View style={s.cardMovingBadge}>
-            <Text style={s.cardMovingBadgeText}>🔄 Đang chuyển vị trí</Text>
+            <RefreshCw size={10} color="#ffffff" />
+            <Text style={s.cardMovingBadgeText}>Đang chuyển vị trí</Text>
           </View>
         )}
         {isValidTarget && (
           <View style={s.cardDropBadge}>
-            <Text style={s.cardDropBadgeText}>📥 Gán làm quản lý</Text>
+            <UserCheck size={10} color="#ffffff" />
+            <Text style={s.cardDropBadgeText}>Gán làm quản lý</Text>
           </View>
         )}
 
@@ -836,7 +917,8 @@ function TreeBranchView({
         <View style={s.cardTopRow}>
           {emp.isLeader ? (
             <View style={s.leaderBadge}>
-              <Text style={s.leaderText}>👑 LEADER</Text>
+              <Crown size={9} color="#ffffff" />
+              <Text style={s.leaderText}>LEADER</Text>
             </View>
           ) : (
             <View style={[s.catBadge, { backgroundColor: cat.bg }]}>
@@ -873,9 +955,12 @@ function TreeBranchView({
             col={cat.text}
           />
           <View style={s.cardMeta}>
-            <Text style={s.roleText} numberOfLines={1}>
-              {roleIcon} {emp.jobTitle || roleBadge(emp.role).label}
-            </Text>
+            <View style={{ flexDirection: "row", alignItems: "center", gap: 3 }}>
+              <RoleIcon roleTitle={emp.jobTitle || emp.role} size={10} color="#64748b" />
+              <Text style={s.roleText} numberOfLines={1}>
+                {emp.jobTitle || roleBadge(emp.role).label}
+              </Text>
+            </View>
             <Text style={s.nameText} numberOfLines={1}>
               {emp.displayName}
             </Text>
@@ -898,14 +983,18 @@ function TreeBranchView({
               toggleCollapse(emp.uid);
             }}
           >
-            <Text
-              style={[
-                s.toggleText,
-                { color: isCollapsed ? "#4f46e5" : "#059669" },
-              ]}
-            >
-              {isCollapsed ? `+${directReports}` : "▲"}
-            </Text>
+            {isCollapsed ? (
+              <Text
+                style={[
+                  s.toggleText,
+                  { color: "#4f46e5" },
+                ]}
+              >
+                {`+${directReports}`}
+              </Text>
+            ) : (
+              <ChevronUp size={11} color="#059669" />
+            )}
           </Pressable>
         )}
       </Pressable>
@@ -1001,7 +1090,6 @@ function OrgListView({
     <ScrollView style={{ flex: 1 }} contentContainerStyle={s.listContainer} showsVerticalScrollIndicator={false}>
       {emps.map((emp) => {
         const cat = getCategoryByDivision(emp.department || emp.division);
-        const roleIcon = getRoleIcon(emp.jobTitle || emp.role);
         const isHighlighted = highlighted ? highlighted.has(emp.uid) : false;
         const dimmed = highlighted !== null && !isHighlighted;
         const mgrName = emp.parentId ? managerMap.get(emp.parentId) : undefined;
@@ -1053,27 +1141,39 @@ function OrgListView({
                 <Text style={s.listEmpName}>{emp.displayName}</Text>
                 {emp.isLeader && (
                   <View style={s.leaderBadge}>
-                    <Text style={s.leaderText}>👑</Text>
+                    <Crown size={9} color="#ffffff" />
                   </View>
                 )}
                 {isMoving && (
-                  <View style={[s.leaderBadge, { backgroundColor: "#6366f1" }]}>
-                    <Text style={s.leaderText}>🔄 ĐANG CHUYỂN</Text>
+                  <View style={[s.leaderBadge, { backgroundColor: "#6366f1", flexDirection: "row", alignItems: "center", gap: 3 }]}>
+                    <RefreshCw size={9} color="#ffffff" />
+                    <Text style={s.leaderText}>ĐANG CHUYỂN</Text>
                   </View>
                 )}
                 {isValidTarget && (
-                  <View style={[s.leaderBadge, { backgroundColor: "#10b981" }]}>
-                    <Text style={s.leaderText}>📥 GÁN LÀM QUẢN LÝ</Text>
+                  <View style={[s.leaderBadge, { backgroundColor: "#10b981", flexDirection: "row", alignItems: "center", gap: 3 }]}>
+                    <UserCheck size={9} color="#ffffff" />
+                    <Text style={s.leaderText}>GÁN LÀM QUẢN LÝ</Text>
                   </View>
                 )}
               </View>
-              <Text style={s.listEmpRole}>
-                {roleIcon} {emp.jobTitle || roleBadge(emp.role).label}
-              </Text>
-              <Text style={s.listEmpDept}>
-                🏢 {emp.department || "Ban Giám đốc"}
-                {mgrName ? ` · 👤 QL: ${mgrName}` : ""}
-              </Text>
+              <View style={{ flexDirection: "row", alignItems: "center", gap: 3, marginTop: 2 }}>
+                <RoleIcon roleTitle={emp.jobTitle || emp.role} size={10} color="#64748b" />
+                <Text style={s.listEmpRole}>
+                  {emp.jobTitle || roleBadge(emp.role).label}
+                </Text>
+              </View>
+              <View style={{ flexDirection: "row", alignItems: "center", gap: 4, flexWrap: "wrap", marginTop: 2 }}>
+                <Building size={11} color="#64748b" />
+                <Text style={s.listEmpDept}>{emp.department || "Ban Giám đốc"}</Text>
+                {mgrName ? (
+                  <>
+                    <Text style={{ fontSize: 11, color: "#94a3b8" }}>·</Text>
+                    <User size={11} color="#64748b" />
+                    <Text style={s.listEmpDept}>QL: {mgrName}</Text>
+                  </>
+                ) : null}
+              </View>
             </View>
             <View style={{ alignItems: "flex-end", gap: 4 }}>
               <View style={[s.catBadge, { backgroundColor: cat.bg }]}>
@@ -1089,7 +1189,7 @@ function OrgListView({
                   } as any);
                 }}
               >
-                <Text style={{ fontSize: 13 }}>💬</Text>
+                <MessageSquare size={13} color="#0284c7" />
               </Pressable>
             </View>
           </Pressable>
@@ -1325,35 +1425,63 @@ export default function OrgChart() {
         )}
       </View>
 
-      {/* View Mode Toggle: Cây vs Danh Sách */}
+      {/* Segmented control: Cây vs Bảng */}
       <View style={s.viewToggleContainer}>
         <Pressable
           style={[s.toggleTab, viewMode === "tree" && s.toggleTabActive]}
           onPress={() => setViewMode("tree")}
         >
+          <FolderTree
+            size={13}
+            color={viewMode === "tree" ? "#4f46e5" : "#64748b"}
+            style={{ marginRight: 4 }}
+          />
           <Text
             style={[
               s.toggleTabTxt,
               viewMode === "tree" ? s.toggleTabTxtActive : s.toggleTabTxtInactive,
             ]}
           >
-            🌳 Cây
+            Cây
           </Text>
         </Pressable>
         <Pressable
           style={[s.toggleTab, viewMode === "list" && s.toggleTabActive]}
           onPress={() => setViewMode("list")}
         >
+          <Table
+            size={13}
+            color={viewMode === "list" ? "#4f46e5" : "#64748b"}
+            style={{ marginRight: 4 }}
+          />
           <Text
             style={[
               s.toggleTabTxt,
               viewMode === "list" ? s.toggleTabTxtActive : s.toggleTabTxtInactive,
             ]}
           >
-            📋 Bảng
+            Bảng
           </Text>
         </Pressable>
       </View>
+
+      <Pressable
+        style={{
+          flexDirection: "row",
+          alignItems: "center",
+          backgroundColor: "#ecfeff",
+          borderWidth: 1,
+          borderColor: "#cffafe",
+          borderRadius: 8,
+          paddingHorizontal: 8,
+          paddingVertical: 5,
+          gap: 4,
+        }}
+        onPress={() => router.push("/(tabs)/departments")}
+      >
+        <Building size={12} color="#0891b2" />
+        <Text style={{ fontSize: 11, fontWeight: "700", color: "#0891b2" }}>Phòng ban</Text>
+      </Pressable>
 
       {canManage && (
         <Pressable style={s.addBtn} onPress={() => setCreateModalVisible(true)}>
@@ -1402,19 +1530,24 @@ export default function OrgChart() {
         <View style={s.dragBanner}>
           <View style={s.dragBannerRow}>
             <View style={{ flex: 1 }}>
-              <Text style={s.dragBannerTitle} numberOfLines={1}>
-                🔄 Đổi quản lý cho: {movingEmp.displayName}
-              </Text>
+              <View style={{ flexDirection: "row", alignItems: "center", gap: 6 }}>
+                <RefreshCw size={14} color="#1e40af" />
+                <Text style={s.dragBannerTitle} numberOfLines={1}>
+                  Đổi quản lý cho: {movingEmp.displayName}
+                </Text>
+              </View>
               <Text style={s.dragBannerSub}>
                 Nhấn thẻ nhân viên để gán làm quản lý mới, hoặc gán làm Cấp cao nhất
               </Text>
             </View>
             <View style={s.dragBannerActions}>
               <Pressable style={s.dragRootBtn} onPress={() => handleConfirmMove(null)}>
-                <Text style={s.dragRootBtnText}>👑 Cấp cao nhất</Text>
+                <Crown size={11} color="#ffffff" style={{ marginRight: 4 }} />
+                <Text style={s.dragRootBtnText}>Cấp cao nhất</Text>
               </Pressable>
               <Pressable style={s.dragCancelBtn} onPress={() => setMovingEmp(null)}>
-                <Text style={s.dragCancelBtnText}>✕ Hủy</Text>
+                <X size={11} color="#ffffff" style={{ marginRight: 4 }} />
+                <Text style={s.dragCancelBtnText}>Hủy</Text>
               </Pressable>
             </View>
           </View>
@@ -1424,7 +1557,7 @@ export default function OrgChart() {
       {/* Control Toolbar: Search + Quick Expand/Collapse + Zoom */}
       <View style={s.toolbar}>
         <View style={s.searchBox}>
-          <Text style={{ color: "#94a3b8", fontSize: 13, marginRight: 6 }}>🔍</Text>
+          <Search size={14} color="#94a3b8" style={{ marginRight: 6 }} />
           <TextInput
             style={s.searchInput}
             placeholder="Tìm tên, chức danh, phòng ban…"
@@ -1434,7 +1567,7 @@ export default function OrgChart() {
           />
           {!!search && (
             <Pressable onPress={() => setSearch("")} hitSlop={6}>
-              <Text style={{ color: "#94a3b8", fontWeight: "700", paddingHorizontal: 4 }}>✕</Text>
+              <X size={14} color="#94a3b8" style={{ marginHorizontal: 4 }} />
             </Pressable>
           )}
         </View>
@@ -1494,7 +1627,7 @@ export default function OrgChart() {
             >
               {tree.length === 0 ? (
                 <View style={s.emptyBox}>
-                  <Text style={{ fontSize: 36, marginBottom: 8 }}>👥</Text>
+                  <Users size={44} color="#94a3b8" style={{ marginBottom: 8 }} />
                   <Text style={s.emptyTitle}>Chưa có dữ liệu cơ cấu nhân sự</Text>
                   <Text style={s.emptySub}>Vui lòng kiểm tra phân quyền hoặc danh sách nhân viên</Text>
                 </View>
@@ -1617,6 +1750,7 @@ const s = StyleSheet.create({
     borderRadius: 8,
     alignItems: "center",
     justifyContent: "center",
+    flexDirection: "row",
   },
   addBtnText: {
     color: "#ffffff",
@@ -1634,6 +1768,8 @@ const s = StyleSheet.create({
     paddingHorizontal: 8,
     paddingVertical: 4,
     borderRadius: 8,
+    flexDirection: "row",
+    alignItems: "center",
   },
   toggleTabActive: {
     backgroundColor: "#ffffff",
@@ -1798,6 +1934,8 @@ const s = StyleSheet.create({
     paddingHorizontal: 8,
     paddingVertical: 5,
     borderRadius: 6,
+    flexDirection: "row",
+    alignItems: "center",
   },
   dragRootBtnText: {
     color: "#ffffff",
@@ -1809,6 +1947,8 @@ const s = StyleSheet.create({
     paddingHorizontal: 8,
     paddingVertical: 5,
     borderRadius: 6,
+    flexDirection: "row",
+    alignItems: "center",
   },
   dragCancelBtnText: {
     color: "#ffffff",
@@ -1918,6 +2058,9 @@ const s = StyleSheet.create({
     paddingVertical: 2,
     borderRadius: 6,
     zIndex: 10,
+    flexDirection: "row",
+    alignItems: "center",
+    gap: 3,
   },
   cardMovingBadgeText: {
     color: "#ffffff",
@@ -1942,6 +2085,9 @@ const s = StyleSheet.create({
     paddingVertical: 2,
     borderRadius: 6,
     zIndex: 10,
+    flexDirection: "row",
+    alignItems: "center",
+    gap: 3,
   },
   cardDropBadgeText: {
     color: "#ffffff",
@@ -1962,6 +2108,9 @@ const s = StyleSheet.create({
     paddingHorizontal: 5,
     paddingVertical: 2,
     borderRadius: 6,
+    flexDirection: "row",
+    alignItems: "center",
+    gap: 2,
   },
   leaderText: {
     color: "#ffffff",
@@ -1976,6 +2125,9 @@ const s = StyleSheet.create({
     paddingHorizontal: 8,
     paddingVertical: 2,
     borderRadius: 8,
+    flexDirection: "row",
+    alignItems: "center",
+    gap: 4,
   },
   leaderTextLarge: {
     color: "#b45309",
@@ -2134,7 +2286,7 @@ const s = StyleSheet.create({
     borderBottomColor: "#f1f5f9",
     gap: 10,
   },
-  iIco: { fontSize: 15, width: 22, textAlign: "center" },
+  iIco: { width: 22, alignItems: "center", justifyContent: "center" },
   iLbl: { fontSize: 12, color: "#64748b", width: 78, fontWeight: "600" },
   iVal: { flex: 1, fontSize: 13, color: "#0f172a", fontWeight: "600" },
   actionRow: { flexDirection: "row", gap: 10 },
@@ -2148,7 +2300,7 @@ const s = StyleSheet.create({
     paddingVertical: 12,
     gap: 5,
   },
-  actionIco: { fontSize: 20 },
+  actionIco: { width: 24, height: 24, alignItems: "center", justifyContent: "center" },
   actionLbl: { fontSize: 12, fontWeight: "700", color: "#475569" },
 
   /* Org Edit Modal Styles */
