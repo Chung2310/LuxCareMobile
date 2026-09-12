@@ -1,6 +1,7 @@
 import type { DashboardSummaryParams } from "../../../../src/services/dashboardService";
 import type { DashboardSummary, DashboardActionItems } from "../../../../src/types/dashboard";
 import type { AttendanceLog, TodayAttendance } from "../../../../src/services/attendanceService";
+import type { UserProfile } from "../../../../src/types/common";
 
 type DashboardSource = {
   getSummary(params: DashboardSummaryParams): Promise<DashboardSummary>;
@@ -10,6 +11,11 @@ type DashboardSource = {
 type AttendanceSource = {
   today?: () => Promise<TodayAttendance>;
   todayCompanyLogs?: (startDate: string, endDate?: string) => Promise<AttendanceLog[]>;
+};
+
+type RosterSource = {
+  list?: (companyCode?: string, branchId?: string) => Promise<UserProfile[]>;
+  colleagues?: () => Promise<UserProfile[]>;
 };
 
 export function attendanceDay(now = new Date()): string {
@@ -53,6 +59,8 @@ export async function loadDashboardSnapshot(
   now = new Date(),
   attendanceSource?: AttendanceSource,
   companyCode?: string,
+  branchId?: string,
+  rosterSource?: RosterSource,
 ) {
   const day = attendanceDay(now);
   const summaryRequest = source.getSummary(params);
@@ -62,13 +70,21 @@ export async function loadDashboardSnapshot(
   const actionRequest = source.getActionItems();
   const myTodayRequest = attendanceSource?.today ? attendanceSource.today() : Promise.resolve(null);
   const logsRequest = attendanceSource?.todayCompanyLogs ? attendanceSource.todayCompanyLogs(day) : Promise.resolve([]);
+  const rosterRequest = rosterSource
+    ? (rosterSource.list
+        ? rosterSource.list(companyCode, branchId).catch(() => [])
+        : rosterSource.colleagues
+        ? rosterSource.colleagues().catch(() => [])
+        : Promise.resolve([]))
+    : Promise.resolve([]);
 
-  const [summary, actions, today, myToday, companyLogs] = await Promise.allSettled([
+  const [summary, actions, today, myToday, companyLogs, rosterResult] = await Promise.allSettled([
     summaryRequest,
     actionRequest,
     todayRequest,
     myTodayRequest,
     logsRequest,
+    rosterRequest,
   ]);
 
   let attendanceResult = today.status === "fulfilled"
@@ -105,7 +121,16 @@ export async function loadDashboardSnapshot(
       ["Present", "Late", "Left-Early", "Late-Left-Early", "Half-Day"].includes(myLog?.status || ""),
   );
 
-  if (attendanceResult || checkedInFromLogs > 0 || hasMyCheckIn) {
+  // Total employees from roster directory
+  const rosterEmployees: UserProfile[] =
+    rosterResult.status === "fulfilled" && Array.isArray(rosterResult.value)
+      ? rosterResult.value
+      : [];
+  const rosterTotal = rosterEmployees.filter(
+    (emp) => emp && emp.role !== "superadmin",
+  ).length;
+
+  if (attendanceResult || checkedInFromLogs > 0 || hasMyCheckIn || rosterTotal > 0) {
     const baseCheckedIn = attendanceResult?.checkedInToday ?? 0;
     const baseLate = attendanceResult?.lateToday ?? 0;
     const baseTotal = attendanceResult?.totalEmployees ?? 0;
@@ -121,7 +146,8 @@ export async function loadDashboardSnapshot(
       Math.max(baseLate, lateFromLogs),
     );
 
-    const mergedTotal = Math.max(baseTotal, mergedCheckedIn);
+    // Ensure totalEmployees represents real total personnel
+    const mergedTotal = Math.max(baseTotal, rosterTotal, mergedCheckedIn);
 
     attendanceResult = {
       checkedInToday: mergedCheckedIn,

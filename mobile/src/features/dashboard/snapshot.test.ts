@@ -107,4 +107,40 @@ describe("home attendance summary", () => {
     expect(result.attendance?.checkedInToday).toBe(1);
     expect(result.myAttendance?.log?.status).toBe("Present");
   });
+
+  it("uses roster count for total personnel when comparing checked in against total", async () => {
+    const emptySummary = summary({ checkedInToday: 0, lateToday: 0, totalEmployees: 0, date: "2026-09-12" });
+    const source = {
+      getSummary: vi.fn().mockResolvedValue(emptySummary),
+      getActionItems: vi.fn().mockResolvedValue(actions),
+    };
+    const attendanceSource = {
+      today: vi.fn().mockResolvedValue({
+        log: {
+          uid: "emp-1",
+          date: "2026-09-12",
+          status: "Present",
+          checkIn: { time: "2026-09-12T08:15:00.000Z" },
+        },
+      }),
+    };
+    const rosterSource = {
+      list: vi.fn().mockResolvedValue([
+        { uid: "emp-1", role: "user" },
+        { uid: "emp-2", role: "user" },
+        { uid: "emp-3", role: "user" },
+      ]),
+    };
+    const result = await loadDashboardSnapshot(
+      source,
+      { filter: "day" },
+      now,
+      attendanceSource,
+      "comp-1",
+      "branch-1",
+      rosterSource,
+    );
+    expect(result.attendance?.checkedInToday).toBe(1);
+    expect(result.attendance?.totalEmployees).toBe(3);
+  });
 });

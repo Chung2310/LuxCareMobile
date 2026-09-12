@@ -24,7 +24,7 @@ import type {
   DashboardDateFilter,
 } from "../../../src/types/dashboard";
 import type { DashboardSummaryParams } from "../../../src/services/dashboardService";
-import { dashboard, attendance } from "../../src/api/services";
+import { dashboard, attendance, roster } from "../../src/api/services";
 import type { TodayAttendance } from "../../../src/services/attendanceService";
 import { messageOf, useSession } from "../../src/auth/SessionProvider";
 import { useCommunication, communicationBadge } from "../../src/features/notifications/CommunicationProvider";
@@ -150,6 +150,8 @@ export default function Home() {
           new Date(),
           attendance,
           user?.companyCode,
+          selectedBranch?._id,
+          roster,
         );
         if (request !== dashboardRequest.current) return;
         setData(snapshot.summary);
@@ -562,11 +564,9 @@ export default function Home() {
                     {loadingDashboard
                       ? "…"
                       : myAttendance?.log?.checkIn
-                      ? "Đã chấm"
-                      : isOwner && attendanceSummary
-                      ? `${attendanceSummary.checkedInToday}/${attendanceSummary.totalEmployees} người`
+                      ? `Đã chấm${attendanceSummary ? ` (${attendanceSummary.checkedInToday}/${attendanceSummary.totalEmployees})` : ""}`
                       : attendanceSummary
-                      ? `${attendanceSummary.checkedInToday} người`
+                      ? `${attendanceSummary.checkedInToday}/${attendanceSummary.totalEmployees} người`
                       : "Chưa chấm"}
                   </Text>
                   <Ionicons name="chevron-forward" size={13} color="#64748b" />
