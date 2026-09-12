@@ -1046,7 +1046,7 @@ export default function ChatScreen() {
   const activeIdRef = useRef<string | null>(null);
   const messageVersion = useRef(0);
   const roomsVersion = useRef(0);
-  const { refreshChat, chatRevision, setActiveChatRoom } = useCommunication();
+  const { chatRooms, refreshChat, chatRevision, setActiveChatRoom } = useCommunication();
   const { roomId: requestedRoom } = useLocalSearchParams<{ roomId?: string }>();
 
 
@@ -1403,7 +1403,6 @@ export default function ChatScreen() {
   );
 
   useEffect(() => {
-    void loadRooms();
     void userManagementApi
       .getUsers()
       .then((list) => {
@@ -1412,7 +1411,26 @@ export default function ChatScreen() {
         }
       })
       .catch(() => {});
-  }, [loadRooms, currentUserId]);
+  }, [currentUserId]);
+
+  // Share the provider snapshot while retaining main's avatar/pinned-room enrichment.
+  useEffect(() => { if (focused) refreshChat(); }, [focused, refreshChat]);
+  useEffect(() => {
+    if (!chatRooms) {
+      setRooms([]);
+      setActiveRoom(null);
+      return;
+    }
+    const enriched = chatRooms.map(room => ({
+      ...room,
+      isChatbot: isChatbotRoom(room),
+      isPinned: isChatbotRoom(room) || isCloudRoom(room) ? true : isRoomPinned(room),
+      avatarURL: getRoomAvatarUrl(room) || undefined,
+    }));
+    setRooms(enriched);
+    setActiveRoom(current => current ? enriched.find(room => room._id === current._id) || null : null);
+    setLoadingRooms(false);
+  }, [chatRooms, isChatbotRoom, isCloudRoom, isRoomPinned, getRoomAvatarUrl]);
 
   const onRefresh = useCallback(() => {
     setRefreshing(true);
@@ -1756,11 +1774,17 @@ export default function ChatScreen() {
   // Polling for real-time messages when a room is active (fallback when socket disconnected)
   useEffect(() => {
     if (focused && activeRoom?._id) {
-      void loadMessages(activeRoom._id, initialScrollDoneRef.current);
+      const roomId = activeRoom._id;
+      const refreshTimer = setTimeout(() => void loadMessages(roomId, initialScrollDoneRef.current), initialScrollDoneRef.current ? 150 : 0);
       if (pollingRef.current) clearInterval(pollingRef.current);
       pollingRef.current = setInterval(() => {
         if (!socketService.isConnected && AppState.currentState === "active") void loadMessages(activeRoom._id, true);
       }, 15000);
+      return () => {
+        clearTimeout(refreshTimer);
+        messageVersion.current++;
+        if (pollingRef.current) clearInterval(pollingRef.current);
+      };
     } else {
       if (pollingRef.current) clearInterval(pollingRef.current);
     }
@@ -6897,4 +6921,3 @@ const styles = StyleSheet.create({
     marginTop: 10,
   },
 });
-
