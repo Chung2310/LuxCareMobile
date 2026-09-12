@@ -36,7 +36,7 @@ plist="$app/Info.plist"
 platform="$(/usr/libexec/PlistBuddy -c 'Print :DTPlatformName' "$plist")"
 [[ "$platform" == "iphoneos" ]]
 executable="$(/usr/libexec/PlistBuddy -c 'Print :CFBundleExecutable' "$plist")"
-xcrun lipo -verify_arch arm64 "$app/$executable"
+xcrun lipo "$app/$executable" -verify_arch arm64
 # A standalone Release IPA must contain its JS/Hermes bundle.
 test -s "$app/main.jsbundle"
 
