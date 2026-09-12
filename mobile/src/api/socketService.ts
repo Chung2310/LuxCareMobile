@@ -1,16 +1,4 @@
-// Safe import for React Native Metro bundler
-let io: any;
-try {
-  const socketModule = require("socket.io-client");
-  io = typeof socketModule === "function" ? socketModule : socketModule?.io || socketModule?.default || socketModule;
-} catch {
-  try {
-    const socketDist = require("socket.io-client/dist/socket.io.js");
-    io = typeof socketDist === "function" ? socketDist : socketDist?.io || socketDist;
-  } catch {
-    io = () => ({ on: () => {}, connect: () => {}, disconnect: () => {}, removeAllListeners: () => {} });
-  }
-}
+import { io } from "socket.io-client";
 
 export type SocketEventHandler = (data: { code: string; message: string }) => void;
 
@@ -20,49 +8,42 @@ interface SocketServiceConfig {
 }
 
 class SocketService {
+  private listeners = new Map<string, Set<(data: any) => void>>();
+
+  subscribe(event: string, callback: (data: any) => void) {
+    const callbacks = this.listeners.get(event) || new Set();
+    callbacks.add(callback);
+    this.listeners.set(event, callbacks);
+    this.socket?.on(event, callback);
+    return () => {
+      callbacks.delete(callback);
+      this.socket?.off(event, callback);
+    };
+  }
+
+  on(event: string, callback: (data: any) => void) {
+    const callbacks = this.listeners.get(event) || new Set();
+    callbacks.add(callback);
+    this.listeners.set(event, callbacks);
+    this.socket?.on(event, callback);
+  }
+
+  off(event: string, callback: (data: any) => void) {
+    const callbacks = this.listeners.get(event);
+    if (callbacks) {
+      callbacks.delete(callback);
+      this.socket?.off(event, callback);
+    }
+  }
+
   private socket: any = null;
   private currentToken: string | null = null;
   private origin: string = "";
   private onSessionReplaced: SocketEventHandler = () => {};
-  private listeners: Map<string, Set<Function>> = new Map();
-
-  subscribe(event: string, callback: (data: any) => void) {
-    this.on(event, callback);
-    return () => {
-      this.off(event, callback);
-    };
-  }
 
   configure(config: SocketServiceConfig) {
     this.origin = config.origin;
     this.onSessionReplaced = config.onSessionReplaced;
-  }
-
-  /**
-   * Đăng ký lắng nghe sự kiện WebSocket thời gian thực
-   */
-  on(event: string, callback: (...args: any[]) => void) {
-    if (!this.listeners.has(event)) {
-      this.listeners.set(event, new Set());
-    }
-    this.listeners.get(event)!.add(callback);
-    if (this.socket) {
-      this.socket.on(event, callback);
-    }
-  }
-
-  /**
-   * Hủy lắng nghe sự kiện WebSocket
-   */
-  off(event: string, callback: (...args: any[]) => void) {
-    const set = this.listeners.get(event);
-    if (set) {
-      set.delete(callback);
-      if (set.size === 0) this.listeners.delete(event);
-    }
-    if (this.socket) {
-      this.socket.off(event, callback);
-    }
   }
 
   /**
@@ -76,7 +57,7 @@ class SocketService {
     if (!rawOrigin || !accessToken) return;
     const cleanOrigin = rawOrigin.replace(/\/+$/, "");
     if (this.socket?.connected && this.currentToken === accessToken) return;
-    this.disconnect(false);
+    this.disconnect();
     this.currentToken = accessToken;
     try {
       this.socket = io(cleanOrigin, {
@@ -86,8 +67,12 @@ class SocketService {
         reconnectionAttempts: Infinity,
         reconnectionDelay: 1000,
         reconnectionDelayMax: 10000,
-        autoConnect: true,
+        upgrade: false,
       });
+
+      this.listeners.forEach((callbacks, event) =>
+        callbacks.forEach((callback) => this.socket?.on(event, callback))
+      );
 
       this.socket.on("auth:session-replaced", (data: { code: string; message: string }) => {
         this.onSessionReplaced(data);
@@ -95,26 +80,11 @@ class SocketService {
         this.disconnect(true);
       });
 
-      this.socket.on("connect", () => {
-        // Gắn lại toàn bộ các event listeners đã đăng ký khi socket kết nối thành công
-        for (const [event, callbacks] of this.listeners.entries()) {
-          for (const cb of callbacks) {
-            this.socket?.off(event, cb as any);
-            this.socket?.on(event, cb as any);
-          }
-        }
-      });
-
+      // Silently suppress connection errors.
+      // HTTP-level errors already surface in the app UI.
       this.socket.on("connect_error", () => {});
-
-      // Gắn trước các event listeners đã đăng ký
-      for (const [event, callbacks] of this.listeners.entries()) {
-        for (const cb of callbacks) {
-          this.socket.on(event, cb as any);
-        }
-      }
     } catch {
-      // Bỏ qua lỗi kết nối socket trong môi trường test/build
+      // Ignored in test/unsupported environments
     }
   }
 

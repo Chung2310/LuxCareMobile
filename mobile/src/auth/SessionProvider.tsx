@@ -9,6 +9,8 @@ type Session = {
   user: UserProfile | null;
   loading: boolean;
   error: string | null;
+  sessionReplaced?: boolean;
+  resetSessionReplaced?: () => void;
   retry: () => Promise<void>;
   login: (email: string, password: string) => Promise<void>;
   logout: () => Promise<void>;
@@ -26,6 +28,8 @@ export function SessionProvider({ children }: React.PropsWithChildren) {
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
   const [selectedBranch, setSelectedBranch] = useState<BranchRecord | null>(null);
+  const [sessionReplaced, setSessionReplaced] = useState(false);
+  const resetSessionReplaced = () => setSessionReplaced(false);
   const operation = useRef(0);
   const endSession = () => {
     operation.current++;
@@ -62,6 +66,7 @@ export function SessionProvider({ children }: React.PropsWithChildren) {
           void api.clear().catch(() => {});
           // Another device signed in with the same account.
           // Expire immediately – no need to call the HTTP logout endpoint.
+          setSessionReplaced(true);
           endSession();
         },
       });
@@ -118,6 +123,8 @@ export function SessionProvider({ children }: React.PropsWithChildren) {
         user,
         loading,
         error,
+        sessionReplaced,
+        resetSessionReplaced,
         retry,
         selectedBranch,
         updateDisplayName: (uid, name) =>
@@ -133,6 +140,7 @@ export function SessionProvider({ children }: React.PropsWithChildren) {
           setSelectedBranch(branch);
         },
         login: async (email, password) => {
+          setSessionReplaced(false);
           const attempt = ++operation.current;
           await api.login(email.trim(), password);
           if (attempt !== operation.current) return;

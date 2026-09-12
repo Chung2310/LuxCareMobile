@@ -1,17 +1,33 @@
 import { useEffect, useRef, useState } from "react";
-import { Animated, Image, StyleSheet, View } from "react-native";
-import { Stack } from "expo-router";
+import { Animated, Image, StyleSheet, Text, TouchableOpacity, View } from "react-native";
+import { router, Stack } from "expo-router";
 import { StatusBar } from "expo-status-bar";
 import { useFonts } from "expo-font";
-import { SafeAreaProvider } from "react-native-safe-area-context";
+import { SafeAreaProvider, SafeAreaView } from "react-native-safe-area-context";
 import { SessionProvider, useSession } from "../src/auth/SessionProvider";
 import { NotificationProvider } from "../src/features/notifications/NotificationProvider";
 import { CommunicationProvider } from "../src/features/notifications/CommunicationProvider";
 import { LoadingProvider } from "../src/context/LoadingContext";
 import { Button, ErrorText, Page } from "../src/ui";
+import { api } from "../src/api/services";
+
+function isSessionExpiredError(msg?: string | null): boolean {
+  if (!msg) return false;
+  const lower = msg.toLowerCase();
+  return (
+    lower.includes("phiên đăng nhập") ||
+    lower.includes("thiết bị khác") ||
+    lower.includes("đăng nhập lại") ||
+    lower.includes("hết hạn") ||
+    lower.includes("unauthorized") ||
+    lower.includes("401") ||
+    lower.includes("403") ||
+    lower.includes("token")
+  );
+}
 
 function Routes() {
-  const { loading, error, retry } = useSession();
+  const { loading, error, retry, sessionReplaced, resetSessionReplaced } = useSession();
   const [minTimeElapsed, setMinTimeElapsed] = useState(false);
   const [splashFinished, setSplashFinished] = useState(false);
   const fadeAnim = useRef(new Animated.Value(1)).current;
@@ -56,7 +72,36 @@ function Routes() {
     );
   }
 
-  if (error && splashFinished) {
+  const isExpired = Boolean(sessionReplaced || (error && isSessionExpiredError(error)));
+
+  if ((error || sessionReplaced) && splashFinished) {
+    if (isExpired) {
+      return (
+        <SafeAreaView style={sessionExpiredStyles.container}>
+          <StatusBar style="dark" />
+          <View style={sessionExpiredStyles.content}>
+            <Image
+              source={require("../public/het-phien.png")}
+              style={sessionExpiredStyles.image}
+              resizeMode="contain"
+            />
+            <TouchableOpacity
+              style={sessionExpiredStyles.button}
+              onPress={async () => {
+                resetSessionReplaced?.();
+                await api.clear().catch(() => {});
+                await retry();
+                router.replace("/login");
+              }}
+              activeOpacity={0.88}
+            >
+              <Text style={sessionExpiredStyles.buttonText}>Đăng nhập lại</Text>
+            </TouchableOpacity>
+          </View>
+        </SafeAreaView>
+      );
+    }
+
     return (
       <Page title="Kết nối LuxCare">
         <ErrorText message={error} />
@@ -100,6 +145,49 @@ const splashStyles = StyleSheet.create({
   logo: {
     width: 140,
     height: 140,
+  },
+});
+
+const sessionExpiredStyles = StyleSheet.create({
+  container: {
+    flex: 1,
+    backgroundColor: "#ffffff",
+  },
+  content: {
+    flex: 1,
+    backgroundColor: "#ffffff",
+    alignItems: "center",
+    justifyContent: "center",
+    paddingHorizontal: 24,
+    paddingBottom: 20,
+  },
+  image: {
+    width: "100%",
+    maxWidth: 350,
+    maxHeight: 220,
+    aspectRatio: 1672 / 941,
+    marginBottom: 28,
+  },
+  button: {
+    width: "100%",
+    maxWidth: 300,
+    backgroundColor: "#059669",
+    paddingVertical: 15,
+    paddingHorizontal: 24,
+    borderRadius: 14,
+    alignItems: "center",
+    justifyContent: "center",
+    shadowColor: "#059669",
+    shadowOffset: { width: 0, height: 4 },
+    shadowOpacity: 0.25,
+    shadowRadius: 8,
+    elevation: 4,
+  },
+  buttonText: {
+    color: "#ffffff",
+    fontSize: 16,
+    fontWeight: "700",
+    fontFamily: "Inter-SemiBold",
   },
 });
 
