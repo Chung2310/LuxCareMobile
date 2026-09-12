@@ -281,7 +281,7 @@ const styles = StyleSheet.create({
     borderColor: "#ffedd5",
     paddingHorizontal: 10,
     paddingVertical: 6,
-    borderRadius: 8,
+    borderRadius: 12,
     marginBottom: 8,
   },
   foreignSupplierText: {
@@ -299,7 +299,7 @@ const styles = StyleSheet.create({
     borderColor: "#e0f2fe",
     paddingHorizontal: 10,
     paddingVertical: 6,
-    borderRadius: 8,
+    borderRadius: 12,
     marginBottom: 8,
   },
   foreignWarehouseText: {
@@ -313,8 +313,8 @@ const styles = StyleSheet.create({
     alignItems: "center",
     gap: 5,
     backgroundColor: "#fef2f2",
-    borderRadius: 6,
-    padding: 6,
+    borderRadius: 12,
+    padding: 8,
     marginBottom: 8,
   },
   overStockText: {

@@ -5,6 +5,7 @@ import {
   Modal,
   Platform,
   ScrollView,
+  StatusBar,
   StyleSheet,
   Switch,
   Text,
@@ -12,7 +13,7 @@ import {
   TouchableOpacity,
   View,
 } from "react-native";
-import { SafeAreaView } from "react-native-safe-area-context";
+import { SafeAreaView, useSafeAreaInsets } from "react-native-safe-area-context";
 import { Ionicons } from "@expo/vector-icons";
 import { AppButton } from "../common";
 import type { DepartmentInput } from "./types";
@@ -31,6 +32,8 @@ export const DepartmentCreateModal: React.FC<DepartmentCreateModalProps> = ({
   onClose,
   onCreate,
 }) => {
+  const insets = useSafeAreaInsets();
+  const topInset = Math.max(insets.top, Platform.OS === "ios" ? 48 : (StatusBar.currentHeight || 0));
   const [code, setCode] = useState("");
   const [name, setName] = useState("");
   const [description, setDescription] = useState("");
@@ -104,7 +107,10 @@ export const DepartmentCreateModal: React.FC<DepartmentCreateModalProps> = ({
       transparent={false}
       onRequestClose={handleClose}
     >
-      <SafeAreaView style={styles.screen} edges={["top", "bottom"]}>
+      <SafeAreaView
+        style={[styles.screen, { paddingTop: topInset }]}
+        edges={["bottom"]}
+      >
         <KeyboardAvoidingView
           style={{ flex: 1 }}
           behavior={Platform.OS === "ios" ? "padding" : undefined}

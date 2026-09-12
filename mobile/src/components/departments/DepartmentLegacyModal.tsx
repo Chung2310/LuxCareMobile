@@ -3,13 +3,15 @@ import {
   ActivityIndicator,
   Alert,
   Modal,
+  Platform,
   ScrollView,
+  StatusBar,
   StyleSheet,
   Text,
   TouchableOpacity,
   View,
 } from "react-native";
-import { SafeAreaView } from "react-native-safe-area-context";
+import { SafeAreaView, useSafeAreaInsets } from "react-native-safe-area-context";
 import { Ionicons } from "@expo/vector-icons";
 import { AppButton } from "../common";
 import { departments } from "../../api/services";
@@ -28,6 +30,8 @@ export const DepartmentLegacyModal: React.FC<DepartmentLegacyModalProps> = ({
   onClose,
   onMergedSuccess,
 }) => {
+  const insets = useSafeAreaInsets();
+  const topInset = Math.max(insets.top, Platform.OS === "ios" ? 48 : (StatusBar.currentHeight || 0));
   const [unmappedList, setUnmappedList] = useState<Array<{ name: string; count: number }>>([]);
   const [loading, setLoading] = useState(false);
   const [selectedNames, setSelectedNames] = useState<string[]>([]);
@@ -123,7 +127,10 @@ export const DepartmentLegacyModal: React.FC<DepartmentLegacyModalProps> = ({
       transparent={false}
       onRequestClose={onClose}
     >
-      <SafeAreaView style={styles.screen} edges={["top", "bottom"]}>
+      <SafeAreaView
+        style={[styles.screen, { paddingTop: topInset }]}
+        edges={["bottom"]}
+      >
         {/* Header Bar */}
         <View style={styles.headerBar}>
           <View style={styles.headerLeft}>

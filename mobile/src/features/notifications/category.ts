@@ -115,6 +115,8 @@ export function detectNotificationCategory(
     combined.includes("kho") ||
     combined.includes("vật tư") ||
     combined.includes("thiết bị") ||
+    combined.includes("dược phẩm") ||
+    combined.includes("thuốc") ||
     combined.includes("nhập kho") ||
     combined.includes("xuất kho")
   ) {
