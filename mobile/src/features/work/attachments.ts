@@ -56,6 +56,8 @@ export async function requestFileReadPermission(): Promise<boolean> {
   }
 }
 
+import { readPickedFileAsBase64 } from "../../files/readBase64";
+
 /**
  * Chọn tệp tài liệu (PDF, Word, Excel, file bất kỳ...) từ thiết bị
  */
@@ -72,11 +74,26 @@ export async function pickWorkAttachment(): Promise<TaskAttachment | null> {
   const asset = result.assets[0];
   const file = new File(asset.uri);
   try {
-    const size = file.size;
+    let size: number | undefined = asset.size;
+    if (!Number.isFinite(size) || (size as number) <= 0) {
+      try {
+        if (Number.isFinite(file.size) && (file.size as number) > 0) {
+          size = file.size;
+        }
+      } catch {}
+    }
+    if (size !== undefined && (size <= 0 || size > 20 * 1024 * 1024))
+      throw new Error("Tệp phải có nội dung và không vượt quá 20 MB.");
+
+    const base64 = await readPickedFileAsBase64(asset.uri, asset.name);
+    if (!size || size <= 0) {
+      size = Math.round((base64.length * 3) / 4);
+    }
     if (!Number.isFinite(size) || size <= 0 || size > 20 * 1024 * 1024)
       throw new Error("Tệp phải có nội dung và không vượt quá 20 MB.");
+
     const mimeType = asset.mimeType || "application/octet-stream";
-    const fileData = `data:${mimeType};base64,${await file.base64()}`;
+    const fileData = `data:${mimeType};base64,${base64}`;
     const uploaded = await kanbanMedia.upload({ file: fileData, fileName: asset.name, mimeType, size });
     const type: TaskAttachment["type"] = mimeType.startsWith("image/")
       ? "image"
