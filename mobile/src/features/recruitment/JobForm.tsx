@@ -45,10 +45,12 @@ function getFileNameFromUrl(url?: string | null): string {
 export function JobForm({
   job,
   onClose,
+  onSaved,
   setLocked,
 }: {
   job?: RecruitmentJob;
   onClose: () => void;
+  onSaved?: () => Promise<void> | void;
   setLocked: (value: boolean) => void;
 }) {
   const { showAlert, alertView } = useAppAlert();
@@ -119,7 +121,9 @@ export function JobForm({
     try {
       if (job) await recruitment.updateJob(job._id, { ...payload, version: job.version });
       else await recruitment.createJob(payload);
-      onClose();
+      setLocked(false);
+      if (onSaved) await onSaved();
+      else onClose();
     } catch (error) {
       const msg = messageOf(error);
       const status = error && typeof error === "object" && "status" in error ? Number(error.status) : 0;

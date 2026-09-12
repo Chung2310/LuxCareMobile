@@ -94,7 +94,7 @@ export default function Recruitment() {
   const [editing, setEditing] = useState<RecruitmentJob | "new" | null>(null);
 
   const closeForm = () => {
-    if (formLock.current) return;
+    formLock.current = false;
     setEditing(null);
     setRevision((v) => v + 1);
   };
@@ -939,6 +939,7 @@ export default function Recruitment() {
             formLock.current = val;
           }}
           onClose={closeForm}
+          onSaved={closeForm}
         />
       )}
       {alertView}
