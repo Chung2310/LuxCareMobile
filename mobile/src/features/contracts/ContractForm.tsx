@@ -10,6 +10,7 @@ import {
   TextInput,
   View,
 } from "react-native";
+import { Ionicons } from "@expo/vector-icons";
 import { SafeAreaView } from "react-native-safe-area-context";
 import type { Contract, Employee } from "../../../../src/types/hrContract";
 import type { ContractScope } from "../../../../src/services/hrContractService";
@@ -125,7 +126,7 @@ export function ContractForm({
             onPress={onClose}
             disabled={busy}
           >
-            <Text style={styles.backBtnText}>✕</Text>
+            <Ionicons name="close" size={22} color="#0f172a" />
           </Pressable>
 
           <View style={{ flex: 1, alignItems: "center" }}>
@@ -170,14 +171,15 @@ export function ContractForm({
         >
           {!!error && (
             <View style={styles.errorBanner}>
-              <Text style={styles.errorBannerText}>⚠️ {error}</Text>
+              <Ionicons name="alert-circle-outline" size={16} color="#e11d48" />
+              <Text style={styles.errorBannerText}>{error}</Text>
             </View>
           )}
 
           {/* Section 1: Nhân sự */}
           <View style={styles.card}>
             <View style={styles.sectionHeaderRow}>
-              <Text style={styles.sectionIcon}>👤</Text>
+              <Ionicons name="person-outline" size={16} color="#0284c7" />
               <Text style={styles.sectionTitle}>Nhân sự áp dụng</Text>
             </View>
 
@@ -213,7 +215,7 @@ export function ContractForm({
           {/* Section 2: Loại hợp đồng & Trạng thái */}
           <View style={styles.card}>
             <View style={styles.sectionHeaderRow}>
-              <Text style={styles.sectionIcon}>📑</Text>
+              <Ionicons name="document-text-outline" size={16} color="#0284c7" />
               <Text style={styles.sectionTitle}>Loại hợp đồng & Trạng thái</Text>
             </View>
 
@@ -299,7 +301,7 @@ export function ContractForm({
           {/* Section 3: Thời hạn hợp đồng */}
           <View style={styles.card}>
             <View style={styles.sectionHeaderRow}>
-              <Text style={styles.sectionIcon}>📅</Text>
+              <Ionicons name="calendar-outline" size={16} color="#0284c7" />
               <Text style={styles.sectionTitle}>Thời hạn hợp đồng</Text>
             </View>
 
@@ -312,7 +314,7 @@ export function ContractForm({
                   disabled={disabled}
                   onPress={() => setDateModalField("startDate")}
                 >
-                  <Text style={styles.datePickerIcon}>🗓️</Text>
+                  <Ionicons name="calendar-outline" size={16} color="#64748b" />
                   <View style={{ flex: 1 }}>
                     <Text style={styles.datePickerValue}>
                       {draft.startDate ? contractDate(draft.startDate) : "Chọn ngày"}
@@ -332,7 +334,7 @@ export function ContractForm({
                   disabled={disabled}
                   onPress={() => setDateModalField("endDate")}
                 >
-                  <Text style={styles.datePickerIcon}>⏳</Text>
+                  <Ionicons name="time-outline" size={16} color="#64748b" />
                   <View style={{ flex: 1 }}>
                     <Text style={styles.datePickerValue}>
                       {draft.endDate ? contractDate(draft.endDate) : "Chọn ngày"}
@@ -349,7 +351,7 @@ export function ContractForm({
           {/* Section 4: Ghi chú */}
           <View style={styles.card}>
             <View style={styles.sectionHeaderRow}>
-              <Text style={styles.sectionIcon}>📝</Text>
+              <Ionicons name="create-outline" size={16} color="#0284c7" />
               <Text style={styles.sectionTitle}>Ghi chú bổ sung</Text>
             </View>
 
@@ -368,7 +370,7 @@ export function ContractForm({
           {/* Section 5: Tệp đính kèm */}
           <View style={styles.card}>
             <View style={styles.sectionHeaderRow}>
-              <Text style={styles.sectionIcon}>📎</Text>
+              <Ionicons name="attach-outline" size={16} color="#0284c7" />
               <Text style={styles.sectionTitle}>Hồ sơ & Tài liệu đính kèm</Text>
             </View>
 
@@ -533,8 +535,12 @@ const styles = StyleSheet.create({
     padding: 12,
     borderWidth: 1,
     borderColor: "#fecdd3",
+    flexDirection: "row",
+    alignItems: "center",
+    gap: 8,
   },
   errorBannerText: {
+    flex: 1,
     color: "#e11d48",
     fontSize: 13,
     fontWeight: "600",

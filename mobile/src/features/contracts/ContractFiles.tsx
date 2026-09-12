@@ -1,5 +1,6 @@
 import React, { useCallback, useRef, useState } from "react";
 import { ActivityIndicator, Pressable, StyleSheet, Text, View } from "react-native";
+import { Ionicons } from "@expo/vector-icons";
 import { useFocusEffect } from "expo-router";
 import type { ContractFileItem } from "../../../../src/types/hrContract";
 import { shareApiFile, MAX_SHARED_FILE_BYTES } from "../../files/shareFile";
@@ -55,13 +56,13 @@ export function ContractFiles({ title, files }: { title: string; files: Contract
       <View style={styles.fileList}>
         {files.map((file, index) => {
           const isImage = /\.(jpe?g|png|webp)$/i.test(file.name || file.url);
-          const icon = isImage ? "🖼️" : "📄";
+          const icon: keyof typeof Ionicons.glyphMap = isImage ? "image-outline" : "document-text-outline";
           const isLoading = busy === index;
 
           return (
             <View key={`${file.url}:${index}`} style={styles.fileCard}>
               <View style={styles.fileIconBox}>
-                <Text style={styles.fileIcon}>{icon}</Text>
+                <Ionicons name={icon} size={18} color="#0284c7" />
               </View>
 
               <View style={styles.fileInfo}>
@@ -95,7 +96,8 @@ export function ContractFiles({ title, files }: { title: string; files: Contract
 
       {!!error && (
         <View style={styles.errorBox}>
-          <Text style={styles.errorText}>⚠️ {error}</Text>
+          <Ionicons name="alert-circle-outline" size={15} color="#e11d48" />
+          <Text style={[styles.errorText, { flex: 1 }]}>{error}</Text>
         </View>
       )}
     </View>
@@ -190,6 +192,9 @@ const styles = StyleSheet.create({
     padding: 8,
     borderWidth: 1,
     borderColor: "#fecdd3",
+    flexDirection: "row",
+    alignItems: "center",
+    gap: 6,
   },
   errorText: {
     color: "#e11d48",

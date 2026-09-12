@@ -1,5 +1,6 @@
 import React, { useCallback, useState } from "react";
 import { ActivityIndicator, Pressable, StyleSheet, Text, View } from "react-native";
+import { Ionicons } from "@expo/vector-icons";
 import { useFocusEffect } from "expo-router";
 import type { Extension } from "../../../../src/types/hrContract";
 import { getExtensionFiles, getExtensionSignedImages } from "../../../../src/services/hrContractFiles";
@@ -53,7 +54,7 @@ export function ExtensionHistory({
   return (
     <View style={styles.container}>
       <View style={styles.sectionHeaderRow}>
-        <Text style={styles.sectionIcon}>📜</Text>
+        <Ionicons name="time-outline" size={16} color="#0284c7" />
         <Text style={styles.sectionTitle}>Lịch sử gia hạn hợp đồng</Text>
         {rows.length > 0 && (
           <View style={styles.countBadge}>
@@ -71,7 +72,10 @@ export function ExtensionHistory({
 
       {!!error && (
         <View style={styles.errorBox}>
-          <Text style={styles.errorText}>⚠️ {error}</Text>
+          <View style={{ flexDirection: "row", alignItems: "center", gap: 6 }}>
+            <Ionicons name="alert-circle-outline" size={15} color="#e11d48" />
+            <Text style={styles.errorText}>{error}</Text>
+          </View>
           <Pressable style={styles.retryBtn} onPress={() => setRevision((v) => v + 1)}>
             <Text style={styles.retryBtnText}>Tải lại</Text>
           </Pressable>
