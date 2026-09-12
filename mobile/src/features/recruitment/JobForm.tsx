@@ -1,3 +1,4 @@
+import { RecruitmentDateField } from "./RecruitmentDateField";
 import { useRef, useState } from "react";
 import {
   ActivityIndicator,
@@ -14,6 +15,7 @@ import {
   FileText,
   Info,
   MapPin,
+  Trash2,
   UploadCloud,
   X,
 } from "lucide-react-native";
@@ -27,6 +29,19 @@ import { RecruitmentModal } from "./RecruitmentModal";
 import { jobDraft, jobPayload } from "./jobModel";
 import { usePublicUpload } from "./usePublicUpload";
 
+function getFileNameFromUrl(url?: string | null): string {
+  if (!url) return "";
+  try {
+    const parsed = new URL(url);
+    const lastPart = parsed.pathname.split("/").filter(Boolean).pop() || "";
+    const decoded = decodeURIComponent(lastPart);
+    return decoded.replace(/^[0-9a-fA-F-]{36}-?/, "") || decoded;
+  } catch {
+    const clean = url.split("/").pop()?.split("?")[0] || "";
+    return decodeURIComponent(clean) || url;
+  }
+}
+
 export function JobForm({
   job,
   onClose,
@@ -38,6 +53,8 @@ export function JobForm({
 }) {
   const { showAlert, alertView } = useAppAlert();
   const [draft, setDraft] = useState(() => jobDraft(job));
+  const [jdFileName, setJdFileName] = useState(() => getFileNameFromUrl(job?.jdFileUrl));
+  const [showManualUrl, setShowManualUrl] = useState(false);
   const [busy, setBusy] = useState(false);
   const [blocked, setBlocked] = useState(false);
   const lock = useRef(false);
@@ -50,7 +67,10 @@ export function JobForm({
     setLocked(true);
     try {
       const file = await publicFile.pick();
-      if (file) setDraft((current) => ({ ...current, jdFileUrl: file.url }));
+      if (file) {
+        setDraft((current) => ({ ...current, jdFileUrl: file.url }));
+        setJdFileName(file.originalName || getFileNameFromUrl(file.url));
+      }
     } catch (error) {
       showAlert("Lỗi tải tệp", messageOf(error), undefined, "error");
     } finally {
@@ -298,11 +318,11 @@ export function JobForm({
           editable={!disabled}
           onChangeText={(value) => setDraft((c) => ({ ...c, location: value }))}
         />
-        <Field
-          label="Hạn nộp hồ sơ (YYYY-MM-DD HH:mm)"
+        <RecruitmentDateField
+          label="Hạn nộp hồ sơ" withTime
           value={draft.deadline}
-          editable={!disabled}
-          onChangeText={(value) => setDraft((c) => ({ ...c, deadline: value }))}
+          disabled={disabled}
+          onChange={(value) => setDraft((c) => ({ ...c, deadline: value }))}
         />
       </View>
 
@@ -319,25 +339,73 @@ export function JobForm({
           Đính kèm bản mô tả JD công khai (PDF, DOC, DOCX tối đa 10 MB) để ứng viên có thể tải về trực tiếp.
         </Text>
 
-        <Pressable
-          style={({ pressed }) => [
-            formStyles.uploadBtn,
-            disabled && { opacity: 0.6 },
-            pressed && !disabled && { opacity: 0.8 },
-          ]}
-          disabled={disabled}
-          onPress={() => void upload()}
-        >
-          <UploadCloud size={16} color="#0284c7" />
-          <Text style={formStyles.uploadBtnText}>Chọn và tải tệp JD lên</Text>
-        </Pressable>
+        {draft.jdFileUrl ? (
+          <View style={formStyles.fileAttachedCard}>
+            <View style={formStyles.fileAttachedIcon}>
+              <FileText size={20} color="#0284c7" />
+            </View>
+            <View style={formStyles.fileAttachedMeta}>
+              <Text style={formStyles.fileAttachedName} numberOfLines={1}>
+                {jdFileName || getFileNameFromUrl(draft.jdFileUrl)}
+              </Text>
+              <Text style={formStyles.fileAttachedStatus}>Đã đính kèm tệp JD</Text>
+            </View>
+            {!disabled && (
+              <View style={formStyles.fileAttachedActions}>
+                <Pressable
+                  style={({ pressed }) => [formStyles.replaceFileBtn, pressed && { opacity: 0.7 }]}
+                  onPress={() => void upload()}
+                >
+                  <Text style={formStyles.replaceFileBtnText}>Đổi tệp</Text>
+                </Pressable>
+                <Pressable
+                  accessibilityLabel="Xóa tệp đính kèm"
+                  style={({ pressed }) => [formStyles.removeFileBtn, pressed && { opacity: 0.7 }]}
+                  onPress={() => {
+                    setDraft((c) => ({ ...c, jdFileUrl: "" }));
+                    setJdFileName("");
+                  }}
+                >
+                  <Trash2 size={15} color="#dc2626" />
+                </Pressable>
+              </View>
+            )}
+          </View>
+        ) : (
+          <View style={{ gap: 8 }}>
+            <Pressable
+              style={({ pressed }) => [
+                formStyles.uploadBtn,
+                disabled && { opacity: 0.6 },
+                pressed && !disabled && { opacity: 0.8 },
+              ]}
+              disabled={disabled}
+              onPress={() => void upload()}
+            >
+              <UploadCloud size={16} color="#0284c7" />
+              <Text style={formStyles.uploadBtnText}>Chọn và tải tệp JD lên</Text>
+            </Pressable>
 
-        <Field
-          label="Liên kết JD công khai"
-          value={draft.jdFileUrl}
-          editable={!disabled}
-          onChangeText={(value) => setDraft((c) => ({ ...c, jdFileUrl: value }))}
-        />
+            {!showManualUrl ? (
+              <Pressable
+                style={formStyles.manualLinkToggle}
+                onPress={() => setShowManualUrl(true)}
+              >
+                <Text style={formStyles.manualLinkToggleText}>+ Hoặc nhập liên kết JD thủ công</Text>
+              </Pressable>
+            ) : (
+              <Field
+                label="Liên kết JD công khai"
+                value={draft.jdFileUrl}
+                editable={!disabled}
+                onChangeText={(value) => {
+                  setDraft((c) => ({ ...c, jdFileUrl: value }));
+                  setJdFileName(getFileNameFromUrl(value));
+                }}
+              />
+            )}
+          </View>
+        )}
       </View>
 
       {/* Action Buttons */}
@@ -463,6 +531,75 @@ const formStyles = StyleSheet.create({
     fontSize: 13,
     fontWeight: "700",
     color: "#0284c7",
+  },
+  fileAttachedCard: {
+    flexDirection: "row",
+    alignItems: "center",
+    backgroundColor: "#f0f9ff",
+    borderWidth: 1,
+    borderColor: "#bae6fd",
+    borderRadius: 12,
+    padding: 12,
+    gap: 10,
+  },
+  fileAttachedIcon: {
+    width: 38,
+    height: 38,
+    borderRadius: 10,
+    backgroundColor: "#e0f2fe",
+    alignItems: "center",
+    justifyContent: "center",
+  },
+  fileAttachedMeta: {
+    flex: 1,
+  },
+  fileAttachedName: {
+    fontSize: 13,
+    fontWeight: "700",
+    color: "#0369a1",
+  },
+  fileAttachedStatus: {
+    fontSize: 11,
+    color: "#0284c7",
+    marginTop: 2,
+  },
+  fileAttachedActions: {
+    flexDirection: "row",
+    alignItems: "center",
+    gap: 8,
+  },
+  replaceFileBtn: {
+    paddingVertical: 6,
+    paddingHorizontal: 10,
+    backgroundColor: "#ffffff",
+    borderWidth: 1,
+    borderColor: "#bae6fd",
+    borderRadius: 8,
+  },
+  replaceFileBtnText: {
+    fontSize: 12,
+    fontWeight: "600",
+    color: "#0284c7",
+  },
+  removeFileBtn: {
+    width: 32,
+    height: 32,
+    borderRadius: 8,
+    backgroundColor: "#fee2e2",
+    borderWidth: 1,
+    borderColor: "#fecaca",
+    alignItems: "center",
+    justifyContent: "center",
+  },
+  manualLinkToggle: {
+    alignSelf: "flex-start",
+    paddingVertical: 4,
+    paddingHorizontal: 2,
+  },
+  manualLinkToggleText: {
+    fontSize: 12,
+    color: "#0284c7",
+    fontWeight: "600",
   },
   actionsRow: {
     flexDirection: "row",

@@ -1,3 +1,4 @@
+import { RecruitmentDateField } from "./RecruitmentDateField";
 import { useState } from "react";
 import {
   ActivityIndicator,
@@ -154,7 +155,7 @@ export function InterviewForm({
       <View style={formStyles.tipBanner}>
         <Info size={16} color="#0284c7" />
         <Text style={formStyles.tipBannerText}>
-          Thời gian nhập theo giờ địa phương (YYYY-MM-DD HH:mm). Hệ thống tự động đồng bộ múi giờ.
+          Bấm vào ô thời gian để chọn ngày, giờ và phút theo giờ địa phương.
         </Text>
       </View>
 
@@ -196,21 +197,21 @@ export function InterviewForm({
           <Text style={formStyles.sectionTitle}>Thời gian & Địa điểm</Text>
         </View>
 
-        <View style={{ flexDirection: "row", gap: 10 }}>
-          <View style={{ flex: 1 }}>
-            <Field
-              label="Bắt đầu *"
+        <View style={{ gap: 10 }}>
+          <View>
+            <RecruitmentDateField
+              label="Bắt đầu" withTime required
               value={draft.scheduledStart}
-              editable={!busy}
-              onChangeText={(value) => update("scheduledStart", value)}
+              disabled={busy}
+              onChange={(value) => update("scheduledStart", value)}
             />
           </View>
-          <View style={{ flex: 1 }}>
-            <Field
-              label="Kết thúc *"
+          <View>
+            <RecruitmentDateField
+              label="Kết thúc" withTime required
               value={draft.scheduledEnd}
-              editable={!busy}
-              onChangeText={(value) => update("scheduledEnd", value)}
+              disabled={busy}
+              onChange={(value) => update("scheduledEnd", value)}
             />
           </View>
         </View>

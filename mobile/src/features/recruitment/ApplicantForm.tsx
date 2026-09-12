@@ -1,3 +1,4 @@
+import { RecruitmentDateField } from "./RecruitmentDateField";
 import { useState } from "react";
 import {
   ActivityIndicator,
@@ -224,11 +225,11 @@ export function ApplicantForm({
           </View>
         </View>
 
-        <Field
-          label="Ngày sinh (YYYY-MM-DD)"
+        <RecruitmentDateField
+          label="Ngày sinh"
           value={draft.birthDate}
-          editable={!busy}
-          onChangeText={(value) => update("birthDate", value)}
+          disabled={busy}
+          onChange={(value) => update("birthDate", value)}
         />
         <Field
           label="Địa chỉ liên hệ"
@@ -289,11 +290,11 @@ export function ApplicantForm({
             />
           </View>
           <View style={{ flex: 1 }}>
-            <Field
-              label="Ngày nhận việc (YYYY-MM-DD)"
+            <RecruitmentDateField
+              label="Ngày nhận việc"
               value={draft.availableDate}
-              editable={!busy}
-              onChangeText={(value) => update("availableDate", value)}
+              disabled={busy}
+              onChange={(value) => update("availableDate", value)}
             />
           </View>
         </View>
