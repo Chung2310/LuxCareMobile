@@ -1,6 +1,5 @@
 import React, { useState } from "react";
 import {
-  Alert,
   KeyboardAvoidingView,
   Modal,
   Platform,
@@ -15,6 +14,7 @@ import { SafeAreaView } from "react-native-safe-area-context";
 import { Ionicons } from "@expo/vector-icons";
 import { AppButton } from "../common/AppButton";
 import { DropdownSelectField } from "../common/DropdownSelectField";
+import { CustomerAlertModal, type CustomerAlertType } from "./CustomerAlertModal";
 import type { CreateCustomerLeadInput } from "../../api/customerLeadApi";
 import type { BranchRecord } from "../../../../src/services/branchService";
 
@@ -61,8 +61,8 @@ export const CustomerCreateModal: React.FC<CustomerCreateModalProps> = ({
   const [address, setAddress] = useState("");
   const [branchId, setBranchId] = useState(defaultBranchId || "");
   const [source, setSource] = useState("manual");
-  const [serviceInterest, setServiceInterest] = useState("Khám & Tư vấn tổng quát");
-  const [preferredContactTime, setPreferredContactTime] = useState("Bất kỳ lúc nào");
+  const [serviceInterest, setServiceInterest] = useState("");
+  const [preferredContactTime, setPreferredContactTime] = useState("");
   const [notes, setNotes] = useState("");
   const [loading, setLoading] = useState(false);
 
@@ -71,6 +71,35 @@ export const CustomerCreateModal: React.FC<CustomerCreateModalProps> = ({
   const [showSourcePicker, setShowSourcePicker] = useState(false);
   const [showTimePicker, setShowTimePicker] = useState(false);
 
+  // Rounded alert state
+  const [alertConfig, setAlertConfig] = useState<{
+    visible: boolean;
+    type?: CustomerAlertType;
+    title: string;
+    message: string;
+    confirmText?: string;
+    onConfirm?: () => void;
+  }>({
+    visible: false,
+    title: "",
+    message: "",
+  });
+
+  const showAlert = (config: Omit<typeof alertConfig, "visible">) => {
+    setAlertConfig({ ...config, visible: true });
+  };
+
+  const closeAlert = () => {
+    setAlertConfig((prev) => ({ ...prev, visible: false }));
+  };
+
+  // Sync default branch
+  React.useEffect(() => {
+    if (defaultBranchId && !branchId) {
+      setBranchId(defaultBranchId);
+    }
+  }, [defaultBranchId]);
+
   const resetForm = () => {
     setFullName("");
     setPhone("");
@@ -78,8 +107,8 @@ export const CustomerCreateModal: React.FC<CustomerCreateModalProps> = ({
     setAddress("");
     setBranchId(defaultBranchId || "");
     setSource("manual");
-    setServiceInterest("Khám & Tư vấn tổng quát");
-    setPreferredContactTime("Bất kỳ lúc nào");
+    setServiceInterest("");
+    setPreferredContactTime("");
     setNotes("");
   };
 
@@ -93,22 +122,37 @@ export const CustomerCreateModal: React.FC<CustomerCreateModalProps> = ({
     const trimmedPhone = phone.trim().replace(/[\s.-]/g, "");
 
     if (!trimmedName || trimmedName.length < 2) {
-      Alert.alert("Thiếu thông tin", "Vui lòng nhập họ và tên (tối thiểu 2 ký tự).");
+      showAlert({
+        type: "warning",
+        title: "Thiếu thông tin",
+        message: "Vui lòng nhập họ và tên khách hàng (tối thiểu 2 ký tự).",
+        confirmText: "Đã hiểu",
+        onConfirm: closeAlert,
+      });
       return;
     }
 
     if (!trimmedPhone) {
-      Alert.alert("Thiếu thông tin", "Vui lòng nhập số điện thoại.");
+      showAlert({
+        type: "warning",
+        title: "Thiếu thông tin",
+        message: "Vui lòng nhập số điện thoại khách hàng.",
+        confirmText: "Đã hiểu",
+        onConfirm: closeAlert,
+      });
       return;
     }
 
     // Phone format check (matches server regex: starts with 0 or +84 followed by 8-11 digits)
     const phoneRegex = /^(0|\+84)[0-9]{8,11}$/;
     if (!phoneRegex.test(trimmedPhone)) {
-      Alert.alert(
-        "Số điện thoại không hợp lệ",
-        "Số điện thoại không hợp lệ (Ví dụ: 0912345678).",
-      );
+      showAlert({
+        type: "warning",
+        title: "Số điện thoại không hợp lệ",
+        message: "Số điện thoại cần có từ 9 đến 11 chữ số (Ví dụ: 0912345678).",
+        confirmText: "Đã hiểu",
+        onConfirm: closeAlert,
+      });
       return;
     }
 
@@ -130,7 +174,13 @@ export const CustomerCreateModal: React.FC<CustomerCreateModalProps> = ({
       resetForm();
       onClose();
     } catch (err: any) {
-      Alert.alert("Lỗi", err.message || "Không thể tạo khách hàng mới.");
+      showAlert({
+        type: "error",
+        title: "Lỗi tạo khách hàng",
+        message: err.message || "Không thể tạo khách hàng mới.",
+        confirmText: "Đóng",
+        onConfirm: closeAlert,
+      });
     } finally {
       setLoading(false);
     }
@@ -465,6 +515,16 @@ export const CustomerCreateModal: React.FC<CustomerCreateModalProps> = ({
             </View>
           </TouchableOpacity>
         </Modal>
+
+        {/* Popup thông báo bo góc */}
+        <CustomerAlertModal
+          visible={alertConfig.visible}
+          type={alertConfig.type}
+          title={alertConfig.title}
+          message={alertConfig.message}
+          confirmText={alertConfig.confirmText}
+          onConfirm={alertConfig.onConfirm || closeAlert}
+        />
       </SafeAreaView>
     </Modal>
   );
@@ -533,7 +593,7 @@ const styles = StyleSheet.create({
     backgroundColor: "#f8fafc",
     borderWidth: 1,
     borderColor: "#cbd5e1",
-    borderRadius: 12,
+    borderRadius: 14,
     paddingHorizontal: 12,
     fontSize: 13.5,
     color: "#0f172a",
@@ -594,13 +654,13 @@ const styles = StyleSheet.create({
   pickerCard: {
     width: "100%",
     backgroundColor: "#ffffff",
-    borderRadius: 16,
-    padding: 16,
+    borderRadius: 24,
+    padding: 20,
     shadowColor: "#000",
-    shadowOffset: { width: 0, height: 4 },
-    shadowOpacity: 0.1,
-    shadowRadius: 8,
-    elevation: 5,
+    shadowOffset: { width: 0, height: 6 },
+    shadowOpacity: 0.12,
+    shadowRadius: 14,
+    elevation: 8,
   },
   pickerTitle: {
     fontSize: 15,
@@ -619,7 +679,7 @@ const styles = StyleSheet.create({
   },
   pickerItemActive: {
     backgroundColor: "#f0fdf4",
-    borderRadius: 8,
+    borderRadius: 12,
   },
   pickerItemText: {
     fontSize: 13.5,

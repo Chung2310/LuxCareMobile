@@ -502,7 +502,7 @@ const styles = StyleSheet.create({
   qrCard: {
     width: "100%",
     backgroundColor: "#ffffff",
-    borderRadius: 20,
+    borderRadius: 24,
     padding: 20,
     alignItems: "center",
     borderWidth: 1.5,
@@ -546,7 +546,7 @@ const styles = StyleSheet.create({
   imageWrapper: {
     padding: 10,
     backgroundColor: "#ffffff",
-    borderRadius: 16,
+    borderRadius: 20,
     borderWidth: 1,
     borderColor: "#e2e8f0",
   },
@@ -570,7 +570,7 @@ const styles = StyleSheet.create({
   },
   urlBox: {
     backgroundColor: "#f8fafc",
-    borderRadius: 10,
+    borderRadius: 14,
     paddingHorizontal: 12,
     paddingVertical: 8,
     borderWidth: 1,
@@ -588,7 +588,7 @@ const styles = StyleSheet.create({
     backgroundColor: "#f0f9ff",
     borderWidth: 1,
     borderColor: "#bae6fd",
-    borderRadius: 12,
+    borderRadius: 16,
     padding: 12,
     gap: 10,
     width: "100%",
@@ -618,13 +618,13 @@ const styles = StyleSheet.create({
   pickerCard: {
     width: "100%",
     backgroundColor: "#ffffff",
-    borderRadius: 16,
-    padding: 16,
+    borderRadius: 24,
+    padding: 20,
     shadowColor: "#000",
-    shadowOffset: { width: 0, height: 4 },
-    shadowOpacity: 0.1,
-    shadowRadius: 8,
-    elevation: 5,
+    shadowOffset: { width: 0, height: 6 },
+    shadowOpacity: 0.12,
+    shadowRadius: 14,
+    elevation: 8,
   },
   pickerTitle: {
     fontSize: 15,
@@ -643,7 +643,7 @@ const styles = StyleSheet.create({
   },
   pickerItemActive: {
     backgroundColor: "#f0fdf4",
-    borderRadius: 8,
+    borderRadius: 12,
   },
   pickerItemText: {
     fontSize: 13.5,

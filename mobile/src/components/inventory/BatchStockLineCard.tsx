@@ -28,6 +28,7 @@ export interface BatchStockLineCardProps {
   onUpdateBatchNumber: (tempId: string, val: string) => void;
   onUpdateUnitPrice: (tempId: string, val: string) => void;
   onOpenExpiryPicker: (tempId: string) => void;
+  onFocusInput?: (tempId: string, field: "quantity" | "batchNumber" | "unitPrice") => void;
 }
 
 export const BatchStockLineCard: React.FC<BatchStockLineCardProps> = ({
@@ -42,6 +43,7 @@ export const BatchStockLineCard: React.FC<BatchStockLineCardProps> = ({
   onUpdateBatchNumber,
   onUpdateUnitPrice,
   onOpenExpiryPicker,
+  onFocusInput,
 }) => {
   const isOverStock = !isIn && line.quantity > line.supply.quantity;
 
@@ -50,7 +52,7 @@ export const BatchStockLineCard: React.FC<BatchStockLineCardProps> = ({
     Boolean(selectedSupplier) &&
     Boolean(line.supply.supplierName) &&
     line.supply.supplierName.trim().toLowerCase() !==
-      selectedSupplier.trim().toLowerCase();
+    selectedSupplier.trim().toLowerCase();
 
   const isForeignWarehouse =
     !isIn &&
@@ -74,36 +76,6 @@ export const BatchStockLineCard: React.FC<BatchStockLineCardProps> = ({
             <Text style={styles.supplyStock}>
               Tồn kho: {line.supply.quantity} {line.supply.unit}
             </Text>
-
-            {isIn && Boolean(line.supply.supplierName) && (
-              <>
-                <Text style={styles.dot}>•</Text>
-                <Text
-                  style={[
-                    styles.supplierBadge,
-                    isForeignSupplier && styles.badgeWarning,
-                  ]}
-                  numberOfLines={1}
-                >
-                  NCC: {line.supply.supplierName}
-                </Text>
-              </>
-            )}
-
-            {!isIn && (
-              <>
-                <Text style={styles.dot}>•</Text>
-                <Text
-                  style={[
-                    styles.warehouseBadge,
-                    isForeignWarehouse && styles.badgeWarning,
-                  ]}
-                  numberOfLines={1}
-                >
-                  Kho: {line.supply.warehouseLocation || line.supply.warehouseName || selectedWarehouse}
-                </Text>
-              </>
-            )}
           </View>
         </View>
 
@@ -148,47 +120,57 @@ export const BatchStockLineCard: React.FC<BatchStockLineCardProps> = ({
 
       {/* Row số lượng & số lô */}
       <View style={styles.inputsRow}>
-        <View style={styles.qtyGroup}>
-          <Text style={styles.miniLabel}>Số lượng ({line.supply.unit}) *</Text>
+        <View style={styles.inputCol}>
+          <Text style={styles.miniLabel} numberOfLines={1}>
+            Số lượng ({line.supply.unit}) *
+          </Text>
           <QuantityStepper
             value={line.quantity}
             onChange={(val) => onUpdateQuantity(line.tempId, val)}
             min={1}
             max={!isIn ? line.supply.quantity : undefined}
+            onFocus={() => onFocusInput?.(line.tempId, "quantity")}
           />
         </View>
 
-        <View style={styles.batchGroup}>
-          <Text style={styles.miniLabel}>Số lô</Text>
+        <View style={styles.inputCol}>
+          <Text style={styles.miniLabel} numberOfLines={1}>
+            Số lô
+          </Text>
           <TextInput
             style={styles.miniInput}
             placeholder="Số lô..."
             placeholderTextColor="#94a3b8"
             value={line.batchNumber}
             onChangeText={(val) => onUpdateBatchNumber(line.tempId, val)}
+            onFocus={() => onFocusInput?.(line.tempId, "batchNumber")}
           />
         </View>
       </View>
 
       {/* Row Hạn dùng & Đơn giá (nếu nhập kho) */}
-      <View style={[styles.inputsRow, { marginTop: 8 }]}>
-        <View style={{ flex: 1 }}>
-          <Text style={styles.miniLabel}>Hạn dùng (HSD)</Text>
+      <View style={[styles.inputsRow, { marginTop: 10 }]}>
+        <View style={styles.inputCol}>
+          <Text style={styles.miniLabel} numberOfLines={1}>
+            Hạn dùng (HSD)
+          </Text>
           <TouchableOpacity
             style={styles.miniDatePickerBtn}
             onPress={() => onOpenExpiryPicker(line.tempId)}
             activeOpacity={0.7}
           >
             <Ionicons name="calendar-outline" size={14} color="#64748b" />
-            <Text style={styles.miniDatePickerText}>
+            <Text style={styles.miniDatePickerText} numberOfLines={1}>
               {line.expiryDate ? formatDateVN(line.expiryDate) : "Chọn HSD"}
             </Text>
           </TouchableOpacity>
         </View>
 
-        {isIn && (
-          <View style={{ flex: 1 }}>
-            <Text style={styles.miniLabel}>Đơn giá nhập (VNĐ)</Text>
+        {isIn ? (
+          <View style={styles.inputCol}>
+            <Text style={styles.miniLabel} numberOfLines={1}>
+              Đơn giá nhập (VNĐ)
+            </Text>
             <TextInput
               style={styles.miniInput}
               keyboardType="number-pad"
@@ -196,8 +178,11 @@ export const BatchStockLineCard: React.FC<BatchStockLineCardProps> = ({
               placeholderTextColor="#94a3b8"
               value={line.unitPrice ? String(line.unitPrice) : ""}
               onChangeText={(val) => onUpdateUnitPrice(line.tempId, val)}
+              onFocus={() => onFocusInput?.(line.tempId, "unitPrice")}
             />
           </View>
+        ) : (
+          <View style={styles.inputCol} />
         )}
       </View>
     </View>
@@ -256,21 +241,10 @@ const styles = StyleSheet.create({
     color: "#059669",
     fontWeight: "600",
   },
-  supplierBadge: {
-    fontSize: 11,
-    color: "#059669",
-    fontWeight: "600",
-  },
-  warehouseBadge: {
-    fontSize: 11,
-    color: "#0284c7",
-    fontWeight: "600",
-  },
-  badgeWarning: {
-    color: "#ea580c",
-  },
   removeBtn: {
-    padding: 4,
+    padding: 6,
+    marginLeft: 6,
+    alignSelf: "flex-start",
   },
   foreignSupplierWarning: {
     flexDirection: "row",
@@ -326,18 +300,17 @@ const styles = StyleSheet.create({
   inputsRow: {
     flexDirection: "row",
     gap: 10,
+    alignItems: "flex-start",
   },
-  qtyGroup: {
-    flex: 1.2,
-  },
-  batchGroup: {
+  inputCol: {
     flex: 1,
   },
   miniLabel: {
-    fontSize: 11,
+    fontSize: 11.5,
     fontWeight: "600",
-    color: "#64748b",
-    marginBottom: 4,
+    color: "#475569",
+    marginBottom: 5,
+    height: 16,
   },
   miniInput: {
     height: 40,
@@ -345,7 +318,9 @@ const styles = StyleSheet.create({
     borderColor: "#cbd5e1",
     borderRadius: 8,
     paddingHorizontal: 10,
-    fontSize: 12,
+    paddingVertical: 0,
+    fontSize: 13,
+    fontWeight: "500",
     color: "#0f172a",
     backgroundColor: "#ffffff",
   },
@@ -361,8 +336,9 @@ const styles = StyleSheet.create({
     backgroundColor: "#ffffff",
   },
   miniDatePickerText: {
-    fontSize: 12,
-    fontWeight: "600",
+    fontSize: 12.5,
+    fontWeight: "500",
     color: "#0f172a",
+    flex: 1,
   },
 });
