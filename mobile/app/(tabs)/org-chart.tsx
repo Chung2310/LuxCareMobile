@@ -13,7 +13,7 @@ import {
   View,
 } from "react-native";
 import { SafeAreaView, useSafeAreaInsets } from "react-native-safe-area-context";
-import { router, useFocusEffect } from "expo-router";
+import { router, useFocusEffect, useNavigation } from "expo-router";
 import type { UserProfile } from "../../../src/types/common";
 import type { BranchRecord } from "../../../src/services/branchService";
 import type { DepartmentRecord } from "../../../src/services/departmentService";
@@ -1300,6 +1300,7 @@ function OrgListView({
 export default function OrgChart() {
   const { showAlert, alertView } = useAppAlert();
   const insets = useSafeAreaInsets();
+  const navigation = useNavigation();
   const { user, selectedBranch } = useSession();
   const branchId = selectedBranch?._id || user?.branchId || undefined;
   const [empList, setEmpList] = useState<UserProfile[]>([]);
@@ -1315,6 +1316,26 @@ export default function OrgChart() {
   const [zoomScale, setZoomScale] = useState<number>(1.0);
   const [isFullscreen, setIsFullscreen] = useState(false);
   const [createModalVisible, setCreateModalVisible] = useState(false);
+
+  // Ẩn / hiện tab bar dưới đáy khi vào chế độ toàn màn hình
+  React.useEffect(() => {
+    try {
+      const parent = navigation.getParent();
+      if (parent) {
+        parent.setOptions({
+          tabBarStyle: isFullscreen ? { display: "none" } : undefined,
+        });
+      }
+    } catch {}
+    return () => {
+      try {
+        const parent = navigation.getParent();
+        if (parent) {
+          parent.setOptions({ tabBarStyle: undefined });
+        }
+      } catch {}
+    };
+  }, [isFullscreen, navigation]);
   const [deptList, setDeptList] = useState<DepartmentRecord[]>([]);
   const [branchList, setBranchList] = useState<BranchRecord[]>([]);
   const canManage =
@@ -1612,11 +1633,11 @@ export default function OrgChart() {
   }
 
   return (
-    <SafeAreaView edges={["top"]} style={s.root}>
-      <Header />
+    <SafeAreaView edges={isFullscreen ? [] : ["top"]} style={s.root}>
+      {!isFullscreen && <Header />}
 
       {/* Drag & Drop Sticky Banner */}
-      {movingEmp && (
+      {!isFullscreen && movingEmp && (
         <View style={s.dragBanner}>
           <View style={s.dragBannerRow}>
             <View style={{ flex: 1 }}>
@@ -1645,55 +1666,60 @@ export default function OrgChart() {
       )}
 
       {/* Control Toolbar: Search + Quick Expand/Collapse + Zoom */}
-      <View style={s.toolbar}>
-        <View style={s.searchBox}>
-          <Search size={14} color="#94a3b8" style={{ marginRight: 6 }} />
-          <TextInput
-            style={s.searchInput}
-            placeholder="Tìm tên, chức danh, phòng ban…"
-            placeholderTextColor="#94a3b8"
-            value={search}
-            onChangeText={setSearch}
-          />
-          {!!search && (
-            <Pressable onPress={() => setSearch("")} hitSlop={6}>
-              <X size={14} color="#94a3b8" style={{ marginHorizontal: 4 }} />
-            </Pressable>
+      {!isFullscreen && (
+        <View style={s.toolbar}>
+          <View style={s.searchBox}>
+            <Search size={14} color="#94a3b8" style={{ marginRight: 6 }} />
+            <TextInput
+              style={s.searchInput}
+              placeholder="Tìm tên, chức danh, phòng ban…"
+              placeholderTextColor="#94a3b8"
+              value={search}
+              onChangeText={setSearch}
+            />
+            {!!search && (
+              <Pressable onPress={() => setSearch("")} hitSlop={6}>
+                <X size={14} color="#94a3b8" style={{ marginHorizontal: 4 }} />
+              </Pressable>
+            )}
+          </View>
+
+          {viewMode === "tree" && (
+            <View style={s.treeToolRow}>
+              <View style={s.expandGroup}>
+                <Pressable style={s.toolBtn} onPress={expandAll}>
+                  <Text style={s.toolBtnTxt}>Mở hết</Text>
+                </Pressable>
+                <Pressable style={s.toolBtn} onPress={collapseAll}>
+                  <Text style={s.toolBtnTxt}>Thu gọn</Text>
+                </Pressable>
+              </View>
+
+              <View style={s.zoomGroup}>
+                <Pressable style={s.zoomBtn} onPress={zoomOut}>
+                  <Text style={s.zoomBtnTxt}>−</Text>
+                </Pressable>
+                <Pressable style={s.zoomLabelBtn} onPress={zoomReset}>
+                  <Text style={s.zoomLabelTxt}>{Math.round(zoomScale * 100)}%</Text>
+                </Pressable>
+                <Pressable style={s.zoomBtn} onPress={zoomIn}>
+                  <Text style={s.zoomBtnTxt}>+</Text>
+                </Pressable>
+                <Pressable style={s.floatingFitBtn} onPress={zoomFit}>
+                  <Text style={s.floatingFitBtnTxt}>Fit</Text>
+                </Pressable>
+                <Pressable
+                  style={s.zoomFullscreenBtn}
+                  onPress={() => setIsFullscreen(true)}
+                  accessibilityLabel="Toàn màn hình"
+                >
+                  <Maximize size={13} color="#4f46e5" />
+                </Pressable>
+              </View>
+            </View>
           )}
         </View>
-
-        {viewMode === "tree" && (
-          <View style={s.treeToolRow}>
-            <View style={s.expandGroup}>
-              <Pressable style={s.toolBtn} onPress={expandAll}>
-                <Text style={s.toolBtnTxt}>Mở hết</Text>
-              </Pressable>
-              <Pressable style={s.toolBtn} onPress={collapseAll}>
-                <Text style={s.toolBtnTxt}>Thu gọn</Text>
-              </Pressable>
-            </View>
-
-            <View style={s.zoomGroup}>
-              <Pressable style={s.zoomBtn} onPress={zoomOut}>
-                <Text style={s.zoomBtnTxt}>−</Text>
-              </Pressable>
-              <Pressable style={s.zoomLabelBtn} onPress={zoomReset}>
-                <Text style={s.zoomLabelTxt}>{Math.round(zoomScale * 100)}%</Text>
-              </Pressable>
-              <Pressable style={s.zoomBtn} onPress={zoomIn}>
-                <Text style={s.zoomBtnTxt}>+</Text>
-              </Pressable>
-              <Pressable style={s.floatingFitBtn} onPress={zoomFit}>
-                <Text style={s.floatingFitBtnTxt}>Fit</Text>
-              </Pressable>
-              <Pressable style={s.fullscreenTriggerBtn} onPress={() => setIsFullscreen(true)}>
-                <Maximize size={12} color="#4f46e5" />
-                <Text style={s.fullscreenTriggerTxt}>Toàn màn hình</Text>
-              </Pressable>
-            </View>
-          </View>
-        )}
-      </View>
+      )}
 
       {/* Main Content Area */}
       {viewMode === "list" ? (
@@ -1708,146 +1734,91 @@ export default function OrgChart() {
         />
       ) : (
         /* 2D Scrollable Interactive Tree Canvas with Pinch Zoom */
-        <View style={{ flex: 1 }}>
-          {/* Tree Canvas */}
-          <View style={{ flex: 1 }} onTouchStart={handleTouchStart} onTouchMove={handleTouchMove} onTouchEnd={handleTouchEnd}>
+        <View style={{ flex: 1 }} onTouchStart={handleTouchStart} onTouchMove={handleTouchMove} onTouchEnd={handleTouchEnd}>
+          <ScrollView
+            style={{ flex: 1 }}
+            contentContainerStyle={s.verticalScroll}
+            showsVerticalScrollIndicator={true}
+          >
             <ScrollView
-              style={{ flex: 1 }}
-              contentContainerStyle={s.verticalScroll}
-              showsVerticalScrollIndicator={true}
+              horizontal
+              showsHorizontalScrollIndicator={true}
+              contentContainerStyle={s.horizontalScroll}
             >
-              <ScrollView
-                horizontal
-                showsHorizontalScrollIndicator={true}
-                contentContainerStyle={s.horizontalScroll}
-              >
-                {tree.length === 0 ? (
-                  <View style={s.emptyBox}>
-                    <Users size={44} color="#94a3b8" style={{ marginBottom: 8 }} />
-                    <Text style={s.emptyTitle}>Chưa có dữ liệu cơ cấu nhân sự</Text>
-                    <Text style={s.emptySub}>Vui lòng kiểm tra phân quyền hoặc danh sách nhân viên</Text>
+              {tree.length === 0 ? (
+                <View style={s.emptyBox}>
+                  <Users size={44} color="#94a3b8" style={{ marginBottom: 8 }} />
+                  <Text style={s.emptyTitle}>Chưa có dữ liệu cơ cấu nhân sự</Text>
+                  <Text style={s.emptySub}>Vui lòng kiểm tra phân quyền hoặc danh sách nhân viên</Text>
+                </View>
+              ) : (
+                <View
+                  style={[
+                    s.treeCanvas,
+                    {
+                      transform: [{ scale: zoomScale }],
+                    },
+                  ]}
+                >
+                  <View style={s.rootRow}>
+                    {tree.map((rootNode) => (
+                      <TreeBranchView
+                        key={rootNode.emp.uid}
+                        node={rootNode}
+                        onSelect={setSelected}
+                        collapsed={collapsed}
+                        toggleCollapse={toggle}
+                        highlighted={highlighted}
+                        movingEmp={movingEmp}
+                        onStartMove={(e) => setMovingEmp(e)}
+                        onTargetSelect={(target) => handleConfirmMove(target)}
+                        canManage={canManage}
+                        allEmps={empList}
+                      />
+                    ))}
                   </View>
-                ) : (
-                  <View
-                    style={[
-                      s.treeCanvas,
-                      {
-                        transform: [{ scale: zoomScale }],
-                      },
-                    ]}
-                  >
-                    <View style={s.rootRow}>
-                      {tree.map((rootNode) => (
-                        <TreeBranchView
-                          key={rootNode.emp.uid}
-                          node={rootNode}
-                          onSelect={setSelected}
-                          collapsed={collapsed}
-                          toggleCollapse={toggle}
-                          highlighted={highlighted}
-                          movingEmp={movingEmp}
-                          onStartMove={(e) => setMovingEmp(e)}
-                          onTargetSelect={(target) => handleConfirmMove(target)}
-                          canManage={canManage}
-                          allEmps={empList}
-                        />
-                      ))}
-                    </View>
-                  </View>
-                )}
-              </ScrollView>
+                </View>
+              )}
             </ScrollView>
-          </View>
+          </ScrollView>
 
-          {/* Floating Zoom Action Controls (FAB) */}
-          <View style={s.floatingZoomBar}>
-            <Pressable style={s.floatingZoomBtn} onPress={zoomIn}>
-              <Text style={s.floatingZoomBtnTxt}>+</Text>
+          {/* Floating Zoom Action Controls (FAB) - chỉ hiện khi ở chế độ xem thông thường */}
+          {!isFullscreen && (
+            <View style={s.floatingZoomBar}>
+              <Pressable style={s.floatingZoomBtn} onPress={zoomIn}>
+                <Text style={s.floatingZoomBtnTxt}>+</Text>
+              </Pressable>
+              <Pressable style={s.floatingZoomLabelBtn} onPress={zoomReset}>
+                <Text style={s.floatingZoomLabelTxt}>{Math.round(zoomScale * 100)}%</Text>
+              </Pressable>
+              <Pressable style={s.floatingZoomBtn} onPress={zoomOut}>
+                <Text style={s.floatingZoomBtnTxt}>−</Text>
+              </Pressable>
+              <Pressable style={s.floatingFitBtn} onPress={zoomFit}>
+                <Text style={s.floatingFitBtnTxt}>Fit</Text>
+              </Pressable>
+              <Pressable style={s.floatingFullscreenBtn} onPress={() => setIsFullscreen(true)}>
+                <Maximize size={15} color="#4f46e5" />
+              </Pressable>
+            </View>
+          )}
+
+          {/* Chế độ Toàn màn hình: CHỈ HIỂN THỊ DUY NHẤT 1 NÚT ĐỂ TẮT CHẾ ĐỘ */}
+          {isFullscreen && (
+            <Pressable
+              style={[
+                s.exitFullscreenBtn,
+                { top: Math.max((insets?.top || 0) + 12, 24) },
+              ]}
+              onPress={() => setIsFullscreen(false)}
+              hitSlop={{ top: 12, bottom: 12, left: 12, right: 12 }}
+            >
+              <Minimize size={16} color="#ffffff" />
+              <Text style={s.exitFullscreenBtnTxt}>Thoát toàn màn hình</Text>
             </Pressable>
-            <Pressable style={s.floatingZoomLabelBtn} onPress={zoomReset}>
-              <Text style={s.floatingZoomLabelTxt}>{Math.round(zoomScale * 100)}%</Text>
-            </Pressable>
-            <Pressable style={s.floatingZoomBtn} onPress={zoomOut}>
-              <Text style={s.floatingZoomBtnTxt}>−</Text>
-            </Pressable>
-            <Pressable style={s.floatingFitBtn} onPress={zoomFit}>
-              <Text style={s.floatingFitBtnTxt}>Fit</Text>
-            </Pressable>
-            <Pressable style={s.floatingFullscreenBtn} onPress={() => setIsFullscreen(true)}>
-              <Maximize size={15} color="#4f46e5" />
-            </Pressable>
-          </View>
+          )}
         </View>
       )}
-
-      {/* Fullscreen Org Chart Modal: Chỉ hiển thị sơ đồ và DUY NHẤT 1 nút để tắt chế độ */}
-      <Modal
-        visible={isFullscreen}
-        animationType="fade"
-        statusBarTranslucent
-        onRequestClose={() => setIsFullscreen(false)}
-      >
-        <View style={s.fullscreenContainer}>
-          <View style={{ flex: 1 }} onTouchStart={handleTouchStart} onTouchMove={handleTouchMove} onTouchEnd={handleTouchEnd}>
-            <ScrollView
-              style={{ flex: 1 }}
-              contentContainerStyle={s.verticalScroll}
-              showsVerticalScrollIndicator={true}
-            >
-              <ScrollView
-                horizontal
-                showsHorizontalScrollIndicator={true}
-                contentContainerStyle={s.horizontalScroll}
-              >
-                {tree.length === 0 ? (
-                  <View style={s.emptyBox}>
-                    <Users size={44} color="#94a3b8" style={{ marginBottom: 8 }} />
-                    <Text style={s.emptyTitle}>Chưa có dữ liệu cơ cấu nhân sự</Text>
-                    <Text style={s.emptySub}>Vui lòng kiểm tra phân quyền hoặc danh sách nhân viên</Text>
-                  </View>
-                ) : (
-                  <View
-                    style={[
-                      s.treeCanvas,
-                      {
-                        transform: [{ scale: zoomScale }],
-                      },
-                    ]}
-                  >
-                    <View style={s.rootRow}>
-                      {tree.map((rootNode) => (
-                        <TreeBranchView
-                          key={rootNode.emp.uid}
-                          node={rootNode}
-                          onSelect={setSelected}
-                          collapsed={collapsed}
-                          toggleCollapse={toggle}
-                          highlighted={highlighted}
-                          movingEmp={movingEmp}
-                          onStartMove={(e) => setMovingEmp(e)}
-                          onTargetSelect={(target) => handleConfirmMove(target)}
-                          canManage={canManage}
-                          allEmps={empList}
-                        />
-                      ))}
-                    </View>
-                  </View>
-                )}
-              </ScrollView>
-            </ScrollView>
-          </View>
-
-          {/* Duy nhất 1 nút để tắt chế độ toàn màn hình */}
-          <Pressable
-            style={[s.exitFullscreenBtn, { top: Math.max(insets.top + 10, 24) }]}
-            onPress={() => setIsFullscreen(false)}
-            hitSlop={{ top: 12, bottom: 12, left: 12, right: 12 }}
-          >
-            <Minimize size={16} color="#ffffff" />
-            <Text style={s.exitFullscreenBtnTxt}>Thoát toàn màn hình</Text>
-          </Pressable>
-        </View>
-      </Modal>
 
       {/* Employee Profile Details Modal */}
       <ProfileModal
@@ -2069,20 +2040,13 @@ const s = StyleSheet.create({
     fontWeight: "800",
     color: "#4f46e5",
   },
-  fullscreenTriggerBtn: {
-    flexDirection: "row",
-    alignItems: "center",
-    gap: 4,
+  zoomFullscreenBtn: {
     paddingHorizontal: 8,
-    paddingVertical: 3,
-    backgroundColor: "#eef2ff",
+    paddingVertical: 4,
+    alignItems: "center",
+    justifyContent: "center",
     borderLeftWidth: 1,
-    borderLeftColor: "#c7d2fe",
-  },
-  fullscreenTriggerTxt: {
-    fontSize: 10,
-    fontWeight: "700",
-    color: "#4f46e5",
+    borderLeftColor: "#e2e8f0",
   },
   floatingFullscreenBtn: {
     width: 38,
@@ -2092,11 +2056,6 @@ const s = StyleSheet.create({
     backgroundColor: "#eef2ff",
     borderTopWidth: 1,
     borderColor: "#c7d2fe",
-  },
-  fullscreenContainer: {
-    flex: 1,
-    backgroundColor: "#f8fafc",
-    position: "relative",
   },
   exitFullscreenBtn: {
     position: "absolute",
