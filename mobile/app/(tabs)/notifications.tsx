@@ -47,6 +47,9 @@ function formatNotificationTime(isoString: string): string {
     const year = date.getFullYear();
     const hours = String(date.getHours()).padStart(2, "0");
     const mins = String(date.getMinutes()).padStart(2, "0");
+    if (year === now.getFullYear()) {
+      return `${day}/${month} ${hours}:${mins}`;
+    }
     return `${day}/${month}/${year} ${hours}:${mins}`;
   } catch {
     return isoString;
@@ -93,6 +96,7 @@ export default function Notifications() {
       return () => {
         active = false;
       };
+      // eslint-disable-next-line react-hooks/exhaustive-deps
     }, [page, unreadOnly, type, revision, user?.uid, notificationState.revision]),
   );
 
@@ -116,7 +120,11 @@ export default function Notifications() {
   const openNotification = async (item: WebNotification) => {
     const destination = notificationTarget(item, user);
     if (!destination.target) {
-      Alert.alert("Thông báo", destination.reason || "Không thể mở liên kết này.");
+      if (!item.read) {
+        await mutate(() => notifications.markAsRead(item._id));
+      } else if (destination.reason) {
+        Alert.alert("Thông báo", destination.reason);
+      }
       return;
     }
     if (lock.current) return;
@@ -159,11 +167,12 @@ export default function Notifications() {
   const filterTabs: Array<{
     id: string;
     label: string;
-    icon?: React.ComponentProps<typeof Ionicons>["name"];
+    icon: React.ComponentProps<typeof Ionicons>["name"];
+    badge?: number;
   }> = [
-    { id: "all", label: "Tất cả", icon: "apps-outline" },
-    { id: "unread", label: unreadCount > 0 ? `Chưa đọc (${unreadCount})` : "Chưa đọc", icon: "mail-unread-outline" },
-    { id: "task", label: "Công việc", icon: "checkbox-outline" },
+    { id: "all", label: "Tất cả", icon: "grid-outline" },
+    { id: "unread", label: "Chưa đọc", icon: "mail-unread-outline", badge: unreadCount },
+    { id: "task", label: "Công việc", icon: "briefcase-outline" },
     { id: "training", label: "Đào tạo", icon: "school-outline" },
     { id: "kho", label: "Kho & Thiết bị", icon: "cube-outline" },
     { id: "he-thong", label: "Hệ thống", icon: "settings-outline" },
@@ -192,107 +201,102 @@ export default function Notifications() {
     const isUnread = !item.read;
 
     return (
-      <View style={[styles.card, isUnread ? styles.cardUnread : styles.cardRead]}>
-        {/* Type Icon and Status Header */}
-        <View style={styles.cardHeader}>
-          <View style={styles.typeBadgeRow}>
-            <View
-              style={[
-                styles.typeIconBox,
-                { backgroundColor: categoryInfo.bg, borderColor: categoryInfo.borderColor },
-              ]}
-            >
-              <Ionicons name={categoryInfo.iconName} size={18} color={categoryInfo.color} />
-            </View>
-            <View style={{ gap: 2 }}>
-              <View style={styles.categoryRow}>
-                <View
-                  style={[
-                    styles.categoryBadge,
-                    { backgroundColor: categoryInfo.bg, borderColor: categoryInfo.borderColor },
-                  ]}
-                >
-                  <Text style={[styles.categoryBadgeText, { color: categoryInfo.color }]}>
-                    {categoryInfo.label}
-                  </Text>
-                </View>
-                <Text style={styles.timeText}>• {formatNotificationTime(item.createdAt)}</Text>
-              </View>
-            </View>
+      <Pressable
+        style={({ pressed }) => [
+          styles.card,
+          isUnread ? styles.cardUnread : styles.cardRead,
+          pressed && styles.cardPressed,
+        ]}
+        onPress={() => void openNotification(item)}
+      >
+        <View style={styles.cardRow}>
+          {/* Left: Category Icon */}
+          <View
+            style={[
+              styles.typeIconBox,
+              { backgroundColor: categoryInfo.bg },
+            ]}
+          >
+            <Ionicons name={categoryInfo.iconName} size={16} color={categoryInfo.color} />
           </View>
 
-          {isUnread && (
-            <View style={styles.unreadPill}>
-              <View style={styles.unreadDot} />
-              <Text style={styles.unreadPillText}>Mới</Text>
+          {/* Right: Main Content */}
+          <View style={styles.cardMain}>
+            {/* Row 1: Title + Unread dot & Delete */}
+            <View style={styles.cardTitleRow}>
+              <Text
+                style={[styles.itemTitle, isUnread && styles.itemTitleUnread]}
+                numberOfLines={1}
+              >
+                {item.title}
+              </Text>
+              <View style={styles.titleActions}>
+                {isUnread && <View style={styles.unreadDot} />}
+                <Pressable
+                  style={({ pressed }) => [styles.deleteIconBtn, pressed && { opacity: 0.5 }]}
+                  hitSlop={8}
+                  onPress={(e) => {
+                    e.stopPropagation?.();
+                    Alert.alert(
+                      "Xóa thông báo",
+                      `Bạn có chắc muốn xóa thông báo "${item.title}"?`,
+                      [
+                        { text: "Hủy", style: "cancel" },
+                        {
+                          text: "Xóa",
+                          style: "destructive",
+                          onPress: () => void mutate(() => notifications.deleteNotification(item._id)),
+                        },
+                      ],
+                    );
+                  }}
+                >
+                  <Ionicons name="trash-outline" size={13} color="#94a3b8" />
+                </Pressable>
+              </View>
             </View>
-          )}
+
+            {/* Row 2: Body text */}
+            {!!item.body && (
+              <Text style={styles.itemBody} numberOfLines={2}>
+                {item.body}
+              </Text>
+            )}
+
+            {/* Row 3: Category • Time and Quick Action */}
+            <View style={styles.cardMetaRow}>
+              <View style={styles.metaLeft}>
+                <Text style={[styles.categoryText, { color: categoryInfo.color }]}>
+                  {categoryInfo.label}
+                </Text>
+                <Text style={styles.metaDot}>•</Text>
+                <Text style={styles.timeText}>
+                  {formatNotificationTime(item.createdAt)}
+                </Text>
+              </View>
+
+              {destination?.target ? (
+                <View style={styles.destinationLink}>
+                  <Text style={styles.destinationLinkText}>{destination.target.label}</Text>
+                  <Ionicons name="chevron-forward" size={11} color="#059669" />
+                </View>
+              ) : isUnread ? (
+                <Pressable
+                  style={({ pressed }) => [styles.quickReadBtn, pressed && { opacity: 0.6 }]}
+                  hitSlop={6}
+                  onPress={(e) => {
+                    e.stopPropagation?.();
+                    void mutate(() => notifications.markAsRead(item._id));
+                  }}
+                >
+                  <Ionicons name="checkmark-done" size={12} color="#059669" />
+                  <Text style={styles.quickReadBtnText}>Đã đọc</Text>
+                </Pressable>
+              ) : null}
+            </View>
+          </View>
         </View>
-
-        {/* Content */}
-        <View style={styles.cardBody}>
-          <Text style={[styles.itemTitle, isUnread && styles.itemTitleUnread]}>
-            {item.title}
-          </Text>
-          {!!item.body && <Text style={styles.itemBody}>{item.body}</Text>}
-        </View>
-
-        {/* Action Link button if target is valid */}
-        {destination?.target && (
-          <Pressable
-            style={({ pressed }) => [
-              styles.targetBtn,
-              pressed && { opacity: 0.8 },
-              busy && { opacity: 0.5 },
-            ]}
-            disabled={busy}
-            onPress={() => void openNotification(item)}
-          >
-            <Text style={styles.targetBtnText}>{destination.target.label}</Text>
-            <Ionicons name="arrow-forward" size={14} color="#15803d" />
-          </Pressable>
-        )}
-
-        {/* Bottom Actions Row */}
-        <View style={styles.cardActionsRow}>
-          {isUnread && (
-            <Pressable
-              style={({ pressed }) => [
-                styles.markReadBtn,
-                pressed && { opacity: 0.7 },
-                busy && { opacity: 0.5 },
-              ]}
-              disabled={busy}
-              onPress={() => void mutate(() => notifications.markAsRead(item._id))}
-            >
-              <Ionicons name="checkmark-done" size={15} color="#059669" />
-              <Text style={styles.markReadBtnText}>Đánh dấu đã đọc</Text>
-            </Pressable>
-          )}
-
-          <Pressable
-            style={({ pressed }) => [
-              styles.deleteBtn,
-              pressed && { opacity: 0.7 },
-              busy && { opacity: 0.5 },
-            ]}
-            disabled={busy}
-            onPress={() =>
-              Alert.alert("Xóa thông báo", `Bạn có chắc muốn xóa thông báo "${item.title}"?`, [
-                { text: "Hủy", style: "cancel" },
-                {
-                  text: "Xóa",
-                  style: "destructive",
-                  onPress: () => void mutate(() => notifications.deleteNotification(item._id)),
-                },
-              ])
-            }
-          >
-            <Ionicons name="trash-outline" size={14} color="#ef4444" />
-            <Text style={styles.deleteBtnText}>Xóa</Text>
-          </Pressable>
-        </View>
-      </View>
+      </Pressable>
     );
   };
 
@@ -338,16 +342,20 @@ export default function Notifications() {
             return (
               <Pressable
                 key={tab.id}
-                style={[styles.filterPill, active && styles.filterPillActive]}
+                style={({ pressed }) => [
+                  styles.filterPill,
+                  active && styles.filterPillActive,
+                  pressed && styles.filterPillPressed,
+                ]}
                 onPress={() => handleSelectTab(tab.id)}
                 disabled={busy}
               >
                 {tab.icon && (
                   <Ionicons
                     name={tab.icon}
-                    size={14}
-                    color={active ? "#ffffff" : "#475569"}
-                    style={{ marginRight: 5 }}
+                    size={15}
+                    color={active ? "#ffffff" : "#64748b"}
+                    style={styles.filterPillIcon}
                   />
                 )}
                 <Text
@@ -358,6 +366,23 @@ export default function Notifications() {
                 >
                   {tab.label}
                 </Text>
+                {typeof tab.badge === "number" && tab.badge > 0 && (
+                  <View
+                    style={[
+                      styles.filterBadge,
+                      active && styles.filterBadgeActive,
+                    ]}
+                  >
+                    <Text
+                      style={[
+                        styles.filterBadgeText,
+                        active && styles.filterBadgeTextActive,
+                      ]}
+                    >
+                      {tab.badge > 99 ? "99+" : tab.badge}
+                    </Text>
+                  </View>
+                )}
               </Pressable>
             );
           })}
@@ -521,24 +546,40 @@ const styles = StyleSheet.create({
   filterBar: {
     backgroundColor: "#ffffff",
     borderBottomWidth: 1,
-    borderBottomColor: "#e2e8f0",
+    borderBottomColor: "#f1f5f9",
   },
   filterScroll: {
-    paddingHorizontal: 14,
+    paddingHorizontal: 16,
     paddingVertical: 10,
     gap: 8,
+    alignItems: "center",
   },
   filterPill: {
+    flexDirection: "row",
+    alignItems: "center",
+    justifyContent: "center",
     paddingVertical: 7,
     paddingHorizontal: 14,
     borderRadius: 20,
-    backgroundColor: "#f1f5f9",
+    backgroundColor: "#f8fafc",
     borderWidth: 1,
     borderColor: "#e2e8f0",
   },
   filterPillActive: {
     backgroundColor: "#059669",
     borderColor: "#059669",
+    shadowColor: "#059669",
+    shadowOffset: { width: 0, height: 2 },
+    shadowOpacity: 0.22,
+    shadowRadius: 4,
+    elevation: 2,
+  },
+  filterPillPressed: {
+    opacity: 0.85,
+    transform: [{ scale: 0.97 }],
+  },
+  filterPillIcon: {
+    marginRight: 6,
   },
   filterPillText: {
     fontSize: 13,
@@ -546,6 +587,27 @@ const styles = StyleSheet.create({
     color: "#475569",
   },
   filterPillTextActive: {
+    color: "#ffffff",
+    fontWeight: "700",
+  },
+  filterBadge: {
+    backgroundColor: "#fee2e2",
+    borderRadius: 10,
+    paddingHorizontal: 6,
+    paddingVertical: 1.5,
+    marginLeft: 6,
+    alignItems: "center",
+    justifyContent: "center",
+  },
+  filterBadgeActive: {
+    backgroundColor: "rgba(255, 255, 255, 0.28)",
+  },
+  filterBadgeText: {
+    color: "#dc2626",
+    fontSize: 11,
+    fontWeight: "700",
+  },
+  filterBadgeTextActive: {
     color: "#ffffff",
     fontWeight: "700",
   },
@@ -567,170 +629,142 @@ const styles = StyleSheet.create({
     flex: 1,
   },
   listContent: {
-    padding: 16,
-    gap: 12,
+    paddingHorizontal: 14,
+    paddingTop: 8,
+    paddingBottom: 20,
+    gap: 7,
   },
   card: {
     backgroundColor: "#ffffff",
-    borderRadius: 16,
-    padding: 16,
+    borderRadius: 12,
+    paddingVertical: 9,
+    paddingHorizontal: 11,
     borderWidth: 1,
-    borderColor: "#e2e8f0",
-    gap: 10,
+    borderColor: "#f1f5f9",
     shadowColor: "#0f172a",
     shadowOffset: { width: 0, height: 1 },
-    shadowOpacity: 0.04,
-    shadowRadius: 4,
+    shadowOpacity: 0.03,
+    shadowRadius: 3,
     elevation: 1,
   },
   cardUnread: {
-    borderColor: "#a7f3d0",
-    borderLeftWidth: 4,
-    borderLeftColor: "#059669",
+    borderColor: "#bbf7d0",
     backgroundColor: "#ffffff",
+    shadowColor: "#059669",
+    shadowOpacity: 0.06,
+    shadowRadius: 5,
+    elevation: 1.5,
   },
   cardRead: {
+    backgroundColor: "#ffffff",
+    opacity: 0.9,
+  },
+  cardPressed: {
     opacity: 0.88,
+    transform: [{ scale: 0.99 }],
   },
-  cardHeader: {
+  cardRow: {
     flexDirection: "row",
-    alignItems: "center",
-    justifyContent: "space-between",
-  },
-  typeBadgeRow: {
-    flexDirection: "row",
-    alignItems: "center",
+    alignItems: "flex-start",
     gap: 10,
   },
   typeIconBox: {
-    width: 36,
-    height: 36,
-    borderRadius: 11,
+    width: 34,
+    height: 34,
+    borderRadius: 9,
     alignItems: "center",
     justifyContent: "center",
-    borderWidth: 1,
+    marginTop: 1,
   },
-  categoryRow: {
+  cardMain: {
+    flex: 1,
+    gap: 2.5,
+  },
+  cardTitleRow: {
+    flexDirection: "row",
+    alignItems: "center",
+    justifyContent: "space-between",
+    gap: 8,
+  },
+  itemTitle: {
+    fontSize: 13.5,
+    fontWeight: "600",
+    color: "#1e293b",
+    flex: 1,
+    lineHeight: 18,
+  },
+  itemTitleUnread: {
+    fontWeight: "700",
+    color: "#0f172a",
+  },
+  titleActions: {
     flexDirection: "row",
     alignItems: "center",
     gap: 6,
   },
-  categoryBadge: {
-    paddingVertical: 2.5,
-    paddingHorizontal: 7,
-    borderRadius: 6,
-    borderWidth: 1,
-  },
-  categoryBadgeText: {
-    fontSize: 10.5,
-    fontWeight: "700",
-    letterSpacing: 0.2,
-  },
-  timeText: {
-    fontSize: 12,
-    color: "#94a3b8",
-    fontWeight: "500",
-  },
-  unreadPill: {
-    flexDirection: "row",
-    alignItems: "center",
-    gap: 5,
-    backgroundColor: "#ecfdf5",
-    paddingVertical: 3,
-    paddingHorizontal: 8,
-    borderRadius: 12,
-  },
   unreadDot: {
-    width: 6,
-    height: 6,
-    borderRadius: 3,
+    width: 7,
+    height: 7,
+    borderRadius: 3.5,
     backgroundColor: "#059669",
   },
-  unreadPillText: {
-    fontSize: 11,
-    color: "#059669",
-    fontWeight: "700",
-  },
-  cardBody: {
-    gap: 4,
-  },
-  itemTitle: {
-    fontSize: 15,
-    fontWeight: "600",
-    color: "#1e293b",
-    lineHeight: 21,
-  },
-  itemTitleUnread: {
-    fontWeight: "800",
-    color: "#0f172a",
+  deleteIconBtn: {
+    padding: 2,
   },
   itemBody: {
-    fontSize: 13,
-    color: "#475569",
-    lineHeight: 19,
+    fontSize: 12,
+    color: "#64748b",
+    lineHeight: 16.5,
   },
-  targetBtn: {
+  cardMetaRow: {
     flexDirection: "row",
     alignItems: "center",
     justifyContent: "space-between",
+    marginTop: 2,
+  },
+  metaLeft: {
+    flexDirection: "row",
+    alignItems: "center",
+    gap: 5,
+  },
+  categoryText: {
+    fontSize: 11,
+    fontWeight: "700",
+  },
+  metaDot: {
+    fontSize: 9,
+    color: "#cbd5e1",
+  },
+  timeText: {
+    fontSize: 11,
+    color: "#94a3b8",
+    fontWeight: "500",
+  },
+  destinationLink: {
+    flexDirection: "row",
+    alignItems: "center",
+    gap: 2,
     backgroundColor: "#f0fdf4",
-    borderWidth: 1,
-    borderColor: "#bbf7d0",
-    paddingVertical: 9,
-    paddingHorizontal: 12,
-    borderRadius: 10,
-    marginTop: 2,
+    paddingVertical: 2,
+    paddingHorizontal: 6,
+    borderRadius: 6,
   },
-  targetBtnText: {
-    color: "#15803d",
-    fontSize: 13,
-    fontWeight: "700",
-  },
-  targetBtnArrow: {
-    color: "#15803d",
-    fontSize: 15,
-    fontWeight: "700",
-  },
-  cardActionsRow: {
-    flexDirection: "row",
-    alignItems: "center",
-    justifyContent: "flex-end",
-    gap: 12,
-    borderTopWidth: 1,
-    borderTopColor: "#f1f5f9",
-    paddingTop: 10,
-    marginTop: 2,
-  },
-  markReadBtn: {
-    flexDirection: "row",
-    alignItems: "center",
-    gap: 4,
-    paddingVertical: 4,
-    paddingHorizontal: 8,
-  },
-  markReadBtnIcon: {
+  destinationLinkText: {
     color: "#059669",
-    fontSize: 13,
-    fontWeight: "700",
-  },
-  markReadBtnText: {
-    color: "#059669",
-    fontSize: 12,
+    fontSize: 11,
     fontWeight: "600",
   },
-  deleteBtn: {
+  quickReadBtn: {
     flexDirection: "row",
     alignItems: "center",
-    gap: 4,
-    paddingVertical: 4,
-    paddingHorizontal: 8,
+    gap: 3,
+    paddingVertical: 1.5,
+    paddingHorizontal: 5,
+    borderRadius: 5,
   },
-  deleteBtnIcon: {
-    fontSize: 12,
-  },
-  deleteBtnText: {
-    color: "#dc2626",
-    fontSize: 12,
+  quickReadBtnText: {
+    color: "#059669",
+    fontSize: 11,
     fontWeight: "600",
   },
   emptyContainer: {
@@ -744,7 +778,9 @@ const styles = StyleSheet.create({
     width: 60,
     height: 60,
     borderRadius: 30,
-    backgroundColor: "#f1f5f9",
+    backgroundColor: "#f0fdf4",
+    borderWidth: 1,
+    borderColor: "#dcfce7",
     alignItems: "center",
     justifyContent: "center",
     marginBottom: 4,
@@ -785,18 +821,25 @@ const styles = StyleSheet.create({
     alignItems: "center",
     justifyContent: "space-between",
     backgroundColor: "#ffffff",
-    borderRadius: 12,
+    borderRadius: 14,
     paddingVertical: 10,
     paddingHorizontal: 14,
     borderWidth: 1,
-    borderColor: "#e2e8f0",
+    borderColor: "#f1f5f9",
+    shadowColor: "#0f172a",
+    shadowOffset: { width: 0, height: 1 },
+    shadowOpacity: 0.03,
+    shadowRadius: 4,
+    elevation: 1,
     marginTop: 4,
   },
   pageBtn: {
     paddingVertical: 6,
     paddingHorizontal: 12,
     borderRadius: 8,
-    backgroundColor: "#f1f5f9",
+    backgroundColor: "#f8fafc",
+    borderWidth: 1,
+    borderColor: "#e2e8f0",
   },
   pageBtnDisabled: {
     opacity: 0.4,

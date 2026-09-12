@@ -4795,19 +4795,33 @@ export default function ChatScreen() {
           MODAL: TẠO PHÒNG CHAT / NHÓM MỚI
           ========================================== */}
       <Modal visible={createModalVisible} animationType="slide" onRequestClose={() => setCreateModalVisible(false)}>
-        <SafeAreaView style={styles.modalSafeArea}>
+        <SafeAreaView
+          style={[
+            styles.modalSafeArea,
+            {
+              paddingTop: Platform.OS === "ios" ? Math.max(insets.top, 44) : insets.top,
+              paddingBottom: Platform.OS === "ios" ? Math.max(insets.bottom, 16) : insets.bottom,
+              paddingLeft: insets.left,
+              paddingRight: insets.right,
+            },
+          ]}
+          edges={[]}
+        >
           <View style={styles.modalHeader}>
-            <TouchableOpacity onPress={() => setCreateModalVisible(false)}>
+            <TouchableOpacity
+              onPress={() => setCreateModalVisible(false)}
+              style={styles.modalHeaderSideButton}
+              hitSlop={8}
+            >
               <Ionicons name="close" size={24} color="#0f172a" />
             </TouchableOpacity>
-            <Text style={styles.modalHeaderTitle}>Tạo cuộc trò chuyện mới</Text>
+            <Text style={[styles.modalHeaderTitle, styles.createModalHeaderTitle]} numberOfLines={1} ellipsizeMode="tail">
+              Tạo cuộc trò chuyện mới
+            </Text>
             <TouchableOpacity
               onPress={handleCreateRoom}
               disabled={creatingRoom || selectedUserIds.length === 0}
-              style={[
-                styles.modalDoneBtn,
-                (selectedUserIds.length === 0 || creatingRoom) && { opacity: 0.4 },
-              ]}
+              style={[styles.modalDoneBtn, (selectedUserIds.length === 0 || creatingRoom) && { opacity: 0.4 }]}
             >
               {creatingRoom ? (
                 <ActivityIndicator size="small" color="#ffffff" />
@@ -6017,10 +6031,22 @@ const styles = StyleSheet.create({
     borderTopLeftRadius: 24,
     borderTopRightRadius: 24,
   },
+  modalHeaderSideButton: {
+    width: 40,
+    height: 40,
+    alignItems: "center",
+    justifyContent: "center",
+  },
   modalHeaderTitle: {
     fontSize: 17,
     fontWeight: "700",
     color: "#0f172a",
+    flexShrink: 1,
+  },
+  createModalHeaderTitle: {
+    flex: 1,
+    textAlign: "center",
+    marginHorizontal: 8,
   },
   modalDoneBtn: {
     backgroundColor: LUXCARE_PRIMARY,
