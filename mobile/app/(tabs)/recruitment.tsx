@@ -23,6 +23,33 @@ import { AttachmentPanel } from "../../src/features/recruitment/AttachmentPanel"
 import { PublicDocumentLink } from "../../src/features/recruitment/PublicDocumentLink";
 import { EmptyState, ErrorText, Loading, Page, styles as baseStyles } from "../../src/ui";
 import { BranchSelector } from "../../src/features/branches/BranchSelector";
+import {
+  AlertTriangle,
+  Banknote,
+  Briefcase,
+  Building2,
+  Calendar,
+  Check,
+  CheckCircle2,
+  Clock,
+  FileEdit,
+  FileText,
+  Gift,
+  Lock,
+  MapPin,
+  PauseCircle,
+  Pencil,
+  Pin,
+  RotateCcw,
+  Search,
+  Settings,
+  Sparkles,
+  Target,
+  Trash2,
+  Users,
+  X,
+  type LucideIcon,
+} from "lucide-react-native";
 
 const WORKPLACE_LABELS: Record<string, string> = {
   onsite: "Tại chỗ",
@@ -268,21 +295,21 @@ export default function Recruitment() {
     return { text: dateStr, isExpired: false, isNear: false };
   };
 
-  const getStatusBadge = (jobStatus: string, isDeleted?: boolean) => {
+  const getStatusBadge = (jobStatus: string, isDeleted?: boolean): { label: string; bg: string; border: string; color: string; Icon: LucideIcon } => {
     if (isDeleted) {
-      return { label: "Đã xóa", bg: "#fee2e2", border: "#fca5a5", color: "#b91c1c", icon: "🗑️" };
+      return { label: "Đã xóa", bg: "#fee2e2", border: "#fca5a5", color: "#b91c1c", Icon: Trash2 };
     }
     switch (jobStatus) {
       case "open":
-        return { label: "Đang tuyển", bg: "#ecfdf5", border: "#a7f3d0", color: "#047857", icon: "🟢" };
+        return { label: "Đang tuyển", bg: "#ecfdf5", border: "#a7f3d0", color: "#047857", Icon: CheckCircle2 };
       case "draft":
-        return { label: "Bản nháp", bg: "#fef3c7", border: "#fde68a", color: "#b45309", icon: "📝" };
+        return { label: "Bản nháp", bg: "#fef3c7", border: "#fde68a", color: "#b45309", Icon: FileEdit };
       case "paused":
-        return { label: "Tạm dừng", bg: "#fff7ed", border: "#fed7aa", color: "#c2410c", icon: "⏸️" };
+        return { label: "Tạm dừng", bg: "#fff7ed", border: "#fed7aa", color: "#c2410c", Icon: PauseCircle };
       case "closed":
-        return { label: "Đã đóng", bg: "#f1f5f9", border: "#cbd5e1", color: "#475569", icon: "🔒" };
+        return { label: "Đã đóng", bg: "#f1f5f9", border: "#cbd5e1", color: "#475569", Icon: Lock };
       default:
-        return { label: jobStatus, bg: "#f8fafc", border: "#e2e8f0", color: "#64748b", icon: "📌" };
+        return { label: jobStatus, bg: "#f8fafc", border: "#e2e8f0", color: "#64748b", Icon: Pin };
     }
   };
 
@@ -303,7 +330,7 @@ export default function Recruitment() {
     return (
       <Page title="Tuyển dụng">
         <View style={uiStyles.emptyBox}>
-          <Text style={uiStyles.emptyIcon}>🔒</Text>
+          <Lock size={40} color="#94a3b8" />
           <Text style={uiStyles.emptyTitle}>Không có quyền truy cập</Text>
           <Text style={uiStyles.emptyText}>
             Tài khoản của bạn cần thuộc doanh nghiệp và có quyền đọc phân hệ HR / Tuyển dụng.
@@ -318,7 +345,7 @@ export default function Recruitment() {
     return (
       <Page title="Tuyển dụng">
         <View style={uiStyles.emptyBox}>
-          <Text style={uiStyles.emptyIcon}>🏢</Text>
+          <Building2 size={40} color="#94a3b8" />
           <Text style={uiStyles.emptyTitle}>Chưa chọn chi nhánh</Text>
           <Text style={uiStyles.emptyText}>
             {user?.role === "admin"
@@ -463,7 +490,7 @@ export default function Recruitment() {
 
           {/* Search Input Box */}
           <View style={uiStyles.searchContainer}>
-            <Text style={uiStyles.searchIcon}>🔍</Text>
+            <Search size={16} color="#94a3b8" style={{ marginRight: 6 }} />
             <TextInput
               style={uiStyles.searchInput}
               placeholder="Tìm theo mã, chức danh, phòng ban..."
@@ -479,7 +506,7 @@ export default function Recruitment() {
                 onPress={handleClearSearch}
                 style={({ pressed }) => [uiStyles.clearSearchBtn, pressed && { opacity: 0.6 }]}
               >
-                <Text style={uiStyles.clearSearchText}>✕</Text>
+                <X size={16} color="#94a3b8" />
               </Pressable>
             )}
             <Pressable
@@ -530,19 +557,17 @@ export default function Recruitment() {
                     setPage(1);
                   }}
                 >
+                  {item.value === "open" && <CheckCircle2 size={13} color={isSelected ? "#047857" : "#64748b"} />}
+                  {item.value === "draft" && <FileEdit size={13} color={isSelected ? "#047857" : "#64748b"} />}
+                  {item.value === "paused" && <PauseCircle size={13} color={isSelected ? "#047857" : "#64748b"} />}
+                  {item.value === "closed" && <Lock size={13} color={isSelected ? "#047857" : "#64748b"} />}
                   <Text
                     style={[
                       uiStyles.filterChipText,
                       isSelected && uiStyles.filterChipTextActive,
                     ]}
                   >
-                    {item.value === "open"
-                      ? "🟢 Đang tuyển"
-                      : item.value === "draft"
-                        ? "📝 Bản nháp"
-                        : item.value === "paused"
-                          ? "⏸️ Tạm dừng"
-                          : "🔒 Đã đóng"}
+                    {item.label}
                   </Text>
                 </Pressable>
               );
@@ -556,13 +581,14 @@ export default function Recruitment() {
                 setPage(1);
               }}
             >
+              <Trash2 size={13} color={deleted ? "#dc2626" : "#64748b"} />
               <Text
                 style={[
                   uiStyles.filterChipText,
                   deleted && uiStyles.filterChipTextActiveDanger,
                 ]}
               >
-                {deleted ? "✓ Thùng rác" : "🗑️ Thùng rác"}
+                Thùng rác
               </Text>
             </Pressable>
           </ScrollView>
@@ -572,7 +598,7 @@ export default function Recruitment() {
           <ErrorText message={mutationError} />
           {success && (
             <View style={uiStyles.successBanner}>
-              <Text style={uiStyles.successBannerIcon}>✓</Text>
+              <Check size={16} color="#059669" />
               <Text style={uiStyles.successBannerText}>{success}</Text>
             </View>
           )}
@@ -600,8 +626,9 @@ export default function Recruitment() {
                       { backgroundColor: badge.bg, borderColor: badge.border },
                     ]}
                   >
+                    <badge.Icon size={12} color={badge.color} />
                     <Text style={[uiStyles.statusBadgeText, { color: badge.color }]}>
-                      {badge.icon} {badge.label}
+                      {badge.label}
                     </Text>
                   </View>
                 </View>
@@ -609,7 +636,7 @@ export default function Recruitment() {
                 {/* Job Title & Department */}
                 <Text style={uiStyles.jobTitle}>{job.title || "Chưa đặt tiêu đề"}</Text>
                 <View style={uiStyles.departmentRow}>
-                  <Text style={uiStyles.deptIcon}>🏢</Text>
+                  <Building2 size={13} color="#64748b" />
                   <Text style={uiStyles.departmentText}>
                     {job.department || "Chưa phân bổ phòng ban"}
                   </Text>
@@ -618,7 +645,7 @@ export default function Recruitment() {
                 {/* 2x2 Key Info Grid */}
                 <View style={uiStyles.gridContainer}>
                   <View style={uiStyles.gridItem}>
-                    <Text style={uiStyles.gridItemIcon}>👥</Text>
+                    <Users size={15} color="#0284c7" style={uiStyles.gridItemIcon} />
                     <View style={uiStyles.gridItemContent}>
                       <Text style={uiStyles.gridItemLabel}>Số lượng</Text>
                       <Text style={uiStyles.gridItemVal}>{job.headcount} chỉ tiêu</Text>
@@ -626,7 +653,7 @@ export default function Recruitment() {
                   </View>
 
                   <View style={uiStyles.gridItem}>
-                    <Text style={uiStyles.gridItemIcon}>💰</Text>
+                    <Banknote size={15} color="#059669" style={uiStyles.gridItemIcon} />
                     <View style={uiStyles.gridItemContent}>
                       <Text style={uiStyles.gridItemLabel}>Mức lương</Text>
                       <Text style={uiStyles.gridItemVal} numberOfLines={1}>
@@ -636,7 +663,7 @@ export default function Recruitment() {
                   </View>
 
                   <View style={uiStyles.gridItem}>
-                    <Text style={uiStyles.gridItemIcon}>📍</Text>
+                    <MapPin size={15} color="#ea580c" style={uiStyles.gridItemIcon} />
                     <View style={uiStyles.gridItemContent}>
                       <Text style={uiStyles.gridItemLabel}>Địa điểm</Text>
                       <Text style={uiStyles.gridItemVal} numberOfLines={1}>
@@ -646,7 +673,7 @@ export default function Recruitment() {
                   </View>
 
                   <View style={uiStyles.gridItem}>
-                    <Text style={uiStyles.gridItemIcon}>💼</Text>
+                    <Briefcase size={15} color="#7c3aed" style={uiStyles.gridItemIcon} />
                     <View style={uiStyles.gridItemContent}>
                       <Text style={uiStyles.gridItemLabel}>Hình thức</Text>
                       <Text style={uiStyles.gridItemVal} numberOfLines={1}>
@@ -668,9 +695,13 @@ export default function Recruitment() {
                           : uiStyles.deadlineValid,
                     ]}
                   >
-                    <Text style={uiStyles.deadlineIcon}>
-                      {deadline.isExpired ? "⚠️" : deadline.isNear ? "⏳" : "📅"}
-                    </Text>
+                    {deadline.isExpired ? (
+                      <AlertTriangle size={13} color="#dc2626" />
+                    ) : deadline.isNear ? (
+                      <Clock size={13} color="#d97706" />
+                    ) : (
+                      <Calendar size={13} color="#64748b" />
+                    )}
                     <Text
                       style={[
                         uiStyles.deadlineText,
@@ -698,7 +729,7 @@ export default function Recruitment() {
                         })
                       }
                     >
-                      <Text style={uiStyles.applicantsBtnIcon}>👥</Text>
+                      <Users size={14} color="#ffffff" />
                       <Text style={uiStyles.applicantsBtnText}>Ứng viên</Text>
                     </Pressable>
                   )}
@@ -713,7 +744,8 @@ export default function Recruitment() {
                       onPress={() => setEditing(job)}
                       disabled={disabled || uncertain}
                     >
-                      <Text style={uiStyles.editBtnText}>✏️ Sửa</Text>
+                      <Pencil size={13} color="#334155" />
+                      <Text style={uiStyles.editBtnText}>Sửa</Text>
                     </Pressable>
                   )}
 
@@ -740,27 +772,36 @@ export default function Recruitment() {
                 {isExpanded && (
                   <View style={uiStyles.expandedSection}>
                     {/* JD and Attachments */}
-                    <PublicDocumentLink title="📄 Mô tả công việc (JD File)" url={job.jdFileUrl} />
+                    <PublicDocumentLink title="Mô tả công việc (JD File)" url={job.jdFileUrl} />
                     {!deleted && <AttachmentPanel kind="job" id={job._id} manage={access.manage} />}
 
                     {/* Detailed Content Blocks */}
                     {job.description ? (
                       <View style={uiStyles.detailBlock}>
-                        <Text style={uiStyles.detailBlockTitle}>📋 Mô tả công việc</Text>
+                        <View style={{ flexDirection: "row", alignItems: "center", gap: 6 }}>
+                          <FileText size={15} color="#0284c7" />
+                          <Text style={uiStyles.detailBlockTitle}>Mô tả công việc</Text>
+                        </View>
                         <Text style={uiStyles.detailBlockContent}>{job.description}</Text>
                       </View>
                     ) : null}
 
                     {job.requirements ? (
                       <View style={uiStyles.detailBlock}>
-                        <Text style={uiStyles.detailBlockTitle}>🎯 Yêu cầu ứng viên</Text>
+                        <View style={{ flexDirection: "row", alignItems: "center", gap: 6 }}>
+                          <Target size={15} color="#0284c7" />
+                          <Text style={uiStyles.detailBlockTitle}>Yêu cầu ứng viên</Text>
+                        </View>
                         <Text style={uiStyles.detailBlockContent}>{job.requirements}</Text>
                       </View>
                     ) : null}
 
                     {job.benefits ? (
                       <View style={uiStyles.detailBlock}>
-                        <Text style={uiStyles.detailBlockTitle}>🎁 Quyền lợi đãi ngộ</Text>
+                        <View style={{ flexDirection: "row", alignItems: "center", gap: 6 }}>
+                          <Gift size={15} color="#0284c7" />
+                          <Text style={uiStyles.detailBlockTitle}>Quyền lợi đãi ngộ</Text>
+                        </View>
                         <Text style={uiStyles.detailBlockContent}>{job.benefits}</Text>
                       </View>
                     ) : null}
@@ -768,7 +809,10 @@ export default function Recruitment() {
                     {/* Management Action Buttons */}
                     {access.manage && (
                       <View style={uiStyles.manageSection}>
-                        <Text style={uiStyles.manageSectionTitle}>⚙️ Thao tác quản lý tin</Text>
+                        <View style={{ flexDirection: "row", alignItems: "center", gap: 6, marginBottom: 2 }}>
+                          <Settings size={14} color="#475569" />
+                          <Text style={uiStyles.manageSectionTitle}>Thao tác quản lý tin</Text>
+                        </View>
                         {deleted ? (
                           <Pressable
                             style={({ pressed }) => [
@@ -779,7 +823,8 @@ export default function Recruitment() {
                             disabled={disabled || uncertain}
                             onPress={() => confirm(job, "restore", "Khôi phục tin tuyển dụng này?")}
                           >
-                            <Text style={uiStyles.restoreActionBtnText}>♻️ Khôi phục tin</Text>
+                            <RotateCcw size={14} color="#047857" />
+                            <Text style={uiStyles.restoreActionBtnText}>Khôi phục tin</Text>
                           </Pressable>
                         ) : (
                           <>
@@ -797,14 +842,12 @@ export default function Recruitment() {
                                     confirm(job, item.value, `Chuyển trạng thái sang "${item.label}"?`)
                                   }
                                 >
+                                  {item.value === "open" && <CheckCircle2 size={12} color="#047857" />}
+                                  {item.value === "draft" && <FileEdit size={12} color="#b45309" />}
+                                  {item.value === "paused" && <PauseCircle size={12} color="#c2410c" />}
+                                  {item.value === "closed" && <Lock size={12} color="#475569" />}
                                   <Text style={uiStyles.statusChangeBtnText}>
-                                    {item.value === "open"
-                                      ? "🟢 Đang tuyển"
-                                      : item.value === "draft"
-                                        ? "📝 Bản nháp"
-                                        : item.value === "paused"
-                                          ? "⏸️ Tạm dừng"
-                                          : "🔒 Đóng tin"}
+                                    {item.label}
                                   </Text>
                                 </Pressable>
                               ))}
@@ -819,7 +862,8 @@ export default function Recruitment() {
                               disabled={disabled || uncertain}
                               onPress={() => confirm(job, "delete", "Chuyển tin vào thùng rác?")}
                             >
-                              <Text style={uiStyles.deleteActionBtnText}>🗑️ Xóa vào thùng rác</Text>
+                              <Trash2 size={14} color="#b91c1c" />
+                              <Text style={uiStyles.deleteActionBtnText}>Xóa vào thùng rác</Text>
                             </Pressable>
                           </>
                         )}
@@ -834,7 +878,7 @@ export default function Recruitment() {
           {/* Empty State */}
           {!loading && !error && jobs.length === 0 && (
             <View style={uiStyles.emptyStateContainer}>
-              <Text style={uiStyles.emptyStateEmoji}>💼</Text>
+              <Briefcase size={44} color="#94a3b8" style={{ marginBottom: 4 }} />
               <Text style={uiStyles.emptyStateTitle}>Không có tin tuyển dụng</Text>
               <Text style={uiStyles.emptyStateDesc}>
                 {search
@@ -858,14 +902,15 @@ export default function Recruitment() {
                   <Pressable
                     style={[
                       uiStyles.createBtn,
-                      { backgroundColor: "#0284c7", paddingHorizontal: 16 },
+                      { backgroundColor: "#0284c7", paddingHorizontal: 16, flexDirection: "row", alignItems: "center", gap: 5 },
                       seeding && uiStyles.btnDisabled,
                     ]}
                     disabled={seeding}
                     onPress={handleSeedDemo}
                   >
+                    <Sparkles size={14} color="#ffffff" />
                     <Text style={uiStyles.createBtnText}>
-                      {seeding ? "Đang tạo..." : "✨ Thêm 3 tin mẫu"}
+                      {seeding ? "Đang tạo..." : "Thêm 3 tin mẫu"}
                     </Text>
                   </Pressable>
                 </View>
@@ -942,7 +987,7 @@ export default function Recruitment() {
               style={({ pressed }) => [uiStyles.modalCloseBtn, pressed && { opacity: 0.7 }]}
               onPress={closeForm}
             >
-              <Text style={uiStyles.modalCloseText}>✕</Text>
+              <X size={20} color="#0f172a" />
             </Pressable>
           </View>
 
@@ -1365,6 +1410,9 @@ const uiStyles = StyleSheet.create({
     backgroundColor: "#f1f5f9",
     borderWidth: 1,
     borderColor: "#e2e8f0",
+    flexDirection: "row",
+    alignItems: "center",
+    gap: 4,
   },
   editBtnText: {
     fontSize: 12,
@@ -1432,7 +1480,6 @@ const uiStyles = StyleSheet.create({
     fontSize: 12,
     fontWeight: "700",
     color: "#475569",
-    marginBottom: 2,
   },
   statusChangeRow: {
     flexDirection: "row",
@@ -1446,6 +1493,9 @@ const uiStyles = StyleSheet.create({
     backgroundColor: "#ffffff",
     borderWidth: 1,
     borderColor: "#cbd5e1",
+    flexDirection: "row",
+    alignItems: "center",
+    gap: 4,
   },
   statusChangeBtnText: {
     fontSize: 11,
@@ -1461,6 +1511,8 @@ const uiStyles = StyleSheet.create({
     alignItems: "center",
     justifyContent: "center",
     marginTop: 4,
+    flexDirection: "row",
+    gap: 6,
   },
   deleteActionBtnText: {
     color: "#b91c1c",
@@ -1475,6 +1527,8 @@ const uiStyles = StyleSheet.create({
     borderRadius: 8,
     alignItems: "center",
     justifyContent: "center",
+    flexDirection: "row",
+    gap: 6,
   },
   restoreActionBtnText: {
     color: "#047857",

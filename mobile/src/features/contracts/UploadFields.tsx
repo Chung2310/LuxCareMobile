@@ -1,6 +1,7 @@
 import { UploadProgress, type FileUploadProgress } from "../../components/UploadProgress";
 import React, { useEffect, useRef, useState } from "react";
 import { ActivityIndicator, Pressable, StyleSheet, Text, View } from "react-native";
+import { Ionicons } from "@expo/vector-icons";
 import type { ContractScope, ContractUploadKind } from "../../../../src/services/hrContractService";
 import { messageOf } from "../../auth/SessionProvider";
 import { pickContractFile } from "./uploadFile";
@@ -59,19 +60,19 @@ export function UploadFields({
     }
   };
 
-  const groups: { kind: ContractUploadKind; title: string; desc: string; icon: string }[] = extension
+  const groups: { kind: ContractUploadKind; title: string; desc: string; icon: keyof typeof Ionicons.glyphMap }[] = extension
     ? [
         {
           kind: "extension",
           title: "Tệp phụ lục gia hạn",
           desc: "PDF, Word, Excel hoặc ảnh (tối đa 10 MB)",
-          icon: "📄",
+          icon: "document-text-outline",
         },
         {
           kind: "extensionSigned",
           title: "Tệp phụ lục đã ký",
           desc: "PDF, Word, Excel hoặc ảnh phụ lục có chữ ký (tối đa 10 MB)",
-          icon: "✍️",
+          icon: "create-outline",
         },
       ]
     : [
@@ -79,21 +80,24 @@ export function UploadFields({
           kind: "contract",
           title: "Tệp hợp đồng lao động",
           desc: "Bản tài liệu số hoặc scan hợp đồng (tối đa 10 MB)",
-          icon: "📄",
+          icon: "document-text-outline",
         },
         {
           kind: "signed",
           title: "Ảnh hợp đồng đã ký",
           desc: "Ảnh chụp trang có chữ ký hai bên (tối đa 10 MB)",
-          icon: "✍️",
+          icon: "create-outline",
         },
       ];
 
   return (
     <View style={styles.container}>
-      <Text style={styles.hint}>
-        📎 Đính kèm tệp hồ sơ (tối đa 10 MB mỗi tệp). Tệp sẽ được lưu cùng hợp đồng khi bạn bấm Lưu.
-      </Text>
+      <View style={{ flexDirection: "row", alignItems: "center", gap: 6 }}>
+        <Ionicons name="attach-outline" size={15} color="#64748b" />
+        <Text style={[styles.hint, { flex: 1 }]}>
+          Đính kèm tệp hồ sơ (tối đa 10 MB mỗi tệp). Tệp sẽ được lưu cùng hợp đồng khi bạn bấm Lưu.
+        </Text>
+      </View>
 
       <View style={styles.list}>
         {groups.map(({ kind, title, desc, icon }) => {
@@ -102,7 +106,7 @@ export function UploadFields({
             <View key={kind} style={styles.card}>
               <View style={styles.headerRow}>
                 <View style={styles.iconBox}>
-                  <Text style={styles.icon}>{icon}</Text>
+                  <Ionicons name={icon} size={18} color="#0284c7" />
                 </View>
                 <View style={{ flex: 1 }}>
                   <Text style={styles.title}>{title}</Text>
@@ -128,7 +132,8 @@ export function UploadFields({
                       onChange(next);
                     }}
                   >
-                    <Text style={styles.removeBtnText}>✕ Xóa</Text>
+                    <Ionicons name="trash-outline" size={11} color="#dc2626" />
+                    <Text style={styles.removeBtnText}>Xóa</Text>
                   </Pressable>
                 </View>
               ) : null}
@@ -171,7 +176,8 @@ export function UploadFields({
 
       {!!error && (
         <View style={styles.errorBox}>
-          <Text style={styles.errorText}>⚠️ {error}</Text>
+          <Ionicons name="alert-circle-outline" size={15} color="#e11d48" />
+          <Text style={[styles.errorText, { flex: 1 }]}>{error}</Text>
         </View>
       )}
     </View>
@@ -252,6 +258,9 @@ const styles = StyleSheet.create({
     paddingHorizontal: 8,
     borderRadius: 6,
     backgroundColor: "#fee2e2",
+    flexDirection: "row",
+    alignItems: "center",
+    gap: 3,
   },
   removeBtnText: {
     fontSize: 11,
@@ -298,6 +307,9 @@ const styles = StyleSheet.create({
     padding: 10,
     borderWidth: 1,
     borderColor: "#fecdd3",
+    flexDirection: "row",
+    alignItems: "center",
+    gap: 6,
   },
   errorText: {
     color: "#e11d48",

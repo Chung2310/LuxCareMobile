@@ -10,6 +10,7 @@ import {
   TextInput,
   View,
 } from "react-native";
+import { Ionicons } from "@expo/vector-icons";
 import { SafeAreaView } from "react-native-safe-area-context";
 import type { Contract } from "../../../../src/types/hrContract";
 import type { ContractScope } from "../../../../src/services/hrContractService";
@@ -91,7 +92,7 @@ export function ExtensionForm({
             onPress={onClose}
             disabled={busy}
           >
-            <Text style={styles.backBtnText}>✕</Text>
+            <Ionicons name="close" size={22} color="#0f172a" />
           </Pressable>
 
           <View style={{ flex: 1, alignItems: "center" }}>
@@ -124,14 +125,15 @@ export function ExtensionForm({
         >
           {!!error && (
             <View style={styles.errorBanner}>
-              <Text style={styles.errorBannerText}>⚠️ {error}</Text>
+              <Ionicons name="alert-circle-outline" size={16} color="#e11d48" />
+              <Text style={styles.errorBannerText}>{error}</Text>
             </View>
           )}
 
           {/* Current Contract Info Card */}
           <View style={styles.card}>
             <View style={styles.sectionHeaderRow}>
-              <Text style={styles.sectionIcon}>📄</Text>
+              <Ionicons name="document-text-outline" size={16} color="#0284c7" />
               <Text style={styles.sectionTitle}>Thông tin hợp đồng hiện tại</Text>
             </View>
 
@@ -160,8 +162,9 @@ export function ExtensionForm({
 
             {contract.status === "expired" ? (
               <View style={styles.alertInfoBox}>
+                <Ionicons name="information-circle-outline" size={16} color="#1e40af" />
                 <Text style={styles.alertInfoText}>
-                  💡 Sau khi gia hạn, hợp đồng hết hạn sẽ tự động chuyển về trạng thái **Đang hiệu lực**.
+                  Sau khi gia hạn, hợp đồng hết hạn sẽ tự động chuyển về trạng thái **Đang hiệu lực**.
                 </Text>
               </View>
             ) : null}
@@ -170,7 +173,7 @@ export function ExtensionForm({
           {/* Extension Dates Card */}
           <View style={styles.card}>
             <View style={styles.sectionHeaderRow}>
-              <Text style={styles.sectionIcon}>⏳</Text>
+              <Ionicons name="time-outline" size={16} color="#0284c7" />
               <Text style={styles.sectionTitle}>Thời hạn gia hạn mới</Text>
             </View>
 
@@ -181,7 +184,7 @@ export function ExtensionForm({
                 disabled={disabled}
                 onPress={() => setDateModalField("newEndDate")}
               >
-                <Text style={styles.datePickerIcon}>📅</Text>
+                <Ionicons name="calendar-outline" size={16} color="#64748b" />
                 <View style={{ flex: 1 }}>
                   <Text style={styles.datePickerValue}>
                     {draft.newEndDate ? contractDate(draft.newEndDate) : "Chạm để chọn ngày hết hạn mới"}
@@ -200,7 +203,7 @@ export function ExtensionForm({
                 disabled={disabled}
                 onPress={() => setDateModalField("extensionDate")}
               >
-                <Text style={styles.datePickerIcon}>✍️</Text>
+                <Ionicons name="create-outline" size={16} color="#64748b" />
                 <View style={{ flex: 1 }}>
                   <Text style={styles.datePickerValue}>
                     {draft.extensionDate ? contractDate(draft.extensionDate) : "Chọn ngày"}
@@ -214,7 +217,7 @@ export function ExtensionForm({
           {/* Reason Card */}
           <View style={styles.card}>
             <View style={styles.sectionHeaderRow}>
-              <Text style={styles.sectionIcon}>📝</Text>
+              <Ionicons name="reader-outline" size={16} color="#0284c7" />
               <Text style={styles.sectionTitle}>Lý do gia hạn</Text>
             </View>
 
@@ -233,7 +236,7 @@ export function ExtensionForm({
           {/* Extension Files */}
           <View style={styles.card}>
             <View style={styles.sectionHeaderRow}>
-              <Text style={styles.sectionIcon}>📎</Text>
+              <Ionicons name="attach-outline" size={16} color="#0284c7" />
               <Text style={styles.sectionTitle}>Hồ sơ gia hạn đính kèm</Text>
             </View>
 
@@ -367,8 +370,12 @@ const styles = StyleSheet.create({
     padding: 12,
     borderWidth: 1,
     borderColor: "#fecdd3",
+    flexDirection: "row",
+    alignItems: "center",
+    gap: 8,
   },
   errorBannerText: {
+    flex: 1,
     color: "#e11d48",
     fontSize: 13,
     fontWeight: "600",
@@ -424,12 +431,16 @@ const styles = StyleSheet.create({
   },
   alertInfoBox: {
     backgroundColor: "#eff6ff",
-    borderRadius: 10,
-    padding: 10,
+    padding: 12,
+    borderRadius: 12,
     borderWidth: 1,
     borderColor: "#bfdbfe",
+    flexDirection: "row",
+    alignItems: "center",
+    gap: 8,
   },
   alertInfoText: {
+    flex: 1,
     fontSize: 12,
     color: "#1e40af",
     lineHeight: 18,
