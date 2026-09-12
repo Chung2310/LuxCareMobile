@@ -1,5 +1,6 @@
 import React, { useEffect, useState } from "react";
 import {
+  Alert,
   KeyboardAvoidingView,
   Modal,
   Platform,
@@ -62,11 +63,11 @@ export const CategoryFormModal: React.FC<CategoryFormModalProps> = ({
 
   const handleSubmit = async () => {
     if (!name.trim()) {
-      alert("Vui lòng nhập tên danh mục phân loại.");
+      Alert.alert("Thiếu thông tin", "Vui lòng nhập tên danh mục phân loại.");
       return;
     }
     if (!code.trim()) {
-      alert("Vui lòng nhập mã danh mục.");
+      Alert.alert("Thiếu thông tin", "Vui lòng nhập mã danh mục.");
       return;
     }
 
@@ -79,6 +80,8 @@ export const CategoryFormModal: React.FC<CategoryFormModalProps> = ({
         color,
       });
       onClose();
+    } catch (err: any) {
+      Alert.alert("Lỗi", err?.message || "Không thể tạo danh mục phân loại.");
     } finally {
       setSubmitting(false);
     }

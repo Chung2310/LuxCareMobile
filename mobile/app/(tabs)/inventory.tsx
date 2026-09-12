@@ -795,16 +795,19 @@ export default function InventoryScreen() {
         warehouses={warehouses}
         suppliers={suppliers}
         onAddCategory={async (catData) => {
-          await supplyApi.createCategory(catData);
+          const res = await supplyApi.createCategory(catData);
           await loadCategoriesData();
+          return res;
         }}
         onAddWarehouse={async (whData) => {
-          await supplyApi.createWarehouse(whData);
+          const res = await supplyApi.createWarehouse(whData);
           await loadWarehousesData();
+          return res;
         }}
         onAddSupplier={async (supData) => {
-          await supplyApi.createSupplier(supData);
+          const res = await supplyApi.createSupplier(supData);
           await loadSuppliersData();
+          return res;
         }}
       />
     </SafeAreaView>

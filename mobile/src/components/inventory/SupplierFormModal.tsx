@@ -1,5 +1,6 @@
 import React, { useEffect, useState } from "react";
 import {
+  Alert,
   KeyboardAvoidingView,
   Modal,
   Platform,
@@ -65,11 +66,11 @@ export const SupplierFormModal: React.FC<SupplierFormModalProps> = ({
 
   const handleSubmit = async () => {
     if (!name.trim()) {
-      alert("Vui lòng nhập tên nhà cung cấp.");
+      Alert.alert("Thiếu thông tin", "Vui lòng nhập tên nhà cung cấp.");
       return;
     }
     if (!code.trim()) {
-      alert("Vui lòng nhập mã nhà cung cấp.");
+      Alert.alert("Thiếu thông tin", "Vui lòng nhập mã nhà cung cấp.");
       return;
     }
 
@@ -85,6 +86,8 @@ export const SupplierFormModal: React.FC<SupplierFormModalProps> = ({
         taxCode: taxCode.trim() || undefined,
       });
       onClose();
+    } catch (err: any) {
+      Alert.alert("Lỗi", err?.message || "Không thể tạo nhà cung cấp.");
     } finally {
       setSubmitting(false);
     }

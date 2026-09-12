@@ -1,5 +1,6 @@
 import React, { useEffect, useState } from "react";
 import {
+  Alert,
   KeyboardAvoidingView,
   Modal,
   Platform,
@@ -61,15 +62,15 @@ export const WarehouseFormModal: React.FC<WarehouseFormModalProps> = ({
 
   const handleSubmit = async () => {
     if (!name.trim()) {
-      alert("Vui lòng nhập tên kho lưu trữ.");
+      Alert.alert("Thiếu thông tin", "Vui lòng nhập tên kho lưu trữ.");
       return;
     }
     if (!code.trim()) {
-      alert("Vui lòng nhập mã kho.");
+      Alert.alert("Thiếu thông tin", "Vui lòng nhập mã kho.");
       return;
     }
     if (!location.trim()) {
-      alert("Vui lòng nhập vị trí tầng / khu vực kho.");
+      Alert.alert("Thiếu thông tin", "Vui lòng nhập vị trí tầng / khu vực kho.");
       return;
     }
 
@@ -84,6 +85,8 @@ export const WarehouseFormModal: React.FC<WarehouseFormModalProps> = ({
         description: description.trim() || undefined,
       });
       onClose();
+    } catch (err: any) {
+      Alert.alert("Lỗi", err?.message || "Không thể tạo kho lưu trữ.");
     } finally {
       setSubmitting(false);
     }
