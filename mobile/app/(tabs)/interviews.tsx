@@ -9,6 +9,26 @@ import {
 } from "react-native";
 import { SafeAreaView } from "react-native-safe-area-context";
 import { router, useFocusEffect, useLocalSearchParams } from "expo-router";
+import {
+  Building2,
+  Calendar,
+  ChevronLeft,
+  ChevronRight,
+  Clock,
+  Edit3,
+  Eye,
+  FileText,
+  MapPin,
+  Phone,
+  Pin,
+  Plus,
+  RotateCcw,
+  Target,
+  User,
+  Users,
+  Video,
+  X,
+} from "lucide-react-native";
 import type { RecruitmentApplicant, RecruitmentInterview, RecruitmentJob } from "../../../src/types/recruitment";
 import type { UserProfile } from "../../../src/types/common";
 import { emptyPagination, type PaginationMeta } from "../../../src/types/pagination";
@@ -31,7 +51,8 @@ function Pagination({ meta, onChange }: { meta: PaginationMeta; onChange: (page:
         disabled={meta.page <= 1}
         onPress={() => onChange(meta.page - 1)}
       >
-        <Text style={ivStyles.pageBtnText}>‹ Trước</Text>
+        <ChevronLeft size={16} color={meta.page <= 1 ? "#94a3b8" : "#334155"} />
+        <Text style={[ivStyles.pageBtnText, meta.page <= 1 && { color: "#94a3b8" }]}>Trước</Text>
       </Pressable>
       <Text style={ivStyles.pageInfo}>
         Trang {meta.page}/{meta.totalPages} ({meta.total} lịch)
@@ -41,16 +62,17 @@ function Pagination({ meta, onChange }: { meta: PaginationMeta; onChange: (page:
         disabled={meta.page >= meta.totalPages}
         onPress={() => onChange(meta.page + 1)}
       >
-        <Text style={ivStyles.pageBtnText}>Sau ›</Text>
+        <Text style={[ivStyles.pageBtnText, meta.page >= meta.totalPages && { color: "#94a3b8" }]}>Sau</Text>
+        <ChevronRight size={16} color={meta.page >= meta.totalPages ? "#94a3b8" : "#334155"} />
       </Pressable>
     </View>
   );
 }
 
 function interviewPlace(item: RecruitmentInterview) {
-  if (item.format === "online") return item.meetingLink ? `💻 ${item.meetingLink}` : "💻 Trực tuyến";
-  if (item.format === "phone") return "📞 Phỏng vấn qua điện thoại";
-  return item.location ? `🏢 ${item.location}` : "🏢 Tại văn phòng cơ sở";
+  if (item.format === "online") return item.meetingLink ? item.meetingLink : "Trực tuyến";
+  if (item.format === "phone") return "Phỏng vấn qua điện thoại";
+  return item.location ? item.location : "Tại văn phòng cơ sở";
 }
 
 export default function Interviews() {
@@ -243,7 +265,7 @@ export default function Interviews() {
                 onPress={() => (router.canGoBack() ? router.back() : router.push("/(tabs)/recruitment"))}
                 style={ivStyles.backBtn}
               >
-                <Text style={ivStyles.backBtnText}>‹</Text>
+                <ChevronLeft size={20} color="#334155" />
               </Pressable>
               <View style={{ flex: 1 }}>
                 <Text style={ivStyles.headerTitle}>Lịch phỏng vấn</Text>
@@ -253,15 +275,24 @@ export default function Interviews() {
               </View>
             </View>
 
-            {access.manage && (
+            <View style={{ flexDirection: "row", alignItems: "center", gap: 8 }}>
               <Pressable
-                style={({ pressed }) => [ivStyles.addBtn, pressed && { opacity: 0.8 }]}
-                onPress={() => setEditing("new")}
+                style={({ pressed }) => [ivStyles.iconBtn, pressed && { opacity: 0.7 }]}
+                onPress={() => void load(true)}
               >
-                <Text style={ivStyles.addBtnIcon}>+</Text>
-                <Text style={ivStyles.addBtnText}>Lên lịch</Text>
+                <RotateCcw size={16} color="#475569" />
               </Pressable>
-            )}
+
+              {access.manage && (
+                <Pressable
+                  style={({ pressed }) => [ivStyles.addBtn, pressed && { opacity: 0.8 }]}
+                  onPress={() => setEditing("new")}
+                >
+                  <Plus size={14} color="#ffffff" style={{ marginRight: 4 }} />
+                  <Text style={ivStyles.addBtnText}>Lên lịch</Text>
+                </Pressable>
+              )}
+            </View>
           </View>
 
           {/* Sub Navigation Bar */}
@@ -270,14 +301,21 @@ export default function Interviews() {
           {/* Filter By Applicant notice if active */}
           {!!applicantId && (
             <View style={ivStyles.filterBanner}>
-              <Text style={ivStyles.filterBannerText}>
-                📌 Đang lọc ứng viên:{" "}
-                <Text style={{ fontWeight: "700" }}>
-                  {applicants.find((a) => a._id === applicantId)?.fullName || applicantId}
+              <View style={{ flexDirection: "row", alignItems: "center", gap: 6, flex: 1 }}>
+                <Pin size={14} color="#1e40af" />
+                <Text style={ivStyles.filterBannerText} numberOfLines={1}>
+                  Đang lọc ứng viên:{" "}
+                  <Text style={{ fontWeight: "700" }}>
+                    {applicants.find((a) => a._id === applicantId)?.fullName || applicantId}
+                  </Text>
                 </Text>
-              </Text>
-              <Pressable onPress={() => router.setParams({ applicantId: "", jobId: "" })}>
-                <Text style={ivStyles.filterBannerClear}>✕ Xem toàn bộ</Text>
+              </View>
+              <Pressable
+                style={{ flexDirection: "row", alignItems: "center", gap: 4 }}
+                onPress={() => router.setParams({ applicantId: "", jobId: "" })}
+              >
+                <X size={13} color="#dc2626" />
+                <Text style={ivStyles.filterBannerClear}>Xem toàn bộ</Text>
               </Pressable>
             </View>
           )}
@@ -298,14 +336,15 @@ export default function Interviews() {
             </Pressable>
 
             <Pressable
-              style={[ivStyles.filterChip, mine && ivStyles.filterChipActive]}
+              style={[ivStyles.filterChip, mine && ivStyles.filterChipActive, { flexDirection: "row", alignItems: "center", gap: 5 }]}
               onPress={() => {
                 setMine((v) => !v);
                 setPage(1);
               }}
             >
+              <User size={13} color={mine ? "#047857" : "#64748b"} />
               <Text style={[ivStyles.filterChipText, mine && ivStyles.filterChipTextActive]}>
-                👤 Lịch của tôi
+                Lịch của tôi
               </Text>
             </Pressable>
 
@@ -343,9 +382,10 @@ export default function Interviews() {
                   <View key={item._id} style={ivStyles.interviewCard}>
                     {/* Header Row: Time & Status */}
                     <View style={ivStyles.cardHeaderRow}>
-                      <View style={ivStyles.timeBadge}>
+                      <View style={[ivStyles.timeBadge, { flexDirection: "row", alignItems: "center", gap: 5 }]}>
+                        <Clock size={13} color="#0f172a" />
                         <Text style={ivStyles.timeBadgeText}>
-                          🕒 {formatDateTime(item.scheduledStart)}
+                          {formatDateTime(item.scheduledStart)}
                         </Text>
                       </View>
                       <View
@@ -361,43 +401,61 @@ export default function Interviews() {
                     </View>
 
                     {/* Candidate & Job Info */}
-                    <View style={{ gap: 2 }}>
-                      <Text style={ivStyles.candidateName}>
-                        👤 {candidate?.fullName || "Ứng viên"}
-                      </Text>
-                      <Text style={ivStyles.jobTitleText}>
-                        💼 Vị trí: {job?.title || "Chưa gán tin"}
-                      </Text>
+                    <View style={{ gap: 4 }}>
+                      <View style={{ flexDirection: "row", alignItems: "center", gap: 6 }}>
+                        <User size={15} color="#0f172a" />
+                        <Text style={ivStyles.candidateName}>
+                          {candidate?.fullName || "Ứng viên"}
+                        </Text>
+                      </View>
+                      <View style={{ flexDirection: "row", alignItems: "center", gap: 6 }}>
+                        <Building2 size={13} color="#64748b" />
+                        <Text style={ivStyles.jobTitleText}>
+                          Vị trí: {job?.title || "Chưa gán tin"}
+                        </Text>
+                      </View>
                     </View>
 
                     {/* Location / Meeting format */}
-                    <View style={ivStyles.placeBox}>
+                    <View style={[ivStyles.placeBox, { flexDirection: "row", alignItems: "center", gap: 6 }]}>
+                      {item.format === "online" ? (
+                        <Video size={13} color="#475569" />
+                      ) : item.format === "phone" ? (
+                        <Phone size={13} color="#475569" />
+                      ) : (
+                        <Building2 size={13} color="#475569" />
+                      )}
                       <Text style={ivStyles.placeText}>{interviewPlace(item)}</Text>
                     </View>
 
                     {/* Interviewers info */}
                     {interviewerNames.length > 0 && (
-                      <Text style={ivStyles.interviewerText}>
-                        👥 Hội đồng PV: {interviewerNames.join(", ")}
-                      </Text>
+                      <View style={{ flexDirection: "row", alignItems: "center", gap: 6 }}>
+                        <Users size={13} color="#64748b" />
+                        <Text style={ivStyles.interviewerText}>
+                          Hội đồng PV: {interviewerNames.join(", ")}
+                        </Text>
+                      </View>
                     )}
 
                     {/* Action buttons */}
                     <View style={ivStyles.cardActionsRow}>
                       <Pressable
-                        style={ivStyles.actionBtn}
+                        style={[ivStyles.actionBtn, { flexDirection: "row", alignItems: "center", gap: 4 }]}
                         onPress={() => setViewing(item)}
                       >
-                        <Text style={ivStyles.actionBtnText}>👁️ Chi tiết</Text>
+                        <Eye size={13} color="#475569" />
+                        <Text style={ivStyles.actionBtnText}>Chi tiết</Text>
                       </Pressable>
 
                       {access.manage && (
                         <Pressable
-                          style={[ivStyles.actionBtn, ivStyles.actionBtnPrimary]}
+                          style={[ivStyles.actionBtn, ivStyles.actionBtnPrimary, { flexDirection: "row", alignItems: "center", gap: 4 }]}
                           onPress={() => setEditing(item)}
                         >
+                          <Edit3 size={13} color="#047857" />
                           <Text style={[ivStyles.actionBtnText, ivStyles.actionBtnPrimaryText]}>
-                            ✏️ Sửa
+                            Sửa
                           </Text>
                         </Pressable>
                       )}
@@ -411,7 +469,9 @@ export default function Interviews() {
           {/* Empty State with Seed Action */}
           {!loading && rows.length === 0 && (
             <View style={ivStyles.emptyBox}>
-              <Text style={ivStyles.emptyEmoji}>📅</Text>
+              <View style={{ width: 64, height: 64, borderRadius: 32, backgroundColor: "#f1f5f9", alignItems: "center", justifyContent: "center", marginBottom: 12 }}>
+                <Calendar size={32} color="#94a3b8" />
+              </View>
               <Text style={ivStyles.emptyTitle}>Chưa có lịch hẹn phỏng vấn</Text>
               <Text style={ivStyles.emptyDesc}>
                 {status || mine
@@ -430,12 +490,13 @@ export default function Interviews() {
                   <Text style={ivStyles.resetBtnText}>Xóa bộ lọc</Text>
                 </Pressable>
               ) : access.manage ? (
-                <View style={{ flexDirection: "row", gap: 10, marginTop: 14 }}>
+                <View style={{ flexDirection: "row", gap: 10, marginTop: 14, alignItems: "center" }}>
                   <Pressable
-                    style={ivStyles.primaryBtn}
+                    style={[ivStyles.primaryBtn, { flexDirection: "row", alignItems: "center" }]}
                     onPress={() => setEditing("new")}
                   >
-                    <Text style={ivStyles.primaryBtnText}>+ Lên lịch mới</Text>
+                    <Plus size={14} color="#ffffff" style={{ marginRight: 4 }} />
+                    <Text style={ivStyles.primaryBtnText}>Lên lịch mới</Text>
                   </Pressable>
                   <Pressable
                     style={[ivStyles.primaryBtn, { backgroundColor: "#0284c7" }, seeding && { opacity: 0.6 }]}
@@ -443,7 +504,7 @@ export default function Interviews() {
                     onPress={handleSeedDemoInterviews}
                   >
                     <Text style={ivStyles.primaryBtnText}>
-                      {seeding ? "Đang tạo..." : "✨ Thêm 2 lịch PV mẫu"}
+                      {seeding ? "Đang tạo..." : "Thêm 2 lịch PV mẫu"}
                     </Text>
                   </Pressable>
                 </View>
@@ -483,33 +544,54 @@ export default function Interviews() {
               </Text>
             </View>
 
-            <View style={{ backgroundColor: "#f8fafc", padding: 12, borderRadius: 10, gap: 6 }}>
-              <Text style={{ fontSize: 12, color: "#334155" }}>
-                🕒 <Text style={{ fontWeight: "700" }}>Bắt đầu:</Text> {formatDateTime(viewing.scheduledStart)}
-              </Text>
-              <Text style={{ fontSize: 12, color: "#334155" }}>
-                🕒 <Text style={{ fontWeight: "700" }}>Kết thúc:</Text> {formatDateTime(viewing.scheduledEnd)}
-              </Text>
-              <Text style={{ fontSize: 12, color: "#334155" }}>
-                📍 <Text style={{ fontWeight: "700" }}>Hình thức:</Text>{" "}
-                {viewing.format === "online" ? "Trực tuyến" : viewing.format === "phone" ? "Điện thoại" : "Tại văn phòng"}
-              </Text>
-              <Text style={{ fontSize: 12, color: "#334155" }}>
-                🏢 <Text style={{ fontWeight: "700" }}>Địa điểm/link:</Text> {interviewPlace(viewing)}
-              </Text>
-              <Text style={{ fontSize: 12, color: "#334155" }}>
-                👥 <Text style={{ fontWeight: "700" }}>Người PV:</Text>{" "}
-                {viewing.interviewerIds.map((id) => people.find((p) => p.uid === id)?.displayName || id).join(", ") || "—"}
-              </Text>
-              {viewing.result ? (
+            <View style={{ backgroundColor: "#f8fafc", padding: 12, borderRadius: 10, gap: 8 }}>
+              <View style={{ flexDirection: "row", alignItems: "center", gap: 6 }}>
+                <Clock size={14} color="#475569" />
                 <Text style={{ fontSize: 12, color: "#334155" }}>
-                  🎯 <Text style={{ fontWeight: "700" }}>Kết quả:</Text> {viewing.result}
+                  <Text style={{ fontWeight: "700" }}>Bắt đầu:</Text> {formatDateTime(viewing.scheduledStart)}
                 </Text>
+              </View>
+              <View style={{ flexDirection: "row", alignItems: "center", gap: 6 }}>
+                <Clock size={14} color="#475569" />
+                <Text style={{ fontSize: 12, color: "#334155" }}>
+                  <Text style={{ fontWeight: "700" }}>Kết thúc:</Text> {formatDateTime(viewing.scheduledEnd)}
+                </Text>
+              </View>
+              <View style={{ flexDirection: "row", alignItems: "center", gap: 6 }}>
+                <MapPin size={14} color="#475569" />
+                <Text style={{ fontSize: 12, color: "#334155" }}>
+                  <Text style={{ fontWeight: "700" }}>Hình thức:</Text>{" "}
+                  {viewing.format === "online" ? "Trực tuyến" : viewing.format === "phone" ? "Điện thoại" : "Tại văn phòng"}
+                </Text>
+              </View>
+              <View style={{ flexDirection: "row", alignItems: "center", gap: 6 }}>
+                <Building2 size={14} color="#475569" />
+                <Text style={{ fontSize: 12, color: "#334155" }}>
+                  <Text style={{ fontWeight: "700" }}>Địa điểm/link:</Text> {interviewPlace(viewing)}
+                </Text>
+              </View>
+              <View style={{ flexDirection: "row", alignItems: "center", gap: 6 }}>
+                <Users size={14} color="#475569" />
+                <Text style={{ fontSize: 12, color: "#334155" }}>
+                  <Text style={{ fontWeight: "700" }}>Người PV:</Text>{" "}
+                  {viewing.interviewerIds.map((id) => people.find((p) => p.uid === id)?.displayName || id).join(", ") || "—"}
+                </Text>
+              </View>
+              {viewing.result ? (
+                <View style={{ flexDirection: "row", alignItems: "center", gap: 6 }}>
+                  <Target size={14} color="#475569" />
+                  <Text style={{ fontSize: 12, color: "#334155" }}>
+                    <Text style={{ fontWeight: "700" }}>Kết quả:</Text> {viewing.result}
+                  </Text>
+                </View>
               ) : null}
               {viewing.notes ? (
-                <Text style={{ fontSize: 12, color: "#334155" }}>
-                  📝 <Text style={{ fontWeight: "700" }}>Ghi chú:</Text> {viewing.notes}
-                </Text>
+                <View style={{ flexDirection: "row", alignItems: "center", gap: 6 }}>
+                  <FileText size={14} color="#475569" />
+                  <Text style={{ fontSize: 12, color: "#334155" }}>
+                    <Text style={{ fontWeight: "700" }}>Ghi chú:</Text> {viewing.notes}
+                  </Text>
+                </View>
               ) : null}
             </View>
 
@@ -565,10 +647,15 @@ const ivStyles = StyleSheet.create({
     alignItems: "center",
     justifyContent: "center",
   },
-  backBtnText: {
-    fontSize: 18,
-    fontWeight: "700",
-    color: "#334155",
+  iconBtn: {
+    width: 32,
+    height: 32,
+    borderRadius: 8,
+    backgroundColor: "#ffffff",
+    borderWidth: 1,
+    borderColor: "#e2e8f0",
+    alignItems: "center",
+    justifyContent: "center",
   },
   headerTitle: {
     fontSize: 20,
@@ -795,6 +882,9 @@ const ivStyles = StyleSheet.create({
     paddingHorizontal: 12,
     paddingVertical: 6,
     borderRadius: 6,
+    flexDirection: "row",
+    alignItems: "center",
+    gap: 4,
   },
   pageBtnDisabled: {
     opacity: 0.4,

@@ -13,6 +13,24 @@ import {
 import { SafeAreaView } from "react-native-safe-area-context";
 import { router, useFocusEffect, useLocalSearchParams } from "expo-router";
 import type { RecruitmentApplicant, RecruitmentJob, RecruitmentPipeline } from "../../../src/types/recruitment";
+import {
+  Briefcase,
+  Calendar,
+  ChevronLeft,
+  ChevronRight,
+  Edit3,
+  Eye,
+  Flag,
+  LayoutGrid,
+  List,
+  Mail,
+  Phone,
+  Pin,
+  Plus,
+  Search,
+  Users,
+  X,
+} from "lucide-react-native";
 import { emptyPagination, type PaginationMeta } from "../../../src/types/pagination";
 import { recruitment } from "../../src/api/services";
 import { messageOf, useSession } from "../../src/auth/SessionProvider";
@@ -30,21 +48,23 @@ function Pagination({ meta, onChange }: { meta: PaginationMeta; onChange: (page:
   return (
     <View style={appStyles.paginationRow}>
       <Pressable
-        style={[appStyles.pageBtn, meta.page <= 1 && appStyles.pageBtnDisabled]}
+        style={[appStyles.pageBtn, meta.page <= 1 && appStyles.pageBtnDisabled, { flexDirection: "row", alignItems: "center" }]}
         disabled={meta.page <= 1}
         onPress={() => onChange(meta.page - 1)}
       >
-        <Text style={appStyles.pageBtnText}>‹ Trước</Text>
+        <ChevronLeft size={14} color={meta.page <= 1 ? "#94a3b8" : "#059669"} style={{ marginRight: 2 }} />
+        <Text style={appStyles.pageBtnText}>Trước</Text>
       </Pressable>
       <Text style={appStyles.pageInfo}>
         Trang {meta.page}/{meta.totalPages} ({meta.total} hồ sơ)
       </Text>
       <Pressable
-        style={[appStyles.pageBtn, meta.page >= meta.totalPages && appStyles.pageBtnDisabled]}
+        style={[appStyles.pageBtn, meta.page >= meta.totalPages && appStyles.pageBtnDisabled, { flexDirection: "row", alignItems: "center" }]}
         disabled={meta.page >= meta.totalPages}
         onPress={() => onChange(meta.page + 1)}
       >
-        <Text style={appStyles.pageBtnText}>Sau ›</Text>
+        <Text style={appStyles.pageBtnText}>Sau</Text>
+        <ChevronRight size={14} color={meta.page >= meta.totalPages ? "#94a3b8" : "#059669"} style={{ marginLeft: 2 }} />
       </Pressable>
     </View>
   );
@@ -254,7 +274,7 @@ export default function Applicants() {
                 onPress={() => (router.canGoBack() ? router.back() : router.push("/(tabs)/recruitment"))}
                 style={appStyles.backBtn}
               >
-                <Text style={appStyles.backBtnText}>‹</Text>
+                <ChevronLeft size={20} color="#334155" />
               </Pressable>
               <View style={{ flex: 1 }}>
                 <Text style={appStyles.headerTitle}>Hồ sơ ứng viên</Text>
@@ -266,10 +286,10 @@ export default function Applicants() {
 
             {access.manage && (
               <Pressable
-                style={({ pressed }) => [appStyles.addBtn, pressed && { opacity: 0.8 }]}
+                style={({ pressed }) => [appStyles.addBtn, { flexDirection: "row", alignItems: "center" }, pressed && { opacity: 0.8 }]}
                 onPress={() => setEditing("new")}
               >
-                <Text style={appStyles.addBtnIcon}>+</Text>
+                <Plus size={14} color="#ffffff" style={{ marginRight: 4 }} />
                 <Text style={appStyles.addBtnText}>Thêm</Text>
               </Pressable>
             )}
@@ -281,18 +301,25 @@ export default function Applicants() {
           {/* Filter By Job notice if active */}
           {!!jobId && (
             <View style={appStyles.jobFilterBadge}>
-              <Text style={appStyles.jobFilterText}>
-                📌 Đang lọc theo tin: <Text style={{ fontWeight: "700" }}>{jobs.find((j) => j._id === jobId)?.title || jobId}</Text>
-              </Text>
-              <Pressable onPress={() => router.setParams({ jobId: "" })}>
-                <Text style={appStyles.jobFilterClear}>✕ Xem tất cả</Text>
+              <View style={{ flexDirection: "row", alignItems: "center", flex: 1, gap: 4 }}>
+                <Pin size={13} color="#047857" />
+                <Text style={appStyles.jobFilterText}>
+                  Đang lọc theo tin: <Text style={{ fontWeight: "700" }}>{jobs.find((j) => j._id === jobId)?.title || jobId}</Text>
+                </Text>
+              </View>
+              <Pressable
+                style={{ flexDirection: "row", alignItems: "center", gap: 3 }}
+                onPress={() => router.setParams({ jobId: "" })}
+              >
+                <X size={12} color="#be123c" />
+                <Text style={appStyles.jobFilterClear}>Xem tất cả</Text>
               </Pressable>
             </View>
           )}
 
           {/* Search Box */}
           <View style={appStyles.searchContainer}>
-            <Text style={appStyles.searchIcon}>🔍</Text>
+            <Search size={16} color="#94a3b8" />
             <TextInput
               style={appStyles.searchInput}
               placeholder="Tìm theo tên, email, số điện thoại..."
@@ -314,7 +341,7 @@ export default function Applicants() {
                 }}
                 style={appStyles.clearSearchBtn}
               >
-                <Text style={appStyles.clearSearchText}>✕</Text>
+                <X size={14} color="#94a3b8" />
               </Pressable>
             )}
             <Pressable
@@ -332,19 +359,21 @@ export default function Applicants() {
           <View style={appStyles.toolsRow}>
             <View style={appStyles.modePill}>
               <Pressable
-                style={[appStyles.modeBtn, mode === "list" && appStyles.modeBtnActive]}
+                style={[appStyles.modeBtn, mode === "list" && appStyles.modeBtnActive, { flexDirection: "row", alignItems: "center", gap: 4 }]}
                 onPress={() => setMode("list")}
               >
+                <List size={13} color={mode === "list" ? "#047857" : "#64748b"} />
                 <Text style={[appStyles.modeBtnText, mode === "list" && appStyles.modeBtnTextActive]}>
-                  📋 Danh sách
+                  Danh sách
                 </Text>
               </Pressable>
               <Pressable
-                style={[appStyles.modeBtn, mode === "kanban" && appStyles.modeBtnActive]}
+                style={[appStyles.modeBtn, mode === "kanban" && appStyles.modeBtnActive, { flexDirection: "row", alignItems: "center", gap: 4 }]}
                 onPress={() => setMode("kanban")}
               >
+                <LayoutGrid size={13} color={mode === "kanban" ? "#047857" : "#64748b"} />
                 <Text style={[appStyles.modeBtnText, mode === "kanban" && appStyles.modeBtnTextActive]}>
-                  📊 Kanban
+                  Kanban
                 </Text>
               </Pressable>
             </View>
@@ -428,11 +457,20 @@ export default function Applicants() {
                       </View>
                       <View style={{ flex: 1, gap: 2 }}>
                         <Text style={appStyles.applicantName}>{applicant.fullName}</Text>
-                        <Text style={appStyles.applicantContact}>
-                          {applicant.phone ? `📞 ${applicant.phone}` : ""}
-                          {applicant.phone && applicant.email ? " · " : ""}
-                          {applicant.email ? `✉️ ${applicant.email}` : ""}
-                        </Text>
+                        <View style={{ flexDirection: "row", alignItems: "center", flexWrap: "wrap", gap: 8, marginTop: 2 }}>
+                          {applicant.phone ? (
+                            <View style={{ flexDirection: "row", alignItems: "center", gap: 3 }}>
+                              <Phone size={11} color="#64748b" />
+                              <Text style={appStyles.applicantContact}>{applicant.phone}</Text>
+                            </View>
+                          ) : null}
+                          {applicant.email ? (
+                            <View style={{ flexDirection: "row", alignItems: "center", gap: 3 }}>
+                              <Mail size={11} color="#64748b" />
+                              <Text style={appStyles.applicantContact}>{applicant.email}</Text>
+                            </View>
+                          ) : null}
+                        </View>
                       </View>
                       <View
                         style={[
@@ -453,38 +491,46 @@ export default function Applicants() {
                     <View style={appStyles.cardInfoRow}>
                       <View style={appStyles.infoItem}>
                         <Text style={appStyles.infoLabel}>Vị trí ứng tuyển</Text>
-                        <Text style={appStyles.infoValue} numberOfLines={1}>
-                          💼 {appliedJob?.title || "Chưa gán tin"}
-                        </Text>
+                        <View style={{ flexDirection: "row", alignItems: "center", gap: 4 }}>
+                          <Briefcase size={12} color="#64748b" />
+                          <Text style={appStyles.infoValue} numberOfLines={1}>
+                            {appliedJob?.title || "Chưa gán tin"}
+                          </Text>
+                        </View>
                       </View>
                       <View style={appStyles.infoItem}>
                         <Text style={appStyles.infoLabel}>Giai đoạn</Text>
-                        <Text style={[appStyles.infoValue, { color: "#059669" }]} numberOfLines={1}>
-                          🚩 {currentStageName}
-                        </Text>
+                        <View style={{ flexDirection: "row", alignItems: "center", gap: 4 }}>
+                          <Flag size={12} color="#059669" />
+                          <Text style={[appStyles.infoValue, { color: "#059669" }]} numberOfLines={1}>
+                            {currentStageName}
+                          </Text>
+                        </View>
                       </View>
                     </View>
 
                     {/* Quick Action Buttons */}
                     <View style={appStyles.cardActionsRow}>
                       <Pressable
-                        style={appStyles.actionBtn}
+                        style={[appStyles.actionBtn, { flexDirection: "row", alignItems: "center" }]}
                         onPress={() => setSelected(applicant)}
                       >
-                        <Text style={appStyles.actionBtnText}>👁️ Chi tiết</Text>
+                        <Eye size={13} color="#475569" style={{ marginRight: 4 }} />
+                        <Text style={appStyles.actionBtnText}>Chi tiết</Text>
                       </Pressable>
 
                       {access.manage && (
                         <Pressable
-                          style={appStyles.actionBtn}
+                          style={[appStyles.actionBtn, { flexDirection: "row", alignItems: "center" }]}
                           onPress={() => setEditing(applicant)}
                         >
-                          <Text style={appStyles.actionBtnText}>✏️ Sửa</Text>
+                          <Edit3 size={13} color="#475569" style={{ marginRight: 4 }} />
+                          <Text style={appStyles.actionBtnText}>Sửa</Text>
                         </Pressable>
                       )}
 
                       <Pressable
-                        style={[appStyles.actionBtn, appStyles.actionBtnPrimary]}
+                        style={[appStyles.actionBtn, appStyles.actionBtnPrimary, { flexDirection: "row", alignItems: "center" }]}
                         onPress={() =>
                           router.push({
                             pathname: "/(tabs)/interviews",
@@ -492,8 +538,9 @@ export default function Applicants() {
                           })
                         }
                       >
+                        <Calendar size={13} color="#0369a1" style={{ marginRight: 4 }} />
                         <Text style={[appStyles.actionBtnText, appStyles.actionBtnPrimaryText]}>
-                          📅 Lịch PV
+                          Lịch PV
                         </Text>
                       </Pressable>
                     </View>
@@ -557,7 +604,9 @@ export default function Applicants() {
           {/* Empty State with Seed Action */}
           {!loading && rows.length === 0 && (
             <View style={appStyles.emptyBox}>
-              <Text style={appStyles.emptyEmoji}>👥</Text>
+              <View style={{ width: 64, height: 64, borderRadius: 32, backgroundColor: "#f1f5f9", alignItems: "center", justifyContent: "center", marginBottom: 12 }}>
+                <Users size={32} color="#94a3b8" />
+              </View>
               <Text style={appStyles.emptyTitle}>Chưa có hồ sơ ứng viên</Text>
               <Text style={appStyles.emptyDesc}>
                 {search
@@ -576,9 +625,10 @@ export default function Applicants() {
                   <Text style={appStyles.resetBtnText}>Xóa bộ lọc tìm kiếm</Text>
                 </Pressable>
               ) : access.manage ? (
-                <View style={{ flexDirection: "row", gap: 10, marginTop: 14 }}>
-                  <Pressable style={appStyles.primaryBtn} onPress={() => setEditing("new")}>
-                    <Text style={appStyles.primaryBtnText}>+ Thêm ứng viên mới</Text>
+                <View style={{ flexDirection: "row", gap: 10, marginTop: 14, alignItems: "center" }}>
+                  <Pressable style={[appStyles.primaryBtn, { flexDirection: "row", alignItems: "center" }]} onPress={() => setEditing("new")}>
+                    <Plus size={14} color="#ffffff" style={{ marginRight: 4 }} />
+                    <Text style={appStyles.primaryBtnText}>Thêm ứng viên mới</Text>
                   </Pressable>
                   <Pressable
                     style={[appStyles.primaryBtn, { backgroundColor: "#0284c7" }, seeding && { opacity: 0.6 }]}
@@ -586,7 +636,7 @@ export default function Applicants() {
                     onPress={handleSeedDemoApplicants}
                   >
                     <Text style={appStyles.primaryBtnText}>
-                      {seeding ? "Đang tạo..." : "✨ Thêm 3 hồ sơ mẫu"}
+                      {seeding ? "Đang tạo..." : "Thêm 3 hồ sơ mẫu"}
                     </Text>
                   </Pressable>
                 </View>

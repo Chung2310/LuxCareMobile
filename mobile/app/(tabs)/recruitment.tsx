@@ -31,6 +31,9 @@ import {
   Calendar,
   Check,
   CheckCircle2,
+  ChevronDown,
+  ChevronLeft,
+  ChevronUp,
   Clock,
   FileEdit,
   FileText,
@@ -40,6 +43,7 @@ import {
   PauseCircle,
   Pencil,
   Pin,
+  Plus,
   RotateCcw,
   Search,
   Settings,
@@ -399,7 +403,7 @@ export default function Recruitment() {
                 onPress={() => (router.canGoBack() ? router.back() : router.push("/(tabs)/modules"))}
                 style={uiStyles.backBtn}
               >
-                <Text style={{ fontSize: 18, color: "#334155", fontWeight: "700" }}>‹</Text>
+                <ChevronLeft size={20} color="#334155" />
               </Pressable>
               <View style={uiStyles.headerLeft}>
                 <Text style={uiStyles.headerTitle}>Tin tuyển dụng</Text>
@@ -423,8 +427,9 @@ export default function Recruitment() {
                       >
                         <View style={[uiStyles.branchDot, { backgroundColor: "#16a34a" }]} />
                         <Text style={[uiStyles.branchName, { color: "#15803d", fontWeight: "700" }]}>
-                          {selectedBranch?.name || "Toàn công ty"} ▾
+                          {selectedBranch?.name || "Toàn công ty"}
                         </Text>
+                        <ChevronDown size={13} color="#15803d" style={{ marginLeft: 3 }} />
                       </Pressable>
                     )}
                   />
@@ -445,7 +450,7 @@ export default function Recruitment() {
                 onPress={() => setRevision((v) => v + 1)}
                 disabled={disabled}
               >
-                <Text style={uiStyles.refreshBtnText}>↻</Text>
+                <RotateCcw size={15} color="#059669" />
               </Pressable>
 
               {access.manage && (
@@ -458,7 +463,7 @@ export default function Recruitment() {
                   onPress={() => setEditing("new")}
                   disabled={disabled || uncertain}
                 >
-                  <Text style={uiStyles.createBtnIcon}>+</Text>
+                  <Plus size={14} color="#ffffff" style={{ marginRight: 4 }} />
                   <Text style={uiStyles.createBtnText}>Tạo tin</Text>
                 </Pressable>
               )}
@@ -757,14 +762,19 @@ export default function Recruitment() {
                     ]}
                     onPress={() => setExpanded(isExpanded ? null : job._id)}
                   >
-                    <Text
-                      style={[
-                        uiStyles.expandBtnText,
-                        isExpanded && uiStyles.expandBtnTextActive,
-                      ]}
-                    >
-                      {isExpanded ? "Thu gọn ▲" : "Chi tiết ▼"}
-                    </Text>
+                    <View style={{ flexDirection: "row", alignItems: "center", gap: 3 }}>
+                      {isExpanded ? (
+                        <>
+                          <ChevronUp size={13} color="#059669" />
+                          <Text style={[uiStyles.expandBtnText, uiStyles.expandBtnTextActive]}>Thu gọn</Text>
+                        </>
+                      ) : (
+                        <>
+                          <ChevronDown size={13} color="#64748b" />
+                          <Text style={uiStyles.expandBtnText}>Chi tiết</Text>
+                        </>
+                      )}
+                    </View>
                   </Pressable>
                 </View>
 
@@ -894,10 +904,11 @@ export default function Recruitment() {
               ) : !deleted && access.manage ? (
                 <View style={{ flexDirection: "row", gap: 10, marginTop: 14 }}>
                   <Pressable
-                    style={[uiStyles.createBtn, { paddingHorizontal: 16 }]}
+                    style={[uiStyles.createBtn, { paddingHorizontal: 16, flexDirection: "row", alignItems: "center" }]}
                     onPress={() => setEditing("new")}
                   >
-                    <Text style={uiStyles.createBtnText}>+ Tạo tin mới</Text>
+                    <Plus size={14} color="#ffffff" style={{ marginRight: 4 }} />
+                    <Text style={uiStyles.createBtnText}>Tạo tin mới</Text>
                   </Pressable>
                   <Pressable
                     style={[
