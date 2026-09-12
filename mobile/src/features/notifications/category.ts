@@ -116,7 +116,7 @@ export function detectNotificationCategory(
   ) {
     return {
       category: "warehouse",
-      label: "Vật tư & Dược phẩm",
+      label: "Kho & Thiết bị",
       iconName: "cube-outline",
       color: "#ea580c",
       bg: "#fff7ed",
