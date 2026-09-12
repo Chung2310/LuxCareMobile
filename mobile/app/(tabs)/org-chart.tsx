@@ -12,7 +12,7 @@ import {
   TextInput,
   View,
 } from "react-native";
-import { SafeAreaView } from "react-native-safe-area-context";
+import { SafeAreaView, useSafeAreaInsets } from "react-native-safe-area-context";
 import { router, useFocusEffect } from "expo-router";
 import type { UserProfile } from "../../../src/types/common";
 import type { BranchRecord } from "../../../src/services/branchService";
@@ -35,7 +35,9 @@ import {
   Folder,
   FolderTree,
   Mail,
+  Maximize,
   MessageSquare,
+  Minimize,
   Pencil,
   Phone,
   RefreshCw,
@@ -1297,6 +1299,7 @@ function OrgListView({
    ========================================================================== */
 export default function OrgChart() {
   const { showAlert, alertView } = useAppAlert();
+  const insets = useSafeAreaInsets();
   const { user, selectedBranch } = useSession();
   const branchId = selectedBranch?._id || user?.branchId || undefined;
   const [empList, setEmpList] = useState<UserProfile[]>([]);
@@ -1310,6 +1313,7 @@ export default function OrgChart() {
   const [movingEmp, setMovingEmp] = useState<UserProfile | null>(null);
   const [viewMode, setViewMode] = useState<"tree" | "list">("tree");
   const [zoomScale, setZoomScale] = useState<number>(1.0);
+  const [isFullscreen, setIsFullscreen] = useState(false);
   const [createModalVisible, setCreateModalVisible] = useState(false);
   const [deptList, setDeptList] = useState<DepartmentRecord[]>([]);
   const [branchList, setBranchList] = useState<BranchRecord[]>([]);
@@ -1682,6 +1686,10 @@ export default function OrgChart() {
               <Pressable style={s.floatingFitBtn} onPress={zoomFit}>
                 <Text style={s.floatingFitBtnTxt}>Fit</Text>
               </Pressable>
+              <Pressable style={s.fullscreenTriggerBtn} onPress={() => setIsFullscreen(true)}>
+                <Maximize size={12} color="#4f46e5" />
+                <Text style={s.fullscreenTriggerTxt}>Toàn màn hình</Text>
+              </Pressable>
             </View>
           </View>
         )}
@@ -1700,53 +1708,56 @@ export default function OrgChart() {
         />
       ) : (
         /* 2D Scrollable Interactive Tree Canvas with Pinch Zoom */
-        <View style={{ flex: 1 }} onTouchStart={handleTouchStart} onTouchMove={handleTouchMove} onTouchEnd={handleTouchEnd}>
-          <ScrollView
-            style={{ flex: 1 }}
-            contentContainerStyle={s.verticalScroll}
-            showsVerticalScrollIndicator={true}
-          >
+        <View style={{ flex: 1 }}>
+          {/* Tree Canvas */}
+          <View style={{ flex: 1 }} onTouchStart={handleTouchStart} onTouchMove={handleTouchMove} onTouchEnd={handleTouchEnd}>
             <ScrollView
-              horizontal
-              showsHorizontalScrollIndicator={true}
-              contentContainerStyle={s.horizontalScroll}
+              style={{ flex: 1 }}
+              contentContainerStyle={s.verticalScroll}
+              showsVerticalScrollIndicator={true}
             >
-              {tree.length === 0 ? (
-                <View style={s.emptyBox}>
-                  <Users size={44} color="#94a3b8" style={{ marginBottom: 8 }} />
-                  <Text style={s.emptyTitle}>Chưa có dữ liệu cơ cấu nhân sự</Text>
-                  <Text style={s.emptySub}>Vui lòng kiểm tra phân quyền hoặc danh sách nhân viên</Text>
-                </View>
-              ) : (
-                <View
-                  style={[
-                    s.treeCanvas,
-                    {
-                      transform: [{ scale: zoomScale }],
-                    },
-                  ]}
-                >
-                  <View style={s.rootRow}>
-                    {tree.map((rootNode) => (
-                      <TreeBranchView
-                        key={rootNode.emp.uid}
-                        node={rootNode}
-                        onSelect={setSelected}
-                        collapsed={collapsed}
-                        toggleCollapse={toggle}
-                        highlighted={highlighted}
-                        movingEmp={movingEmp}
-                        onStartMove={(e) => setMovingEmp(e)}
-                        onTargetSelect={(target) => handleConfirmMove(target)}
-                        canManage={canManage}
-                        allEmps={empList}
-                      />
-                    ))}
+              <ScrollView
+                horizontal
+                showsHorizontalScrollIndicator={true}
+                contentContainerStyle={s.horizontalScroll}
+              >
+                {tree.length === 0 ? (
+                  <View style={s.emptyBox}>
+                    <Users size={44} color="#94a3b8" style={{ marginBottom: 8 }} />
+                    <Text style={s.emptyTitle}>Chưa có dữ liệu cơ cấu nhân sự</Text>
+                    <Text style={s.emptySub}>Vui lòng kiểm tra phân quyền hoặc danh sách nhân viên</Text>
                   </View>
-                </View>
-              )}
+                ) : (
+                  <View
+                    style={[
+                      s.treeCanvas,
+                      {
+                        transform: [{ scale: zoomScale }],
+                      },
+                    ]}
+                  >
+                    <View style={s.rootRow}>
+                      {tree.map((rootNode) => (
+                        <TreeBranchView
+                          key={rootNode.emp.uid}
+                          node={rootNode}
+                          onSelect={setSelected}
+                          collapsed={collapsed}
+                          toggleCollapse={toggle}
+                          highlighted={highlighted}
+                          movingEmp={movingEmp}
+                          onStartMove={(e) => setMovingEmp(e)}
+                          onTargetSelect={(target) => handleConfirmMove(target)}
+                          canManage={canManage}
+                          allEmps={empList}
+                        />
+                      ))}
+                    </View>
+                  </View>
+                )}
+              </ScrollView>
             </ScrollView>
-          </ScrollView>
+          </View>
 
           {/* Floating Zoom Action Controls (FAB) */}
           <View style={s.floatingZoomBar}>
@@ -1762,9 +1773,81 @@ export default function OrgChart() {
             <Pressable style={s.floatingFitBtn} onPress={zoomFit}>
               <Text style={s.floatingFitBtnTxt}>Fit</Text>
             </Pressable>
+            <Pressable style={s.floatingFullscreenBtn} onPress={() => setIsFullscreen(true)}>
+              <Maximize size={15} color="#4f46e5" />
+            </Pressable>
           </View>
         </View>
       )}
+
+      {/* Fullscreen Org Chart Modal: Chỉ hiển thị sơ đồ và DUY NHẤT 1 nút để tắt chế độ */}
+      <Modal
+        visible={isFullscreen}
+        animationType="fade"
+        statusBarTranslucent
+        onRequestClose={() => setIsFullscreen(false)}
+      >
+        <View style={s.fullscreenContainer}>
+          <View style={{ flex: 1 }} onTouchStart={handleTouchStart} onTouchMove={handleTouchMove} onTouchEnd={handleTouchEnd}>
+            <ScrollView
+              style={{ flex: 1 }}
+              contentContainerStyle={s.verticalScroll}
+              showsVerticalScrollIndicator={true}
+            >
+              <ScrollView
+                horizontal
+                showsHorizontalScrollIndicator={true}
+                contentContainerStyle={s.horizontalScroll}
+              >
+                {tree.length === 0 ? (
+                  <View style={s.emptyBox}>
+                    <Users size={44} color="#94a3b8" style={{ marginBottom: 8 }} />
+                    <Text style={s.emptyTitle}>Chưa có dữ liệu cơ cấu nhân sự</Text>
+                    <Text style={s.emptySub}>Vui lòng kiểm tra phân quyền hoặc danh sách nhân viên</Text>
+                  </View>
+                ) : (
+                  <View
+                    style={[
+                      s.treeCanvas,
+                      {
+                        transform: [{ scale: zoomScale }],
+                      },
+                    ]}
+                  >
+                    <View style={s.rootRow}>
+                      {tree.map((rootNode) => (
+                        <TreeBranchView
+                          key={rootNode.emp.uid}
+                          node={rootNode}
+                          onSelect={setSelected}
+                          collapsed={collapsed}
+                          toggleCollapse={toggle}
+                          highlighted={highlighted}
+                          movingEmp={movingEmp}
+                          onStartMove={(e) => setMovingEmp(e)}
+                          onTargetSelect={(target) => handleConfirmMove(target)}
+                          canManage={canManage}
+                          allEmps={empList}
+                        />
+                      ))}
+                    </View>
+                  </View>
+                )}
+              </ScrollView>
+            </ScrollView>
+          </View>
+
+          {/* Duy nhất 1 nút để tắt chế độ toàn màn hình */}
+          <Pressable
+            style={[s.exitFullscreenBtn, { top: Math.max(insets.top + 10, 24) }]}
+            onPress={() => setIsFullscreen(false)}
+            hitSlop={{ top: 12, bottom: 12, left: 12, right: 12 }}
+          >
+            <Minimize size={16} color="#ffffff" />
+            <Text style={s.exitFullscreenBtnTxt}>Thoát toàn màn hình</Text>
+          </Pressable>
+        </View>
+      </Modal>
 
       {/* Employee Profile Details Modal */}
       <ProfileModal
@@ -1985,6 +2068,57 @@ const s = StyleSheet.create({
     fontSize: 10,
     fontWeight: "800",
     color: "#4f46e5",
+  },
+  fullscreenTriggerBtn: {
+    flexDirection: "row",
+    alignItems: "center",
+    gap: 4,
+    paddingHorizontal: 8,
+    paddingVertical: 3,
+    backgroundColor: "#eef2ff",
+    borderLeftWidth: 1,
+    borderLeftColor: "#c7d2fe",
+  },
+  fullscreenTriggerTxt: {
+    fontSize: 10,
+    fontWeight: "700",
+    color: "#4f46e5",
+  },
+  floatingFullscreenBtn: {
+    width: 38,
+    height: 34,
+    alignItems: "center",
+    justifyContent: "center",
+    backgroundColor: "#eef2ff",
+    borderTopWidth: 1,
+    borderColor: "#c7d2fe",
+  },
+  fullscreenContainer: {
+    flex: 1,
+    backgroundColor: "#f8fafc",
+    position: "relative",
+  },
+  exitFullscreenBtn: {
+    position: "absolute",
+    right: 16,
+    flexDirection: "row",
+    alignItems: "center",
+    gap: 6,
+    backgroundColor: "rgba(15, 23, 42, 0.85)",
+    paddingVertical: 8,
+    paddingHorizontal: 14,
+    borderRadius: 24,
+    shadowColor: "#000000",
+    shadowOffset: { width: 0, height: 4 },
+    shadowOpacity: 0.3,
+    shadowRadius: 6,
+    elevation: 8,
+    zIndex: 999,
+  },
+  exitFullscreenBtnTxt: {
+    color: "#ffffff",
+    fontSize: 12,
+    fontWeight: "700",
   },
 
   /* Drag & Drop / Reassign Mode Banner */
