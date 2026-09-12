@@ -1,5 +1,8 @@
 import { beforeEach, expect, it, vi } from "vitest";
-const mocks = vi.hoisted(() => ({ pick: vi.fn(), upload: vi.fn(), remove: vi.fn(), size: 4 }));
+const mocks = vi.hoisted(() => {
+  (globalThis as any).__DEV__ = false;
+  return { pick: vi.fn(), upload: vi.fn(), remove: vi.fn(), size: 4 };
+});
 vi.mock("expo-document-picker", () => ({ getDocumentAsync: mocks.pick }));
 vi.mock("expo-file-system", () => ({
   Paths: { cache: { uri: "file:///cache/" } },
@@ -18,7 +21,6 @@ vi.mock("react-native", () => ({
   Linking: { openSettings: vi.fn() },
   PermissionsAndroid: { request: vi.fn(), PERMISSIONS: {}, RESULTS: {} },
 }));
-(globalThis as any).__DEV__ = false;
 vi.mock("expo-image-picker", () => ({
   requestMediaLibraryPermissionsAsync: vi.fn(async () => ({ status: "granted" })),
 }));

@@ -5,6 +5,8 @@ const mocks = vi.hoisted(() => ({
   fetch: vi.fn(),
   share: vi.fn(),
   remove: vi.fn(),
+  base64: vi.fn(),
+  legacyReadAsString: vi.fn(),
   size: 4,
 }));
 vi.mock("expo-document-picker", () => ({ getDocumentAsync: mocks.pick }));
@@ -16,10 +18,17 @@ vi.mock("expo-file-system", () => ({
       return mocks.size;
     }
     uri = "file:///cache/download.pdf";
-    base64 = async () => "dGVzdA==";
+    base64 = mocks.base64;
     delete = mocks.remove;
     write = vi.fn();
   },
+}));
+vi.mock("expo-file-system/legacy", () => ({
+  readAsStringAsync: mocks.legacyReadAsString,
+  copyAsync: vi.fn(),
+  deleteAsync: vi.fn(),
+  cacheDirectory: "file:///cache/",
+  EncodingType: { Base64: "base64" },
 }));
 vi.mock("expo-sharing", () => ({ isAvailableAsync: async () => true, shareAsync: mocks.share }));
 vi.mock("expo-crypto", () => ({ randomUUID: () => "unique" }));
@@ -28,6 +37,7 @@ import { MAX_LEAVE_FILE_BYTES, pickLeaveAttachment, shareLeaveFile } from "./fil
 beforeEach(() => {
   vi.clearAllMocks();
   mocks.size = 4;
+  mocks.base64.mockResolvedValue("dGVzdA==");
   mocks.pick.mockResolvedValue({
     canceled: false,
     assets: [{ uri: "file:///cache/picker.pdf", name: "proof.pdf", mimeType: "application/pdf" }],
@@ -69,6 +79,20 @@ it("does not lose the upload token if cache cleanup fails", async () => {
   });
   await expect(pickLeaveAttachment()).resolves.toMatchObject({ uploadToken: "owned-token" });
 });
+it("recovers from FileSystemFile.base64 Missing READ permission error via fallback", async () => {
+  mocks.base64.mockRejectedValue(
+    new Error("Call to function 'FileSystemFile.base64' has been rejected. Missing 'READ' permission for accessing the file."),
+  );
+  mocks.legacyReadAsString.mockResolvedValue("dGVzdEZhbGxiYWNr");
+
+  const result = await pickLeaveAttachment();
+  expect(result).toMatchObject({ uploadToken: "owned-token", name: "proof.pdf" });
+  expect(mocks.upload).toHaveBeenCalledWith(
+    expect.objectContaining({
+      file: "data:application/pdf;base64,dGVzdEZhbGxiYWNr",
+    }),
+  );
+});
 it("downloads through the authenticated API client without putting a token in the URL", async () => {
   mocks.fetch.mockResolvedValue(new Response(new Uint8Array([1, 2, 3])));
   await shareLeaveFile("https://example.com/proof.pdf", "proof.pdf");
@@ -77,3 +101,4 @@ it("downloads through the authenticated API client without putting a token in th
   );
   expect(mocks.share).toHaveBeenCalledTimes(1);
 });
+
