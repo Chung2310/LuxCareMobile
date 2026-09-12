@@ -1,19 +1,41 @@
+// @refresh reset
+import { useRoleOptions } from "../../features/roles/useRoleOptions";
+import { roleTitle } from "../../features/roles/model";
+import { useSession } from "../../auth/SessionProvider";
+import { useAppAlert } from "../AppAlert";
 import React, { useState } from "react";
 import {
   ActivityIndicator,
-  Alert,
+  Image,
   KeyboardAvoidingView,
   Linking,
   Modal,
   Platform,
   ScrollView,
   StyleSheet,
+  Switch,
   Text,
   TextInput,
   TouchableOpacity,
   View,
 } from "react-native";
 import { SafeAreaView } from "react-native-safe-area-context";
+import {
+  User,
+  Mail,
+  Phone,
+  Building2,
+  Calendar,
+  Award,
+  DollarSign,
+  Layers,
+  ShieldCheck,
+  FileText,
+  X,
+  Edit3,
+  ExternalLink,
+  Trash2,
+} from "lucide-react-native";
 import { Ionicons } from "@expo/vector-icons";
 import { AppButton } from "../common/AppButton";
 import { DropdownSelectField } from "../common/DropdownSelectField";
@@ -33,9 +55,78 @@ interface UserDetailModalProps {
   canManage?: boolean;
 }
 
-const ROLES_ORDER: UserRole[] = ["user", "manager", "branch_owner", "admin"];
 
-export const UserDetailModal: React.FC<UserDetailModalProps> = ({
+const normalizePhone = (phone?: string | null): string => {
+  if (!phone) return "";
+  const str = String(phone).trim();
+  const lower = str.toLowerCase();
+  if (
+    !str ||
+    lower === "chưa cập nhật" ||
+    lower === "chua cap nhat" ||
+    lower === "chưa có" ||
+    lower === "chua co" ||
+    lower === "không có" ||
+    lower === "khong co" ||
+    lower === "null" ||
+    lower === "undefined" ||
+    lower === "n/a" ||
+    lower === "none" ||
+    lower === "—" ||
+    lower === "-"
+  ) {
+    return "";
+  }
+  return str;
+};
+
+const normalizeDateInput = (val?: any): string => {
+  if (!val) return "";
+  const str = String(val).trim();
+  if (!str) return "";
+
+  // If ISO timestamp format (e.g. 2026-09-02T00:00:00.000Z)
+  if (str.includes("T")) {
+    const part = str.split("T")[0];
+    if (/^\d{4}-\d{2}-\d{2}$/.test(part)) return part;
+  }
+
+  // Already YYYY-MM-DD
+  if (/^\d{4}-\d{2}-\d{2}$/.test(str)) {
+    return str;
+  }
+
+  // DD/MM/YYYY or DD-MM-YYYY
+  const dmyMatch = str.match(/^(\d{1,2})[/-](\d{1,2})[/-](\d{4})$/);
+  if (dmyMatch) {
+    const day = dmyMatch[1].padStart(2, "0");
+    const month = dmyMatch[2].padStart(2, "0");
+    const year = dmyMatch[3];
+    return `${year}-${month}-${day}`;
+  }
+
+  // General Date parse
+  const d = new Date(str);
+  if (!isNaN(d.getTime())) {
+    const year = d.getFullYear();
+    const month = String(d.getMonth() + 1).padStart(2, "0");
+    const day = String(d.getDate()).padStart(2, "0");
+    return `${year}-${month}-${day}`;
+  }
+
+  return str.slice(0, 10);
+};
+
+// Keep visibility checks outside the component that owns hooks.
+export const UserDetailModal: React.FC<UserDetailModalProps> = (props) => {
+  if (!props.visible || !props.user) return null;
+
+  return <UserDetailContent {...props} key={props.user.uid} user={props.user} />;
+};
+
+type UserDetailContentProps = Omit<UserDetailModalProps, "user"> & { user: UserProfile };
+
+const UserDetailContent: React.FC<UserDetailContentProps> = ({
   visible,
   user,
   onClose,
@@ -45,17 +136,24 @@ export const UserDetailModal: React.FC<UserDetailModalProps> = ({
   departments = [],
   canManage = true,
 }) => {
-  if (!user) return null;
-
+  const { showAlert, alertView } = useAppAlert();
+  const { user: actor } = useSession();
+  const roleOptions = useRoleOptions(visible, user.companyCode);
+  const roleLabel = (code: string) => { const option = roleOptions.roles.find(item => item.role === code); return option ? roleTitle(option) : ROLE_MAP[code]?.label || code; };
   const [currentUser, setCurrentUser] = useState<UserProfile>(user);
   const [isEditing, setIsEditing] = useState(false);
 
   // Edit draft states
   const [draftName, setDraftName] = useState(user.displayName || "");
-  const [draftPhone, setDraftPhone] = useState(user.phone || "");
+  const [draftPhone, setDraftPhone] = useState(normalizePhone(user.phone));
   const [draftDept, setDraftDept] = useState(user.department || "");
-  const [draftJobTitle, setDraftJobTitle] = useState(user.jobTitle || "");
   const [draftBranchId, setDraftBranchId] = useState(user.branchId || "");
+  const [draftBirthDate, setDraftBirthDate] = useState(normalizeDateInput(user.birthDate));
+  const [draftSalary, setDraftSalary] = useState(
+    user.monthlySalary ? String(user.monthlySalary) : "",
+  );
+  const [draftIsLeader, setDraftIsLeader] = useState(!!user.isLeader);
+  const [draftJdLink, setDraftJdLink] = useState(user.jobDescriptionLink || "");
 
   // Sub pickers
   const [showBranchPicker, setShowBranchPicker] = useState(false);
@@ -68,42 +166,64 @@ export const UserDetailModal: React.FC<UserDetailModalProps> = ({
     if (user) {
       setCurrentUser(user);
       setDraftName(user.displayName || "");
-      setDraftPhone(user.phone || "");
+      setDraftPhone(normalizePhone(user.phone));
       setDraftDept(user.department || "");
-      setDraftJobTitle(user.jobTitle || "");
       setDraftBranchId(user.branchId || "");
+      setDraftBirthDate(normalizeDateInput(user.birthDate));
+      setDraftSalary(user.monthlySalary ? String(user.monthlySalary) : "");
+      setDraftIsLeader(!!user.isLeader);
+      setDraftJdLink(user.jobDescriptionLink || "");
       setIsEditing(false);
     }
   }, [user]);
 
-  const roleConfig = ROLE_MAP[currentUser.role] || ROLE_MAP.user;
+  const roleConfig = { ...(ROLE_MAP[currentUser.role] || ROLE_MAP.user), label: roleLabel(currentUser.role) };
 
-  const handleCall = () => {
-    if (!currentUser.phone) return;
-    Linking.openURL(`tel:${currentUser.phone}`).catch(() => {
-      Alert.alert("Lỗi", "Không thể thực hiện cuộc gọi.");
-    });
+  const branchObj = branches.find(
+    (b) => b._id === (currentUser.branchId || draftBranchId),
+  );
+  const branchDisplayName =
+    currentUser.branchName || branchObj?.name || "Toàn viện / Chưa gán";
+
+  const formatDate = (dateStr?: any) => {
+    if (!dateStr) return "Chưa cập nhật";
+    try {
+      const d = new Date(dateStr);
+      if (isNaN(d.getTime())) return "Chưa cập nhật";
+      return d.toLocaleDateString("vi-VN", {
+        day: "2-digit",
+        month: "2-digit",
+        year: "numeric",
+      });
+    } catch {
+      return "Chưa cập nhật";
+    }
   };
 
-  const handleSms = () => {
-    if (!currentUser.phone) return;
-    Linking.openURL(`sms:${currentUser.phone}`).catch(() => {
-      Alert.alert("Lỗi", "Không thể gửi tin nhắn.");
-    });
+  const formatVND = (val?: number) => {
+    if (!val || val <= 0) return "Chưa thiết lập";
+    return new Intl.NumberFormat("vi-VN", {
+      style: "currency",
+      currency: "VND",
+    }).format(val);
   };
 
-  const handleEmail = () => {
-    if (!currentUser.email) return;
-    Linking.openURL(`mailto:${currentUser.email}`).catch(() => {
-      Alert.alert("Lỗi", "Không thể mở ứng dụng email.");
+  const handleOpenJd = () => {
+    if (!currentUser.jobDescriptionLink) return;
+    let url = currentUser.jobDescriptionLink.trim();
+    if (!/^https?:\/\//i.test(url)) {
+      url = `https://${url}`;
+    }
+    Linking.openURL(url).catch(() => {
+      showAlert("Lỗi", "Không thể mở liên kết mô tả công việc.", undefined, "error");
     });
   };
 
   const handleChangeRole = (newRole: UserRole) => {
     if (newRole === currentUser.role) return;
 
-    const newRoleCfg = ROLE_MAP[newRole] || ROLE_MAP.user;
-    Alert.alert(
+    const newRoleCfg = { ...(ROLE_MAP[newRole] || ROLE_MAP.user), label: roleLabel(newRole) };
+    showAlert(
       "Xác nhận thay đổi vai trò",
       `Bạn có chắc chắn muốn thay đổi quyền của "${currentUser.displayName}" thành "${newRoleCfg.label}" không?`,
       [
@@ -115,9 +235,12 @@ export const UserDetailModal: React.FC<UserDetailModalProps> = ({
             try {
               await onUpdate(currentUser.uid, { role: newRole });
               setCurrentUser((prev) => ({ ...prev, role: newRole }));
-              Alert.alert("Thành công", `Đã cập nhật vai trò thành "${newRoleCfg.label}".`);
+              showAlert(
+                "Thành công",
+                `Đã cập nhật vai trò thành "${newRoleCfg.label}".`, undefined, "success",
+              );
             } catch (err: any) {
-              Alert.alert("Lỗi cập nhật", err.message || "Không thể đổi vai trò.");
+              showAlert("Lỗi cập nhật", err.message || "Không thể đổi vai trò.", undefined, "error");
             } finally {
               setUpdating(false);
             }
@@ -130,53 +253,85 @@ export const UserDetailModal: React.FC<UserDetailModalProps> = ({
   const handleSaveProfile = async () => {
     const trimmedName = draftName.trim();
     if (!trimmedName || trimmedName.length < 2) {
-      Alert.alert("Thiếu thông tin", "Vui lòng nhập họ và tên (tối thiểu 2 ký tự).");
+      showAlert("Thiếu thông tin", "Vui lòng nhập họ và tên (tối thiểu 2 ký tự).", undefined, "error");
       return;
     }
 
-    const trimmedPhone = draftPhone.trim().replace(/[\s.-]/g, "");
-    if (trimmedPhone) {
-      const phoneRegex = /^(0|\+84)[0-9]{8,11}$/;
-      if (!phoneRegex.test(trimmedPhone)) {
-        Alert.alert("Số điện thoại không hợp lệ", "Số điện thoại không đúng định dạng (Ví dụ: 0912345678).");
+    const rawPhone = normalizePhone(draftPhone);
+    const cleanedPhone = rawPhone.replace(/[\s.\-()]/g, "");
+    if (cleanedPhone) {
+      const phoneRegex = /^(\+84|84|0)[0-9]{8,11}$/;
+      if (!phoneRegex.test(cleanedPhone)) {
+        showAlert(
+          "Số điện thoại không hợp lệ",
+          "Số điện thoại không đúng định dạng (Ví dụ: 0912345678 hoặc +84912345678).",
+          undefined,
+          "error",
+        );
         return;
       }
     }
 
+    const parsedSalary = draftSalary.trim()
+      ? Number(draftSalary.replace(/[^0-9]/g, ""))
+      : undefined;
+
+    let formattedBirthDate: string | undefined = undefined;
+    if (draftBirthDate.trim()) {
+      const normalized = normalizeDateInput(draftBirthDate.trim());
+      if (!/^\d{4}-\d{2}-\d{2}$/.test(normalized)) {
+        showAlert(
+          "Ngày sinh không hợp lệ",
+          "Vui lòng nhập ngày sinh theo định dạng YYYY-MM-DD (Ví dụ: 1995-08-20).",
+          undefined,
+          "error",
+        );
+        return;
+      }
+      formattedBirthDate = normalized;
+    }
+
     setUpdating(true);
     try {
-      const branchObj = branches.find((b) => b._id === draftBranchId);
+      const selectedBranchObj = branches.find((b) => b._id === draftBranchId);
       await onUpdate(currentUser.uid, {
         displayName: trimmedName,
-        phone: trimmedPhone || undefined,
+        phone: cleanedPhone || undefined,
         department: draftDept || undefined,
-        division: draftJobTitle.trim() || undefined,
-        jobTitle: draftJobTitle.trim() || undefined,
+        division: currentUser.division || undefined,
+        jobTitle: currentUser.jobTitle || undefined,
         branchId: draftBranchId || undefined,
+        birthDate: formattedBirthDate,
+        isLeader: draftIsLeader,
+        monthlySalary: parsedSalary,
+        jobDescriptionLink: draftJdLink.trim() || undefined,
       });
 
       setCurrentUser((prev) => ({
         ...prev,
         displayName: trimmedName,
-        phone: trimmedPhone,
+        phone: cleanedPhone,
         department: draftDept,
-        jobTitle: draftJobTitle.trim(),
-        division: draftJobTitle.trim(),
         branchId: draftBranchId,
-        branchName: branchObj ? branchObj.name : prev.branchName,
+        branchName: selectedBranchObj ? selectedBranchObj.name : prev.branchName,
+        birthDate: formattedBirthDate || prev.birthDate,
+        isLeader: draftIsLeader,
+        monthlySalary:
+          parsedSalary !== undefined ? parsedSalary : prev.monthlySalary,
+        jobDescriptionLink: draftJdLink.trim() || prev.jobDescriptionLink,
       }));
 
       setIsEditing(false);
-      Alert.alert("Thành công", "Đã cập nhật thông tin thành viên.");
+      showAlert("Thành công", "Đã cập nhật thông tin thành viên.", undefined, "success");
     } catch (err: any) {
-      Alert.alert("Lỗi cập nhật", err.message || "Không thể lưu thông tin.");
+      showAlert("Lỗi cập nhật", err.message || "Không thể lưu thông tin.", undefined, "error");
     } finally {
       setUpdating(false);
     }
   };
 
   const handleDelete = () => {
-    Alert.alert(
+    showAlert(
       "Xác nhận xóa tài khoản",
       `Bạn có chắc chắn muốn xóa tài khoản của "${currentUser.displayName}" khỏi hệ thống không? Hành động này không thể hoàn tác.`,
       [
@@ -190,7 +345,7 @@ export const UserDetailModal: React.FC<UserDetailModalProps> = ({
               await onDelete(currentUser.uid);
               onClose();
             } catch (err: any) {
-              Alert.alert("Lỗi", err.message || "Không thể xóa tài khoản.");
+              showAlert("Lỗi", err.message || "Không thể xóa tài khoản.", undefined, "error");
             } finally {
               setDeleting(false);
             }
@@ -200,39 +355,34 @@ export const UserDetailModal: React.FC<UserDetailModalProps> = ({
     );
   };
 
-  const formatDate = (dateStr?: any) => {
-    if (!dateStr) return "Chưa cập nhật";
-    try {
-      const d = new Date(dateStr);
-      return d.toLocaleDateString("vi-VN", {
-        day: "2-digit",
-        month: "2-digit",
-        year: "numeric",
-      });
-    } catch {
-      return "Chưa cập nhật";
-    }
-  };
-
   return (
-    <Modal visible={visible} animationType="slide" transparent onRequestClose={onClose}>
+    <Modal
+      visible={visible}
+      animationType="slide"
+      transparent
+      onRequestClose={onClose}
+    >
       <SafeAreaView style={styles.modalOverlay} edges={["top", "bottom"]}>
         <KeyboardAvoidingView
           behavior={Platform.OS === "ios" ? "padding" : undefined}
           style={styles.container}
         >
-          {/* Header */}
+          {/* Header Bar */}
           <View style={styles.header}>
             <View style={{ flex: 1 }}>
               <Text style={styles.headerTitle} numberOfLines={1}>
                 {currentUser.displayName || "Chi tiết người dùng"}
               </Text>
               <Text style={styles.headerSubtitle}>
-                Hồ sơ tài khoản & quyền hạn hệ thống
+                Hồ sơ tài khoản & phân quyền nhân sự
               </Text>
             </View>
-            <TouchableOpacity style={styles.closeBtn} onPress={onClose}>
-              <Ionicons name="close" size={20} color="#64748b" />
+            <TouchableOpacity
+              style={styles.closeBtn}
+              onPress={onClose}
+              hitSlop={{ top: 8, bottom: 8, left: 8, right: 8 }}
+            >
+              <X size={18} color="#64748b" />
             </TouchableOpacity>
           </View>
 
@@ -240,227 +390,381 @@ export const UserDetailModal: React.FC<UserDetailModalProps> = ({
             style={styles.scroll}
             contentContainerStyle={styles.scrollContent}
             keyboardShouldPersistTaps="handled"
+            showsVerticalScrollIndicator={false}
           >
-            {/* Primary Profile Card */}
+            {/* Primary Profile Identity Card */}
             <View style={styles.profileCard}>
               <View style={styles.profileTop}>
-                <View style={styles.avatarCircle}>
-                  <Text style={styles.avatarText}>
-                    {currentUser.displayName ? currentUser.displayName[0].toUpperCase() : "U"}
-                  </Text>
-                </View>
-                <View style={{ flex: 1 }}>
-                  <Text style={styles.profileName}>{currentUser.displayName}</Text>
-                  <Text style={styles.profileEmail}>{currentUser.email}</Text>
-                </View>
-                <View
-                  style={[
-                    styles.roleBadge,
-                    { backgroundColor: roleConfig.bg, borderColor: roleConfig.border },
-                  ]}
-                >
-                  <Ionicons name={roleConfig.icon} size={13} color={roleConfig.color} />
-                  <Text style={[styles.roleText, { color: roleConfig.color }]}>
-                    {roleConfig.label}
-                  </Text>
-                </View>
-              </View>
-
-              {/* Quick Actions: Call, SMS, Email */}
-              <View style={styles.actionRow}>
-                <TouchableOpacity
-                  style={[styles.actionBtn, styles.callBtn, !currentUser.phone && styles.actionBtnDisabled]}
-                  onPress={handleCall}
-                  disabled={!currentUser.phone}
-                  activeOpacity={0.7}
-                >
-                  <Ionicons name="call" size={15} color="#ffffff" />
-                  <Text style={styles.actionBtnText}>Gọi điện</Text>
-                </TouchableOpacity>
-
-                <TouchableOpacity
-                  style={[styles.actionBtn, styles.smsBtn, !currentUser.phone && styles.actionBtnDisabled]}
-                  onPress={handleSms}
-                  disabled={!currentUser.phone}
-                  activeOpacity={0.7}
-                >
-                  <Ionicons name="chatbox" size={15} color="#ffffff" />
-                  <Text style={styles.actionBtnText}>Gửi SMS</Text>
-                </TouchableOpacity>
-
-                <TouchableOpacity
-                  style={[styles.actionBtn, styles.emailBtn]}
-                  onPress={handleEmail}
-                  activeOpacity={0.7}
-                >
-                  <Ionicons name="mail" size={15} color="#ffffff" />
-                  <Text style={styles.actionBtnText}>Email</Text>
-                </TouchableOpacity>
-              </View>
-
-              {/* Info Attributes */}
-              {!isEditing ? (
-                <View style={styles.infoList}>
-                  <View style={styles.infoItem}>
-                    <Ionicons name="call-outline" size={14} color="#64748b" />
-                    <Text style={styles.infoText}>
-                      Điện thoại:{" "}
-                      <Text style={styles.infoHighlight}>
-                        {currentUser.phone || "Chưa có SĐT"}
-                      </Text>
-                    </Text>
-                  </View>
-
-                  <View style={styles.infoItem}>
-                    <Ionicons name="business-outline" size={14} color="#64748b" />
-                    <Text style={styles.infoText}>
-                      Chi nhánh:{" "}
-                      <Text style={styles.infoHighlight}>
-                        {currentUser.branchName || "Toàn viện / Chưa gán"}
-                      </Text>
-                    </Text>
-                  </View>
-
-                  <View style={styles.infoItem}>
-                    <Ionicons name="layers-outline" size={14} color="#64748b" />
-                    <Text style={styles.infoText}>
-                      Khoa / Phòng ban:{" "}
-                      <Text style={styles.infoHighlight}>
-                        {currentUser.department || "Chưa phân khoa"}
-                      </Text>
-                    </Text>
-                  </View>
-
-                  {currentUser.jobTitle ? (
-                    <View style={styles.infoItem}>
-                      <Ionicons name="id-card-outline" size={14} color="#64748b" />
-                      <Text style={styles.infoText}>
-                        Chức danh:{" "}
-                        <Text style={styles.infoHighlight}>{currentUser.jobTitle}</Text>
-                      </Text>
-                    </View>
-                  ) : null}
-
-                  <View style={styles.infoItem}>
-                    <Ionicons name="calendar-outline" size={14} color="#64748b" />
-                    <Text style={styles.infoText}>
-                      Ngày tham gia: {formatDate(currentUser.createdAt)}
-                    </Text>
-                  </View>
-
-                  {canManage && (
-                    <TouchableOpacity
-                      style={styles.editProfileBtn}
-                      onPress={() => setIsEditing(true)}
-                      activeOpacity={0.75}
-                    >
-                      <Ionicons name="create-outline" size={14} color="#0284c7" />
-                      <Text style={styles.editProfileBtnText}>
-                        Chỉnh sửa thông tin thành viên
-                      </Text>
-                    </TouchableOpacity>
-                  )}
-                </View>
-              ) : (
-                /* Inline Edit Form */
-                <View style={styles.editFormContainer}>
-                  <Text style={styles.editFormTitle}>Chỉnh sửa thông tin</Text>
-
-                  <View style={styles.fieldGroup}>
-                    <Text style={styles.fieldLabel}>Họ và tên</Text>
-                    <TextInput
-                      style={styles.input}
-                      value={draftName}
-                      onChangeText={setDraftName}
-                    />
-                  </View>
-
-                  <View style={styles.fieldGroup}>
-                    <Text style={styles.fieldLabel}>Số điện thoại</Text>
-                    <TextInput
-                      style={styles.input}
-                      keyboardType="phone-pad"
-                      value={draftPhone}
-                      onChangeText={setDraftPhone}
-                    />
-                  </View>
-
-                  <DropdownSelectField
-                    label="Chi nhánh công tác"
-                    value={
-                      branches.find((b) => b._id === draftBranchId)?.name ||
-                      "Toàn viện / Chưa gán"
-                    }
-                    icon="business-outline"
-                    iconColor="#0284c7"
-                    iconBgColor="#e0f2fe"
-                    onPress={() => setShowBranchPicker(true)}
+                {currentUser.photoURL ? (
+                  <Image
+                    source={{ uri: currentUser.photoURL }}
+                    style={styles.avatarImage}
                   />
+                ) : (
+                  <View style={styles.avatarCircle}>
+                    <Text style={styles.avatarText}>
+                      {currentUser.displayName
+                        ? currentUser.displayName[0].toUpperCase()
+                        : "U"}
+                    </Text>
+                  </View>
+                )}
 
-                  {departments.length > 0 ? (
-                    <DropdownSelectField
-                      label="Khoa / Phòng ban"
-                      value={draftDept || "Chưa chọn phòng ban"}
-                      icon="layers-outline"
-                      iconColor="#7c3aed"
-                      iconBgColor="#f5f3ff"
-                      onPress={() => setShowDeptPicker(true)}
-                    />
-                  ) : (
-                    <View style={styles.fieldGroup}>
-                      <Text style={styles.fieldLabel}>Khoa / Phòng ban</Text>
-                      <TextInput
-                        style={styles.input}
-                        value={draftDept}
-                        onChangeText={setDraftDept}
+                <View style={styles.profileMetaCol}>
+                  <View style={styles.nameRow}>
+                    <Text style={styles.profileName} numberOfLines={1}>
+                      {currentUser.displayName || "Chưa đặt tên"}
+                    </Text>
+                  </View>
+                  <Text style={styles.profileEmail} numberOfLines={1}>
+                    {currentUser.email}
+                  </Text>
+
+                  <View style={styles.badgesRow}>
+                    {/* Role badge */}
+                    <View
+                      style={[
+                        styles.roleBadge,
+                        {
+                          backgroundColor: roleConfig.bg,
+                          borderColor: roleConfig.border,
+                        },
+                      ]}
+                    >
+                      <Ionicons
+                        name={roleConfig.icon}
+                        size={12}
+                        color={roleConfig.color}
                       />
+                      <Text
+                        style={[styles.roleText, { color: roleConfig.color }]}
+                      >
+                        {roleConfig.label}
+                      </Text>
                     </View>
-                  )}
 
-                  <View style={styles.fieldGroup}>
-                    <Text style={styles.fieldLabel}>Chức vụ / Vị trí</Text>
-                    <TextInput
-                      style={styles.input}
-                      value={draftJobTitle}
-                      onChangeText={setDraftJobTitle}
-                    />
+                    {/* Active Status tag */}
+                    <View style={styles.statusBadge}>
+                      <View style={styles.statusDot} />
+                      <Text style={styles.statusText}>
+                        {currentUser.status === "online"
+                          ? "Trực tuyến"
+                          : "Hoạt động"}
+                      </Text>
+                    </View>
+                  </View>
+                </View>
+              </View>
+            </View>
+
+            {/* Display Mode (Full Info) vs Edit Mode */}
+            {!isEditing ? (
+              <>
+                {/* 1. Vị trí & Cơ cấu tổ chức */}
+                <View style={styles.sectionCard}>
+                  <View style={styles.sectionHeader}>
+                    <View
+                      style={[styles.sectionIconWrap, { backgroundColor: "#eff6ff" }]}
+                    >
+                      <Building2 size={15} color="#2563eb" />
+                    </View>
+                    <Text style={styles.sectionTitle}>
+                      Đơn vị & Cơ cấu tổ chức
+                    </Text>
                   </View>
 
-                  <View style={styles.editButtonsRow}>
-                    <AppButton
-                      title="Hủy"
-                      variant="secondary"
-                      size="sm"
-                      onPress={() => setIsEditing(false)}
-                      style={{ flex: 1 }}
-                      disabled={updating}
+                  <View style={styles.infoGroup}>
+                    <InfoRow
+                      icon={Building2}
+                      iconColor="#0284c7"
+                      label="Chi nhánh công tác"
+                      value={branchDisplayName}
+                      highlight
                     />
-                    <AppButton
-                      title="Lưu thay đổi"
-                      variant="primary"
-                      size="sm"
-                      icon="save-outline"
-                      onPress={handleSaveProfile}
-                      loading={updating}
-                      style={{ flex: 1.5 }}
+                    <InfoRow
+                      icon={Layers}
+                      iconColor="#7c3aed"
+                      label="Khoa / Phòng ban"
+                      value={currentUser.department || "Chưa phân khoa"}
+                      highlight
+                    />
+                    <InfoRow
+                      icon={Building2}
+                      iconColor="#64748b"
+                      label="Đơn vị quản lý"
+                      value={
+                        currentUser.companyName ||
+                        currentUser.companyCode ||
+                        "Hệ thống LuxCare"
+                      }
                     />
                   </View>
                 </View>
-              )}
-            </View>
+
+                {/* 2. Thông tin cá nhân & Liên hệ */}
+                <View style={styles.sectionCard}>
+                  <View style={styles.sectionHeader}>
+                    <View
+                      style={[styles.sectionIconWrap, { backgroundColor: "#f0fdf4" }]}
+                    >
+                      <User size={15} color="#16a34a" />
+                    </View>
+                    <Text style={styles.sectionTitle}>
+                      Thông tin cá nhân & Liên hệ
+                    </Text>
+                  </View>
+
+                  <View style={styles.infoGroup}>
+                    <InfoRow
+                      icon={Phone}
+                      iconColor="#059669"
+                      label="Số điện thoại"
+                      value={currentUser.phone || "Chưa cập nhật"}
+                      highlight={!!currentUser.phone}
+                    />
+                    <InfoRow
+                      icon={Mail}
+                      iconColor="#2563eb"
+                      label="Email tài khoản"
+                      value={currentUser.email}
+                    />
+                    <InfoRow
+                      icon={Calendar}
+                      iconColor="#ea580c"
+                      label="Ngày sinh"
+                      value={formatDate(currentUser.birthDate)}
+                    />
+                    <InfoRow
+                      icon={Award}
+                      iconColor="#9333ea"
+                      label="Trình độ chuyên môn"
+                      value={currentUser.qualification || "Chưa cập nhật"}
+                    />
+                  </View>
+                </View>
+
+                {/* 3. Hệ thống & Hợp đồng */}
+                <View style={styles.sectionCard}>
+                  <View style={styles.sectionHeader}>
+                    <View
+                      style={[styles.sectionIconWrap, { backgroundColor: "#f8fafc" }]}
+                    >
+                      <FileText size={15} color="#475569" />
+                    </View>
+                    <Text style={styles.sectionTitle}>Hệ thống & Đãi ngộ</Text>
+                  </View>
+
+                  <View style={styles.infoGroup}>
+                    <InfoRow
+                      icon={Calendar}
+                      iconColor="#0284c7"
+                      label="Ngày tham gia hệ thống"
+                      value={formatDate(currentUser.createdAt)}
+                    />
+                    <InfoRow
+                      icon={DollarSign}
+                      iconColor="#059669"
+                      label="Mức lương cơ bản"
+                      value={
+                        currentUser.monthlySalary
+                          ? formatVND(currentUser.monthlySalary)
+                          : "Thỏa thuận / Chưa thiết lập"
+                      }
+                    />
+                    {currentUser.jobDescriptionLink ? (
+                      <InfoRow
+                        icon={ExternalLink}
+                        iconColor="#2563eb"
+                        label="Bản mô tả công việc (JD)"
+                        value="Xem tài liệu JD"
+                        action={{
+                          label: "Mở liên kết",
+                          onPress: handleOpenJd,
+                        }}
+                      />
+                    ) : null}
+                  </View>
+                </View>
+
+                {/* Edit Button */}
+                {canManage && (
+                  <TouchableOpacity
+                    style={styles.editProfileBtn}
+                    onPress={() => setIsEditing(true)}
+                    activeOpacity={0.8}
+                  >
+                    <Edit3 size={15} color="#0284c7" />
+                    <Text style={styles.editProfileBtnText}>
+                      Chỉnh sửa hồ sơ thành viên
+                    </Text>
+                  </TouchableOpacity>
+                )}
+              </>
+            ) : (
+              /* Inline Edit Form */
+              <View style={styles.editFormContainer}>
+                <View style={styles.editFormHeader}>
+                  <View
+                    style={[styles.sectionIconWrap, { backgroundColor: "#e0f2fe" }]}
+                  >
+                    <Edit3 size={15} color="#0284c7" />
+                  </View>
+                  <Text style={styles.editFormTitle}>
+                    Cập nhật thông tin thành viên
+                  </Text>
+                </View>
+
+                <View style={styles.fieldGroup}>
+                  <Text style={styles.fieldLabel}>
+                    Họ và tên <Text style={styles.requiredStar}>*</Text>
+                  </Text>
+                  <TextInput
+                    style={styles.input}
+                    value={draftName}
+                    onChangeText={setDraftName}
+                    placeholder="Nhập họ và tên"
+                    placeholderTextColor="#94a3b8"
+                  />
+                </View>
+
+                <View style={styles.fieldGroup}>
+                  <Text style={styles.fieldLabel}>Số điện thoại</Text>
+                  <TextInput
+                    style={styles.input}
+                    keyboardType="phone-pad"
+                    value={draftPhone}
+                    onChangeText={setDraftPhone}
+                    placeholder="Ví dụ: 0912345678"
+                    placeholderTextColor="#94a3b8"
+                  />
+                </View>
+
+                <DropdownSelectField
+                  label="Chi nhánh công tác"
+                  value={
+                    branches.find((b) => b._id === draftBranchId)?.name ||
+                    "Toàn viện / Chưa gán"
+                  }
+                  icon="business-outline"
+                  iconColor="#0284c7"
+                  iconBgColor="#e0f2fe"
+                  onPress={() => setShowBranchPicker(true)}
+                />
+
+                {departments.length > 0 ? (
+                  <DropdownSelectField
+                    label="Khoa / Phòng ban"
+                    value={draftDept || "Chưa chọn phòng ban"}
+                    icon="layers-outline"
+                    iconColor="#7c3aed"
+                    iconBgColor="#f5f3ff"
+                    onPress={() => setShowDeptPicker(true)}
+                  />
+                ) : (
+                  <View style={styles.fieldGroup}>
+                    <Text style={styles.fieldLabel}>Khoa / Phòng ban</Text>
+                    <TextInput
+                      style={styles.input}
+                      value={draftDept}
+                      onChangeText={setDraftDept}
+                      placeholder="Nhập tên khoa / phòng ban"
+                      placeholderTextColor="#94a3b8"
+                    />
+                  </View>
+                )}
+
+                <View style={styles.fieldGroup}>
+                  <Text style={styles.fieldLabel}>Ngày sinh (YYYY-MM-DD)</Text>
+                  <TextInput
+                    style={styles.input}
+                    value={draftBirthDate}
+                    onChangeText={setDraftBirthDate}
+                    placeholder="YYYY-MM-DD"
+                    placeholderTextColor="#94a3b8"
+                  />
+                </View>
+
+                <View style={styles.fieldGroup}>
+                  <Text style={styles.fieldLabel}>Mức lương cơ bản (VNĐ)</Text>
+                  <TextInput
+                    style={styles.input}
+                    keyboardType="numeric"
+                    value={draftSalary}
+                    onChangeText={setDraftSalary}
+                    placeholder="Nhập mức lương (ví dụ: 15000000)"
+                    placeholderTextColor="#94a3b8"
+                  />
+                </View>
+
+                <View style={styles.fieldGroup}>
+                  <Text style={styles.fieldLabel}>
+                    Liên kết bản mô tả công việc (JD)
+                  </Text>
+                  <TextInput
+                    style={styles.input}
+                    value={draftJdLink}
+                    onChangeText={setDraftJdLink}
+                    placeholder="https://..."
+                    placeholderTextColor="#94a3b8"
+                    autoCapitalize="none"
+                  />
+                </View>
+
+                <View style={styles.switchRow}>
+                  <View style={{ flex: 1 }}>
+                    <Text style={styles.switchLabel}>Trưởng đơn vị / Leader</Text>
+                    <Text style={styles.switchSublabel}>
+                      Kích hoạt vai trò quản lý phụ trách bộ phận
+                    </Text>
+                  </View>
+                  <Switch
+                    value={draftIsLeader}
+                    onValueChange={setDraftIsLeader}
+                    trackColor={{ false: "#cbd5e1", true: "#93c5fd" }}
+                    thumbColor={draftIsLeader ? "#0284c7" : "#f1f5f9"}
+                  />
+                </View>
+
+                <View style={styles.editButtonsRow}>
+                  <AppButton
+                    title="Hủy"
+                    variant="secondary"
+                    size="sm"
+                    onPress={() => setIsEditing(false)}
+                    style={{ flex: 1 }}
+                    disabled={updating}
+                  />
+                  <AppButton
+                    title="Lưu thay đổi"
+                    variant="primary"
+                    size="sm"
+                    icon="save-outline"
+                    onPress={handleSaveProfile}
+                    loading={updating}
+                    style={{ flex: 1.5 }}
+                  />
+                </View>
+              </View>
+            )}
 
             {/* Quick Role Switcher (Quyền hạn) */}
             {canManage && (
               <View style={styles.sectionCard}>
                 <View style={styles.sectionHeader}>
-                  <Ionicons name="shield-checkmark-outline" size={16} color="#059669" />
+                  <View
+                    style={[styles.sectionIconWrap, { backgroundColor: "#ecfdf5" }]}
+                  >
+                    <ShieldCheck size={15} color="#059669" />
+                  </View>
                   <Text style={styles.sectionTitle}>Chuyển quyền vai trò</Text>
                   {updating && <ActivityIndicator size="small" color="#059669" />}
                 </View>
 
                 <View style={styles.rolesRow}>
-                  {ROLES_ORDER.map((r) => {
-                    const cfg = ROLE_MAP[r];
+                  {!!roleOptions.error && <Text style={{ color: "#b91c1c" }}>{roleOptions.error}</Text>}
+                  {(currentUser.uid === actor?.uid ? [] : roleOptions.assignable).map((option) => {
+                    const r = option.role;
+                    const cfg = { ...(ROLE_MAP[r] || ROLE_MAP.user), label: roleTitle(option) };
                     const isSelected = currentUser.role === r;
                     return (
                       <TouchableOpacity
@@ -628,15 +932,59 @@ export const UserDetailModal: React.FC<UserDetailModalProps> = ({
             </TouchableOpacity>
           </Modal>
         </KeyboardAvoidingView>
+        {alertView}
       </SafeAreaView>
     </Modal>
   );
 };
 
+// Reusable Info Row Component
+function InfoRow({
+  icon: IconComponent,
+  iconColor = "#64748b",
+  label,
+  value,
+  highlight,
+  action,
+}: {
+  icon: React.ComponentType<{ size: number; color: string }>;
+  iconColor?: string;
+  label: string;
+  value?: string | React.ReactNode;
+  highlight?: boolean;
+  action?: { label: string; onPress: () => void };
+}) {
+  return (
+    <View style={styles.infoRow}>
+      <View style={styles.infoIconBox}>
+        <IconComponent size={14} color={iconColor} />
+      </View>
+      <View style={styles.infoContentCol}>
+        <Text style={styles.infoLabel}>{label}</Text>
+        <Text
+          style={[styles.infoValue, highlight && styles.infoValueHighlight]}
+          numberOfLines={2}
+        >
+          {value || "Chưa cập nhật"}
+        </Text>
+      </View>
+      {action && (
+        <TouchableOpacity
+          style={styles.infoActionBtn}
+          onPress={action.onPress}
+          activeOpacity={0.7}
+        >
+          <Text style={styles.infoActionBtnText}>{action.label}</Text>
+        </TouchableOpacity>
+      )}
+    </View>
+  );
+}
+
 const styles = StyleSheet.create({
   modalOverlay: {
     flex: 1,
-    backgroundColor: "rgba(15, 23, 42, 0.6)",
+    backgroundColor: "rgba(15, 23, 42, 0.65)",
     justifyContent: "flex-end",
   },
   container: {
@@ -650,7 +998,7 @@ const styles = StyleSheet.create({
     flexDirection: "row",
     alignItems: "center",
     justifyContent: "space-between",
-    paddingHorizontal: 18,
+    paddingHorizontal: 20,
     paddingVertical: 14,
     backgroundColor: "#ffffff",
     borderTopLeftRadius: 24,
@@ -693,39 +1041,60 @@ const styles = StyleSheet.create({
   profileTop: {
     flexDirection: "row",
     alignItems: "center",
-    gap: 12,
-    marginBottom: 14,
+    gap: 14,
   },
   avatarCircle: {
-    width: 48,
-    height: 48,
-    borderRadius: 24,
-    backgroundColor: "#f0fdf4",
+    width: 52,
+    height: 52,
+    borderRadius: 26,
+    backgroundColor: "#ecfdf5",
     borderWidth: 1.5,
-    borderColor: "#bbf7d0",
+    borderColor: "#a7f3d0",
     alignItems: "center",
     justifyContent: "center",
   },
+  avatarImage: {
+    width: 52,
+    height: 52,
+    borderRadius: 26,
+    borderWidth: 1.5,
+    borderColor: "#e2e8f0",
+  },
   avatarText: {
-    fontSize: 18,
+    fontSize: 20,
     fontWeight: "700",
-    color: "#16a34a",
+    color: "#059669",
+  },
+  profileMetaCol: {
+    flex: 1,
+    gap: 3,
+  },
+  nameRow: {
+    flexDirection: "row",
+    alignItems: "center",
+    justifyContent: "space-between",
   },
   profileName: {
-    fontSize: 16,
+    fontSize: 16.5,
     fontWeight: "700",
     color: "#0f172a",
   },
   profileEmail: {
     fontSize: 12.5,
     color: "#64748b",
-    marginTop: 2,
+  },
+  badgesRow: {
+    flexDirection: "row",
+    alignItems: "center",
+    flexWrap: "wrap",
+    gap: 6,
+    marginTop: 4,
   },
   roleBadge: {
     flexDirection: "row",
     alignItems: "center",
     paddingHorizontal: 8,
-    paddingVertical: 4,
+    paddingVertical: 3,
     borderRadius: 999,
     borderWidth: 1,
     gap: 4,
@@ -734,108 +1103,43 @@ const styles = StyleSheet.create({
     fontSize: 11,
     fontWeight: "600",
   },
-  actionRow: {
-    flexDirection: "row",
-    gap: 8,
-    marginBottom: 14,
-  },
-  actionBtn: {
-    flex: 1,
+  leaderBadge: {
     flexDirection: "row",
     alignItems: "center",
-    justifyContent: "center",
-    paddingVertical: 9,
-    borderRadius: 10,
-    gap: 5,
-  },
-  actionBtnDisabled: {
-    opacity: 0.4,
-  },
-  callBtn: {
-    backgroundColor: "#059669",
-  },
-  smsBtn: {
-    backgroundColor: "#0284c7",
-  },
-  emailBtn: {
-    backgroundColor: "#6366f1",
-  },
-  actionBtnText: {
-    fontSize: 12,
-    fontWeight: "600",
-    color: "#ffffff",
-  },
-  infoList: {
-    gap: 8,
-    borderTopWidth: 1,
-    borderTopColor: "#f1f5f9",
-    paddingTop: 12,
-  },
-  infoItem: {
-    flexDirection: "row",
-    alignItems: "center",
-    gap: 8,
-  },
-  infoText: {
-    fontSize: 12.5,
-    color: "#475569",
-    flex: 1,
-  },
-  infoHighlight: {
-    fontWeight: "600",
-    color: "#0f172a",
-  },
-  editProfileBtn: {
-    flexDirection: "row",
-    alignItems: "center",
-    justifyContent: "center",
-    backgroundColor: "#f0f9ff",
+    backgroundColor: "#fffbeb",
+    borderColor: "#fde68a",
     borderWidth: 1,
-    borderColor: "#bae6fd",
-    borderRadius: 10,
-    paddingVertical: 8,
-    gap: 6,
-    marginTop: 8,
+    paddingHorizontal: 7,
+    paddingVertical: 3,
+    borderRadius: 999,
+    gap: 3,
   },
-  editProfileBtnText: {
-    fontSize: 12.5,
+  leaderBadgeText: {
+    fontSize: 10.5,
     fontWeight: "600",
-    color: "#0284c7",
+    color: "#b45309",
   },
-  editFormContainer: {
-    borderTopWidth: 1,
-    borderTopColor: "#f1f5f9",
-    paddingTop: 12,
-    gap: 10,
-  },
-  editFormTitle: {
-    fontSize: 13,
-    fontWeight: "700",
-    color: "#1e293b",
-    marginBottom: 2,
-  },
-  fieldGroup: {
+  statusBadge: {
+    flexDirection: "row",
+    alignItems: "center",
+    backgroundColor: "#f0fdf4",
+    borderColor: "#bbf7d0",
+    borderWidth: 1,
+    paddingHorizontal: 7,
+    paddingVertical: 3,
+    borderRadius: 999,
     gap: 4,
   },
-  fieldLabel: {
-    fontSize: 12,
+  statusDot: {
+    width: 6,
+    height: 6,
+    borderRadius: 3,
+    backgroundColor: "#16a34a",
+  },
+  statusText: {
+    fontSize: 10.5,
     fontWeight: "600",
-    color: "#475569",
-  },
-  input: {
-    height: 40,
-    backgroundColor: "#f8fafc",
-    borderWidth: 1,
-    borderColor: "#cbd5e1",
-    borderRadius: 10,
-    paddingHorizontal: 12,
-    fontSize: 13,
-    color: "#0f172a",
-  },
-  editButtonsRow: {
-    flexDirection: "row",
-    gap: 8,
-    marginTop: 4,
+    color: "#16a34a",
   },
   sectionCard: {
     backgroundColor: "#ffffff",
@@ -847,14 +1151,157 @@ const styles = StyleSheet.create({
   sectionHeader: {
     flexDirection: "row",
     alignItems: "center",
-    gap: 6,
+    gap: 8,
     marginBottom: 10,
+    borderBottomWidth: 1,
+    borderBottomColor: "#f1f5f9",
+    paddingBottom: 8,
+  },
+  sectionIconWrap: {
+    width: 26,
+    height: 26,
+    borderRadius: 8,
+    alignItems: "center",
+    justifyContent: "center",
   },
   sectionTitle: {
     fontSize: 13.5,
     fontWeight: "700",
     color: "#1e293b",
     flex: 1,
+  },
+  infoGroup: {
+    gap: 9,
+  },
+  infoRow: {
+    flexDirection: "row",
+    alignItems: "center",
+    gap: 10,
+  },
+  infoIconBox: {
+    width: 28,
+    height: 28,
+    borderRadius: 7,
+    backgroundColor: "#f8fafc",
+    alignItems: "center",
+    justifyContent: "center",
+  },
+  infoContentCol: {
+    flex: 1,
+  },
+  infoLabel: {
+    fontSize: 11,
+    fontWeight: "500",
+    color: "#64748b",
+  },
+  infoValue: {
+    fontSize: 13,
+    color: "#334155",
+    fontWeight: "500",
+    marginTop: 1,
+  },
+  infoValueHighlight: {
+    fontWeight: "600",
+    color: "#0f172a",
+  },
+  infoActionBtn: {
+    backgroundColor: "#eff6ff",
+    borderColor: "#bfdbfe",
+    borderWidth: 1,
+    paddingHorizontal: 8,
+    paddingVertical: 4,
+    borderRadius: 6,
+  },
+  infoActionBtnText: {
+    fontSize: 11,
+    fontWeight: "600",
+    color: "#1d4ed8",
+  },
+  editProfileBtn: {
+    flexDirection: "row",
+    alignItems: "center",
+    justifyContent: "center",
+    backgroundColor: "#f0f9ff",
+    borderWidth: 1,
+    borderColor: "#bae6fd",
+    borderRadius: 12,
+    paddingVertical: 10,
+    gap: 7,
+  },
+  editProfileBtnText: {
+    fontSize: 13,
+    fontWeight: "600",
+    color: "#0284c7",
+  },
+  editFormContainer: {
+    backgroundColor: "#ffffff",
+    borderRadius: 14,
+    padding: 14,
+    borderWidth: 1,
+    borderColor: "#e2e8f0",
+    gap: 10,
+  },
+  editFormHeader: {
+    flexDirection: "row",
+    alignItems: "center",
+    gap: 8,
+    borderBottomWidth: 1,
+    borderBottomColor: "#f1f5f9",
+    paddingBottom: 8,
+    marginBottom: 4,
+  },
+  editFormTitle: {
+    fontSize: 14,
+    fontWeight: "700",
+    color: "#1e293b",
+  },
+  fieldGroup: {
+    gap: 4,
+  },
+  fieldLabel: {
+    fontSize: 12,
+    fontWeight: "600",
+    color: "#475569",
+  },
+  requiredStar: {
+    color: "#ef4444",
+  },
+  input: {
+    height: 40,
+    backgroundColor: "#f8fafc",
+    borderWidth: 1,
+    borderColor: "#cbd5e1",
+    borderRadius: 10,
+    paddingHorizontal: 12,
+    fontSize: 13,
+    color: "#0f172a",
+  },
+  switchRow: {
+    flexDirection: "row",
+    alignItems: "center",
+    justifyContent: "space-between",
+    backgroundColor: "#f8fafc",
+    borderWidth: 1,
+    borderColor: "#e2e8f0",
+    borderRadius: 10,
+    paddingHorizontal: 12,
+    paddingVertical: 10,
+    marginVertical: 4,
+  },
+  switchLabel: {
+    fontSize: 12.5,
+    fontWeight: "600",
+    color: "#1e293b",
+  },
+  switchSublabel: {
+    fontSize: 11,
+    color: "#64748b",
+    marginTop: 1,
+  },
+  editButtonsRow: {
+    flexDirection: "row",
+    gap: 8,
+    marginTop: 6,
   },
   rolesRow: {
     flexDirection: "row",
@@ -876,7 +1323,7 @@ const styles = StyleSheet.create({
   },
   deleteSection: {
     marginTop: 4,
-    marginBottom: 12,
+    marginBottom: 16,
     alignItems: "center",
   },
   pickerBackdrop: {

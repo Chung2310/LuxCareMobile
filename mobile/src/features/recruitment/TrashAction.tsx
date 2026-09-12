@@ -1,5 +1,5 @@
+import { useAppAlert } from "../../components/AppAlert";
 import { useRef, useState } from "react";
-import { Alert } from "react-native";
 import { recruitment } from "../../api/services";
 import { messageOf } from "../../auth/SessionProvider";
 import { Button, ErrorText } from "../../ui";
@@ -20,6 +20,7 @@ export function TrashAction({
   onSaved: () => void;
   setBusy: (value: boolean) => void;
 }) {
+  const { showAlert, alertView } = useAppAlert();
   const [blocked, setBlocked] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const lock = useRef(false);
@@ -54,12 +55,13 @@ export function TrashAction({
         title={deleted ? "Khôi phục" : "Chuyển vào thùng rác"}
         disabled={blocked}
         onPress={() =>
-          Alert.alert(deleted ? "Khôi phục bản ghi?" : "Xóa mềm bản ghi?", title, [
+          showAlert(deleted ? "Khôi phục bản ghi?" : "Xóa mềm bản ghi?", title, [
             { text: "Hủy", style: "cancel" },
             { text: "Xác nhận", style: deleted ? "default" : "destructive", onPress: () => void run() },
           ])
         }
       />
+      {alertView}
     </>
   );
 }

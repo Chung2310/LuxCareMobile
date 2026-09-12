@@ -1,7 +1,7 @@
+import { useAppAlert } from "../../src/components/AppAlert";
 import React, { useCallback, useMemo, useState } from "react";
 import {
   ActivityIndicator,
-  Alert,
   Modal,
   Pressable,
   ScrollView,
@@ -196,6 +196,7 @@ function parseIsoTimePart(isoString?: string): string {
    2. MAIN COMPONENT: WORK SCHEDULE (LỊCH LÀM VIỆC)
    ========================================================================== */
 export default function CalendarEvents() {
+  const { showAlert, alertView } = useAppAlert();
   const { user, selectedBranch } = useSession();
   const allowed = canUseModule(user, "hr") && !!user?.companyCode;
   const isManager = hasPermission(user, "timekeeping:manage") || user?.role === "admin" || user?.role === "superadmin";
@@ -270,6 +271,9 @@ export default function CalendarEvents() {
 
   // Modal State for Edit Employee Shift & Hours
   const [editingEmployeeShift, setEditingEmployeeShift] = useState<ShiftEmployee | null>(null);
+  const hasOpenCalendarModal = isAddModalOpen || !!viewingItem ||
+    editingCalendarItem !== null || editingEmployeeShift !== null ||
+    editingShift !== null || editingHoliday !== null;
   const [assignShiftId, setAssignShiftId] = useState<string>("");
   const [assignEffectiveFrom, setAssignEffectiveFrom] = useState<string>(todayStr);
   const [assignEffectiveTo, setAssignEffectiveTo] = useState<string>("");
@@ -479,11 +483,11 @@ export default function CalendarEvents() {
      ========================================================================== */
   async function handleCreateEvent() {
     if (!newTitle.trim()) {
-      Alert.alert("Lỗi", "Vui lòng nhập tiêu đề sự kiện.");
+      showAlert("Lỗi", "Vui lòng nhập tiêu đề sự kiện.", undefined, "error");
       return;
     }
     if (!newStartDate || !newEndDate) {
-      Alert.alert("Lỗi", "Vui lòng nhập ngày bắt đầu và kết thúc.");
+      showAlert("Lỗi", "Vui lòng nhập ngày bắt đầu và kết thúc.", undefined, "error");
       return;
     }
 
@@ -507,13 +511,13 @@ export default function CalendarEvents() {
       };
 
       await hrCalendar.create(payload);
-      Alert.alert("Thành công", "Đã thêm lịch trình mới.");
+      showAlert("Thành công", "Đã thêm lịch trình mới.", undefined, "success");
       setIsAddModalOpen(false);
       setNewTitle("");
       setNewDesc("");
       setRevision((v) => v + 1);
     } catch (err) {
-      Alert.alert("Lỗi", messageOf(err));
+      showAlert("Lỗi", messageOf(err), undefined, "error");
     } finally {
       setIsSavingEvent(false);
     }
@@ -521,7 +525,7 @@ export default function CalendarEvents() {
 
   async function handleDeleteEvent(id?: string) {
     if (!id) return;
-    Alert.alert("Xác nhận xóa", "Bạn có chắc chắn muốn xóa mục lịch trình này?", [
+    showAlert("Xác nhận xóa", "Bạn có chắc chắn muốn xóa mục lịch trình này?", [
       { text: "Hủy", style: "cancel" },
       {
         text: "Xóa",
@@ -532,7 +536,7 @@ export default function CalendarEvents() {
             setViewingItem(null);
             setRevision((v) => v + 1);
           } catch (err) {
-            Alert.alert("Lỗi", messageOf(err));
+            showAlert("Lỗi", messageOf(err), undefined, "error");
           }
         },
       },
@@ -555,11 +559,11 @@ export default function CalendarEvents() {
   async function handleSaveEditEvent() {
     if (!editingCalendarItem) return;
     if (!editTitle.trim()) {
-      Alert.alert("Lỗi", "Vui lòng nhập tiêu đề sự kiện.");
+      showAlert("Lỗi", "Vui lòng nhập tiêu đề sự kiện.", undefined, "error");
       return;
     }
     if (!editStartDate || !editEndDate) {
-      Alert.alert("Lỗi", "Vui lòng nhập ngày bắt đầu và kết thúc.");
+      showAlert("Lỗi", "Vui lòng nhập ngày bắt đầu và kết thúc.", undefined, "error");
       return;
     }
 
@@ -585,11 +589,11 @@ export default function CalendarEvents() {
       };
 
       await hrCalendar.update(targetId, payload);
-      Alert.alert("Thành công", "Đã cập nhật giờ làm và lịch trình.");
+      showAlert("Thành công", "Đã cập nhật giờ làm và lịch trình.", undefined, "success");
       setEditingCalendarItem(null);
       setRevision((v) => v + 1);
     } catch (err) {
-      Alert.alert("Lỗi", messageOf(err));
+      showAlert("Lỗi", messageOf(err), undefined, "error");
     } finally {
       setIsUpdatingEvent(false);
     }
@@ -626,11 +630,11 @@ export default function CalendarEvents() {
   async function handleSaveEmployeeShift() {
     if (!editingEmployeeShift) return;
     if (!assignEffectiveFrom.trim()) {
-      Alert.alert("Lỗi", "Vui lòng nhập ngày bắt đầu hiệu lực.");
+      showAlert("Lỗi", "Vui lòng nhập ngày bắt đầu hiệu lực.", undefined, "error");
       return;
     }
     if (assignDaysOfWeek.length === 0) {
-      Alert.alert("Lỗi", "Vui lòng chọn ít nhất một ngày làm việc trong tuần.");
+      showAlert("Lỗi", "Vui lòng chọn ít nhất một ngày làm việc trong tuần.", undefined, "error");
       return;
     }
 
@@ -640,7 +644,7 @@ export default function CalendarEvents() {
 
       if (isCustomHoursMode) {
         if (!customStartTime || !customEndTime) {
-          Alert.alert("Lỗi", "Vui lòng nhập đầy đủ giờ bắt đầu và kết thúc.");
+          showAlert("Lỗi", "Vui lòng nhập đầy đủ giờ bắt đầu và kết thúc.", undefined, "error");
           setIsSavingEmployeeShift(false);
           return;
         }
@@ -663,7 +667,7 @@ export default function CalendarEvents() {
       }
 
       if (!finalShiftId) {
-        Alert.alert("Lỗi", "Vui lòng chọn ca làm việc.");
+        showAlert("Lỗi", "Vui lòng chọn ca làm việc.", undefined, "error");
         setIsSavingEmployeeShift(false);
         return;
       }
@@ -676,11 +680,11 @@ export default function CalendarEvents() {
         daysOfWeek: assignDaysOfWeek,
       });
 
-      Alert.alert("Thành công", `Đã lưu phân ca và giờ làm việc cho ${editingEmployeeShift.displayName || editingEmployeeShift.email}.`);
+      showAlert("Thành công", `Đã lưu phân ca và giờ làm việc cho ${editingEmployeeShift.displayName || editingEmployeeShift.email}.`, undefined, "success");
       setEditingEmployeeShift(null);
       setRevision((v) => v + 1);
     } catch (err) {
-      Alert.alert("Lỗi", messageOf(err));
+      showAlert("Lỗi", messageOf(err), undefined, "error");
     } finally {
       setIsSavingEmployeeShift(false);
     }
@@ -1010,7 +1014,7 @@ export default function CalendarEvents() {
      10. CRUD HANDLERS & RENDER SUB-TAB 4: CA & NGÀY LỄ (SHIFTS & HOLIDAYS)
      ========================================================================== */
   const handleDeleteShift = (sh: WorkShift) => {
-    Alert.alert(
+    showAlert(
       "Xóa ca làm việc?",
       `Bạn có chắc chắn muốn xóa ca "${sh.name}" (${sh.code})? Ca đã được phân cho nhân viên có thể bị backend từ chối xóa; hãy ngừng hoạt động nếu cần.`,
       [
@@ -1023,7 +1027,7 @@ export default function CalendarEvents() {
               await attendance.removeShift(sh._id);
               setRevision((v) => v + 1);
             } catch (e) {
-              Alert.alert("Lỗi xóa ca", messageOf(e));
+              showAlert("Lỗi xóa ca", messageOf(e), undefined, "error");
             }
           },
         },
@@ -1032,7 +1036,7 @@ export default function CalendarEvents() {
   };
 
   const handleDeleteHoliday = (h: WorkCalendarDay) => {
-    Alert.alert(
+    showAlert(
       "Xóa ngày nghỉ lễ?",
       `Bạn có chắc chắn muốn xóa ngày lễ "${h.name}" (${h.date})?`,
       [
@@ -1045,7 +1049,7 @@ export default function CalendarEvents() {
               await workCalendar.remove(h._id);
               setRevision((v) => v + 1);
             } catch (e) {
-              Alert.alert("Lỗi xóa ngày lễ", messageOf(e));
+              showAlert("Lỗi xóa ngày lễ", messageOf(e), undefined, "error");
             }
           },
         },
@@ -1055,7 +1059,7 @@ export default function CalendarEvents() {
 
   const handleToggleHolidayApplied = (h: WorkCalendarDay) => {
     if (h.isApplied) {
-      Alert.alert(
+      showAlert(
         "Tắt áp dụng ngày lễ?",
         `Tắt áp dụng ngày "${h.name}" (${h.date}). Ngày này sẽ được tính như ngày làm việc bình thường.`,
         [
@@ -1068,14 +1072,14 @@ export default function CalendarEvents() {
                 await workCalendar.update(h._id, { isApplied: false, adminReason: "Tắt bởi quản lý" });
                 setRevision((v) => v + 1);
               } catch (e) {
-                Alert.alert("Lỗi", messageOf(e));
+                showAlert("Lỗi", messageOf(e), undefined, "error");
               }
             },
           },
         ],
       );
     } else {
-      Alert.alert(
+      showAlert(
         "Bật áp dụng ngày lễ?",
         `Bật lại ngày "${h.name}" (${h.date}) để nhân viên được tính công nghỉ lễ.`,
         [
@@ -1087,7 +1091,7 @@ export default function CalendarEvents() {
                 await workCalendar.update(h._id, { isApplied: true });
                 setRevision((v) => v + 1);
               } catch (e) {
-                Alert.alert("Lỗi", messageOf(e));
+                showAlert("Lỗi", messageOf(e), undefined, "error");
               }
             },
           },
@@ -1097,7 +1101,7 @@ export default function CalendarEvents() {
   };
 
   const handleSyncHolidays = () => {
-    Alert.alert(
+    showAlert(
       "Đồng bộ ngày lễ quốc gia?",
       `Đồng bộ toàn bộ lịch nghỉ lễ chuẩn quốc gia năm ${year} cho doanh nghiệp.`,
       [
@@ -1109,9 +1113,9 @@ export default function CalendarEvents() {
             try {
               await workCalendar.sync(year);
               setRevision((v) => v + 1);
-              Alert.alert("Thành công", `Đã đồng bộ lịch nghỉ lễ năm ${year}`);
+              showAlert("Thành công", `Đã đồng bộ lịch nghỉ lễ năm ${year}`, undefined, "success");
             } catch (e) {
-              Alert.alert("Lỗi đồng bộ", messageOf(e));
+              showAlert("Lỗi đồng bộ", messageOf(e), undefined, "error");
             } finally {
               setIsSyncingHolidays(false);
             }
@@ -1599,6 +1603,7 @@ export default function CalendarEvents() {
         <View style={s.centerBox}>
           <Text style={s.emptyTitle}>Cần phân hệ nhân sự (HR) để sử dụng Lịch làm việc</Text>
         </View>
+        {!hasOpenCalendarModal && alertView}
       </SafeAreaView>
     );
   }
@@ -1815,6 +1820,7 @@ export default function CalendarEvents() {
             </ScrollView>
           </Pressable>
         </Pressable>
+        {isAddModalOpen && alertView}
       </Modal>
 
       {/* MODAL: VIEW EVENT DETAIL */}
@@ -1896,6 +1902,7 @@ export default function CalendarEvents() {
             )}
           </Pressable>
         </Pressable>
+        {!!viewingItem && alertView}
       </Modal>
 
       {/* MODAL: EDIT CALENDAR EVENT & WORK HOURS */}
@@ -2071,6 +2078,7 @@ export default function CalendarEvents() {
             </ScrollView>
           </Pressable>
         </Pressable>
+        {editingCalendarItem !== null && alertView}
       </Modal>
 
       {/* MODAL: EDIT EMPLOYEE SHIFT & WORK HOURS */}
@@ -2297,6 +2305,7 @@ export default function CalendarEvents() {
             </ScrollView>
           </Pressable>
         </Pressable>
+        {editingEmployeeShift !== null && alertView}
       </Modal>
 
       {/* MODAL: SHIFT CRUD */}
@@ -2318,6 +2327,7 @@ export default function CalendarEvents() {
             />
           )}
         </SafeAreaView>
+        {editingShift !== null && alertView}
       </Modal>
 
       {/* MODAL: HOLIDAY CRUD */}
@@ -2339,7 +2349,9 @@ export default function CalendarEvents() {
             />
           )}
         </SafeAreaView>
+        {editingHoliday !== null && alertView}
       </Modal>
+      {!hasOpenCalendarModal && alertView}
     </SafeAreaView>
   );
 }

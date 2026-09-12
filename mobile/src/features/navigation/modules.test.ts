@@ -27,3 +27,12 @@ it("groups work, projects and monthly KPI under one mobile module", () => {
   expect(modules.some((item) => item.href === "/(tabs)/kpi")).toBe(false);
   expect(availableModules({ ...user, enabledModules: ["chat"], permissions: ["work:read"] }).some((item) => item.href === "/(tabs)/work")).toBe(false);
 });
+
+it("only exposes role management to administrators", () => {
+  const visible = (role: UserProfile["role"]) => availableModules({ ...user, role }).some(item => item.href === "/(tabs)/roles");
+  expect(visible("admin")).toBe(true);
+  expect(visible("superadmin")).toBe(true);
+  expect(visible("manager")).toBe(false);
+  expect(visible("branch_owner")).toBe(false);
+  expect(visible("user")).toBe(false);
+});

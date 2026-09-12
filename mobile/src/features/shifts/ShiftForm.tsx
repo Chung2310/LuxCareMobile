@@ -1,7 +1,7 @@
+import { useAppAlert } from "../../components/AppAlert";
 import React, { useRef, useState } from "react";
 import {
   ActivityIndicator,
-  Alert,
   KeyboardAvoidingView,
   Platform,
   Pressable,
@@ -43,6 +43,7 @@ export function ShiftForm({
   onSuccess?: () => void;
   setLocked: (value: boolean) => void;
 }) {
+  const { showAlert, alertView } = useAppAlert();
   const isEditing = !!shift;
   const [draft, setDraft] = useState(() => shiftDraft(shift));
   const [standard, setStandard] = useState(() =>
@@ -96,7 +97,7 @@ export function ShiftForm({
 
   const addBreakPeriod = () => {
     if (!breakName.trim() || !breakStart.trim() || !breakEnd.trim()) {
-      Alert.alert("Thông báo", "Vui lòng nhập đầy đủ tên và giờ bắt đầu, kết thúc giờ nghỉ.");
+      showAlert("Thông báo", "Vui lòng nhập đầy đủ tên và giờ bắt đầu, kết thúc giờ nghỉ.", undefined, "info");
       return;
     }
     setDraft((cur) => ({
@@ -569,6 +570,7 @@ export function ShiftForm({
           </Pressable>
         </View>
       </SafeAreaView>
+      {alertView}
     </KeyboardAvoidingView>
   );
 }

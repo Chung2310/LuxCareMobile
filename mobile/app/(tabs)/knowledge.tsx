@@ -27,14 +27,14 @@ export const DOC_TYPES: Array<{
   bgColor: string;
   icon: keyof typeof Ionicons.glyphMap;
 }> = [
-  { id: "all", label: "Tất cả", color: "#475569", bgColor: "#f1f5f9", icon: "albums-outline" },
-  { id: "medical", label: "Phác đồ & Y tế", color: "#e11d48", bgColor: "#fff1f2", icon: "medkit-outline" },
-  { id: "guideline", label: "Quy chuẩn", color: "#7c3aed", bgColor: "#f5f3ff", icon: "shield-checkmark-outline" },
-  { id: "policy", label: "Chính sách", color: "#4f46e5", bgColor: "#eef2ff", icon: "document-text-outline" },
-  { id: "procedure", label: "Quy trình", color: "#0284c7", bgColor: "#f0f9ff", icon: "git-network-outline" },
-  { id: "company_profile", label: "Hồ sơ viện", color: "#059669", bgColor: "#ecfdf5", icon: "business-outline" },
-  { id: "faq", label: "Hỏi đáp", color: "#d97706", bgColor: "#fffbeb", icon: "help-circle-outline" },
-];
+    { id: "all", label: "Tất cả", color: "#475569", bgColor: "#f1f5f9", icon: "albums-outline" },
+    { id: "medical", label: "Phác đồ & Y tế", color: "#e11d48", bgColor: "#fff1f2", icon: "medkit-outline" },
+    { id: "guideline", label: "Quy chuẩn", color: "#7c3aed", bgColor: "#f5f3ff", icon: "shield-checkmark-outline" },
+    { id: "policy", label: "Chính sách", color: "#4f46e5", bgColor: "#eef2ff", icon: "document-text-outline" },
+    { id: "procedure", label: "Quy trình", color: "#0284c7", bgColor: "#f0f9ff", icon: "git-network-outline" },
+    { id: "company_profile", label: "Hồ sơ viện", color: "#059669", bgColor: "#ecfdf5", icon: "business-outline" },
+    { id: "faq", label: "Hỏi đáp", color: "#d97706", bgColor: "#fffbeb", icon: "help-circle-outline" },
+  ];
 
 export default function KnowledgeScreen() {
   const router = useRouter();
@@ -234,7 +234,7 @@ export default function KnowledgeScreen() {
           <Ionicons name="chevron-back" size={24} color="#0f172a" />
         </Pressable>
         <View style={styles.headerTitleWrap}>
-          <Text style={styles.headerTitle}>Kho tri thức & SOP</Text>
+          <Text style={styles.headerTitle}>Kho tri thức</Text>
           <Text style={styles.headerSubtitle}>Tài liệu chuyên môn & quy chuẩn y tế</Text>
         </View>
         {canManage && (

@@ -1,7 +1,7 @@
+import { useAppAlert } from "../../src/components/AppAlert";
 import React, { useCallback, useMemo, useState } from "react";
 import {
   ActivityIndicator,
-  Alert,
   Image,
   Linking,
   Modal,
@@ -331,6 +331,76 @@ function IRow({ icon, label, value }: { icon: string; label: string; value: stri
   );
 }
 
+function normalizeDateInput(val?: any): string {
+  if (!val) return "";
+  const str = String(val).trim();
+  if (!str) return "";
+
+  if (str.includes("T")) {
+    const part = str.split("T")[0];
+    if (/^\d{4}-\d{2}-\d{2}$/.test(part)) return part;
+  }
+
+  if (/^\d{4}-\d{2}-\d{2}$/.test(str)) return str;
+
+  const dmyMatch = str.match(/^(\d{1,2})[/-](\d{1,2})[/-](\d{4})$/);
+  if (dmyMatch) {
+    const day = dmyMatch[1].padStart(2, "0");
+    const month = dmyMatch[2].padStart(2, "0");
+    const year = dmyMatch[3];
+    return `${year}-${month}-${day}`;
+  }
+
+  const d = new Date(str);
+  if (!isNaN(d.getTime())) {
+    const year = d.getFullYear();
+    const month = String(d.getMonth() + 1).padStart(2, "0");
+    const day = String(d.getDate()).padStart(2, "0");
+    return `${year}-${month}-${day}`;
+  }
+
+  return str.slice(0, 10);
+}
+
+function formatDate(dateStr?: any): string {
+  if (!dateStr) return "Chưa cập nhật";
+  try {
+    const d = new Date(dateStr);
+    if (isNaN(d.getTime())) return "Chưa cập nhật";
+    return d.toLocaleDateString("vi-VN", {
+      day: "2-digit",
+      month: "2-digit",
+      year: "numeric",
+    });
+  } catch {
+    return "Chưa cập nhật";
+  }
+}
+
+function normalizePhone(phone?: string | null): string {
+  if (!phone) return "";
+  const str = String(phone).trim();
+  const lower = str.toLowerCase();
+  if (
+    !str ||
+    lower === "chưa cập nhật" ||
+    lower === "chua cap nhat" ||
+    lower === "chưa có" ||
+    lower === "chua co" ||
+    lower === "không có" ||
+    lower === "khong co" ||
+    lower === "null" ||
+    lower === "undefined" ||
+    lower === "n/a" ||
+    lower === "none" ||
+    lower === "—" ||
+    lower === "-"
+  ) {
+    return "";
+  }
+  return str;
+}
+
 function OrgEditModal({
   visible,
   emp,
@@ -346,14 +416,15 @@ function OrgEditModal({
   onClose: () => void;
   onSave: (uid: string, data: Partial<UserProfile>) => Promise<void>;
 }) {
+  const { showAlert, alertView } = useAppAlert();
   if (!emp) return null;
 
   const [displayName, setDisplayName] = useState(emp.displayName || "");
   const [jobTitle, setJobTitle] = useState(emp.jobTitle || "");
   const [department, setDepartment] = useState(emp.department || "");
   const [parentId, setParentId] = useState(emp.parentId || "");
-  const [phone, setPhone] = useState(emp.phone || "");
-  const [birthDate, setBirthDate] = useState(emp.birthDate || "");
+  const [phone, setPhone] = useState(normalizePhone(emp.phone));
+  const [birthDate, setBirthDate] = useState(normalizeDateInput(emp.birthDate));
   const [monthlySalary, setMonthlySalary] = useState(emp.monthlySalary ? String(emp.monthlySalary) : "");
   const [jobDescriptionLink, setJobDescriptionLink] = useState(emp.jobDescriptionLink || "");
   const [isLeader, setIsLeader] = useState(!!emp.isLeader);
@@ -369,8 +440,8 @@ function OrgEditModal({
       setJobTitle(emp.jobTitle || "");
       setDepartment(emp.department || "");
       setParentId(emp.parentId || "");
-      setPhone(emp.phone || "");
-      setBirthDate(emp.birthDate || "");
+      setPhone(normalizePhone(emp.phone));
+      setBirthDate(normalizeDateInput(emp.birthDate));
       setMonthlySalary(emp.monthlySalary ? String(emp.monthlySalary) : "");
       setJobDescriptionLink(emp.jobDescriptionLink || "");
       setIsLeader(!!emp.isLeader);
@@ -403,13 +474,27 @@ function OrgEditModal({
   const handleSave = async () => {
     const trimmedName = displayName.trim();
     if (!trimmedName || trimmedName.length < 2) {
-      Alert.alert("Thiếu thông tin", "Vui lòng nhập họ và tên (tối thiểu 2 ký tự).");
+      showAlert("Thiếu thông tin", "Vui lòng nhập họ và tên (tối thiểu 2 ký tự).", undefined, "error");
       return;
     }
 
     if (parentId && isDescendant(emp.uid, parentId, empList)) {
-      Alert.alert("Không hợp lệ", "Quản lý trực tiếp không thể là cấp dưới của nhân sự này.");
+      showAlert("Không hợp lệ", "Quản lý trực tiếp không thể là cấp dưới của nhân sự này.", undefined, "error");
       return;
+    }
+
+    const cleanPhone = normalizePhone(phone).replace(/[\s.\-()]/g, "");
+    if (cleanPhone) {
+      const phoneRegex = /^(\+84|84|0)[0-9]{8,11}$/;
+      if (!phoneRegex.test(cleanPhone)) {
+        showAlert(
+          "Số điện thoại không hợp lệ",
+          "Số điện thoại không đúng định dạng (Ví dụ: 0912345678 hoặc +84912345678).",
+          undefined,
+          "error",
+        );
+        return;
+      }
     }
 
     setLoading(true);
@@ -420,15 +505,15 @@ function OrgEditModal({
         department: department || undefined,
         division: jobTitle.trim() || undefined,
         parentId: parentId || undefined,
-        phone: phone.trim() || undefined,
-        birthDate: birthDate.trim() || undefined,
+        phone: cleanPhone || undefined,
+        birthDate: birthDate.trim() ? normalizeDateInput(birthDate) : undefined,
         monthlySalary: salaryNum ? parseInt(salaryNum, 10) : undefined,
         jobDescriptionLink: jobDescriptionLink.trim() || undefined,
         isLeader,
       });
       onClose();
     } catch (e: any) {
-      Alert.alert("Lỗi", e?.message || "Không thể lưu thông tin.");
+      showAlert("Lỗi", e?.message || "Không thể lưu thông tin.", undefined, "error");
     } finally {
       setLoading(false);
     }
@@ -621,6 +706,7 @@ function OrgEditModal({
           </Pressable>
         </Modal>
       </SafeAreaView>
+    {alertView}
     </Modal>
   );
 }
@@ -683,7 +769,7 @@ function ProfileModal({
             />
             {!!emp.email && <IRow icon="✉️" label="Email" value={emp.email} />}
             {!!emp.phone && <IRow icon="📱" label="Điện thoại" value={emp.phone} />}
-            {!!emp.birthDate && <IRow icon="🎂" label="Ngày sinh" value={emp.birthDate} />}
+            {!!emp.birthDate && <IRow icon="🎂" label="Ngày sinh" value={formatDate(emp.birthDate)} />}
             {emp.monthlySalary != null && emp.monthlySalary > 0 && (
               <IRow icon="💰" label="Lương tháng" value={`${emp.monthlySalary.toLocaleString("vi-VN")} đ`} />
             )}
@@ -702,7 +788,8 @@ function ProfileModal({
           <View style={s.actionRow}>
             <Pressable
               style={s.actionBtn}
-              onPress={() => {
+              onPress={(event) => {
+                      event.stopPropagation();
                 onClose();
                 router.push({
                   pathname: "/(tabs)/chat",
@@ -775,6 +862,7 @@ function TreeBranchView({
   canManage?: boolean;
   allEmps: UserProfile[];
 }) {
+  const { showAlert, alertView } = useAppAlert();
   const { emp, children } = node;
   const isCollapsed = collapsed.has(emp.uid);
   const hasChildren = children.length > 0;
@@ -798,7 +886,7 @@ function TreeBranchView({
             if (isValidTarget && onTargetSelect) {
               onTargetSelect(emp);
             } else if (isInvalidTarget) {
-              Alert.alert("Không thể gán", "Không thể gán nhân sự này vào cấp dưới của chính họ.");
+              showAlert("Không thể gán", "Không thể gán nhân sự này vào cấp dưới của chính họ.", undefined, "error");
             }
           } else {
             onSelect(emp);
@@ -965,6 +1053,7 @@ function TreeBranchView({
           </View>
         </View>
       )}
+      {alertView}
     </View>
   );
 }
@@ -989,6 +1078,7 @@ function OrgListView({
   onTargetSelect?: (target: UserProfile) => void;
   canManage?: boolean;
 }) {
+  const { showAlert, alertView } = useAppAlert();
   const managerMap = useMemo(() => {
     const map = new Map<string, string>();
     emps.forEach((e) => {
@@ -1019,7 +1109,7 @@ function OrgListView({
                 if (isValidTarget && onTargetSelect) {
                   onTargetSelect(emp);
                 } else if (isInvalidTarget) {
-                  Alert.alert("Không thể gán", "Không thể gán nhân sự này vào cấp dưới của chính họ.");
+                  showAlert("Không thể gán", "Không thể gán nhân sự này vào cấp dưới của chính họ.", undefined, "error");
                 }
               } else {
                 onSelect(emp);
@@ -1082,7 +1172,8 @@ function OrgListView({
               <Pressable
                 hitSlop={8}
                 style={s.listCallBtn}
-                onPress={() => {
+                onPress={(event) => {
+                      event.stopPropagation();
                   router.push({
                     pathname: "/(tabs)/chat",
                     params: { peerId: emp.uid, name: emp.displayName || emp.email },
@@ -1096,6 +1187,7 @@ function OrgListView({
         );
       })}
       <View style={{ height: 60 }} />
+      {alertView}
     </ScrollView>
   );
 }
@@ -1104,6 +1196,7 @@ function OrgListView({
    6. MAIN ORG CHART SCREEN
    ========================================================================== */
 export default function OrgChart() {
+  const { showAlert, alertView } = useAppAlert();
   const { user, selectedBranch } = useSession();
   const branchId = selectedBranch?._id || user?.branchId || undefined;
   const [empList, setEmpList] = useState<UserProfile[]>([]);
@@ -1152,14 +1245,10 @@ export default function OrgChart() {
   };
 
   const handleCreateUser = async (data: CreateUserInput) => {
-    try {
-      await userManagementApi.createUser(data);
-      Alert.alert("Thành công", "Đã thêm nhân sự mới vào hệ thống.");
-      setCreateModalVisible(false);
-      setRevision((v) => v + 1);
-    } catch (err: any) {
-      Alert.alert("Lỗi", err?.message || "Không thể tạo tài khoản nhân sự.");
-    }
+    await userManagementApi.createUser(data);
+    showAlert("Thành công", "Đã thêm nhân sự mới vào hệ thống.", undefined, "success");
+    setCreateModalVisible(false);
+    setRevision((v) => v + 1);
   };
 
   useFocusEffect(
@@ -1249,15 +1338,15 @@ export default function OrgChart() {
     if (!movingEmp) return;
     const empToMove = movingEmp;
     if (target && isDescendant(empToMove.uid, target.uid, empList)) {
-      Alert.alert(
+      showAlert(
         "Không thể gán",
-        "Không thể gán nhân sự này làm cấp dưới của người nằm trong nhánh dưới của chính họ."
+        "Không thể gán nhân sự này làm cấp dưới của người nằm trong nhánh dưới của chính họ.", undefined, "error"
       );
       return;
     }
 
     const targetName = target ? target.displayName : "Cấp cao nhất (Không có quản lý)";
-    Alert.alert(
+    showAlert(
       "Xác nhận thay đổi quản lý",
       `Bạn có chắc chắn muốn chuyển quản lý trực tiếp của "${empToMove.displayName}" thành "${targetName}"?`,
       [
@@ -1277,9 +1366,9 @@ export default function OrgChart() {
                 prev.map((e) => (e.uid === empToMove.uid ? { ...e, parentId: newParentId } : e))
               );
               setRevision((v) => v + 1);
-              Alert.alert("Thành công", `Đã cập nhật quản lý trực tiếp cho ${empToMove.displayName}.`);
+              showAlert("Thành công", `Đã cập nhật quản lý trực tiếp cho ${empToMove.displayName}.`, undefined, "success");
             } catch (err: any) {
-              Alert.alert("Lỗi", err?.message || "Không thể cập nhật quản lý trực tiếp.");
+              showAlert("Lỗi", err?.message || "Không thể cập nhật quản lý trực tiếp.", undefined, "error");
             } finally {
               setLoading(false);
               setMovingEmp(null);
@@ -1291,24 +1380,19 @@ export default function OrgChart() {
   };
 
   const handleSaveEdit = async (uid: string, draft: Partial<UserProfile>) => {
-    try {
-      await Promise.all([
-        roster.update(uid, draft as any).catch(() => null),
-        userManagementApi.updateUser(uid, draft as any),
-      ]);
-      setEmpList((prev) =>
-        prev.map((e) => (e.uid === uid ? { ...e, ...draft } : e))
-      );
-      setRevision((v) => v + 1);
-      if (selected?.uid === uid) {
-        setSelected((prev) => (prev ? { ...prev, ...draft } : null));
-      }
-      Alert.alert("Thành công", "Đã cập nhật thông tin nhân sự.");
-      setEditingEmp(null);
-    } catch (err: any) {
-      Alert.alert("Lỗi", err?.message || "Không thể lưu thông tin nhân sự.");
-      throw err;
+    await Promise.all([
+      roster.update(uid, draft as any).catch(() => null),
+      userManagementApi.updateUser(uid, draft as any),
+    ]);
+    setEmpList((prev) =>
+      prev.map((e) => (e.uid === uid ? { ...e, ...draft } : e))
+    );
+    setRevision((v) => v + 1);
+    if (selected?.uid === uid) {
+      setSelected((prev) => (prev ? { ...prev, ...draft } : null));
     }
+    showAlert("Thành công", "Đã cập nhật thông tin nhân sự.", undefined, "success");
+    setEditingEmp(null);
   };
 
   const Header = () => (
@@ -1375,6 +1459,7 @@ export default function OrgChart() {
           <ActivityIndicator size="large" color="#4f46e5" />
           <Text style={s.loadingText}>Đang tải dữ liệu sơ đồ tổ chức…</Text>
         </View>
+        {alertView}
       </SafeAreaView>
     );
   }
@@ -1389,6 +1474,7 @@ export default function OrgChart() {
             <Text style={s.retryTxt}>Thử lại</Text>
           </Pressable>
         </View>
+        {alertView}
       </SafeAreaView>
     );
   }
@@ -1581,6 +1667,7 @@ export default function OrgChart() {
         companyName={user?.companyName}
         managers={empList}
       />
+      {alertView}
     </SafeAreaView>
   );
 }

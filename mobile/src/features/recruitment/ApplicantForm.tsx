@@ -1,4 +1,5 @@
-import { Alert, Text } from "react-native";
+import { useAppAlert } from "../../components/AppAlert";
+import { Text } from "react-native";
 import { useState } from "react";
 import type { RecruitmentApplicant, RecruitmentJob } from "../../../../src/types/recruitment";
 import { recruitment } from "../../api/services";
@@ -59,6 +60,7 @@ export function ApplicantForm({
   onSaved?: () => Promise<void> | void;
   setLocked?: (value: boolean) => void;
 }) {
+  const { showAlert, alertView } = useAppAlert();
   const [draft, setDraft] = useState(() => draftOf(applicant, jobId));
   const [busy, setBusy] = useState(false);
   const [error, setError] = useState<string | null>(null);
@@ -94,7 +96,7 @@ export function ApplicantForm({
       } else {
         const result = await recruitment.createApplicant({ ...payload, confirmDuplicate });
         if (result?.duplicateWarning && !confirmDuplicate) {
-          Alert.alert(
+          showAlert(
             "Có hồ sơ trùng",
             "LuxCare phát hiện hồ sơ có cùng email hoặc số điện thoại. Bạn có muốn vẫn tạo hồ sơ mới không?",
             [
@@ -144,6 +146,7 @@ export function ApplicantForm({
       <ErrorText message={error} />
       <Button title={busy ? "Đang lưu..." : "Lưu hồ sơ"} disabled={busy} onPress={() => void save()} />
       <Button title="Hủy" disabled={busy} onPress={onClose} />
+      {alertView}
     </RecruitmentModal>
   );
 }

@@ -1,7 +1,7 @@
-import { useCallback, useMemo, useState } from "react";
+import { useAppAlert } from "../../src/components/AppAlert";
+import { type ReactNode, useCallback, useMemo, useState } from "react";
 import { useFocusEffect } from "expo-router";
 import {
-  Alert,
   KeyboardAvoidingView,
   Linking,
   Modal,
@@ -36,6 +36,7 @@ function nextStep(course: TrainingCourse, enrollment: TrainingEnrollment) {
 }
 
 export default function TrainingPage() {
+  const { showAlert, alertView } = useAppAlert();
   const { user, selectedBranch } = useSession();
   const access = trainingAccess(user);
 
@@ -146,7 +147,7 @@ export default function TrainingPage() {
       setQuizSubmitted(false);
       setQuizErrors([]);
     } catch (openError) {
-      Alert.alert("Không thể bắt đầu khóa học", messageOf(openError));
+      showAlert("Không thể bắt đầu khóa học", messageOf(openError), undefined, "error");
     } finally {
       setBusyCourseId(null);
     }
@@ -189,7 +190,7 @@ export default function TrainingPage() {
         ...(completedNow ? { completedAt: new Date().toISOString() } : {}),
       });
       if (completedNow) {
-        Alert.alert("Chúc mừng 🎉", `Bạn đã hoàn thành xuất sắc khóa học “${activeCourse.title}”.`);
+        showAlert("Chúc mừng 🎉", `Bạn đã hoàn thành xuất sắc khóa học “${activeCourse.title}”.`, undefined, "success");
         setActiveCourse(null);
       } else if (activeStep + 1 < (activeCourse.lessons || []).length) {
         setActiveStep(activeStep + 1);
@@ -197,7 +198,7 @@ export default function TrainingPage() {
         setActiveStep(activeCourse.lessons?.length || -1);
       }
     } catch (saveError) {
-      Alert.alert("Không thể lưu tiến độ", messageOf(saveError));
+      showAlert("Không thể lưu tiến độ", messageOf(saveError), undefined, "error");
     }
   };
 
@@ -207,7 +208,7 @@ export default function TrainingPage() {
     const enrollment = enrollments.find((item) => item.courseId === activeCourse.id);
     if (!enrollment || !quizzes.length) return;
     if (quizzes.some((_, index) => answers[index] === undefined)) {
-      Alert.alert("Chưa hoàn tất", "Vui lòng trả lời tất cả các câu hỏi trước khi nộp bài.");
+      showAlert("Chưa hoàn tất", "Vui lòng trả lời tất cả các câu hỏi trước khi nộp bài.", undefined, "error");
       return;
     }
     const errors = quizzes.map((quiz, index) => answers[index] !== quiz.correctOptionIndex);
@@ -225,11 +226,11 @@ export default function TrainingPage() {
         status: progress >= 100 ? "completed" : "in_progress",
         ...(progress >= 100 ? { completedAt: new Date().toISOString() } : {}),
       });
-      Alert.alert("Đạt sát hạch 🏆", `Chúc mừng! Bạn đã hoàn thành phần kiểm tra của “${activeCourse.title}”.`, [
+      showAlert("Đạt sát hạch 🏆", `Chúc mừng! Bạn đã hoàn thành phần kiểm tra của “${activeCourse.title}”.`, [
         { text: "Đóng", onPress: () => setActiveCourse(null) },
-      ]);
+      ], "success");
     } catch (saveError) {
-      Alert.alert("Không thể lưu kết quả", messageOf(saveError));
+      showAlert("Không thể lưu kết quả", messageOf(saveError), undefined, "error");
     }
   };
 
@@ -245,12 +246,12 @@ export default function TrainingPage() {
       });
       setActiveCourse(null);
     } catch (saveError) {
-      Alert.alert("Không thể hoàn thành khóa học", messageOf(saveError));
+      showAlert("Không thể hoàn thành khóa học", messageOf(saveError), undefined, "error");
     }
   };
 
   const deleteCourse = (course: TrainingCourse) => {
-    Alert.alert("Xóa khóa học?", `Bạn có chắc muốn xóa “${course.title}”? Thao tác này không thể hoàn tác.`, [
+    showAlert("Xóa khóa học?", `Bạn có chắc muốn xóa “${course.title}”? Thao tác này không thể hoàn tác.`, [
       { text: "Hủy", style: "cancel" },
       {
         text: "Xóa khóa học",
@@ -260,7 +261,7 @@ export default function TrainingPage() {
             .removeCourse(course.id)
             .then(() => setRevision((value) => value + 1))
             .catch((deleteError) => {
-              Alert.alert("Không thể xóa khóa học", messageOf(deleteError));
+              showAlert("Không thể xóa khóa học", messageOf(deleteError), undefined, "error");
             });
         },
       },
@@ -320,6 +321,7 @@ export default function TrainingPage() {
             Cần phân hệ Nhân sự và mã doanh nghiệp hợp lệ để sử dụng chức năng Đào tạo nội bộ.
           </Text>
         </View>
+        {!activeCourse && alertView}
       </Page>
     );
   }
@@ -677,6 +679,7 @@ export default function TrainingPage() {
 
       {/* Interactive Study / Quiz Modal */}
       <StudyModal
+        notification={alertView}
         course={activeCourse}
         enrollment={activeCourse ? enrollments.find((item) => item.courseId === activeCourse.id) : undefined}
         step={activeStep}
@@ -692,8 +695,9 @@ export default function TrainingPage() {
         onCompleteLesson={() => void markLessonComplete()}
         onSubmitQuiz={() => void submitQuiz()}
         onCompleteDirectly={() => void completeDirectly()}
-        onOpenLink={(url) => void openLink(url)}
+        onOpenLink={(url) => void openLink(url, showAlert)}
       />
+      {!activeCourse && alertView}
     </>
   );
 }
@@ -702,6 +706,7 @@ export default function TrainingPage() {
 // Study Modal Subcomponent
 // -------------------------------------------------------------
 function StudyModal({
+  notification,
   course,
   enrollment,
   step,
@@ -715,6 +720,7 @@ function StudyModal({
   onCompleteDirectly,
   onOpenLink,
 }: {
+  notification: ReactNode;
   course: TrainingCourse | null;
   enrollment?: TrainingEnrollment;
   step: number;
@@ -928,6 +934,7 @@ function StudyModal({
           </TouchableOpacity>
         </ScrollView>
       </SafeAreaView>
+      {notification}
     </Modal>
   );
 }
@@ -1299,13 +1306,13 @@ function CourseForm({
   );
 }
 
-async function openLink(url: string) {
+async function openLink(url: string, showAlert: ReturnType<typeof useAppAlert>["showAlert"]) {
   try {
     const parsed = new URL(url);
     if (!["http:", "https:"].includes(parsed.protocol)) throw new Error();
     await Linking.openURL(parsed.toString());
   } catch {
-    Alert.alert("Không thể mở liên kết", "Đường dẫn tài liệu không hợp lệ hoặc không được thiết bị hỗ trợ.");
+    showAlert("Không thể mở liên kết", "Đường dẫn tài liệu không hợp lệ hoặc không được thiết bị hỗ trợ.", undefined, "error");
   }
 }
 

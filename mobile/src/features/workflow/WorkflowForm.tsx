@@ -1,5 +1,6 @@
+import { useAppAlert } from "../../components/AppAlert";
 import { useRef, useState } from "react";
-import { Alert, Modal, Pressable, ScrollView, Text, View } from "react-native";
+import { Modal, Pressable, ScrollView, Text, View } from "react-native";
 import type { Workflow, WorkflowEdge, WorkflowStep, WorkflowSubTask } from "../../../../src/types/hr";
 import { workflow } from "../../api/services";
 import { messageOf } from "../../auth/SessionProvider";
@@ -18,6 +19,7 @@ export function WorkflowForm({
   onSaved: () => void;
   setLocked: (value: boolean) => void;
 }) {
+  const { showAlert, alertView } = useAppAlert();
   const [name, setName] = useState(initialWorkflow?.name || "Quy trình mới");
   const [category, setCategory] = useState(initialWorkflow?.category || "");
   const [description, setDescription] = useState(initialWorkflow?.description || "");
@@ -41,7 +43,7 @@ export function WorkflowForm({
   };
 
   const deleteStep = (step: WorkflowStep) => {
-    Alert.alert("Xóa bước?", `Bạn có chắc muốn xóa “${step.title}”?`, [
+    showAlert("Xóa bước?", `Bạn có chắc muốn xóa “${step.title}”?`, [
       { text: "Hủy", style: "cancel" },
       {
         text: "Xóa",
@@ -183,6 +185,7 @@ export function WorkflowForm({
           />
         )}
       </Modal>
+      {alertView}
     </>
   );
 }

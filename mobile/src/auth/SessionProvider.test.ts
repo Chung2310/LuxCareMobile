@@ -14,12 +14,15 @@ function mount(restore: (api: any) => Promise<boolean>, getMe = vi.fn().mockReso
   const values: any[] = [];
   const refs: any[] = [];
   const effects: (() => void)[] = [];
+  const currentEffects: (() => void)[] = [];
+  let effectIndex = 0;
+  const unsubscribe = vi.fn();
   let stateIndex = 0, refIndex = 0, initial = true;
   const api: any = {
     restore: () => restore(api), getOrigin: () => "https://example.com", getAccessToken: () => "access",
     clear: vi.fn().mockResolvedValue(undefined), setBranchId: vi.fn(), logout: vi.fn().mockResolvedValue(undefined),
   };
-  const socket = { configure: vi.fn(), connect: vi.fn(), disconnect: vi.fn() };
+  const socket = { configure: vi.fn(), connect: vi.fn(), disconnect: vi.fn(), subscribe: vi.fn((_event: string, _listener: (data: any) => void) => unsubscribe) };
   const react = {
     createContext: () => ({ Provider: "provider" }),
     createElement: (_type: any, props: any) => props,
@@ -30,7 +33,7 @@ function mount(restore: (api: any) => Promise<boolean>, getMe = vi.fn().mockReso
       return [values[index], (next: any) => { values[index] = typeof next === "function" ? next(values[index]) : next; }];
     },
     useRef: (value: any) => refs[refIndex++] ||= { current: value },
-    useEffect: (effect: () => void) => { if (initial) effects.push(effect); },
+    useEffect: (effect: () => void) => { currentEffects[effectIndex++] = effect; if (initial) effects.push(effect); },
   };
   const module = { exports: {} as any };
   vm.runInNewContext(source, { exports: module.exports, module, Error, require: (name: string) => {
@@ -41,14 +44,14 @@ function mount(restore: (api: any) => Promise<boolean>, getMe = vi.fn().mockReso
     throw new Error(name);
   } });
   const render = () => {
-    stateIndex = refIndex = 0;
+    stateIndex = refIndex = effectIndex = 0;
     const result = module.exports.SessionProvider({ children: null }).value;
     initial = false;
     return result;
   };
   render();
   effects.forEach(effect => effect());
-  return { api, render, getMe, socket };
+  return { api, render, getMe, socket, unsubscribe, runProfileEffect: () => currentEffects[currentEffects.length - 1]() };
 }
 
 describe("autologin state and login fallback", () => {
@@ -98,4 +101,20 @@ describe("autologin state and login fallback", () => {
     await vi.waitFor(() => expect(profile).toHaveBeenCalled());
     expect(host.render()).toMatchObject({ user: null, error: null, loading: false });
   });
+});
+
+it("refreshes the active user permissions on socket notification and unsubscribes", async () => {
+  const getMe = vi.fn().mockResolvedValue({ uid: "u1", role: "user", companyCode: "A", permissions: ["hr:read"] });
+  const host = mount(async () => true, getMe);
+  await vi.waitFor(() => expect(host.render().user?.uid).toBe("u1"));
+  const cleanup = host.runProfileEffect() as unknown as () => void;
+  expect(host.socket.subscribe.mock.calls[0][0]).toBe("role_permissions_updated");
+  const listener = host.socket.subscribe.mock.calls[0][1] as (data: any) => void;
+  listener({ userId: "other" });
+  expect(getMe).toHaveBeenCalledTimes(1);
+  getMe.mockResolvedValue({ uid: "u1", role: "user", companyCode: "A", permissions: [] });
+  listener({ userId: "u1" });
+  await vi.waitFor(() => expect(host.render().user?.permissions).toEqual([]));
+  cleanup();
+  expect(host.unsubscribe).toHaveBeenCalledOnce();
 });

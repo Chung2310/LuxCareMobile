@@ -1,6 +1,5 @@
 import React from "react";
 import {
-  Linking,
   StyleSheet,
   Text,
   TouchableOpacity,
@@ -53,16 +52,12 @@ export const ROLE_MAP: Record<
 
 interface UserCardProps {
   user: UserProfile;
+  roleName?: string;
   onPress: (user: UserProfile) => void;
 }
 
-export const UserCard: React.FC<UserCardProps> = ({ user, onPress }) => {
-  const roleConfig = ROLE_MAP[user.role] || ROLE_MAP.user;
-
-  const handleCall = () => {
-    if (!user.phone) return;
-    Linking.openURL(`tel:${user.phone}`).catch(() => {});
-  };
+export const UserCard: React.FC<UserCardProps> = ({ user, onPress, roleName }) => {
+  const roleConfig = { ...(ROLE_MAP[user.role] || ROLE_MAP.user), label: roleName || ROLE_MAP[user.role]?.label || user.role };
 
   const getInitials = (name: string) => {
     const parts = (name || "").trim().split(" ");
@@ -115,14 +110,10 @@ export const UserCard: React.FC<UserCardProps> = ({ user, onPress }) => {
       {/* Middle row: Branch, Department, Phone chips */}
       <View style={styles.chipsRow}>
         {user.phone ? (
-          <TouchableOpacity
-            style={styles.phoneChip}
-            onPress={handleCall}
-            activeOpacity={0.7}
-          >
-            <Ionicons name="call" size={11} color="#059669" />
+          <View style={styles.phoneChip}>
+            <Ionicons name="call-outline" size={11} color="#059669" />
             <Text style={styles.phoneText}>{user.phone}</Text>
-          </TouchableOpacity>
+          </View>
         ) : null}
 
         {user.branchName ? (
@@ -153,24 +144,12 @@ export const UserCard: React.FC<UserCardProps> = ({ user, onPress }) => {
         ) : null}
       </View>
 
-      {/* Footer: Detail navigation hint & compact call action */}
+      {/* Footer: Detail navigation hint */}
       <View style={styles.footerRow}>
         <View style={styles.viewDetailHint}>
           <Text style={styles.tapToViewText}>Xem chi tiết & phân quyền</Text>
           <Ionicons name="chevron-forward" size={12} color="#94a3b8" />
         </View>
-
-        {user.phone ? (
-          <TouchableOpacity
-            style={styles.quickCallBtn}
-            onPress={handleCall}
-            hitSlop={6}
-            activeOpacity={0.75}
-          >
-            <Ionicons name="call" size={12} color="#059669" />
-            <Text style={styles.quickCallText}>Gọi điện</Text>
-          </TouchableOpacity>
-        ) : null}
       </View>
     </TouchableOpacity>
   );
