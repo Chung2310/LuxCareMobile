@@ -4,10 +4,12 @@ import { Text } from "react-native";
 import type { PayrollRun } from "../../../../src/types/payrollRun";
 import { payroll } from "../../api/services";
 import { useSession, messageOf } from "../../auth/SessionProvider";
-import { Button, Card, ErrorText, styles } from "../../ui";
+import { useAppAlert } from "../../components/AppAlert";
+import { Button, Card, styles } from "../../ui";
 import { canSyncRunAttendance } from "./syncAttendanceModel";
 import { canClosePayrollRun, validateClosedRun, validateReviewedRun } from "./reviewModel";
 import { payslipMoney } from "./model";
+
 export function ReviewPayrollRun({
   run,
   onChanged,
@@ -27,6 +29,8 @@ export function ReviewPayrollRun({
   const [busy, setBusy] = useState(false);
   const [done, setDone] = useState(false);
   const [error, setError] = useState<string | null>(null);
+  const { showAlert, alertView } = useAppAlert();
+
   useFocusEffect(
     useCallback(() => {
       active.current = true;
@@ -35,26 +39,53 @@ export function ReviewPayrollRun({
       };
     }, []),
   );
+
   const review = async () => {
     if (!allowed || !confirming || attempted.current) return;
     attempted.current = true;
     setBusy(true);
+    setError(null);
     try {
       const saved = close
         ? await payroll.closeRun(run._id, run.version!)
         : await payroll.reviewRun(run._id, run.version!);
       if (close) validateClosedRun(saved, run);
       else validateReviewedRun(saved, run);
-      if (active.current) setDone(true);
-    } catch (error) {
-      if (active.current) setError(`${messageOf(error)} Tải lại kỳ để kiểm tra trước khi thao tác tiếp.`);
+      if (active.current) {
+        setDone(true);
+        showAlert(
+          "Thành công",
+          close
+            ? "Đã chốt kỳ lương thành công. Số liệu đã được đóng băng để thực hiện thanh toán."
+            : "Đã duyệt và chuyển kỳ lương sang kiểm tra thành công.",
+          [{ text: "Đã hiểu", onPress: onChanged }],
+          "success",
+        );
+      }
+    } catch (err) {
+      const msg = messageOf(err);
+      if (active.current) {
+        setError(msg);
+        attempted.current = false;
+        showAlert(
+          close ? "Chốt kỳ lương không thành công" : "Kiểm tra bảng lương không thành công",
+          msg,
+          [
+            { text: "Tải lại kỳ lương", onPress: onChanged },
+            { text: "Đã hiểu", style: "cancel" },
+          ],
+          "error",
+        );
+      }
     } finally {
       if (active.current) setBusy(false);
     }
   };
+
   if (!allowed) return null;
   const lines = run.effectiveLines || [];
   const total = lines.reduce((sum, line) => sum + (line.calculation.net ?? line.calculation.netPay ?? NaN), 0);
+
   return (
     <Card>
       <Text style={styles.heading}>
@@ -91,7 +122,7 @@ export function ReviewPayrollRun({
               </Text>
               <Button
                 title={busy ? (close ? "Đang chốt…" : "Đang duyệt…") : close ? "Xác nhận chốt kỳ" : "Xác nhận duyệt kỳ"}
-                disabled={busy || !!error}
+                disabled={busy}
                 onPress={() => void review()}
               />
               {!attempted.current && <Button title="Quay lại" onPress={() => setConfirming(false)} />}
@@ -99,8 +130,8 @@ export function ReviewPayrollRun({
           )}
         </>
       )}
-      <ErrorText message={error} />
       {(done || error) && <Button title="Tải lại trạng thái kỳ lương" disabled={busy} onPress={onChanged} />}
+      {alertView}
     </Card>
   );
 }

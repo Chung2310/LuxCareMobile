@@ -5,9 +5,11 @@ import { Text } from "react-native";
 import type { PayrollRun } from "../../../../src/types/payrollRun";
 import { payroll } from "../../api/services";
 import { useSession, messageOf } from "../../auth/SessionProvider";
-import { Button, Card, ErrorText, styles } from "../../ui";
+import { useAppAlert } from "../../components/AppAlert";
+import { Button, Card, styles } from "../../ui";
 import { canSyncRunAttendance, syncAttendanceSummary } from "./syncAttendanceModel";
 import { lockedAttendanceSummary } from "./lockAttendanceModel";
+
 export function SyncRunAttendance({ run, onChanged }: { run: PayrollRun; onChanged: () => void }) {
   const { user, selectedBranch } = useSession();
   const allowed = canSyncRunAttendance(user, selectedBranch?._id || user?.branchId, run);
@@ -20,6 +22,8 @@ export function SyncRunAttendance({ run, onChanged }: { run: PayrollRun; onChang
   const lockAttempted = useRef(false);
   const [confirmLock, setConfirmLock] = useState(false);
   const [locked, setLocked] = useState<ReturnType<typeof lockedAttendanceSummary> | null>(null);
+  const { showAlert, alertView } = useAppAlert();
+
   useFocusEffect(
     useCallback(() => {
       active.current = true;
@@ -28,37 +32,85 @@ export function SyncRunAttendance({ run, onChanged }: { run: PayrollRun; onChang
       };
     }, []),
   );
+
   const sync = async () => {
     if (!allowed || !confirming || attempted.current) return;
     attempted.current = true;
     setBusy(true);
+    setError(null);
     try {
       const key = randomUUID();
       const saved = await payroll.syncRunAttendance(run._id, run.version!, key);
       const summary = syncAttendanceSummary(saved, run, key);
-      if (active.current) setResult(summary);
-    } catch (error) {
-      if (active.current) setError(`${messageOf(error)} Tải lại để kiểm tra trạng thái trước khi đồng bộ tiếp.`);
+      if (active.current) {
+        setResult(summary);
+        showAlert(
+          "Đồng bộ công thành công",
+          `Đã đồng bộ ${summary.employeeCount} nhân viên · ${summary.blockingIssueCount} lỗi chặn xử lý.`,
+          [{ text: "Đã hiểu" }],
+          "success",
+        );
+      }
+    } catch (err) {
+      const msg = messageOf(err);
+      if (active.current) {
+        setError(msg);
+        attempted.current = false;
+        showAlert(
+          "Đồng bộ công không thành công",
+          msg,
+          [
+            { text: "Tải lại kỳ", onPress: onChanged },
+            { text: "Đã hiểu", style: "cancel" },
+          ],
+          "error",
+        );
+      }
     } finally {
       if (active.current) setBusy(false);
     }
   };
+
   if (!allowed) return null;
+
   const lockAttendance = async () => {
     if (!allowed || !result || result.blockingIssueCount !== 0 || !confirmLock || lockAttempted.current) return;
     lockAttempted.current = true;
     setBusy(true);
+    setError(null);
     try {
       const expectedVersion = run.version! + 1;
       const saved = await payroll.lockRunAttendance(run._id, expectedVersion);
       const summary = lockedAttendanceSummary(saved, run, expectedVersion);
-      if (active.current) setLocked(summary);
-    } catch (error) {
-      if (active.current) setError(`${messageOf(error)} Tải lại kỳ để kiểm tra trạng thái trước khi thao tác tiếp.`);
+      if (active.current) {
+        setLocked(summary);
+        showAlert(
+          "Khóa công thành công",
+          `Đã khóa bản công của ${summary.employeeCount} nhân viên. Vui lòng tính lương.`,
+          [{ text: "Đã hiểu", onPress: onChanged }],
+          "success",
+        );
+      }
+    } catch (err) {
+      const msg = messageOf(err);
+      if (active.current) {
+        setError(msg);
+        lockAttempted.current = false;
+        showAlert(
+          "Khóa công không thành công",
+          msg,
+          [
+            { text: "Tải lại kỳ", onPress: onChanged },
+            { text: "Đã hiểu", style: "cancel" },
+          ],
+          "error",
+        );
+      }
     } finally {
       if (active.current) setBusy(false);
     }
   };
+
   return (
     <Card>
       <Text style={styles.heading}>Đồng bộ công kỳ {run.periodKey}</Text>
@@ -84,7 +136,7 @@ export function SyncRunAttendance({ run, onChanged }: { run: PayrollRun; onChang
               <Text style={styles.text}>Xác nhận đồng bộ công cho kỳ và chi nhánh ở trên.</Text>
               <Button
                 title={busy ? "Đang đồng bộ…" : "Xác nhận đồng bộ công"}
-                disabled={busy || !!error}
+                disabled={busy}
                 onPress={() => void sync()}
               />
               {!attempted.current && <Button title="Quay lại" onPress={() => setConfirming(false)} />}
@@ -92,7 +144,7 @@ export function SyncRunAttendance({ run, onChanged }: { run: PayrollRun; onChang
           )}
         </>
       )}
-      {result && !locked && result.blockingIssueCount === 0 && !error && (
+      {result && !locked && result.blockingIssueCount === 0 && (
         <>
           <Text style={styles.muted}>
             Khóa công sẽ lưu bản công vừa đồng bộ để dùng tính lương. Kỳ lương vẫn là nháp.
@@ -124,8 +176,8 @@ export function SyncRunAttendance({ run, onChanged }: { run: PayrollRun; onChang
           </Text>
         </>
       )}
-      <ErrorText message={error} />
       {(result || error) && <Button title="Tải lại trạng thái kỳ lương" disabled={busy} onPress={onChanged} />}
+      {alertView}
     </Card>
   );
 }

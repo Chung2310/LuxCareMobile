@@ -4,7 +4,8 @@ import { Text } from "react-native";
 import type { PayrollRun } from "../../../../src/types/payrollRun";
 import { payroll } from "../../api/services";
 import { messageOf, useSession } from "../../auth/SessionProvider";
-import { Button, Card, ErrorText, Field, styles } from "../../ui";
+import { useAppAlert } from "../../components/AppAlert";
+import { Button, Card, Field, styles } from "../../ui";
 import {
   canPublishPayslips,
   canWithdrawPayslip,
@@ -12,6 +13,7 @@ import {
   validatePublicationResponse,
   validateWithdrawalResponse,
 } from "./publicationModel";
+
 export function PayslipPublication({ run, onChanged }: { run: PayrollRun; onChanged: () => void }) {
   const { user, selectedBranch } = useSession();
   const allowed = canPublishPayslips(user, run);
@@ -24,6 +26,8 @@ export function PayslipPublication({ run, onChanged }: { run: PayrollRun; onChan
   const [error, setError] = useState<string | null>(null);
   const [done, setDone] = useState(false);
   const [withdrawing, setWithdrawing] = useState<string | null>(null);
+  const { showAlert, alertView } = useAppAlert();
+
   useFocusEffect(
     useCallback(() => {
       active.current = true;
@@ -32,6 +36,7 @@ export function PayslipPublication({ run, onChanged }: { run: PayrollRun; onChan
       };
     }, []),
   );
+
   const lines = run.effectiveLines || [];
   const published = new Set(run.publishedEmployeeIds || []);
   const rows = lines.filter((line) =>
@@ -41,17 +46,40 @@ export function PayslipPublication({ run, onChanged }: { run: PayrollRun; onChan
           .toLocaleLowerCase("vi-VN")
           .includes(search.trim().toLocaleLowerCase("vi-VN")),
   );
+
   const send = async () => {
     if (!allowed || attempted.current || !confirming) return;
     try {
       const ids = publicationEmployees(run, selected);
       attempted.current = true;
       setBusy(true);
+      setError(null);
       const value = await payroll.publishPayslips(run._id, ids);
       validatePublicationResponse(value, run._id, ids);
-      if (active.current) setDone(true);
-    } catch (error) {
-      if (active.current) setError(`${messageOf(error)} Tải lại để kiểm tra trạng thái trước khi thao tác tiếp.`);
+      if (active.current) {
+        setDone(true);
+        showAlert(
+          "Phát hành thành công",
+          `Đã phát hành phiếu lương cho ${ids.length} nhân viên.`,
+          [{ text: "Đã hiểu", onPress: onChanged }],
+          "success",
+        );
+      }
+    } catch (err) {
+      const msg = messageOf(err);
+      if (active.current) {
+        setError(msg);
+        attempted.current = false;
+        showAlert(
+          "Phát hành không thành công",
+          msg,
+          [
+            { text: "Tải lại", onPress: onChanged },
+            { text: "Đã hiểu", style: "cancel" },
+          ],
+          "error",
+        );
+      }
     } finally {
       if (active.current) setBusy(false);
     }
@@ -63,12 +91,34 @@ export function PayslipPublication({ run, onChanged }: { run: PayrollRun; onChan
       if (attempted.current || !canWithdrawPayslip(user, run, withdrawing)) return;
       attempted.current = true;
       setBusy(true);
+      setError(null);
       try {
         const saved = await payroll.withdrawPayslip(run._id, withdrawing);
         validateWithdrawalResponse(saved, run._id, withdrawing);
-        if (active.current) setDone(true);
-      } catch (error) {
-        if (active.current) setError(`${messageOf(error)} Tải lại để kiểm tra trạng thái trước khi thao tác tiếp.`);
+        if (active.current) {
+          setDone(true);
+          showAlert(
+            "Thu hồi thành công",
+            "Đã thu hồi phiếu lương. Tải lại để cập nhật trạng thái.",
+            [{ text: "Đã hiểu", onPress: onChanged }],
+            "success",
+          );
+        }
+      } catch (err) {
+        const msg = messageOf(err);
+        if (active.current) {
+          setError(msg);
+          attempted.current = false;
+          showAlert(
+            "Thu hồi không thành công",
+            msg,
+            [
+              { text: "Tải lại", onPress: onChanged },
+              { text: "Đã hiểu", style: "cancel" },
+            ],
+            "error",
+          );
+        }
       } finally {
         if (active.current) setBusy(false);
       }
@@ -91,14 +141,14 @@ export function PayslipPublication({ run, onChanged }: { run: PayrollRun; onChan
             </Text>
             <Button
               title={busy ? "Đang thu hồi…" : "Xác nhận thu hồi phiếu lương"}
-              disabled={busy || !!error || !canWithdrawPayslip(user, run, withdrawing)}
+              disabled={busy || !canWithdrawPayslip(user, run, withdrawing)}
               onPress={() => void withdraw()}
             />
             {!attempted.current && <Button title="Quay lại" onPress={() => setWithdrawing(null)} />}
           </>
         )}
-        <ErrorText message={error} />
         {(done || error) && <Button title="Tải lại trạng thái kỳ lương" disabled={busy} onPress={onChanged} />}
+        {alertView}
       </Card>
     );
   }
@@ -167,7 +217,7 @@ export function PayslipPublication({ run, onChanged }: { run: PayrollRun; onChan
             <>
               <Button
                 title={busy ? "Đang phát hành…" : "Xác nhận phát hành phiếu lương"}
-                disabled={busy || !!error}
+                disabled={busy}
                 onPress={() => void send()}
               />
               {!attempted.current && <Button title="Sửa danh sách" onPress={() => setConfirming(false)} />}
@@ -175,8 +225,8 @@ export function PayslipPublication({ run, onChanged }: { run: PayrollRun; onChan
           )}
         </>
       )}
-      <ErrorText message={error} />
       {(done || error) && <Button title="Tải lại trạng thái kỳ lương" disabled={busy} onPress={onChanged} />}
+      {alertView}
     </Card>
   );
 }

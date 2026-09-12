@@ -5,11 +5,13 @@ import { Text } from "react-native";
 import type { PayrollRun } from "../../../../src/types/payrollRun";
 import { payroll } from "../../api/services";
 import { useSession, messageOf } from "../../auth/SessionProvider";
-import { Button, Card, ErrorText, Field, styles } from "../../ui";
-import { payslipMoney } from "./model";
+import { useAppAlert } from "../../components/AppAlert";
+import { Button, Card, Field, styles } from "../../ui";
 import { canCreatePayrollPayment, paymentDraftInput, validatePaymentDraft } from "./paymentFormModel";
 import { validatePaymentMetadata } from "./paymentMetadataModel";
+import { payslipMoney } from "./model";
 import { contractDate } from "../contracts/model";
+
 export function CreatePayrollPayment({ run, onChanged }: { run: PayrollRun; onChanged: () => void }) {
   const { user, selectedBranch } = useSession();
   const allowed = canCreatePayrollPayment(user, selectedBranch?._id || user?.branchId, run);
@@ -24,6 +26,8 @@ export function CreatePayrollPayment({ run, onChanged }: { run: PayrollRun; onCh
   const [busy, setBusy] = useState(false);
   const [done, setDone] = useState(false);
   const [error, setError] = useState<string | null>(null);
+  const { showAlert, alertView } = useAppAlert();
+
   useFocusEffect(
     useCallback(() => {
       active.current = true;
@@ -36,13 +40,35 @@ export function CreatePayrollPayment({ run, onChanged }: { run: PayrollRun; onCh
     if (!allowed || !payload || attempted.current) return;
     attempted.current = true;
     setBusy(true);
+    setError(null);
     try {
       const saved = await payroll.createPayment(run._id, { ...payload, idempotencyKey: randomUUID() });
       validatePaymentDraft(saved, run._id, payload);
       validatePaymentMetadata(saved, payload);
-      if (active.current) setDone(true);
-    } catch (error) {
-      if (active.current) setError(`${messageOf(error)} Tải lại thanh toán trước khi tạo tiếp.`);
+      if (active.current) {
+        setDone(true);
+        showAlert(
+          "Tạo thanh toán thành công",
+          "Đã tạo khoản thanh toán nháp thành công. Tải lại lịch sử để kiểm tra phân bổ.",
+          [{ text: "Đã hiểu", onPress: onChanged }],
+          "success",
+        );
+      }
+    } catch (err) {
+      const msg = messageOf(err);
+      if (active.current) {
+        setError(msg);
+        attempted.current = false;
+        showAlert(
+          "Tạo thanh toán không thành công",
+          msg,
+          [
+            { text: "Tải lại", onPress: onChanged },
+            { text: "Đã hiểu", style: "cancel" },
+          ],
+          "error",
+        );
+      }
     } finally {
       if (active.current) setBusy(false);
     }
@@ -88,8 +114,10 @@ export function CreatePayrollPayment({ run, onChanged }: { run: PayrollRun; onCh
                   try {
                     setPayload(paymentDraftInput(run, amounts, note, date, evidence));
                     setError(null);
-                  } catch (error) {
-                    setError(messageOf(error));
+                  } catch (err) {
+                    const msg = messageOf(err);
+                    setError(msg);
+                    showAlert("Lỗi thông tin thanh toán", msg, [{ text: "Đã hiểu" }], "error");
                   }
                 }}
               />
@@ -114,7 +142,7 @@ export function CreatePayrollPayment({ run, onChanged }: { run: PayrollRun; onCh
               </Text>
               <Button
                 title={busy ? "Đang tạo…" : "Xác nhận tạo khoản nháp"}
-                disabled={busy || attempted.current}
+                disabled={busy}
                 onPress={() => void save()}
               />
               {!attempted.current && <Button title="Sửa phân bổ" onPress={() => setPayload(null)} />}
@@ -122,8 +150,8 @@ export function CreatePayrollPayment({ run, onChanged }: { run: PayrollRun; onCh
           )}
         </>
       )}
-      <ErrorText message={error} />
-      {(done || attempted.current) && <Button title="Tải lại kỳ và thanh toán" disabled={busy} onPress={onChanged} />}
+      {(done || attempted.current || error) && <Button title="Tải lại kỳ và thanh toán" disabled={busy} onPress={onChanged} />}
+      {alertView}
     </Card>
   );
 }

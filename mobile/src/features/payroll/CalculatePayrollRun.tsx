@@ -5,9 +5,11 @@ import { Text } from "react-native";
 import type { PayrollRun } from "../../../../src/types/payrollRun";
 import { payroll } from "../../api/services";
 import { useSession, messageOf } from "../../auth/SessionProvider";
-import { Button, Card, ErrorText, styles } from "../../ui";
+import { useAppAlert } from "../../components/AppAlert";
+import { Button, Card, styles } from "../../ui";
 import { canSyncRunAttendance } from "./syncAttendanceModel";
 import { calculationSummary } from "./calculationModel";
+
 export function CalculatePayrollRun({ run, onChanged }: { run: PayrollRun; onChanged: () => void }) {
   const { user, selectedBranch } = useSession();
   const allowed = canSyncRunAttendance(user, selectedBranch?._id || user?.branchId, run);
@@ -17,6 +19,8 @@ export function CalculatePayrollRun({ run, onChanged }: { run: PayrollRun; onCha
   const [busy, setBusy] = useState(false);
   const [result, setResult] = useState<ReturnType<typeof calculationSummary> | null>(null);
   const [error, setError] = useState<string | null>(null);
+  const { showAlert, alertView } = useAppAlert();
+
   useFocusEffect(
     useCallback(() => {
       active.current = true;
@@ -25,21 +29,46 @@ export function CalculatePayrollRun({ run, onChanged }: { run: PayrollRun; onCha
       };
     }, []),
   );
+
   const calculate = async () => {
     if (!allowed || !confirming || attempted.current) return;
     attempted.current = true;
     setBusy(true);
+    setError(null);
     try {
       const saved = await payroll.calculateOperationalRun(run._id, run.version!, randomUUID());
       const summary = calculationSummary(saved, run);
-      if (active.current) setResult(summary);
-    } catch (error) {
-      if (active.current) setError(`${messageOf(error)} Tải lại trạng thái trước khi tính tiếp.`);
+      if (active.current) {
+        setResult(summary);
+        showAlert(
+          "Tính lương thành công",
+          `Đã hoàn tất bản tính cho ${summary.employeeCount} dòng lương. Tải lại để kiểm tra số liệu.`,
+          [{ text: "Đã hiểu", onPress: onChanged }],
+          "success",
+        );
+      }
+    } catch (err) {
+      const msg = messageOf(err);
+      if (active.current) {
+        setError(msg);
+        attempted.current = false;
+        showAlert(
+          "Tính lương không thành công",
+          msg,
+          [
+            { text: "Tải lại kỳ", onPress: onChanged },
+            { text: "Đã hiểu", style: "cancel" },
+          ],
+          "error",
+        );
+      }
     } finally {
       if (active.current) setBusy(false);
     }
   };
+
   if (!allowed) return null;
+
   return (
     <Card>
       <Text style={styles.heading}>Tính lương kỳ {run.periodKey}</Text>
@@ -70,7 +99,7 @@ export function CalculatePayrollRun({ run, onChanged }: { run: PayrollRun; onCha
               <Text style={styles.text}>Xác nhận tính lương cho kỳ và chi nhánh ở trên.</Text>
               <Button
                 title={busy ? "Đang tính lương…" : "Xác nhận tính lương"}
-                disabled={busy || !!error}
+                disabled={busy}
                 onPress={() => void calculate()}
               />
               {!attempted.current && <Button title="Quay lại" onPress={() => setConfirming(false)} />}
@@ -78,8 +107,8 @@ export function CalculatePayrollRun({ run, onChanged }: { run: PayrollRun; onCha
           )}
         </>
       )}
-      <ErrorText message={error} />
       {(result || error) && <Button title="Tải lại bảng lương và cảnh báo" disabled={busy} onPress={onChanged} />}
+      {alertView}
     </Card>
   );
 }

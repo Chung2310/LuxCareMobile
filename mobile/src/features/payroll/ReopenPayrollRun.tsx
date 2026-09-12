@@ -4,8 +4,10 @@ import { Text } from "react-native";
 import type { PayrollRun } from "../../../../src/types/payrollRun";
 import { payroll } from "../../api/services";
 import { useSession, messageOf } from "../../auth/SessionProvider";
-import { Button, Card, ErrorText, Field, styles } from "../../ui";
+import { useAppAlert } from "../../components/AppAlert";
+import { Button, Card, Field, styles } from "../../ui";
 import { canReopenPayrollRun, reopenPayload, validateReopenedRun } from "./reopenModel";
+
 export function ReopenPayrollRun({ run, onChanged }: { run: PayrollRun; onChanged: () => void }) {
   const { user, selectedBranch } = useSession();
   const allowed = canReopenPayrollRun(user, selectedBranch?._id || user?.branchId, run);
@@ -16,6 +18,8 @@ export function ReopenPayrollRun({ run, onChanged }: { run: PayrollRun; onChange
   const [busy, setBusy] = useState(false);
   const [done, setDone] = useState(false);
   const [error, setError] = useState<string | null>(null);
+  const { showAlert, alertView } = useAppAlert();
+
   useFocusEffect(
     useCallback(() => {
       active.current = true;
@@ -24,13 +28,16 @@ export function ReopenPayrollRun({ run, onChanged }: { run: PayrollRun; onChange
       };
     }, []),
   );
+
   const reopen = async () => {
     if (!allowed || !confirming || attempted.current) return;
     let payload;
     try {
       payload = reopenPayload(run, reason);
-    } catch (error) {
-      setError(messageOf(error));
+    } catch (err) {
+      const msg = messageOf(err);
+      setError(msg);
+      showAlert("Lỗi nhập liệu", msg, [{ text: "Đã hiểu" }], "error");
       return;
     }
     attempted.current = true;
@@ -39,14 +46,37 @@ export function ReopenPayrollRun({ run, onChanged }: { run: PayrollRun; onChange
     try {
       const saved = await payroll.reopen(run._id, payload);
       validateReopenedRun(saved, run);
-      if (active.current) setDone(true);
-    } catch (error) {
-      if (active.current) setError(`${messageOf(error)} Tải lại kỳ để kiểm tra trạng thái trước khi thao tác tiếp.`);
+      if (active.current) {
+        setDone(true);
+        showAlert(
+          "Mở lại kỳ lương thành công",
+          "Kỳ lương đã được chuyển về trạng thái nháp. Tải lại để kiểm tra số liệu.",
+          [{ text: "Đã hiểu", onPress: onChanged }],
+          "success",
+        );
+      }
+    } catch (err) {
+      const msg = messageOf(err);
+      if (active.current) {
+        setError(msg);
+        attempted.current = false;
+        showAlert(
+          "Mở lại kỳ lương không thành công",
+          msg,
+          [
+            { text: "Tải lại kỳ", onPress: onChanged },
+            { text: "Đã hiểu", style: "cancel" },
+          ],
+          "error",
+        );
+      }
     } finally {
       if (active.current) setBusy(false);
     }
   };
+
   if (!allowed) return null;
+
   return (
     <Card>
       <Text style={styles.heading}>Mở lại kỳ lương {run.periodKey}</Text>
@@ -83,8 +113,10 @@ export function ReopenPayrollRun({ run, onChanged }: { run: PayrollRun; onChange
                   reopenPayload(run, reason);
                   setError(null);
                   setConfirming(true);
-                } catch (error) {
-                  setError(messageOf(error));
+                } catch (err) {
+                  const msg = messageOf(err);
+                  setError(msg);
+                  showAlert("Lỗi nhập liệu", msg, [{ text: "Đã hiểu" }], "error");
                 }
               }}
             />
@@ -93,7 +125,7 @@ export function ReopenPayrollRun({ run, onChanged }: { run: PayrollRun; onChange
               <Text style={styles.text}>Xác nhận mở lại kỳ với lý do: {reason.trim()}</Text>
               <Button
                 title={busy ? "Đang mở lại…" : "Xác nhận mở lại kỳ"}
-                disabled={busy || attempted.current}
+                disabled={busy}
                 onPress={() => void reopen()}
               />
               {!attempted.current && <Button title="Sửa lý do / quay lại" onPress={() => setConfirming(false)} />}
@@ -101,10 +133,10 @@ export function ReopenPayrollRun({ run, onChanged }: { run: PayrollRun; onChange
           )}
         </>
       )}
-      <ErrorText message={error} />
-      {(done || attempted.current) && (
+      {(done || error) && (
         <Button title="Tải lại trạng thái kỳ lương" disabled={busy} onPress={onChanged} />
       )}
+      {alertView}
     </Card>
   );
 }
