@@ -32,7 +32,7 @@ import type {
 } from "../../../../src/types/recruitment";
 import { recruitment } from "../../api/services";
 import { messageOf } from "../../auth/SessionProvider";
-import { ErrorText, Field, Loading } from "../../ui";
+import { Field, Loading } from "../../ui";
 import { ChoiceField } from "../leave/ChoiceField";
 import { RecruitmentModal } from "./RecruitmentModal";
 import { formatDate, formatOutcome } from "./recruitmentModel";
@@ -64,7 +64,6 @@ export function ApplicantDetail({
   const [note, setNote] = useState("");
   const [loading, setLoading] = useState(true);
   const [busy, setBusy] = useState(false);
-  const [error, setError] = useState<string | null>(null);
 
   useEffect(() => {
     let active = true;
@@ -74,9 +73,7 @@ export function ApplicantDetail({
       .then((value) => {
         if (active) setHistory(value);
       })
-      .catch((err) => {
-        if (active) setError(messageOf(err));
-      })
+      .catch(() => {})
       .finally(() => {
         if (active) setLoading(false);
       });
@@ -88,14 +85,12 @@ export function ApplicantDetail({
   const transition = async () => {
     if (!isManage || !stageId || stageId === applicant.stageId || busy) return;
     setBusy(true);
-    setError(null);
     try {
       await recruitment.transitionApplicant(applicant._id, applicant.version, stageId, note.trim());
       await onChanged?.();
       onClose();
     } catch (err) {
       const msg = messageOf(err);
-      setError(msg);
       showAlert("Không thể chuyển giai đoạn", msg, [{ text: "Đã hiểu" }], "error");
     } finally {
       setBusy(false);
@@ -289,8 +284,6 @@ export function ApplicantDetail({
             </View>
           ))}
         </View>
-
-        <ErrorText message={error} />
       </View>
 
       {/* Actions Row */}

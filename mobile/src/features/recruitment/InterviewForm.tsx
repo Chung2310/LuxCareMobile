@@ -28,7 +28,7 @@ import type { UserProfile } from "../../../../src/types/common";
 import { recruitment } from "../../api/services";
 import { messageOf } from "../../auth/SessionProvider";
 import { useAppAlert } from "../../components/AppAlert";
-import { ErrorText, Field } from "../../ui";
+import { Field } from "../../ui";
 import { ChoiceField } from "../leave/ChoiceField";
 import { RecruitmentModal } from "./RecruitmentModal";
 import { dateTime, dateTimeInput, INTERVIEW_STATUS_CHOICES } from "./recruitmentModel";
@@ -87,7 +87,6 @@ export function InterviewForm({
   const { showAlert, alertView } = useAppAlert();
   const [draft, setDraft] = useState(() => draftOf(interview, applicantId, jobId));
   const [busy, setBusy] = useState(false);
-  const [error, setError] = useState<string | null>(null);
   const update = <K extends keyof Draft>(key: K, value: Draft[K]) =>
     setDraft((current) => ({ ...current, [key]: value }));
 
@@ -108,12 +107,10 @@ export function InterviewForm({
         undefined,
         "error",
       );
-      setError("Vui lòng bổ sung các trường bắt buộc.");
       return;
     }
 
     setBusy(true);
-    setError(null);
     try {
       const payload = {
         applicantId: draft.applicantId,
@@ -135,7 +132,6 @@ export function InterviewForm({
     } catch (err) {
       const msg = messageOf(err);
       showAlert("Thông tin chưa hợp lệ", msg, undefined, "error");
-      setError(msg);
     } finally {
       setBusy(false);
     }
@@ -340,8 +336,6 @@ export function InterviewForm({
           onChangeText={(value) => update("notes", value)}
         />
       </View>
-
-      <ErrorText message={error} />
 
       {/* Actions Row */}
       <View style={formStyles.actionsRow}>

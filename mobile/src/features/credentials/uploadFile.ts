@@ -41,13 +41,25 @@ export async function pickCredentialFile(
   try {
     if (signal.aborted) throw new Error("Đã hủy tải tệp.");
     onProgress?.({ stage: "preparing", name: asset.name });
-    const size = asset.file ? asset.file.size : file!.size;
+    // Document providers may allow content reads without exposing native metadata.
+    let estimatedSize = asset.file?.size ?? asset.size;
+    if (file) {
+      try {
+        const nativeSize = file.size;
+        if (Number.isFinite(nativeSize) && nativeSize > 0) estimatedSize = nativeSize;
+      } catch {
+        // The shared reader can still use the legacy API.
+      }
+    }
     if (!asset.name.trim() || asset.name.length > 300) throw new Error("Tên tệp cần từ 1 đến 300 ký tự.");
-    if (!Number.isFinite(size) || size <= 0 || size > 10 * 1024 * 1024)
+    if (estimatedSize !== undefined && estimatedSize > 10 * 1024 * 1024)
       throw new Error("Tệp phải có nội dung và tối đa 10 MB.");
     const mimeType = FILE_MIMES[asset.name.toLowerCase().split(".").pop() || ""];
     if (!mimeType) throw new Error("Chọn PDF, Word (DOC/DOCX), Excel (XLS/XLSX), JPG, PNG hoặc WebP, tối đa 10 MB.");
     const content = asset.file ? await readBrowserFile(asset.file) : await readPickedFileAsBase64(asset.uri, asset.name);
+    const size = Math.floor(content.length * 3 / 4) - (content.endsWith("==") ? 2 : content.endsWith("=") ? 1 : 0);
+    if (!Number.isFinite(size) || size <= 0 || size > 10 * 1024 * 1024)
+      throw new Error("Tệp phải có nội dung và tối đa 10 MB.");
     if (signal.aborted) throw new Error("Đã hủy tải tệp.");
     onProgress?.({ stage: "uploading", name: asset.name });
     const result = await credentials.upload(

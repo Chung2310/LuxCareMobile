@@ -1,12 +1,10 @@
 import { useAppAlert } from "../../components/AppAlert";
-import { useState } from "react";
 import { Linking, Text } from "react-native";
-import { Button, Card, ErrorText, styles } from "../../ui";
+import { Button, Card, styles } from "../../ui";
 import { messageOf } from "../../auth/SessionProvider";
 import { validatePublicLink } from "./publicLink";
 export function PublicDocumentLink({ title, url }: { title: string; url?: string }) {
   const { showAlert, alertView } = useAppAlert();
-  const [error, setError] = useState<string | null>(null);
   if (!url) return null;
   return (
     <Card>
@@ -14,19 +12,23 @@ export function PublicDocumentLink({ title, url }: { title: string; url?: string
       <Text selectable style={styles.muted}>
         {url}
       </Text>
-      <ErrorText message={error} />
       <Button
         title="Mở tài liệu"
         onPress={() => {
           try {
             const target = validatePublicLink(url);
-            setError(null);
             showAlert("Mở liên kết tài liệu?", new URL(target).hostname, [
               { text: "Hủy", style: "cancel" },
-              { text: "Mở", onPress: () => void Linking.openURL(target).catch((error) => setError(messageOf(error))) },
+              {
+                text: "Mở",
+                onPress: () =>
+                  void Linking.openURL(target).catch((error) =>
+                    showAlert("Không thể mở liên kết", messageOf(error), undefined, "error"),
+                  ),
+              },
             ]);
           } catch (error) {
-            setError(messageOf(error));
+            showAlert("Liên kết không hợp lệ", messageOf(error), undefined, "error");
           }
         }}
       />

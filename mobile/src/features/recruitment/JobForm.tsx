@@ -21,7 +21,7 @@ import type { RecruitmentJob } from "../../../../src/types/recruitment";
 import { recruitment } from "../../api/services";
 import { messageOf } from "../../auth/SessionProvider";
 import { useAppAlert } from "../../components/AppAlert";
-import { ErrorText, Field } from "../../ui";
+import { Field } from "../../ui";
 import { ChoiceField } from "../leave/ChoiceField";
 import { RecruitmentModal } from "./RecruitmentModal";
 import { jobDraft, jobPayload } from "./jobModel";
@@ -40,7 +40,6 @@ export function JobForm({
   const [draft, setDraft] = useState(() => jobDraft(job));
   const [busy, setBusy] = useState(false);
   const [blocked, setBlocked] = useState(false);
-  const [error, setError] = useState<string | null>(null);
   const lock = useRef(false);
   const publicFile = usePublicUpload();
 
@@ -49,12 +48,11 @@ export function JobForm({
     lock.current = true;
     setBusy(true);
     setLocked(true);
-    setError(null);
     try {
       const file = await publicFile.pick();
       if (file) setDraft((current) => ({ ...current, jdFileUrl: file.url }));
     } catch (error) {
-      setError(messageOf(error));
+      showAlert("Lỗi tải tệp", messageOf(error), undefined, "error");
     } finally {
       lock.current = false;
       setBusy(false);
@@ -82,7 +80,6 @@ export function JobForm({
         undefined,
         "error",
       );
-      setError("Vui lòng bổ sung các trường bắt buộc.");
       return;
     }
 
@@ -93,13 +90,11 @@ export function JobForm({
     } catch (error) {
       const msg = messageOf(error);
       showAlert("Thông tin chưa hợp lệ", msg, undefined, "error");
-      setError(msg);
       return;
     }
     lock.current = true;
     setBusy(true);
     setLocked(true);
-    setError(null);
     publicFile.uploads.dispatched(draft.jdFileUrl);
     try {
       if (job) await recruitment.updateJob(job._id, { ...payload, version: job.version });
@@ -110,16 +105,14 @@ export function JobForm({
       const status = error && typeof error === "object" && "status" in error ? Number(error.status) : 0;
       if (!status || status >= 500 || status === 409 || /phiên bản|version/i.test(msg)) {
         setBlocked(true);
-        setError(`${msg} Đóng và tải lại danh sách trước khi lưu tiếp.`);
         showAlert(
           "Không thể lưu tin tuyển dụng",
-          `${msg}\nVui lòng đóng và tải lại danh sách trước khi thao tác tiếp.`,
+          `${msg}\nVui lòng đóng và tải lại danh sách trước khi lưu tiếp.`,
           [{ text: "Đã hiểu" }],
           "error",
         );
       } else {
-        setError(msg);
-        showAlert("Lỗi lưu tin tuyển dụng", msg, [{ text: "Đã hiểu" }], "error");
+        showAlert("Không thể lưu tin tuyển dụng", msg, [{ text: "Đã hiểu" }], "error");
       }
     } finally {
       lock.current = false;
@@ -346,8 +339,6 @@ export function JobForm({
           onChangeText={(value) => setDraft((c) => ({ ...c, jdFileUrl: value }))}
         />
       </View>
-
-      <ErrorText message={error} />
 
       {/* Action Buttons */}
       <View style={formStyles.actionsRow}>

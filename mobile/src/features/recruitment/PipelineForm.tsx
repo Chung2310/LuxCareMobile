@@ -24,19 +24,25 @@ import type { RecruitmentPipeline, RecruitmentStage } from "../../../../src/type
 import { recruitment } from "../../api/services";
 import { messageOf } from "../../auth/SessionProvider";
 import { useAppAlert } from "../../components/AppAlert";
-import { ErrorText, Field } from "../../ui";
+import { Field } from "../../ui";
 import { ChoiceField } from "../leave/ChoiceField";
 import { moveStage, pipelinePayload } from "./pipelineModel";
 
 const QUICK_COLORS = [
   "#3b82f6", // Blue
-  "#059669", // Emerald
-  "#10b981", // Green
+  "#6366f1", // Indigo
+  "#8b5cf6", // Violet
+  "#ec4899", // Pink
   "#f59e0b", // Amber
-  "#ef4444", // Red
-  "#8b5cf6", // Purple
+  "#10b981", // Emerald
   "#06b6d4", // Cyan
   "#64748b", // Slate
+];
+
+const OUTCOME_OPTIONS = [
+  { label: "Bình thường (Đang xử lý)", value: "" },
+  { label: "Thành công (Đã tuyển / Hired)", value: "hired" },
+  { label: "Từ chối (Không đạt / Rejected)", value: "rejected" },
 ];
 
 export function PipelineForm({
@@ -49,15 +55,13 @@ export function PipelineForm({
   setLocked?: (value: boolean) => void;
 }) {
   const { showAlert, alertView } = useAppAlert();
-  const [stages, setStages] = useState(() =>
-    pipeline.stages
-      .slice()
+  const [stages, setStages] = useState<RecruitmentStage[]>(() =>
+    [...(pipeline.stages || [])]
       .sort((a, b) => a.position - b.position)
       .map((stage) => ({ ...stage })),
   );
   const [busy, setBusy] = useState(false);
   const [blocked, setBlocked] = useState(false);
-  const [error, setError] = useState<string | null>(null);
   const lock = useRef(false);
 
   const change = (id: string, patch: Partial<RecruitmentStage>) =>
@@ -68,16 +72,23 @@ export function PipelineForm({
     lock.current = true;
     setBusy(true);
     setLocked?.(true);
-    setError(null);
     try {
       await recruitment.savePipeline(pipeline.version, input);
       onClose();
     } catch (error) {
       const msg = messageOf(error);
       const status = error && typeof error === "object" && "status" in error ? Number(error.status) : 0;
-      if (!status || status >= 500 || status === 409 || /phiên bản|version/i.test(msg)) setBlocked(true);
-      setError(msg);
-      showAlert("Không thể lưu quy trình", msg, [{ text: "Đã hiểu" }], "error");
+      if (!status || status >= 500 || status === 409 || /phiên bản|version/i.test(msg)) {
+        setBlocked(true);
+        showAlert(
+          "Không thể lưu quy trình",
+          `${msg}\nVui lòng đóng và tải lại danh sách trước khi lưu tiếp.`,
+          [{ text: "Đã hiểu" }],
+          "error",
+        );
+      } else {
+        showAlert("Không thể lưu quy trình", msg, [{ text: "Đã hiểu" }], "error");
+      }
     } finally {
       lock.current = false;
       setBusy(false);
@@ -96,7 +107,6 @@ export function PipelineForm({
         undefined,
         "error",
       );
-      setError("Vui lòng nhập tên cho tất cả các giai đoạn.");
       return;
     }
     if (!stages.some((stage) => stage.isActive)) {
@@ -106,7 +116,6 @@ export function PipelineForm({
         undefined,
         "error",
       );
-      setError("Cần ít nhất một giai đoạn đang hoạt động.");
       return;
     }
     try {
@@ -122,7 +131,6 @@ export function PipelineForm({
     } catch (error) {
       const msg = messageOf(error);
       showAlert("Thông tin chưa hợp lệ", msg, undefined, "error");
-      setError(msg);
     }
   };
 
@@ -281,13 +289,6 @@ export function PipelineForm({
         <Plus size={16} color="#059669" />
         <Text style={pipeStyles.addStageBtnText}>Thêm giai đoạn mới</Text>
       </Pressable>
-
-      <ErrorText message={error} />
-      {blocked && (
-        <Text style={{ fontSize: 12, color: "#dc2626", textAlign: "center" }}>
-          Đóng và tải lại quy trình trước khi lưu tiếp.
-        </Text>
-      )}
 
       {/* Actions Row */}
       <View style={pipeStyles.actionsRow}>

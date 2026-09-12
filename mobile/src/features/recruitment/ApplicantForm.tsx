@@ -20,7 +20,7 @@ import type { RecruitmentApplicant, RecruitmentJob } from "../../../../src/types
 import { recruitment } from "../../api/services";
 import { messageOf } from "../../auth/SessionProvider";
 import { useAppAlert } from "../../components/AppAlert";
-import { ErrorText, Field } from "../../ui";
+import { Field } from "../../ui";
 import { ChoiceField } from "../leave/ChoiceField";
 import { RecruitmentModal } from "./RecruitmentModal";
 import { dateInput, dateOnly, numericOrNull } from "./recruitmentModel";
@@ -79,7 +79,6 @@ export function ApplicantForm({
   const { showAlert, alertView } = useAppAlert();
   const [draft, setDraft] = useState(() => draftOf(applicant, jobId));
   const [busy, setBusy] = useState(false);
-  const [error, setError] = useState<string | null>(null);
   const update = (key: keyof Draft, value: string) =>
     setDraft((current) => ({ ...current, [key]: value }));
 
@@ -96,12 +95,10 @@ export function ApplicantForm({
         undefined,
         "error",
       );
-      setError("Vui lòng bổ sung các trường bắt buộc.");
       return;
     }
 
     setBusy(true);
-    setError(null);
     try {
       const payload = {
         jobId: draft.jobId,
@@ -144,7 +141,6 @@ export function ApplicantForm({
     } catch (err) {
       const msg = messageOf(err);
       showAlert("Thông tin chưa hợp lệ", msg, undefined, "error");
-      setError(msg);
     } finally {
       setBusy(false);
     }
@@ -323,8 +319,6 @@ export function ApplicantForm({
           onChangeText={(value) => update("notes", value)}
         />
       </View>
-
-      <ErrorText message={error} />
 
       {/* Actions Row */}
       <View style={formStyles.actionsRow}>

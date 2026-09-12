@@ -1,5 +1,5 @@
 import { afterEach, beforeEach, expect, it, vi } from "vitest";
-const mocks = vi.hoisted(() => ({ pick: vi.fn(), upload: vi.fn(), remove: vi.fn(), base64: vi.fn(), size: 10, camera: vi.fn(), legacyRead: vi.fn() }));
+const mocks = vi.hoisted(() => ({ pick: vi.fn(), upload: vi.fn(), remove: vi.fn(), base64: vi.fn(), size: 10, sizeError: false, camera: vi.fn(), legacyRead: vi.fn() }));
 vi.mock("../../files/captureDocumentPhoto", () => ({ captureDocumentPhoto: mocks.camera }));
 vi.mock("expo-document-picker", () => ({ getDocumentAsync: mocks.pick }));
 vi.mock("expo-file-system/legacy", () => ({ readAsStringAsync: mocks.legacyRead, EncodingType: { Base64: "base64" } }));
@@ -8,6 +8,7 @@ vi.mock("expo-file-system", () => ({
   File: class {
     exists = true;
     get size() {
+      if (mocks.sizeError) throw new Error("Cannot read file metadata");
       return mocks.size;
     }
     base64 = mocks.base64;
@@ -20,6 +21,7 @@ import { createHrCredentialService } from "../../../../src/services/hrCredential
 beforeEach(() => {
   vi.resetAllMocks();
   mocks.size = 10;
+  mocks.sizeError = false;
   mocks.base64.mockResolvedValue("dGVzdA==");
   mocks.pick.mockResolvedValue({ canceled: false, assets: [{ uri: "file:///cache/doc.pdf", name: "doc.pdf" }] });
   mocks.upload.mockResolvedValue({ url: "https://files.example/doc", uploadToken: "token" });
@@ -30,12 +32,12 @@ it("uploads with tenant and maps the pending token to credential fields", async 
     fileUrl: "https://files.example/doc",
     fileName: "doc.pdf",
     fileMimeType: "application/pdf",
-    fileSize: 10,
+    fileSize: 4,
     uploadToken: "token",
   });
   expect(mocks.upload).toHaveBeenCalledWith(
     "COMP",
-    { file: "data:application/pdf;base64,dGVzdA==", name: "doc.pdf", mimeType: "application/pdf", size: 10 },
+    { file: "data:application/pdf;base64,dGVzdA==", name: "doc.pdf", mimeType: "application/pdf", size: 4 },
     signal,
   );
   expect(mocks.remove).toHaveBeenCalledOnce();
@@ -45,7 +47,7 @@ it("does not upload when picker is canceled", async () => {
   expect(await pickCredentialFile("A", new AbortController().signal)).toBeNull();
   expect(mocks.upload).not.toHaveBeenCalled();
 });
-it.each([0, 10485761])("rejects actual file size %s before reading base64", async (size) => {
+it.each([10485761])("rejects actual file size %s before reading base64", async (size) => {
   mocks.size = size;
   await expect(pickCredentialFile("A", new AbortController().signal)).rejects.toThrow("10 MB");
   expect(mocks.base64).not.toHaveBeenCalled();
@@ -220,4 +222,28 @@ it("does not upload if the form is canceled during fallback reading", async () =
   await expect(pickCredentialFile("COMP", controller.signal)).rejects.toThrow("hủy");
   expect(mocks.upload).not.toHaveBeenCalled();
   expect(mocks.remove).toHaveBeenCalledOnce();
+});
+it.each(["throws", "zero"])("reads a selected file when native size %s", async (failure) => {
+  mocks.sizeError = failure === "throws";
+  mocks.size = 0;
+  mocks.base64.mockRejectedValue(new Error("Native reader unavailable"));
+  mocks.legacyRead.mockResolvedValue("dGVzdA==");
+  const result = await pickCredentialFile("COMP", new AbortController().signal);
+  expect(result).toMatchObject({ fileSize: 4, uploadToken: "token" });
+  expect(mocks.upload.mock.calls[0][1].size).toBe(4);
+  expect(mocks.remove).toHaveBeenCalledOnce();
+});
+it("rejects oversized picker metadata when native metadata is unavailable", async () => {
+  mocks.sizeError = true;
+  mocks.pick.mockResolvedValue({ canceled: false, assets: [{ uri: "file:///cache/doc.pdf", name: "doc.pdf", size: 10485761 }] });
+  await expect(pickCredentialFile("COMP", new AbortController().signal)).rejects.toThrow("10 MB");
+  expect(mocks.base64).not.toHaveBeenCalled();
+  expect(mocks.upload).not.toHaveBeenCalled();
+});
+it.each(["", "AAAA".repeat(3495254)])("rejects empty or oversized content despite metadata", async (content) => {
+  const browserFile = new globalThis.File(["test"], "scan.pdf");
+  vi.stubGlobal("FileReader", class { readAsDataURL() { (this as any).result = "data:application/pdf;base64," + content; (this as any).onload(); } });
+  mocks.pick.mockResolvedValue({ canceled: false, assets: [{ uri: "blob:invalid", file: browserFile, name: "scan.pdf" }] });
+  await expect(pickCredentialFile("COMP", new AbortController().signal)).rejects.toThrow("10 MB");
+  expect(mocks.upload).not.toHaveBeenCalled();
 });
