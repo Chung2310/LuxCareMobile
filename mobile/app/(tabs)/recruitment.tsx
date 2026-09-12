@@ -33,6 +33,7 @@ import {
   CheckCircle2,
   ChevronDown,
   ChevronLeft,
+  ChevronRight,
   ChevronUp,
   Clock,
   FileEdit,
@@ -941,13 +942,14 @@ export default function Recruitment() {
                 disabled={disabled || page <= 1}
                 onPress={() => setPage((v) => v - 1)}
               >
+                <ChevronLeft size={14} color={disabled || page <= 1 ? "#94a3b8" : "#0f172a"} />
                 <Text
                   style={[
                     uiStyles.pageBtnText,
                     (disabled || page <= 1) && uiStyles.pageBtnTextDisabled,
                   ]}
                 >
-                  ◀ Trang trước
+                  Trang trước
                 </Text>
               </Pressable>
 
@@ -970,8 +972,9 @@ export default function Recruitment() {
                     (disabled || page >= pagination.totalPages) && uiStyles.pageBtnTextDisabled,
                   ]}
                 >
-                  Trang sau ▶
+                  Trang sau
                 </Text>
+                <ChevronRight size={14} color={disabled || page >= pagination.totalPages ? "#94a3b8" : "#0f172a"} />
               </Pressable>
             </View>
           )}
@@ -979,43 +982,15 @@ export default function Recruitment() {
       </SafeAreaView>
 
       {/* Modal for Creating / Editing Job */}
-      <Modal
-        visible={editing !== null && access.manage}
-        animationType="slide"
-        onRequestClose={closeForm}
-      >
-        <SafeAreaView style={uiStyles.modalSafeArea} edges={["top", "bottom"]}>
-          <View style={uiStyles.modalHeader}>
-            <View>
-              <Text style={uiStyles.modalTitle}>
-                {editing === "new" ? "Tạo tin tuyển dụng mới" : `Sửa tin: ${typeof editing === "object" ? editing?.code : ""}`}
-              </Text>
-              <Text style={uiStyles.modalSubtitle}>
-                Điền đầy đủ thông tin để thu hút ứng viên tài năng
-              </Text>
-            </View>
-            <Pressable
-              style={({ pressed }) => [uiStyles.modalCloseBtn, pressed && { opacity: 0.7 }]}
-              onPress={closeForm}
-            >
-              <X size={20} color="#0f172a" />
-            </Pressable>
-          </View>
-
-          {editing && access.manage && (
-            <JobForm
-              job={editing === "new" ? undefined : editing}
-              setLocked={(val) => {
-                formLock.current = val;
-              }}
-              onClose={() => {
-                setEditing(null);
-                setRevision((v) => v + 1);
-              }}
-            />
-          )}
-        </SafeAreaView>
-      </Modal>
+      {editing && access.manage && (
+        <JobForm
+          job={editing === "new" ? undefined : editing}
+          setLocked={(val) => {
+            formLock.current = val;
+          }}
+          onClose={closeForm}
+        />
+      )}
       {alertView}
     </>
   );
@@ -1598,10 +1573,13 @@ const uiStyles = StyleSheet.create({
     borderColor: "#e2e8f0",
   },
   pageBtn: {
-    paddingHorizontal: 14,
+    paddingHorizontal: 12,
     paddingVertical: 8,
     borderRadius: 8,
     backgroundColor: "#f1f5f9",
+    flexDirection: "row",
+    alignItems: "center",
+    gap: 4,
   },
   pageBtnDisabled: {
     opacity: 0.4,

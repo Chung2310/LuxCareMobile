@@ -1,10 +1,26 @@
-import { useAppAlert } from "../../components/AppAlert";
-import { Text } from "react-native";
 import { useState } from "react";
+import {
+  ActivityIndicator,
+  Pressable,
+  StyleSheet,
+  Text,
+  View,
+} from "react-native";
+import {
+  Award,
+  Briefcase,
+  CalendarCheck,
+  Check,
+  GraduationCap,
+  Info,
+  User,
+  X,
+} from "lucide-react-native";
 import type { RecruitmentApplicant, RecruitmentJob } from "../../../../src/types/recruitment";
 import { recruitment } from "../../api/services";
 import { messageOf } from "../../auth/SessionProvider";
-import { Button, ErrorText, Field, styles } from "../../ui";
+import { useAppAlert } from "../../components/AppAlert";
+import { ErrorText, Field } from "../../ui";
 import { ChoiceField } from "../leave/ChoiceField";
 import { RecruitmentModal } from "./RecruitmentModal";
 import { dateInput, dateOnly, numericOrNull } from "./recruitmentModel";
@@ -70,7 +86,7 @@ export function ApplicantForm({
   const save = async (confirmDuplicate = false) => {
     if (busy) return;
     const missing: string[] = [];
-    if (!draft.jobId) missing.push("• Tin tuyển dụng");
+    if (!draft.jobId) missing.push("• Vị trí ứng tuyển (tin tuyển dụng)");
     if (!draft.fullName.trim()) missing.push("• Họ tên ứng viên");
 
     if (missing.length > 0) {
@@ -140,28 +156,293 @@ export function ApplicantForm({
   }));
 
   return (
-    <RecruitmentModal title={applicant ? "Sửa hồ sơ ứng viên" : "Thêm ứng viên"} visible onClose={onClose}>
-      <Text style={styles.muted}>
-        Hồ sơ mới cần gắn với một tin tuyển dụng. CV có thể là đường dẫn HTTP/HTTPS công khai.
-      </Text>
-      <ChoiceField label="Tin tuyển dụng" value={draft.jobId} choices={choices} disabled={busy} onChange={(value) => update("jobId", value)} />
-      <Field label="Họ tên" value={draft.fullName} editable={!busy} onChangeText={(value) => update("fullName", value)} />
-      <Field label="Email" value={draft.email} keyboardType="email-address" editable={!busy} onChangeText={(value) => update("email", value)} />
-      <Field label="Điện thoại" value={draft.phone} keyboardType="phone-pad" editable={!busy} onChangeText={(value) => update("phone", value)} />
-      <Field label="Ngày sinh (YYYY-MM-DD)" value={draft.birthDate} editable={!busy} onChangeText={(value) => update("birthDate", value)} />
-      <Field label="Địa chỉ" value={draft.address} editable={!busy} onChangeText={(value) => update("address", value)} />
-      <Field label="Kinh nghiệm" value={draft.experience} multiline editable={!busy} onChangeText={(value) => update("experience", value)} />
-      <Field label="Học vấn" value={draft.education} multiline editable={!busy} onChangeText={(value) => update("education", value)} />
-      <Field label="Kỹ năng (phân cách bằng dấu phẩy)" value={draft.skills} editable={!busy} onChangeText={(value) => update("skills", value)} />
-      <Field label="Lương mong muốn" value={draft.expectedSalary} keyboardType="numeric" editable={!busy} onChangeText={(value) => update("expectedSalary", value)} />
-      <Field label="Ngày có thể nhận việc (YYYY-MM-DD)" value={draft.availableDate} editable={!busy} onChangeText={(value) => update("availableDate", value)} />
-      <Field label="Nguồn ứng viên" value={draft.source} editable={!busy} onChangeText={(value) => update("source", value)} />
-      <Field label="Ghi chú" value={draft.notes} multiline editable={!busy} onChangeText={(value) => update("notes", value)} />
-      <Field label="Liên kết CV công khai" value={draft.cvUrl} keyboardType="url" editable={!busy} onChangeText={(value) => update("cvUrl", value)} />
+    <RecruitmentModal
+      title={applicant ? `Sửa hồ sơ: ${applicant.fullName}` : "Thêm ứng viên mới"}
+      subtitle={
+        applicant
+          ? "Cập nhật thông tin chi tiết ứng viên"
+          : "Tạo hồ sơ ứng tuyển mới vào hệ thống"
+      }
+      visible
+      onClose={onClose}
+    >
+      {/* Tip Banner */}
+      <View style={formStyles.tipBanner}>
+        <Info size={16} color="#0284c7" />
+        <Text style={formStyles.tipBannerText}>
+          Hồ sơ mới cần gắn với một tin tuyển dụng đang mở. Bạn có thể đính kèm đường dẫn CV trực tuyến.
+        </Text>
+      </View>
+
+      {/* Section 1: Vị trí ứng tuyển */}
+      <View style={formStyles.sectionCard}>
+        <View style={formStyles.sectionHeader}>
+          <View style={formStyles.sectionIconBox}>
+            <Briefcase size={15} color="#059669" />
+          </View>
+          <Text style={formStyles.sectionTitle}>Vị trí tuyển dụng</Text>
+        </View>
+
+        <ChoiceField
+          label="Tin tuyển dụng *"
+          value={draft.jobId}
+          choices={choices}
+          disabled={busy}
+          onChange={(value) => update("jobId", value)}
+        />
+      </View>
+
+      {/* Section 2: Thông tin cá nhân */}
+      <View style={formStyles.sectionCard}>
+        <View style={formStyles.sectionHeader}>
+          <View style={formStyles.sectionIconBox}>
+            <User size={15} color="#059669" />
+          </View>
+          <Text style={formStyles.sectionTitle}>Thông tin cá nhân</Text>
+        </View>
+
+        <Field
+          label="Họ và tên *"
+          value={draft.fullName}
+          editable={!busy}
+          onChangeText={(value) => update("fullName", value)}
+        />
+        <View style={{ flexDirection: "row", gap: 10 }}>
+          <View style={{ flex: 1 }}>
+            <Field
+              label="Email"
+              value={draft.email}
+              keyboardType="email-address"
+              editable={!busy}
+              onChangeText={(value) => update("email", value)}
+            />
+          </View>
+          <View style={{ flex: 1 }}>
+            <Field
+              label="Số điện thoại"
+              value={draft.phone}
+              keyboardType="phone-pad"
+              editable={!busy}
+              onChangeText={(value) => update("phone", value)}
+            />
+          </View>
+        </View>
+
+        <Field
+          label="Ngày sinh (YYYY-MM-DD)"
+          value={draft.birthDate}
+          editable={!busy}
+          onChangeText={(value) => update("birthDate", value)}
+        />
+        <Field
+          label="Địa chỉ liên hệ"
+          value={draft.address}
+          editable={!busy}
+          onChangeText={(value) => update("address", value)}
+        />
+      </View>
+
+      {/* Section 3: Học vấn & Kinh nghiệm */}
+      <View style={formStyles.sectionCard}>
+        <View style={formStyles.sectionHeader}>
+          <View style={formStyles.sectionIconBox}>
+            <GraduationCap size={15} color="#059669" />
+          </View>
+          <Text style={formStyles.sectionTitle}>Học vấn & Kỹ năng</Text>
+        </View>
+
+        <Field
+          label="Kinh nghiệm làm việc"
+          value={draft.experience}
+          multiline
+          editable={!busy}
+          onChangeText={(value) => update("experience", value)}
+        />
+        <Field
+          label="Trình độ học vấn"
+          value={draft.education}
+          multiline
+          editable={!busy}
+          onChangeText={(value) => update("education", value)}
+        />
+        <Field
+          label="Kỹ năng chuyên môn (cách nhau dấu phẩy)"
+          value={draft.skills}
+          editable={!busy}
+          onChangeText={(value) => update("skills", value)}
+        />
+      </View>
+
+      {/* Section 4: Kỳ vọng & Tiếp nhận */}
+      <View style={formStyles.sectionCard}>
+        <View style={formStyles.sectionHeader}>
+          <View style={formStyles.sectionIconBox}>
+            <CalendarCheck size={15} color="#059669" />
+          </View>
+          <Text style={formStyles.sectionTitle}>Kỳ vọng & CV</Text>
+        </View>
+
+        <View style={{ flexDirection: "row", gap: 10 }}>
+          <View style={{ flex: 1 }}>
+            <Field
+              label="Lương mong muốn (VNĐ)"
+              value={draft.expectedSalary}
+              keyboardType="numeric"
+              editable={!busy}
+              onChangeText={(value) => update("expectedSalary", value)}
+            />
+          </View>
+          <View style={{ flex: 1 }}>
+            <Field
+              label="Ngày nhận việc (YYYY-MM-DD)"
+              value={draft.availableDate}
+              editable={!busy}
+              onChangeText={(value) => update("availableDate", value)}
+            />
+          </View>
+        </View>
+
+        <Field
+          label="Nguồn ứng viên (Website, Giới thiệu, ...)"
+          value={draft.source}
+          editable={!busy}
+          onChangeText={(value) => update("source", value)}
+        />
+        <Field
+          label="Liên kết CV công khai (URL)"
+          value={draft.cvUrl}
+          keyboardType="url"
+          editable={!busy}
+          onChangeText={(value) => update("cvUrl", value)}
+        />
+        <Field
+          label="Ghi chú thêm"
+          value={draft.notes}
+          multiline
+          editable={!busy}
+          onChangeText={(value) => update("notes", value)}
+        />
+      </View>
+
       <ErrorText message={error} />
-      <Button title={busy ? "Đang lưu..." : "Lưu hồ sơ"} disabled={busy} onPress={() => void save()} />
-      <Button title="Hủy" disabled={busy} onPress={onClose} />
+
+      {/* Actions Row */}
+      <View style={formStyles.actionsRow}>
+        <Pressable
+          style={({ pressed }) => [formStyles.cancelBtn, pressed && { opacity: 0.7 }]}
+          disabled={busy}
+          onPress={onClose}
+        >
+          <X size={15} color="#475569" />
+          <Text style={formStyles.cancelBtnText}>Hủy</Text>
+        </Pressable>
+
+        <Pressable
+          style={({ pressed }) => [
+            formStyles.submitBtn,
+            busy && { opacity: 0.6 },
+            pressed && !busy && { opacity: 0.85 },
+          ]}
+          disabled={busy}
+          onPress={() => void save()}
+        >
+          {busy ? (
+            <ActivityIndicator size="small" color="#ffffff" />
+          ) : (
+            <Check size={16} color="#ffffff" />
+          )}
+          <Text style={formStyles.submitBtnText}>
+            {busy ? "Đang lưu..." : applicant ? "Lưu thay đổi" : "Lưu hồ sơ"}
+          </Text>
+        </Pressable>
+      </View>
+
       {alertView}
     </RecruitmentModal>
   );
 }
+
+const formStyles = StyleSheet.create({
+  tipBanner: {
+    flexDirection: "row",
+    alignItems: "center",
+    gap: 10,
+    backgroundColor: "#f0f9ff",
+    padding: 12,
+    borderRadius: 12,
+    borderWidth: 1,
+    borderColor: "#bae6fd",
+  },
+  tipBannerText: {
+    fontSize: 12,
+    color: "#0369a1",
+    lineHeight: 18,
+    flex: 1,
+  },
+  sectionCard: {
+    backgroundColor: "#ffffff",
+    borderRadius: 14,
+    borderWidth: 1,
+    borderColor: "#e2e8f0",
+    padding: 14,
+    gap: 12,
+  },
+  sectionHeader: {
+    flexDirection: "row",
+    alignItems: "center",
+    gap: 8,
+    paddingBottom: 4,
+    borderBottomWidth: 1,
+    borderBottomColor: "#f1f5f9",
+  },
+  sectionIconBox: {
+    width: 28,
+    height: 28,
+    borderRadius: 8,
+    backgroundColor: "#ecfdf5",
+    alignItems: "center",
+    justifyContent: "center",
+  },
+  sectionTitle: {
+    fontSize: 14,
+    fontWeight: "700",
+    color: "#0f172a",
+  },
+  actionsRow: {
+    flexDirection: "row",
+    gap: 12,
+    marginTop: 8,
+  },
+  cancelBtn: {
+    flex: 1,
+    height: 46,
+    borderRadius: 12,
+    backgroundColor: "#f1f5f9",
+    borderWidth: 1,
+    borderColor: "#e2e8f0",
+    alignItems: "center",
+    justifyContent: "center",
+    flexDirection: "row",
+    gap: 6,
+  },
+  cancelBtnText: {
+    fontSize: 13,
+    fontWeight: "700",
+    color: "#475569",
+  },
+  submitBtn: {
+    flex: 1.8,
+    height: 46,
+    borderRadius: 12,
+    backgroundColor: "#059669",
+    alignItems: "center",
+    justifyContent: "center",
+    flexDirection: "row",
+    gap: 6,
+  },
+  submitBtnText: {
+    fontSize: 13,
+    fontWeight: "700",
+    color: "#ffffff",
+  },
+});

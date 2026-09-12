@@ -1,13 +1,32 @@
 import { useRef, useState } from "react";
-import { Switch, Text, View } from "react-native";
+import {
+  ActivityIndicator,
+  Pressable,
+  StyleSheet,
+  Switch,
+  Text,
+  View,
+} from "react-native";
+import {
+  Briefcase,
+  Check,
+  DollarSign,
+  FileText,
+  Info,
+  MapPin,
+  UploadCloud,
+  X,
+} from "lucide-react-native";
 import type { RecruitmentJob } from "../../../../src/types/recruitment";
 import { recruitment } from "../../api/services";
 import { messageOf } from "../../auth/SessionProvider";
 import { useAppAlert } from "../../components/AppAlert";
-import { Button, ErrorText, Field, Page, styles } from "../../ui";
+import { ErrorText, Field } from "../../ui";
 import { ChoiceField } from "../leave/ChoiceField";
+import { RecruitmentModal } from "./RecruitmentModal";
 import { jobDraft, jobPayload } from "./jobModel";
 import { usePublicUpload } from "./usePublicUpload";
+
 export function JobForm({
   job,
   onClose,
@@ -24,6 +43,7 @@ export function JobForm({
   const [error, setError] = useState<string | null>(null);
   const lock = useRef(false);
   const publicFile = usePublicUpload();
+
   const upload = async () => {
     if (lock.current || blocked) return;
     lock.current = true;
@@ -41,6 +61,7 @@ export function JobForm({
       setLocked(false);
     }
   };
+
   const save = async () => {
     if (lock.current) return;
     const missing: string[] = [];
@@ -96,70 +117,387 @@ export function JobForm({
       setLocked(false);
     }
   };
+
   const disabled = busy || blocked;
-  const fields = [
-    { key: "code", label: "Mã tin" },
-    { key: "title", label: "Tiêu đề" },
-    { key: "department", label: "Phòng ban" },
-    { key: "headcount", label: "Số lượng tuyển" },
-    { key: "description", label: "Mô tả công việc" },
-    { key: "requirements", label: "Yêu cầu" },
-    { key: "benefits", label: "Quyền lợi" },
-    { key: "salaryMin", label: "Lương tối thiểu (để trống nếu chưa xác định)" },
-    { key: "salaryMax", label: "Lương tối đa" },
-    { key: "employmentType", label: "Loại hợp đồng (ví dụ full_time, part_time)" },
-    { key: "location", label: "Địa điểm" },
-    { key: "deadline", label: "Hạn nộp (YYYY-MM-DD HH:mm, giờ Việt Nam)" },
-    { key: "jdFileUrl", label: "Liên kết JD công khai (HTTP/HTTPS)" },
-  ] as const;
+
   return (
-    <Page title={job ? "Sửa tin tuyển dụng" : "Tạo tin tuyển dụng"}>
-      <Text style={styles.muted}>
-        {job
-          ? "Giữ trạng thái hiện tại khi lưu. Thay đổi trạng thái trong danh sách tin."
-          : "Tin mới được lưu ở dạng bản nháp. Mở tuyển sau khi kiểm tra đủ thông tin."}
-      </Text>
-      {fields.map(({ key, label }) => (
+    <RecruitmentModal
+      title={job ? `Sửa tin tuyển dụng: ${job.code}` : "Tạo tin tuyển dụng mới"}
+      subtitle={
+        job
+          ? "Cập nhật thông tin chi tiết tin tuyển dụng"
+          : "Điền thông tin để đăng tuyển vị trí mới"
+      }
+      visible
+      onClose={onClose}
+    >
+      {/* Tip Banner */}
+      <View style={formStyles.tipBanner}>
+        <Info size={16} color="#0284c7" />
+        <Text style={formStyles.tipBannerText}>
+          {job
+            ? "Giữ nguyên trạng thái hiện tại khi lưu. Bạn có thể mở hoặc đóng tin ở danh sách ngoài."
+            : "Tin mới tạo sẽ ở dạng bản nháp. Hãy kiểm tra kỹ trước khi kích hoạt mở tuyển."}
+        </Text>
+      </View>
+
+      {/* Section 1: Thông tin cơ bản */}
+      <View style={formStyles.sectionCard}>
+        <View style={formStyles.sectionHeader}>
+          <View style={formStyles.sectionIconBox}>
+            <Briefcase size={15} color="#059669" />
+          </View>
+          <Text style={formStyles.sectionTitle}>Thông tin cơ bản</Text>
+        </View>
+
         <Field
-          key={key}
-          label={label}
-          value={draft[key]}
+          label="Mã tin tuyển dụng *"
+          value={draft.code}
           editable={!disabled}
-          multiline={["description", "requirements", "benefits"].includes(key)}
-          keyboardType={["headcount", "salaryMin", "salaryMax"].includes(key) ? "numeric" : "default"}
-          onChangeText={(value) => setDraft((current) => ({ ...current, [key]: value }))}
+          onChangeText={(value) => setDraft((c) => ({ ...c, code: value }))}
         />
-      ))}
-      <ChoiceField
-        label="Hình thức làm việc"
-        value={draft.workplaceType}
-        choices={[
-          { value: "onsite", label: "Tại chỗ" },
-          { value: "hybrid", label: "Kết hợp" },
-          { value: "remote", label: "Từ xa" },
-        ]}
-        disabled={disabled}
-        onChange={(value) => setDraft((current) => ({ ...current, workplaceType: value }))}
-      />
-      <View style={styles.row}>
-        <Text style={styles.text}>Công khai lương</Text>
-        <Switch
-          value={draft.showSalary}
-          disabled={disabled}
-          onValueChange={(value) => setDraft((current) => ({ ...current, showSalary: value }))}
+        <Field
+          label="Tiêu đề công việc *"
+          value={draft.title}
+          editable={!disabled}
+          onChangeText={(value) => setDraft((c) => ({ ...c, title: value }))}
+        />
+        <Field
+          label="Phòng ban / Khoa"
+          value={draft.department}
+          editable={!disabled}
+          onChangeText={(value) => setDraft((c) => ({ ...c, department: value }))}
+        />
+        <Field
+          label="Số lượng cần tuyển *"
+          value={draft.headcount}
+          keyboardType="numeric"
+          editable={!disabled}
+          onChangeText={(value) => setDraft((c) => ({ ...c, headcount: value }))}
         />
       </View>
-      <Text style={styles.muted}>
-        Để trống liên kết JD để gỡ. Khi thay/gỡ liên kết, LuxCare có thể xóa tệp công khai cũ do hệ thống lưu trữ.
-      </Text>
+
+      {/* Section 2: Chi tiết công việc */}
+      <View style={formStyles.sectionCard}>
+        <View style={formStyles.sectionHeader}>
+          <View style={formStyles.sectionIconBox}>
+            <FileText size={15} color="#059669" />
+          </View>
+          <Text style={formStyles.sectionTitle}>Mô tả & Yêu cầu</Text>
+        </View>
+
+        <Field
+          label="Mô tả công việc"
+          value={draft.description}
+          multiline
+          editable={!disabled}
+          onChangeText={(value) => setDraft((c) => ({ ...c, description: value }))}
+        />
+        <Field
+          label="Yêu cầu ứng viên"
+          value={draft.requirements}
+          multiline
+          editable={!disabled}
+          onChangeText={(value) => setDraft((c) => ({ ...c, requirements: value }))}
+        />
+        <Field
+          label="Quyền lợi & đãi ngộ"
+          value={draft.benefits}
+          multiline
+          editable={!disabled}
+          onChangeText={(value) => setDraft((c) => ({ ...c, benefits: value }))}
+        />
+      </View>
+
+      {/* Section 3: Lương & Hợp đồng */}
+      <View style={formStyles.sectionCard}>
+        <View style={formStyles.sectionHeader}>
+          <View style={formStyles.sectionIconBox}>
+            <DollarSign size={15} color="#059669" />
+          </View>
+          <Text style={formStyles.sectionTitle}>Mức lương & Hợp đồng</Text>
+        </View>
+
+        <View style={{ flexDirection: "row", gap: 10 }}>
+          <View style={{ flex: 1 }}>
+            <Field
+              label="Lương tối thiểu (VNĐ)"
+              value={draft.salaryMin}
+              keyboardType="numeric"
+              editable={!disabled}
+              onChangeText={(value) => setDraft((c) => ({ ...c, salaryMin: value }))}
+            />
+          </View>
+          <View style={{ flex: 1 }}>
+            <Field
+              label="Lương tối đa (VNĐ)"
+              value={draft.salaryMax}
+              keyboardType="numeric"
+              editable={!disabled}
+              onChangeText={(value) => setDraft((c) => ({ ...c, salaryMax: value }))}
+            />
+          </View>
+        </View>
+
+        <View style={formStyles.switchRow}>
+          <View style={{ flex: 1 }}>
+            <Text style={formStyles.switchLabel}>Công khai mức lương</Text>
+            <Text style={formStyles.switchDesc}>Cho phép ứng viên nhìn thấy dải lương</Text>
+          </View>
+          <Switch
+            value={draft.showSalary}
+            disabled={disabled}
+            onValueChange={(value) => setDraft((c) => ({ ...c, showSalary: value }))}
+            trackColor={{ false: "#cbd5e1", true: "#a7f3d0" }}
+            thumbColor={draft.showSalary ? "#059669" : "#f8fafc"}
+          />
+        </View>
+
+        <ChoiceField
+          label="Loại hợp đồng *"
+          value={draft.employmentType}
+          disabled={disabled}
+          choices={[
+            { value: "full_time", label: "Toàn thời gian (Full-time)" },
+            { value: "part_time", label: "Bán thời gian (Part-time)" },
+            { value: "contract", label: "Hợp đồng (Contract)" },
+            { value: "internship", label: "Thực tập (Internship)" },
+            { value: "seasonal", label: "Thời vụ" },
+          ]}
+          onChange={(value) => setDraft((c) => ({ ...c, employmentType: value }))}
+        />
+
+        <ChoiceField
+          label="Hình thức làm việc"
+          value={draft.workplaceType}
+          choices={[
+            { value: "onsite", label: "Tại văn phòng / Cơ sở" },
+            { value: "hybrid", label: "Kết hợp linh hoạt (Hybrid)" },
+            { value: "remote", label: "Từ xa (Remote)" },
+          ]}
+          disabled={disabled}
+          onChange={(value) => setDraft((c) => ({ ...c, workplaceType: value }))}
+        />
+      </View>
+
+      {/* Section 4: Thời gian & Địa điểm */}
+      <View style={formStyles.sectionCard}>
+        <View style={formStyles.sectionHeader}>
+          <View style={formStyles.sectionIconBox}>
+            <MapPin size={15} color="#059669" />
+          </View>
+          <Text style={formStyles.sectionTitle}>Thời gian & Địa điểm</Text>
+        </View>
+
+        <Field
+          label="Địa điểm làm việc"
+          value={draft.location}
+          editable={!disabled}
+          onChangeText={(value) => setDraft((c) => ({ ...c, location: value }))}
+        />
+        <Field
+          label="Hạn nộp hồ sơ (YYYY-MM-DD HH:mm)"
+          value={draft.deadline}
+          editable={!disabled}
+          onChangeText={(value) => setDraft((c) => ({ ...c, deadline: value }))}
+        />
+      </View>
+
+      {/* Section 5: Tài liệu JD đính kèm */}
+      <View style={formStyles.sectionCard}>
+        <View style={formStyles.sectionHeader}>
+          <View style={formStyles.sectionIconBox}>
+            <UploadCloud size={15} color="#059669" />
+          </View>
+          <Text style={formStyles.sectionTitle}>Tệp mô tả công việc (JD)</Text>
+        </View>
+
+        <Text style={formStyles.fieldNote}>
+          Đính kèm bản mô tả JD công khai (PDF, DOC, DOCX tối đa 10 MB) để ứng viên có thể tải về trực tiếp.
+        </Text>
+
+        <Pressable
+          style={({ pressed }) => [
+            formStyles.uploadBtn,
+            disabled && { opacity: 0.6 },
+            pressed && !disabled && { opacity: 0.8 },
+          ]}
+          disabled={disabled}
+          onPress={() => void upload()}
+        >
+          <UploadCloud size={16} color="#0284c7" />
+          <Text style={formStyles.uploadBtnText}>Chọn và tải tệp JD lên</Text>
+        </Pressable>
+
+        <Field
+          label="Liên kết JD công khai"
+          value={draft.jdFileUrl}
+          editable={!disabled}
+          onChangeText={(value) => setDraft((c) => ({ ...c, jdFileUrl: value }))}
+        />
+      </View>
+
       <ErrorText message={error} />
-      <Text style={styles.muted}>
-        Tệp tải lên ở đây là công khai: người có liên kết có thể xem. Hỗ trợ PDF, DOC, DOCX, tối đa 10 MB.
-      </Text>
-      <Button title="Chọn và tải JD công khai" disabled={disabled} onPress={() => void upload()} />
-      <Button title={busy ? "Đang lưu…" : "Lưu tin"} disabled={disabled} onPress={() => void save()} />
-      <Button title="Đóng và tải lại" disabled={busy} onPress={onClose} />
+
+      {/* Action Buttons */}
+      <View style={formStyles.actionsRow}>
+        <Pressable
+          style={({ pressed }) => [formStyles.cancelBtn, pressed && { opacity: 0.7 }]}
+          disabled={busy}
+          onPress={onClose}
+        >
+          <X size={15} color="#475569" />
+          <Text style={formStyles.cancelBtnText}>Hủy</Text>
+        </Pressable>
+
+        <Pressable
+          style={({ pressed }) => [
+            formStyles.submitBtn,
+            disabled && { opacity: 0.6 },
+            pressed && !disabled && { opacity: 0.85 },
+          ]}
+          disabled={disabled}
+          onPress={() => void save()}
+        >
+          {busy ? (
+            <ActivityIndicator size="small" color="#ffffff" />
+          ) : (
+            <Check size={16} color="#ffffff" />
+          )}
+          <Text style={formStyles.submitBtnText}>
+            {busy ? "Đang lưu..." : job ? "Lưu thay đổi" : "Tạo tin tuyển dụng"}
+          </Text>
+        </Pressable>
+      </View>
+
       {alertView}
-    </Page>
+    </RecruitmentModal>
   );
 }
+
+const formStyles = StyleSheet.create({
+  tipBanner: {
+    flexDirection: "row",
+    alignItems: "center",
+    gap: 10,
+    backgroundColor: "#f0f9ff",
+    padding: 12,
+    borderRadius: 12,
+    borderWidth: 1,
+    borderColor: "#bae6fd",
+  },
+  tipBannerText: {
+    fontSize: 12,
+    color: "#0369a1",
+    lineHeight: 18,
+    flex: 1,
+  },
+  sectionCard: {
+    backgroundColor: "#ffffff",
+    borderRadius: 14,
+    borderWidth: 1,
+    borderColor: "#e2e8f0",
+    padding: 14,
+    gap: 12,
+  },
+  sectionHeader: {
+    flexDirection: "row",
+    alignItems: "center",
+    gap: 8,
+    paddingBottom: 4,
+    borderBottomWidth: 1,
+    borderBottomColor: "#f1f5f9",
+  },
+  sectionIconBox: {
+    width: 28,
+    height: 28,
+    borderRadius: 8,
+    backgroundColor: "#ecfdf5",
+    alignItems: "center",
+    justifyContent: "center",
+  },
+  sectionTitle: {
+    fontSize: 14,
+    fontWeight: "700",
+    color: "#0f172a",
+  },
+  switchRow: {
+    flexDirection: "row",
+    alignItems: "center",
+    justifyContent: "space-between",
+    backgroundColor: "#f8fafc",
+    padding: 12,
+    borderRadius: 10,
+    borderWidth: 1,
+    borderColor: "#e2e8f0",
+  },
+  switchLabel: {
+    fontSize: 13,
+    fontWeight: "700",
+    color: "#1e293b",
+  },
+  switchDesc: {
+    fontSize: 11,
+    color: "#64748b",
+    marginTop: 2,
+  },
+  fieldNote: {
+    fontSize: 12,
+    color: "#64748b",
+    lineHeight: 18,
+  },
+  uploadBtn: {
+    flexDirection: "row",
+    alignItems: "center",
+    justifyContent: "center",
+    gap: 8,
+    backgroundColor: "#eff6ff",
+    borderWidth: 1,
+    borderColor: "#bfdbfe",
+    borderRadius: 10,
+    paddingVertical: 11,
+    paddingHorizontal: 16,
+  },
+  uploadBtnText: {
+    fontSize: 13,
+    fontWeight: "700",
+    color: "#0284c7",
+  },
+  actionsRow: {
+    flexDirection: "row",
+    gap: 12,
+    marginTop: 8,
+  },
+  cancelBtn: {
+    flex: 1,
+    height: 46,
+    borderRadius: 12,
+    backgroundColor: "#f1f5f9",
+    borderWidth: 1,
+    borderColor: "#e2e8f0",
+    alignItems: "center",
+    justifyContent: "center",
+    flexDirection: "row",
+    gap: 6,
+  },
+  cancelBtnText: {
+    fontSize: 13,
+    fontWeight: "700",
+    color: "#475569",
+  },
+  submitBtn: {
+    flex: 1.8,
+    height: 46,
+    borderRadius: 12,
+    backgroundColor: "#059669",
+    alignItems: "center",
+    justifyContent: "center",
+    flexDirection: "row",
+    gap: 6,
+  },
+  submitBtnText: {
+    fontSize: 13,
+    fontWeight: "700",
+    color: "#ffffff",
+  },
+});
