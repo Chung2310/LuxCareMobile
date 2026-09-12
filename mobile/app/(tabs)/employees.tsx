@@ -167,22 +167,24 @@ export default function Employees() {
   );
 
   const initDraftFromUser = (u: UserProfile) => {
+    const sanitize = (val?: string) => (val && val.trim() !== "Chưa cập nhật" ? val.trim() : "");
+
     setDraft({
       displayName: u.displayName || "",
       email: u.email || "",
-      phone: u.phone || "",
-      birthDate: u.birthDate || "",
-      department: u.department || "",
+      phone: sanitize(u.phone),
+      birthDate: sanitize(u.birthDate),
+      department: sanitize(u.department),
       departmentId: u.departmentId || "",
-      jobTitle: u.jobTitle || "",
-      qualification: u.qualification || "",
-      division: u.division || "",
+      jobTitle: sanitize(u.jobTitle),
+      qualification: sanitize(u.qualification),
+      division: sanitize(u.division),
       role: u.role || "user",
       branchId: u.branchId || "",
-      branchName: u.branchName || "",
+      branchName: sanitize(u.branchName),
       isLeader: !!u.isLeader,
       monthlySalary: u.monthlySalary || undefined,
-      jobDescriptionLink: u.jobDescriptionLink || "",
+      jobDescriptionLink: sanitize(u.jobDescriptionLink),
       level: u.level || undefined,
       status: u.status || "online",
     });
@@ -633,10 +635,10 @@ export default function Employees() {
                       <Text style={styles.fieldLabel}>Số điện thoại liên hệ</Text>
                       <TextInput
                         style={styles.formInput}
-                        placeholder="Ví dụ: 0987654321"
+                        placeholder="Chưa cập nhật"
                         placeholderTextColor="#94a3b8"
                         keyboardType="phone-pad"
-                        value={draft.phone || ""}
+                        value={draft.phone && draft.phone !== "Chưa cập nhật" ? draft.phone : ""}
                         onChangeText={(val) => setDraft((curr) => ({ ...curr, phone: val }))}
                       />
                     </View>
@@ -645,9 +647,9 @@ export default function Employees() {
                       <Text style={styles.fieldLabel}>Ngày sinh (YYYY-MM-DD)</Text>
                       <TextInput
                         style={styles.formInput}
-                        placeholder="Ví dụ: 1990-05-20"
+                        placeholder="Chưa cập nhật (Ví dụ: 1990-05-20)"
                         placeholderTextColor="#94a3b8"
-                        value={draft.birthDate || ""}
+                        value={draft.birthDate && draft.birthDate !== "Chưa cập nhật" ? draft.birthDate : ""}
                         onChangeText={(val) => setDraft((curr) => ({ ...curr, birthDate: val }))}
                       />
                     </View>

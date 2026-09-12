@@ -104,8 +104,8 @@ export default function InventoryScreen() {
     try {
       const serverCategory =
         selectedCategory !== "all" &&
-        selectedCategory !== "low-stock" &&
-        selectedCategory !== "expiring"
+          selectedCategory !== "low-stock" &&
+          selectedCategory !== "expiring"
           ? selectedCategory
           : undefined;
 
