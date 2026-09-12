@@ -1,3 +1,4 @@
+import { evaluateQuiz, parsePassingScore, passingScoreOf } from "../../src/features/training/quiz";
 import { useAppAlert } from "../../src/components/AppAlert";
 import { type ReactNode, useCallback, useMemo, useState } from "react";
 import { useFocusEffect } from "expo-router";
@@ -17,7 +18,36 @@ import {
   View,
 } from "react-native";
 import { SafeAreaView } from "react-native-safe-area-context";
-import { Ionicons } from "@expo/vector-icons";
+import {
+  AlertCircle,
+  Award,
+  BookOpen,
+  CheckCheck,
+  CheckCircle2,
+  Circle,
+  CircleDot,
+  Clock,
+  Code2,
+  ExternalLink,
+  FileText,
+  GraduationCap,
+  HeartHandshake,
+  Lock,
+  Pencil,
+  Play,
+  Plus,
+  RotateCw,
+  Search,
+  Trash2,
+  TrendingUp,
+  User,
+  UserPlus,
+  Users,
+  Video,
+  X,
+  XCircle,
+  Zap,
+} from "lucide-react-native";
 import type { Lesson, QuizQuestion, TrainingCourse, TrainingEnrollment } from "../../../src/types/hr";
 import { roster, training } from "../../src/api/services";
 import { messageOf, useSession } from "../../src/auth/SessionProvider";
@@ -33,6 +63,45 @@ function nextStep(course: TrainingCourse, enrollment: TrainingEnrollment) {
   if (nextLesson >= 0) return nextLesson;
   if (course.quizzes?.length && !enrollment.quizPassed) return lessons.length;
   return -1;
+}
+
+function CourseIcon({ course, size = 22, color = "#7c3aed" }: { course: TrainingCourse; size?: number; color?: string }) {
+  const iconKey = (course.icon || "").toLowerCase().trim();
+  if (iconKey === "code" || iconKey.includes("kỹ thuật") || iconKey.includes("tech")) {
+    return <Code2 size={size} color={color} />;
+  }
+  if (iconKey === "business" || iconKey.includes("kinh doanh") || iconKey.includes("sales")) {
+    return <TrendingUp size={size} color={color} />;
+  }
+  if (iconKey === "culture" || iconKey.includes("văn hóa")) {
+    return <HeartHandshake size={size} color={color} />;
+  }
+  if (iconKey === "onboarding" || iconKey.includes("hướng dẫn") || iconKey.includes("nhân viên mới")) {
+    return <UserPlus size={size} color={color} />;
+  }
+  if (iconKey === "award" || iconKey === "certificate") {
+    return <Award size={size} color={color} />;
+  }
+  if (iconKey === "book" || iconKey === "lesson") {
+    return <BookOpen size={size} color={color} />;
+  }
+
+  // Fallback based on category
+  const cat = (course.category || "").toLowerCase();
+  if (cat.includes("kỹ thuật") || cat.includes("tech")) {
+    return <Code2 size={size} color={color} />;
+  }
+  if (cat.includes("kinh doanh") || cat.includes("sales") || cat.includes("marketing")) {
+    return <TrendingUp size={size} color={color} />;
+  }
+  if (cat.includes("văn hóa") || cat.includes("culture")) {
+    return <HeartHandshake size={size} color={color} />;
+  }
+  if (cat.includes("hướng dẫn") || cat.includes("nhân viên mới") || cat.includes("onboarding")) {
+    return <UserPlus size={size} color={color} />;
+  }
+
+  return <GraduationCap size={size} color={color} />;
 }
 
 export default function TrainingPage() {
@@ -190,7 +259,7 @@ export default function TrainingPage() {
         ...(completedNow ? { completedAt: new Date().toISOString() } : {}),
       });
       if (completedNow) {
-        showAlert("Chúc mừng 🎉", `Bạn đã hoàn thành xuất sắc khóa học “${activeCourse.title}”.`, undefined, "success");
+        showAlert("Chúc mừng", `Bạn đã hoàn thành xuất sắc khóa học “${activeCourse.title}”.`, undefined, "success");
         setActiveCourse(null);
       } else if (activeStep + 1 < (activeCourse.lessons || []).length) {
         setActiveStep(activeStep + 1);
@@ -207,14 +276,18 @@ export default function TrainingPage() {
     const quizzes = activeCourse.quizzes || [];
     const enrollment = enrollments.find((item) => item.courseId === activeCourse.id);
     if (!enrollment || !quizzes.length) return;
-    if (quizzes.some((_, index) => answers[index] === undefined)) {
+    const result = evaluateQuiz(quizzes, answers, activeCourse.passingScore);
+    if (!result.answered) {
       showAlert("Chưa hoàn tất", "Vui lòng trả lời tất cả các câu hỏi trước khi nộp bài.", undefined, "error");
       return;
     }
-    const errors = quizzes.map((quiz, index) => answers[index] !== quiz.correctOptionIndex);
-    setQuizSubmitted(true);
-    setQuizErrors(errors);
-    if (errors.some(Boolean)) return;
+    const errors = result.errors;
+    if (!result.passed) {
+      setQuizSubmitted(true);
+      setQuizErrors(errors);
+      showAlert("Chưa đạt điểm yêu cầu", `Bạn đạt ${result.score}% (${result.correctCount}/${quizzes.length} câu đúng). Yêu cầu tối thiểu ${result.passingScore}%. Vui lòng thử lại.`, undefined, "error");
+      return;
+    }
     const totalItems = (activeCourse.lessons || []).length + 1;
     const progress = Math.round(
       (((enrollment.completedLessons || []).length + 1) / Math.max(totalItems, 1)) * 100,
@@ -222,11 +295,14 @@ export default function TrainingPage() {
     try {
       await updateEnrollment(enrollment, {
         quizPassed: true,
+        quizScore: result.score,
         progress,
         status: progress >= 100 ? "completed" : "in_progress",
         ...(progress >= 100 ? { completedAt: new Date().toISOString() } : {}),
       });
-      showAlert("Đạt sát hạch 🏆", `Chúc mừng! Bạn đã hoàn thành phần kiểm tra của “${activeCourse.title}”.`, [
+      setQuizSubmitted(true);
+      setQuizErrors(errors);
+      showAlert("Đạt sát hạch", `Bạn đạt ${result.score}% (${result.correctCount}/${quizzes.length} câu đúng), đáp ứng yêu cầu ${result.passingScore}% của khóa học “${activeCourse.title}”.`, [
         { text: "Đóng", onPress: () => setActiveCourse(null) },
       ], "success");
     } catch (saveError) {
@@ -315,7 +391,7 @@ export default function TrainingPage() {
     return (
       <Page title="Đào tạo">
         <View style={uiStyles.emptyStateContainer}>
-          <Ionicons name="lock-closed" size={40} color="#94a3b8" />
+          <Lock size={40} color="#94a3b8" />
           <Text style={uiStyles.emptyStateTitle}>Không có quyền truy cập</Text>
           <Text style={uiStyles.emptyStateDesc}>
             Cần phân hệ Nhân sự và mã doanh nghiệp hợp lệ để sử dụng chức năng Đào tạo nội bộ.
@@ -364,7 +440,7 @@ export default function TrainingPage() {
                 disabled={loading}
                 activeOpacity={0.7}
               >
-                <Ionicons name="reload" size={17} color="#475569" />
+                <RotateCw size={17} color="#475569" />
               </TouchableOpacity>
 
               {access.manage && (
@@ -373,7 +449,7 @@ export default function TrainingPage() {
                   onPress={() => setEditing("new")}
                   activeOpacity={0.8}
                 >
-                  <Ionicons name="add" size={18} color="#ffffff" />
+                  <Plus size={18} color="#ffffff" />
                   <Text style={uiStyles.createBtnText}>Tạo khóa</Text>
                 </TouchableOpacity>
               )}
@@ -437,7 +513,7 @@ export default function TrainingPage() {
 
           {/* Search Box */}
           <View style={uiStyles.searchContainer}>
-            <Ionicons name="search" size={17} color="#64748b" style={{ marginRight: 8 }} />
+            <Search size={17} color="#64748b" style={{ marginRight: 8 }} />
             <TextInput
               style={uiStyles.searchInput}
               placeholder="Tìm theo tên khóa học, giảng viên, bài học..."
@@ -452,7 +528,7 @@ export default function TrainingPage() {
                 style={{ padding: 4 }}
                 activeOpacity={0.6}
               >
-                <Ionicons name="close-circle" size={17} color="#94a3b8" />
+                <XCircle size={17} color="#94a3b8" />
               </TouchableOpacity>
             )}
           </View>
@@ -489,7 +565,7 @@ export default function TrainingPage() {
           {/* Empty State */}
           {!loading && !error && filteredCourses.length === 0 && (
             <View style={uiStyles.emptyStateContainer}>
-              <Text style={{ fontSize: 44, marginBottom: 8 }}>🎓</Text>
+              <GraduationCap size={44} color="#7c3aed" style={{ marginBottom: 8 }} />
               <Text style={uiStyles.emptyStateTitle}>Không tìm thấy khóa học</Text>
               <Text style={uiStyles.emptyStateDesc}>
                 {searchQuery
@@ -526,7 +602,7 @@ export default function TrainingPage() {
                 {/* Header Row */}
                 <View style={uiStyles.cardTopRow}>
                   <View style={uiStyles.courseIconBox}>
-                    <Text style={uiStyles.courseIconText}>{course.icon || "📚"}</Text>
+                    <CourseIcon course={course} size={22} color="#7c3aed" />
                   </View>
 
                   <View style={uiStyles.courseHeaderInfo}>
@@ -551,26 +627,30 @@ export default function TrainingPage() {
                   {course.description || "Khóa học chuyên môn nâng cao kỹ năng và tiêu chuẩn LuxCare."}
                 </Text>
 
+                {quizzesCount > 0 && (
+                  <Text style={uiStyles.metaItemText}>Điểm đạt trắc nghiệm: {passingScoreOf(course.passingScore)}%</Text>
+                )}
+
                 {/* 2x2 Metadata Grid */}
                 <View style={uiStyles.metaGrid}>
                   <View style={uiStyles.metaItem}>
-                    <Ionicons name="time-outline" size={13} color="#64748b" />
+                    <Clock size={13} color="#64748b" />
                     <Text style={uiStyles.metaItemText}>{course.duration || "Tự do"}</Text>
                   </View>
                   <View style={uiStyles.metaItem}>
-                    <Ionicons name="person-outline" size={13} color="#64748b" />
+                    <User size={13} color="#64748b" />
                     <Text style={uiStyles.metaItemText} numberOfLines={1}>
                       {course.instructor || "LuxCare Academy"}
                     </Text>
                   </View>
                   <View style={uiStyles.metaItem}>
-                    <Ionicons name="book-outline" size={13} color="#64748b" />
+                    <BookOpen size={13} color="#64748b" />
                     <Text style={uiStyles.metaItemText}>
                       {lessonsCount} bài{quizzesCount ? ` · ${quizzesCount} câu hỏi` : ""}
                     </Text>
                   </View>
                   <View style={uiStyles.metaItem}>
-                    <Ionicons name="people-outline" size={13} color="#64748b" />
+                    <Users size={13} color="#64748b" />
                     <Text style={uiStyles.metaItemText}>
                       {course.enrolledCount || 0} học viên
                     </Text>
@@ -585,7 +665,7 @@ export default function TrainingPage() {
                       <View style={uiStyles.progressPercentRow}>
                         {completed ? (
                           <View style={uiStyles.completedBadge}>
-                            <Ionicons name="checkmark-circle" size={13} color="#059669" />
+                            <CheckCircle2 size={13} color="#059669" />
                             <Text style={uiStyles.completedBadgeText}>Đã hoàn thành</Text>
                           </View>
                         ) : (
@@ -619,11 +699,13 @@ export default function TrainingPage() {
                     disabled={busyCourseId === course.id}
                     activeOpacity={0.8}
                   >
-                    <Ionicons
-                      name={completed ? "repeat" : inProgress ? "play" : "flash"}
-                      size={15}
-                      color="#ffffff"
-                    />
+                    {completed ? (
+                      <RotateCw size={15} color="#ffffff" />
+                    ) : inProgress ? (
+                      <Play size={15} color="#ffffff" />
+                    ) : (
+                      <Zap size={15} color="#ffffff" />
+                    )}
                     <Text style={uiStyles.primaryStudyBtnText}>
                       {completed
                         ? "Xem lại khóa học"
@@ -639,7 +721,7 @@ export default function TrainingPage() {
                       onPress={() => setEditing(course)}
                       activeOpacity={0.7}
                     >
-                      <Ionicons name="pencil" size={16} color="#475569" />
+                      <Pencil size={16} color="#475569" />
                     </TouchableOpacity>
                   )}
 
@@ -649,7 +731,7 @@ export default function TrainingPage() {
                       onPress={() => deleteCourse(course)}
                       activeOpacity={0.7}
                     >
-                      <Ionicons name="trash" size={16} color="#dc2626" />
+                      <Trash2 size={16} color="#dc2626" />
                     </TouchableOpacity>
                   )}
                 </View>
@@ -738,6 +820,7 @@ function StudyModal({
   const quizzes = course?.quizzes || [];
   const lesson = step >= 0 && step < lessons.length ? lessons[step] : undefined;
   const isQuiz = !!course && step >= lessons.length && quizzes.length > 0;
+  const quizResult = evaluateQuiz(quizzes, answers, course?.passingScore);
 
   if (!course) return null;
 
@@ -762,7 +845,7 @@ function StudyModal({
             </Text>
           </View>
           <TouchableOpacity style={studyStyles.closeBtn} onPress={onClose} activeOpacity={0.7}>
-            <Ionicons name="close" size={20} color="#ffffff" />
+            <X size={20} color="#ffffff" />
           </TouchableOpacity>
         </View>
 
@@ -785,6 +868,9 @@ function StudyModal({
                   ]}
                 />
               </View>
+              {typeof enrollment.quizScore === "number" && (
+                <Text style={studyStyles.progressCardLabel}>Điểm trắc nghiệm: {enrollment.quizScore}% · Yêu cầu {passingScoreOf(course.passingScore)}%</Text>
+              )}
             </View>
           )}
 
@@ -792,15 +878,11 @@ function StudyModal({
           {lesson && (
             <View style={studyStyles.contentCard}>
               <View style={studyStyles.lessonTypeBadge}>
-                <Ionicons
-                  name={
-                    lesson.type === "video" || lesson.type === "youtube"
-                      ? "videocam-outline"
-                      : "document-text-outline"
-                  }
-                  size={14}
-                  color="#7c3aed"
-                />
+                {lesson.type === "video" || lesson.type === "youtube" ? (
+                  <Video size={14} color="#7c3aed" />
+                ) : (
+                  <FileText size={14} color="#7c3aed" />
+                )}
                 <Text style={studyStyles.lessonTypeText}>
                   {lesson.type === "video" || lesson.type === "youtube" ? "Video bài giảng" : "Tài liệu lý thuyết"}
                 </Text>
@@ -820,7 +902,7 @@ function StudyModal({
                   onPress={() => onOpenLink(lesson.url)}
                   activeOpacity={0.8}
                 >
-                  <Ionicons name="open-outline" size={17} color="#4f46e5" />
+                  <ExternalLink size={17} color="#4f46e5" />
                   <Text style={studyStyles.externalLinkText}>Mở tài liệu / Video đính kèm</Text>
                 </TouchableOpacity>
               )}
@@ -830,7 +912,7 @@ function StudyModal({
                 onPress={onCompleteLesson}
                 activeOpacity={0.8}
               >
-                <Ionicons name="checkmark-circle" size={18} color="#ffffff" />
+                <CheckCircle2 size={18} color="#ffffff" />
                 <Text style={studyStyles.completeLessonBtnText}>
                   {enrollment?.completedLessons?.includes(`lesson_${step}`)
                     ? "Đã học · Sang bài tiếp theo"
@@ -844,15 +926,20 @@ function StudyModal({
           {isQuiz && (
             <View style={studyStyles.contentCard}>
               <View style={studyStyles.quizHeaderBox}>
-                <Ionicons name="ribbon" size={20} color="#7c3aed" />
+                <Award size={20} color="#7c3aed" />
                 <View style={{ flex: 1 }}>
                   <Text style={studyStyles.quizHeaderTitle}>Đánh giá sát hạch cuối khóa</Text>
                   <Text style={studyStyles.quizHeaderSubtitle}>
-                    Trả lời đúng tất cả các câu hỏi để được cấp chứng nhận hoàn thành.
+                    Đạt tối thiểu {passingScoreOf(course.passingScore)}% điểm trắc nghiệm và hoàn thành các bài giảng để hoàn thành khóa học.
                   </Text>
                 </View>
               </View>
 
+              {quizSubmitted && (
+                <Text style={[studyStyles.quizHeaderSubtitle, { color: quizResult.passed ? "#059669" : "#dc2626" }]}>
+                  Kết quả: {quizResult.score}% ({quizResult.correctCount}/{quizzes.length} câu đúng) · {quizResult.passed ? "Đạt" : "Chưa đạt"} · Yêu cầu {quizResult.passingScore}%
+                </Text>
+              )}
               {quizzes.map((quiz, qIdx) => (
                 <View
                   key={`${qIdx}-${quiz.question}`}
@@ -871,11 +958,11 @@ function StudyModal({
                         onPress={() => onSelectAnswer(qIdx, oIdx)}
                         activeOpacity={0.7}
                       >
-                        <Ionicons
-                          name={isSelected ? "radio-button-on" : "radio-button-off"}
-                          size={18}
-                          color={isSelected ? "#7c3aed" : "#94a3b8"}
-                        />
+                        {isSelected ? (
+                          <CircleDot size={18} color="#7c3aed" />
+                        ) : (
+                          <Circle size={18} color="#94a3b8" />
+                        )}
                         <Text
                           style={[
                             studyStyles.quizOptionText,
@@ -890,9 +977,9 @@ function StudyModal({
 
                   {quizSubmitted && quizErrors[qIdx] && (
                     <View style={studyStyles.quizErrorBanner}>
-                      <Ionicons name="alert-circle" size={14} color="#dc2626" />
+                      <AlertCircle size={14} color="#dc2626" />
                       <Text style={studyStyles.quizErrorBannerText}>
-                        Câu trả lời chưa chính xác, vui lòng chọn lại.
+                        Câu trả lời chưa chính xác.
                       </Text>
                     </View>
                   )}
@@ -900,7 +987,7 @@ function StudyModal({
               ))}
 
               <TouchableOpacity style={studyStyles.submitQuizBtn} onPress={onSubmitQuiz} activeOpacity={0.8}>
-                <Ionicons name="checkmark-done" size={18} color="#ffffff" />
+                <CheckCheck size={18} color="#ffffff" />
                 <Text style={studyStyles.submitQuizBtnText}>Nộp bài kiểm tra</Text>
               </TouchableOpacity>
             </View>
@@ -909,7 +996,7 @@ function StudyModal({
           {/* Fallback for Empty Course */}
           {!lesson && !isQuiz && (
             <View style={studyStyles.contentCard}>
-              <Ionicons name="checkmark-circle-outline" size={48} color="#059669" />
+              <CheckCircle2 size={48} color="#059669" />
               <Text style={studyStyles.lessonTitle}>
                 {enrollment?.status === "completed" ? "Bạn đã hoàn thành khóa học!" : "Bắt đầu khóa học"}
               </Text>
@@ -963,6 +1050,7 @@ function CourseForm({
   const [autoAssign, setAutoAssign] = useState(!!course?.autoAssignOnboarding);
   const [lessons, setLessons] = useState<Lesson[]>(course?.lessons || []);
   const [quizzes, setQuizzes] = useState<QuizQuestion[]>(course?.quizzes || []);
+  const [passingScore, setPassingScore] = useState(String(course ? passingScoreOf(course.passingScore) : 80));
   const [busy, setBusy] = useState(false);
   const [error, setError] = useState<string | null>(null);
 
@@ -996,10 +1084,11 @@ function CourseForm({
         companyCode,
         tags: required ? ["Bắt buộc"] : [category],
         isRequired: required,
-        icon: course?.icon || "📚",
+        icon: course?.icon && !/[\p{Extended_Pictographic}]/u.test(course.icon) ? course.icon : "graduation-cap",
         autoAssignOnboarding: autoAssign,
         lessons: cleanLessons,
         quizzes: cleanQuizzes,
+        passingScore: parsePassingScore(passingScore),
       };
 
       const savedCourse = course
@@ -1061,7 +1150,7 @@ function CourseForm({
           </Text>
         </View>
         <TouchableOpacity style={formStyles.closeHeaderBtn} onPress={onClose} activeOpacity={0.7}>
-          <Ionicons name="close" size={20} color="#64748b" />
+          <X size={20} color="#64748b" />
         </TouchableOpacity>
       </View>
 
@@ -1170,7 +1259,7 @@ function CourseForm({
                 onPress={() => setLessons((curr) => curr.filter((_, i) => i !== idx))}
                 activeOpacity={0.7}
               >
-                <Ionicons name="trash-outline" size={16} color="#dc2626" />
+                <Trash2 size={16} color="#dc2626" />
               </TouchableOpacity>
             </View>
             <TextInput
@@ -1211,6 +1300,21 @@ function CourseForm({
         ))}
 
         {/* Quiz section */}
+        <View style={formStyles.fieldGroup}>
+          <Text style={formStyles.fieldLabel}>Điểm trắc nghiệm tối thiểu để đạt (%)</Text>
+          <TextInput
+            style={formStyles.input}
+            value={passingScore}
+            onChangeText={setPassingScore}
+            keyboardType="decimal-pad"
+            placeholder="100"
+            editable={!busy}
+            accessibilityLabel="Điểm trắc nghiệm tối thiểu (%)"
+          />
+          <Text style={formStyles.switchCardDesc}>
+            Yêu cầu đạt {parsePassingScore(passingScore)}% điểm trắc nghiệm (0–100%). Để trống sẽ dùng 100%.
+          </Text>
+        </View>
         <View style={formStyles.sectionHeaderRow}>
           <Text style={formStyles.sectionHeaderTitle}>Câu hỏi trắc nghiệm ({quizzes.length})</Text>
           <TouchableOpacity onPress={addQuiz} activeOpacity={0.7}>
@@ -1226,7 +1330,7 @@ function CourseForm({
                 onPress={() => setQuizzes((curr) => curr.filter((_, i) => i !== qIdx))}
                 activeOpacity={0.7}
               >
-                <Ionicons name="trash-outline" size={16} color="#dc2626" />
+                <Trash2 size={16} color="#dc2626" />
               </TouchableOpacity>
             </View>
             <TextInput
@@ -1250,11 +1354,11 @@ function CourseForm({
                   }
                   activeOpacity={0.7}
                 >
-                  <Ionicons
-                    name={quiz.correctOptionIndex === oIdx ? "radio-button-on" : "radio-button-off"}
-                    size={18}
-                    color={quiz.correctOptionIndex === oIdx ? "#059669" : "#94a3b8"}
-                  />
+                  {quiz.correctOptionIndex === oIdx ? (
+                    <CircleDot size={18} color="#059669" />
+                  ) : (
+                    <Circle size={18} color="#94a3b8" />
+                  )}
                 </TouchableOpacity>
                 <TextInput
                   style={[formStyles.input, { flex: 1 }]}

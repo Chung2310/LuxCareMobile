@@ -1,15 +1,17 @@
 import type { ReactNode } from "react";
 import { Modal, Pressable, ScrollView, StyleSheet, Text, View } from "react-native";
 import { SafeAreaView } from "react-native-safe-area-context";
-import { Ionicons } from "@expo/vector-icons";
+import { X } from "lucide-react-native";
 
 export function RecruitmentModal({
   title,
+  subtitle = "Quản lý tuyển dụng LuxCare",
   visible,
   children,
   onClose,
 }: {
   title: string;
+  subtitle?: string;
   visible: boolean;
   children: ReactNode;
   onClose: () => void;
@@ -20,10 +22,14 @@ export function RecruitmentModal({
         <View style={styles.header}>
           <View style={{ flex: 1 }}>
             <Text style={styles.title}>{title}</Text>
-            <Text style={styles.subtitle}>Quản lý tuyển dụng LuxCare</Text>
+            {!!subtitle && <Text style={styles.subtitle}>{subtitle}</Text>}
           </View>
-          <Pressable accessibilityRole="button" onPress={onClose} style={styles.close}>
-            <Ionicons name="close" size={22} color="#334155" />
+          <Pressable
+            accessibilityRole="button"
+            onPress={onClose}
+            style={({ pressed }) => [styles.close, pressed && { opacity: 0.7 }]}
+          >
+            <X size={18} color="#334155" />
           </Pressable>
         </View>
         <ScrollView
@@ -50,15 +56,18 @@ const styles = StyleSheet.create({
     borderBottomWidth: 1,
     borderBottomColor: "#e2e8f0",
   },
-  title: { fontSize: 18, fontWeight: "800", color: "#0f172a" },
+  title: { fontSize: 17, fontWeight: "800", color: "#0f172a", letterSpacing: -0.2 },
   subtitle: { marginTop: 2, color: "#64748b", fontSize: 12 },
   close: {
-    width: 40,
-    height: 40,
-    borderRadius: 20,
+    width: 34,
+    height: 34,
+    borderRadius: 10,
     alignItems: "center",
     justifyContent: "center",
     backgroundColor: "#f1f5f9",
+    borderWidth: 1,
+    borderColor: "#e2e8f0",
   },
-  content: { padding: 16, gap: 12, paddingBottom: 40 },
+  content: { padding: 16, gap: 14, paddingBottom: 48 },
 });
+

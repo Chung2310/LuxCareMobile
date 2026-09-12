@@ -25,7 +25,10 @@ export type TaskUpdate = Partial<TaskInput> & {
   attachments?: HRTask["attachments"];
   tags?: HRTask["tags"];
 };
-export type ProjectInput = Pick<Project, "name" | "status" | "priority"> & Partial<Pick<Project, "startAt" | "dueAt">>;
+export type ProjectInput = Pick<Project, "name" | "status" | "priority"> &
+  Partial<Pick<Project, "startAt" | "dueAt">> & {
+    attachments?: Project["attachments"];
+  };
 export function createKanbanService({ fetch, getAccessToken }: ServiceTransport) {
   async function request<T>(path: string, init: RequestInit = {}): Promise<T> {
     const headers = new Headers(init.headers);

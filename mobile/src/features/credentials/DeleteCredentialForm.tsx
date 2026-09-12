@@ -1,6 +1,7 @@
 import { useRef, useState } from "react";
 import { ActivityIndicator, Pressable, StyleSheet, Text, View } from "react-native";
 import { SafeAreaView } from "react-native-safe-area-context";
+import { AlertTriangle, Trash2, X } from "lucide-react-native";
 import type { Credential } from "../../../../src/types/hrCredential";
 import { credentials } from "../../api/services";
 import { messageOf } from "../../auth/SessionProvider";
@@ -50,13 +51,13 @@ export function DeleteCredentialForm({
           hitSlop={8}
           style={({ pressed }) => [styles.closeBtn, pressed && { opacity: 0.7 }]}
         >
-          <Text style={styles.closeBtnText}>✕</Text>
+          <X size={18} color="#64748b" />
         </Pressable>
       </View>
 
       <View style={styles.content}>
         <View style={styles.iconCircle}>
-          <Text style={styles.iconText}>⚠️</Text>
+          <AlertTriangle size={32} color="#e11d48" />
         </View>
 
         <Text style={styles.confirmTitle}>Xác nhận xóa vĩnh viễn?</Text>
@@ -119,7 +120,10 @@ export function DeleteCredentialForm({
           {busy ? (
             <ActivityIndicator size="small" color="#ffffff" />
           ) : (
-            <Text style={styles.deleteBtnText}>🗑️ Xác nhận xóa</Text>
+            <>
+              <Trash2 size={16} color="#ffffff" style={{ marginRight: 6 }} />
+              <Text style={styles.deleteBtnText}>Xác nhận xóa</Text>
+            </>
           )}
         </Pressable>
       </View>
@@ -258,6 +262,8 @@ const styles = StyleSheet.create({
   },
   deleteBtn: {
     flex: 2,
+    flexDirection: "row",
+    justifyContent: "center",
     backgroundColor: "#e11d48",
     borderRadius: 12,
     paddingVertical: 13,

@@ -19,7 +19,6 @@ import { kanban } from "../../src/api/services";
 import { useSession, messageOf } from "../../src/auth/SessionProvider";
 import { canUseModule, hasPermission } from "../../src/auth/access";
 import { ProjectForm } from "../../src/features/work/ProjectForm";
-import { AttachmentsForm } from "../../src/features/work/AttachmentsForm";
 import { PROJECT_PRIORITIES, PROJECT_STATUSES } from "../../src/features/work/project";
 import { EmptyState, Page } from "../../src/ui";
 import { WorkSectionTabs, type WorkSection } from "../../src/features/work/WorkSectionTabs";
@@ -51,7 +50,6 @@ export default function Projects({ onSectionChange }: ProjectsProps = {}) {
   const branchId = selectedBranch?._id || user?.branchId || undefined;
 
   const [editing, setEditing] = useState<Project | "new" | null>(null);
-  const [attachmentProject, setAttachmentProject] = useState<Project | null>(null);
   const [busy, setBusy] = useState(false);
   const lock = useRef(false);
   const formLock = useRef(false);
@@ -101,7 +99,6 @@ export default function Projects({ onSectionChange }: ProjectsProps = {}) {
 
   const reload = () => {
     setEditing(null);
-    setAttachmentProject(null);
     setRevision((value) => value + 1);
   };
 
@@ -310,7 +307,7 @@ export default function Projects({ onSectionChange }: ProjectsProps = {}) {
                 <Pressable
                   style={[styles.attachmentBtn, { flexDirection: "row", alignItems: "center", gap: 4 }]}
                   disabled={busy}
-                  onPress={() => setAttachmentProject(item)}
+                  onPress={() => setEditing(item)}
                 >
                   <Paperclip size={13} color="#2563eb" />
                   <Text style={styles.attachmentBtnText}>
@@ -387,9 +384,9 @@ export default function Projects({ onSectionChange }: ProjectsProps = {}) {
         }
       />
 
-      {/* Project Form / Attachments Modal */}
+      {/* Project Form Modal */}
       <Modal
-        visible={editing !== null || attachmentProject !== null}
+        visible={editing !== null}
         animationType="slide"
         onRequestClose={() => {
           if (!formLock.current) reload();
@@ -401,22 +398,6 @@ export default function Projects({ onSectionChange }: ProjectsProps = {}) {
               project={editing === "new" ? undefined : editing}
               onClose={reload}
               onSaved={reload}
-              setLocked={(value) => {
-                formLock.current = value;
-              }}
-            />
-          )}
-          {attachmentProject && (
-            <AttachmentsForm
-              initial={attachmentProject.attachments || []}
-              save={
-                manage
-                  ? async (attachments) => {
-                      await kanban.updateProject(attachmentProject.id, { attachments });
-                    }
-                  : undefined
-              }
-              onClose={reload}
               setLocked={(value) => {
                 formLock.current = value;
               }}

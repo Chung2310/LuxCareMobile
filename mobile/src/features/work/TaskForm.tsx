@@ -14,7 +14,7 @@ import {
   View,
 } from "react-native";
 import { randomUUID } from "expo-crypto";
-import type { HRTask, Project, TaskAttachment, TaskSubtask } from "../../../../src/types/hr";
+import type { HRTask, Project, TaskAttachment } from "../../../../src/types/hr";
 import type { UserProfile } from "../../../../src/types/common";
 import type { TaskInput } from "../../../../src/services/kanbanService";
 import { kanban, roster } from "../../api/services";
@@ -24,7 +24,8 @@ import { pickImageAttachment, pickWorkAttachment } from "./attachments";
 import {
   TASK_PRIORITIES,
   TASK_STATUSES,
-  calculateEstimatedHours,
+  taskDurationHours,
+  updateTaskTiming,
   draftForTask,
   evaluateTaskKpi,
   isTaskManager,
@@ -34,6 +35,7 @@ import {
   type TaskDraft,
 } from "./model";
 import { DateTimePickerModal } from "./DateTimePickerModal";
+import { TaskSubtasksEditor } from "./TaskSubtasksEditor";
 import {
   X,
   AlertCircle,
@@ -48,7 +50,6 @@ import {
   FileText,
   Calendar,
   Zap,
-  RotateCw,
   Search,
   Ban,
 } from "lucide-react-native";
@@ -93,32 +94,6 @@ function formatDisplayDate(str: string): string {
   return str;
 }
 
-function parseDateToTime(str?: string): number {
-  if (!str || !str.trim()) return 0;
-  const s = str.trim();
-  const match = s.match(/^(\d{4})-(\d{2})-(\d{2})[ T](\d{2}):(\d{2})/);
-  if (match) {
-    const y = parseInt(match[1], 10);
-    const m = parseInt(match[2], 10) - 1;
-    const d = parseInt(match[3], 10);
-    const h = parseInt(match[4], 10);
-    const min = parseInt(match[5], 10);
-    return new Date(y, m, d, h, min, 0, 0).getTime();
-  }
-  const t = new Date(s).getTime();
-  return Number.isFinite(t) ? t : 0;
-}
-
-function calculateDurationHours(startStr?: string, endStr?: string): number {
-  const s = parseDateToTime(startStr);
-  const e = parseDateToTime(endStr);
-  if (s > 0 && e > 0 && e > s) {
-    const diffHours = (e - s) / (1000 * 60 * 60);
-    return Math.round(diffHours * 10) / 10;
-  }
-  return 0;
-}
-
 export function TaskForm({
   task,
   projects,
@@ -144,8 +119,8 @@ export function TaskForm({
         now.setHours(8, 0, 0, 0);
         d.startTime = localDateTime(now.toISOString());
       }
-      const initialEst = calculateDurationHours(d.startTime, d.dueDate);
-      if (initialEst > 0 && !d.estTime) d.estTime = String(initialEst);
+      const initialEst = taskDurationHours(d.startTime, d.dueDate);
+      if (initialEst !== null && initialEst > 0 && !d.estTime) d.estTime = String(Number(initialEst.toFixed(1)));
     }
     return d;
   });
@@ -158,75 +133,21 @@ export function TaskForm({
   const [error, setError] = useState<string | null>(null);
   const lock = useRef(false);
 
-  // Tự động tính toán lại Giờ dự tính và Giờ thực tế khi có thay đổi về ngày giờ
-  useEffect(() => {
-    const effectiveStart =
-      draft.startTime ||
-      localDateTime(new Date(new Date().setHours(8, 0, 0, 0)).toISOString());
-    const estTarget = draft.endTime || draft.dueDate;
-
-    let nextEst: string | undefined;
-    let nextActual: string | undefined;
-
-    if (estTarget) {
-      const estH = calculateDurationHours(effectiveStart, estTarget);
-      if (estH > 0) {
-        nextEst = String(estH);
-      }
-    }
-
-    if (draft.startTime && draft.endTime) {
-      const actH = calculateDurationHours(draft.startTime, draft.endTime);
-      if (actH > 0) {
-        nextActual = String(actH);
-      }
-    } else if (!draft.endTime) {
-      nextActual = "";
-    }
-
-    setDraft((prev) => {
-      let changed = false;
-      const patch: Partial<TaskDraft> = {};
-      if (nextEst !== undefined && prev.estTime !== nextEst) {
-        patch.estTime = nextEst;
-        changed = true;
-      }
-      if (nextActual !== undefined && prev.actualTime !== nextActual) {
-        patch.actualTime = nextActual;
-        changed = true;
-      }
-      return changed ? { ...prev, ...patch } : prev;
-    });
-  }, [draft.startTime, draft.endTime, draft.dueDate]);
-
-  // Cập nhật ngày và kích hoạt tính toán
+  // Recalculate only the values affected by an explicit date change.
   const updateDatesAndRecalculateTimes = (patch: Partial<TaskDraft>) => {
-    setDraft((prev) => ({ ...prev, ...patch }));
+    setDraft(prev => updateTaskTiming(prev, patch));
   };
 
   const handleStatusChange = (statusVal: string) => {
-    setDraft((prev) => {
-      const next = { ...prev, status: statusVal };
-      if (statusVal === "Done") {
-        if (!next.startTime) {
-          const now = new Date();
-          now.setHours(8, 0, 0, 0);
-          next.startTime = localDateTime(now.toISOString());
-        }
-        if (!next.endTime) {
-          next.endTime = localDateTime(new Date().toISOString());
-        }
-        const estTarget = next.endTime || next.dueDate;
-        if (next.startTime && estTarget) {
-          const estH = calculateDurationHours(next.startTime, estTarget);
-          if (estH > 0) next.estTime = String(estH);
-        }
-        if (next.startTime && next.endTime) {
-          const actH = calculateDurationHours(next.startTime, next.endTime);
-          if (actH > 0) next.actualTime = String(actH);
-        }
+    setDraft(prev => {
+      const patch: Partial<TaskDraft> = { status: statusVal };
+      if (statusVal === "In Progress" && !prev.startTime) {
+        patch.startTime = localDateTime(new Date().toISOString());
       }
-      return next;
+      if (statusVal === "Done" && !prev.endTime) {
+        patch.endTime = localDateTime(new Date().toISOString());
+      }
+      return updateTaskTiming(prev, patch);
     });
   };
 
@@ -243,8 +164,6 @@ export function TaskForm({
   // Tags input
   const [tagInput, setTagInput] = useState("");
 
-  // Subtask input
-  const [subtaskInput, setSubtaskInput] = useState("");
 
   // Attachment link modal
   const [linkModal, setLinkModal] = useState(false);
@@ -365,31 +284,6 @@ export function TaskForm({
 
   const handleRemoveTag = (tagToRemove: string) => {
     setDraft((v) => ({ ...v, tags: v.tags.filter((t) => t !== tagToRemove) }));
-  };
-
-  // Subtask actions
-  const handleAddSubtask = () => {
-    const title = subtaskInput.trim();
-    if (!title) return;
-    const newSubtask: TaskSubtask = {
-      id: randomUUID(),
-      title,
-      completed: false,
-      assigneeUid: draft.assigneeUid || undefined,
-    };
-    setDraft((v) => ({ ...v, subtasks: [...v.subtasks, newSubtask] }));
-    setSubtaskInput("");
-  };
-
-  const handleToggleSubtask = (id: string) => {
-    setDraft((v) => ({
-      ...v,
-      subtasks: v.subtasks.map((s) => (s.id === id ? { ...s, completed: !s.completed } : s)),
-    }));
-  };
-
-  const handleRemoveSubtask = (id: string) => {
-    setDraft((v) => ({ ...v, subtasks: v.subtasks.filter((s) => s.id !== id) }));
   };
 
   // Attachment actions
@@ -745,65 +639,13 @@ export function TaskForm({
           )}
         </View>
 
-        {/* Section 5: Công việc nhỏ (Subtasks) */}
-        <View style={styles.card}>
-          <View style={styles.cardHeaderWithCount}>
-            <Text style={styles.cardSectionTitle}>
-              CÔNG VIỆC CON ({draft.subtasks.filter((s) => s.completed).length}/{draft.subtasks.length})
-            </Text>
-          </View>
-
-          {/* Add subtask input row */}
-          <View style={styles.subtaskInputRow}>
-            <TextInput
-              style={[styles.textInput, { flex: 1 }]}
-              placeholder="Thêm đầu việc nhỏ cần làm..."
-              placeholderTextColor="#94a3b8"
-              value={subtaskInput}
-              editable={!disabled}
-              onChangeText={setSubtaskInput}
-              onSubmitEditing={handleAddSubtask}
-            />
-            <Pressable
-              style={styles.addSubtaskBtn}
-              onPress={handleAddSubtask}
-              disabled={disabled || !subtaskInput.trim()}
-            >
-              <Text style={styles.addSubtaskBtnText}>+ Thêm việc</Text>
-            </Pressable>
-          </View>
-
-          {/* Subtasks list */}
-          {draft.subtasks.length > 0 ? (
-            <View style={styles.subtaskList}>
-              {draft.subtasks.map((st) => (
-                <View key={st.id} style={styles.subtaskItem}>
-                  <Pressable
-                    onPress={() => handleToggleSubtask(st.id)}
-                    style={[styles.subtaskCheckbox, st.completed && styles.subtaskCheckboxChecked]}
-                  >
-                    {st.completed && <Check size={11} color="#ffffff" strokeWidth={3} />}
-                  </Pressable>
-                  <Text
-                    style={[styles.subtaskTitle, st.completed && styles.subtaskTitleDone]}
-                    numberOfLines={2}
-                  >
-                    {st.title}
-                  </Text>
-                  <Pressable
-                    onPress={() => handleRemoveSubtask(st.id)}
-                    hitSlop={8}
-                    style={styles.subtaskDeleteBtn}
-                  >
-                    <Trash2 size={13} color="#dc2626" />
-                  </Pressable>
-                </View>
-              ))}
-            </View>
-          ) : (
-            <Text style={styles.emptyTipText}>Chưa có việc con nào. Chia nhỏ công việc để theo dõi tốt hơn.</Text>
-          )}
-        </View>
+        <TaskSubtasksEditor
+          items={draft.subtasks}
+          people={people}
+          disabled={disabled}
+          canManage={manager}
+          onChange={subtasks => setDraft(current => ({ ...current, subtasks }))}
+        />
 
         {/* Section 6: Danh sách tệp & Liên kết đính kèm */}
         <View style={styles.card}>
@@ -1020,36 +862,14 @@ export function TaskForm({
             </View>
           </View>
 
-          {/* Auto calculate hours indicator and manual recalculate */}
+          {/* Auto calculate hours indicator */}
           <View style={styles.calcRow}>
             <View style={[styles.autoCalculatedBadge, { flexDirection: "row", alignItems: "center", gap: 4 }]}>
               <Zap size={12} color="#1d4ed8" />
               <Text style={styles.autoCalculatedBadgeText}>
-                Tự động tính: Dự tính {draft.estTime || "0"}h · Thực tế {draft.actualTime || "0"}h
+                Dự tính: Bắt đầu → Hạn hoàn thành. Thực tế: Bắt đầu → Kết thúc.
               </Text>
             </View>
-            <Pressable
-              disabled={disabled}
-              style={[styles.recalcBtn, { flexDirection: "row", alignItems: "center", gap: 4 }]}
-              onPress={() => {
-                const effectiveStart =
-                  draft.startTime ||
-                  localDateTime(new Date(new Date().setHours(8, 0, 0, 0)).toISOString());
-                const estTarget = draft.endTime || draft.dueDate;
-                const estH = calculateDurationHours(effectiveStart, estTarget);
-                const actH = draft.endTime ? calculateDurationHours(draft.startTime, draft.endTime) : 0;
-                setDraft((v) => ({
-                  ...v,
-                  estTime: estH > 0 ? String(estH) : v.estTime,
-                  actualTime: actH > 0 ? String(actH) : "",
-                }));
-              }}
-            >
-              <>
-                <RotateCw size={11} color="#1d4ed8" />
-                <Text style={styles.recalcBtnText}>Tính lại</Text>
-              </>
-            </Pressable>
           </View>
 
           {/* Hours inputs */}
@@ -1082,7 +902,7 @@ export function TaskForm({
 
           {/* KPI Evaluation Banner based on hours & dates */}
           {(() => {
-            const kpiInfo = evaluateTaskKpi(draft.estTime, draft.actualTime, draft.endTime, draft.dueDate);
+            const kpiInfo = evaluateTaskKpi(draft.estTime, draft.actualTime, draft.endTime, draft.dueDate, draft.startTime);
             if (!kpiInfo) return null;
             return (
               <View
@@ -1903,33 +1723,6 @@ const styles = StyleSheet.create({
     fontSize: 12,
     fontWeight: "600",
     opacity: 0.9,
-  },
-  recalcBtn: {
-    paddingHorizontal: 10,
-    paddingVertical: 6,
-    borderRadius: 8,
-    backgroundColor: "#eff6ff",
-    borderWidth: 1,
-    borderColor: "#bfdbfe",
-  },
-  recalcBtnText: {
-    fontSize: 12,
-    fontWeight: "600",
-    color: "#1d4ed8",
-  },
-  calcBtn: {
-    alignSelf: "flex-start",
-    paddingHorizontal: 12,
-    paddingVertical: 7,
-    borderRadius: 10,
-    backgroundColor: "#f5f3ff",
-    borderWidth: 1,
-    borderColor: "#ddd6fe",
-  },
-  calcBtnText: {
-    fontSize: 12,
-    fontWeight: "600",
-    color: "#7c3aed",
   },
   bottomBar: {
     flexDirection: "row",

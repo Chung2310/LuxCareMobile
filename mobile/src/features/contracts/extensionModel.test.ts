@@ -50,3 +50,11 @@ it("propagates rejection without retrying a mutation", async () => {
   await expect(service.extend({ companyCode: "A" }, "id", draft)).rejects.toMatchObject({ status: 400 });
   expect(fetch).toHaveBeenCalledOnce();
 });
+
+it.each([
+  ["2026-09-11T17:00:00.000Z", "2026-09-12"],
+  ["2026-12-31T18:30:00.000Z", "2027-01-01"],
+  ["2026-09-11T16:59:59.000Z", "2026-09-11"],
+])("defaults extension day to Vietnam time for %s", (timestamp, expected) => {
+  expect(extensionDraft(new Date(timestamp)).extensionDate).toBe(expected);
+});

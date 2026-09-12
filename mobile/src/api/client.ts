@@ -84,6 +84,7 @@ export class MobileApi {
       input.startsWith("/api/v1/assistant/knowledge/") ||
       input === "/api/v1/supplies/upload-files";
     const timeout = setTimeout(cancel, isFileTransfer ? 120000 : 20000);
+
     try {
       if (isFormData(init.body) && typeof XMLHttpRequest !== "undefined") {
         return await new Promise<Response>((resolve, reject) => {

@@ -3,7 +3,7 @@ import { publicLinkPatch } from "./publicLink";
 import { customDashboardRange } from "../dashboard/range";
 export function deadlineText(value?: string | null) {
   if (!value || !Number.isFinite(Date.parse(value))) return "";
-  return new Date(Date.parse(value) + 7 * 3600000).toISOString().slice(0, 16).replace("T", " ");
+  return value.slice(0, 10);
 }
 export function jobDraft(job?: RecruitmentJob) {
   return {
@@ -29,8 +29,9 @@ export function jobPayload(
   job?: RecruitmentJob,
   now = Date.now(),
 ): Partial<RecruitmentJob> {
-  const code = draft.code.trim().toUpperCase();
+  const code = job?.code || draft.code.trim().toUpperCase();
   if (!code) throw new Error("Nhập mã tin tuyển dụng.");
+  if (!draft.title.trim()) throw new Error("Nhập tên vị trí tuyển dụng.");
   const headcount = Number(draft.headcount);
   if (!Number.isInteger(headcount) || headcount < 1) throw new Error("Số lượng tuyển phải là số nguyên dương.");
   const salary = (value: string) => {
@@ -46,13 +47,12 @@ export function jobPayload(
   const deadline = draft.deadline.trim();
   let applicationDeadline: string | null = null;
   if (deadline) {
-    if (!/^\d{4}-\d{2}-\d{2} ([01]\d|2[0-3]):[0-5]\d$/.test(deadline))
-      throw new Error("Hạn nộp phải có dạng YYYY-MM-DD HH:mm (giờ Việt Nam).");
-    customDashboardRange(deadline.slice(0, 10), deadline.slice(0, 10));
-    applicationDeadline =
-      deadline === deadlineText(job?.applicationDeadline)
-        ? job!.applicationDeadline!
-        : new Date(`${deadline.replace(" ", "T")}:00+07:00`).toISOString();
+    if (!/^\d{4}-\d{2}-\d{2}$/.test(deadline))
+      throw new Error("Hạn ứng tuyển phải có dạng YYYY-MM-DD.");
+    customDashboardRange(deadline, deadline);
+    applicationDeadline = deadline === deadlineText(job?.applicationDeadline)
+      ? job!.applicationDeadline!
+      : deadline;
   }
   const result = {
     ...publicLinkPatch("job", draft.jdFileUrl, job?.jdFileUrl),

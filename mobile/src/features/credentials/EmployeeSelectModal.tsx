@@ -11,6 +11,7 @@ import {
   View,
 } from "react-native";
 import { SafeAreaView } from "react-native-safe-area-context";
+import { Search, Users, X } from "lucide-react-native";
 import type { Employee } from "../../../../src/types/hrContract";
 
 export interface EmployeeSelectModalProps {
@@ -91,13 +92,13 @@ export function EmployeeSelectModal({
               <Text style={styles.subtitle}>{filtered.length} nhân sự trong danh sách</Text>
             </View>
             <Pressable onPress={onClose} hitSlop={10} style={styles.closeBtn}>
-              <Text style={styles.closeBtnText}>✕</Text>
+              <X size={18} color="#64748b" />
             </Pressable>
           </View>
 
           {/* Search Box */}
           <View style={styles.searchBox}>
-            <Text style={styles.searchIcon}>🔍</Text>
+            <Search size={16} color="#94a3b8" />
             <TextInput
               style={styles.searchInput}
               placeholder="Tìm theo tên, email, phòng ban..."
@@ -109,7 +110,7 @@ export function EmployeeSelectModal({
             />
             {search.length > 0 && (
               <Pressable onPress={() => setSearch("")} hitSlop={8} style={styles.searchClearBtn}>
-                <Text style={styles.searchClearText}>✕</Text>
+                <X size={14} color="#94a3b8" />
               </Pressable>
             )}
           </View>
@@ -131,7 +132,7 @@ export function EmployeeSelectModal({
                   }}
                 >
                   <View style={[styles.avatarCircle, { backgroundColor: "#f1f5f9" }]}>
-                    <Text style={[styles.avatarText, { color: "#475569" }]}>★</Text>
+                    <Users size={20} color="#475569" />
                   </View>
                   <View style={styles.itemInfo}>
                     <Text style={[styles.itemName, !selectedId && styles.itemNameSelected]}>
@@ -147,7 +148,7 @@ export function EmployeeSelectModal({
             }
             ListEmptyComponent={
               <View style={styles.emptyContainer}>
-                <Text style={styles.emptyIcon}>🔍</Text>
+                <Search size={36} color="#94a3b8" style={{ marginBottom: 4 }} />
                 <Text style={styles.emptyTitle}>Không tìm thấy nhân viên</Text>
                 <Text style={styles.emptySubtitle}>
                   Thử tìm kiếm với từ khóa khác (họ tên, email hoặc phòng ban).
