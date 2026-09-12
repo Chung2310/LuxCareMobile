@@ -77,7 +77,7 @@ class SocketService {
       this.socket.on("auth:session-replaced", (data: { code: string; message: string }) => {
         this.onSessionReplaced(data);
         // Forcefully disconnect – the session is no longer valid.
-        this.disconnect();
+        this.disconnect(true);
       });
 
       // Silently suppress connection errors.
