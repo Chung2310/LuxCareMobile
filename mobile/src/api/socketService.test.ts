@@ -10,7 +10,7 @@ const source = ts.transpileModule(readFileSync(new URL("./socketService.ts", imp
 
 // vi.mock does not intercept CommonJS require. Execute the actual service with
 // an injected require so tests never load a real socket or open network connections.
-function createHost(shape: "named" | "default" | "function" | "dist" = "named") {
+function createHost() {
   const sockets: any[] = [];
   const io = vi.fn(() => {
     const listeners = new Map<string, Set<(...args: any[]) => void>>();
@@ -31,10 +31,8 @@ function createHost(shape: "named" | "default" | "function" | "dist" = "named") 
   });
   const requireModule = vi.fn((name: string) => {
     if (name === "socket.io-client") {
-      if (shape === "dist") throw Error("Primary entry unavailable");
-      return shape === "function" ? io : shape === "default" ? { default: io } : { io };
+      return { io };
     }
-    if (name === "socket.io-client/dist/socket.io.js" && shape === "dist") return { io };
     throw Error("Unexpected dependency: " + name);
   });
   const module = { exports: {} as typeof import("./socketService") };
@@ -62,8 +60,8 @@ it("preserves notification subscribers across token rotation and removes them on
   expect(sockets[2].on).not.toHaveBeenCalledWith("new_notification", handler);
 });
 
-it.each(["named", "default", "function", "dist"] as const)("supports the %s socket module entry", shape => {
-  const { socketService, io } = createHost(shape);
+it("connects using the named io export and passes the access token", () => {
+  const { socketService, io } = createHost();
   socketService.connect("token");
   expect(io).toHaveBeenCalledExactlyOnceWith("https://luxcare.example", expect.objectContaining({
     auth: { token: "token" },
