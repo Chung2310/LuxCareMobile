@@ -48,7 +48,6 @@ import {
   FileText,
   Calendar,
   Zap,
-  RotateCw,
   Search,
   Ban,
 } from "lucide-react-native";
@@ -1020,7 +1019,7 @@ export function TaskForm({
             </View>
           </View>
 
-          {/* Auto calculate hours indicator and manual recalculate */}
+          {/* Auto calculate hours indicator */}
           <View style={styles.calcRow}>
             <View style={[styles.autoCalculatedBadge, { flexDirection: "row", alignItems: "center", gap: 4 }]}>
               <Zap size={12} color="#1d4ed8" />
@@ -1028,28 +1027,6 @@ export function TaskForm({
                 Tự động tính: Dự tính {draft.estTime || "0"}h · Thực tế {draft.actualTime || "0"}h
               </Text>
             </View>
-            <Pressable
-              disabled={disabled}
-              style={[styles.recalcBtn, { flexDirection: "row", alignItems: "center", gap: 4 }]}
-              onPress={() => {
-                const effectiveStart =
-                  draft.startTime ||
-                  localDateTime(new Date(new Date().setHours(8, 0, 0, 0)).toISOString());
-                const estTarget = draft.endTime || draft.dueDate;
-                const estH = calculateDurationHours(effectiveStart, estTarget);
-                const actH = draft.endTime ? calculateDurationHours(draft.startTime, draft.endTime) : 0;
-                setDraft((v) => ({
-                  ...v,
-                  estTime: estH > 0 ? String(estH) : v.estTime,
-                  actualTime: actH > 0 ? String(actH) : "",
-                }));
-              }}
-            >
-              <>
-                <RotateCw size={11} color="#1d4ed8" />
-                <Text style={styles.recalcBtnText}>Tính lại</Text>
-              </>
-            </Pressable>
           </View>
 
           {/* Hours inputs */}
@@ -1903,33 +1880,6 @@ const styles = StyleSheet.create({
     fontSize: 12,
     fontWeight: "600",
     opacity: 0.9,
-  },
-  recalcBtn: {
-    paddingHorizontal: 10,
-    paddingVertical: 6,
-    borderRadius: 8,
-    backgroundColor: "#eff6ff",
-    borderWidth: 1,
-    borderColor: "#bfdbfe",
-  },
-  recalcBtnText: {
-    fontSize: 12,
-    fontWeight: "600",
-    color: "#1d4ed8",
-  },
-  calcBtn: {
-    alignSelf: "flex-start",
-    paddingHorizontal: 12,
-    paddingVertical: 7,
-    borderRadius: 10,
-    backgroundColor: "#f5f3ff",
-    borderWidth: 1,
-    borderColor: "#ddd6fe",
-  },
-  calcBtnText: {
-    fontSize: 12,
-    fontWeight: "600",
-    color: "#7c3aed",
   },
   bottomBar: {
     flexDirection: "row",
