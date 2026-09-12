@@ -1,3 +1,4 @@
+import { UploadProgress, type FileUploadProgress } from "../../components/UploadProgress";
 import { useEffect, useRef, useState } from "react";
 import {
   ActivityIndicator,
@@ -63,6 +64,7 @@ export function CredentialForm({
   const uploadController = useRef<AbortController | null>(null);
   const [upload, setUpload] = useState<CredentialFileFields | null>(null);
   const [uploading, setUploading] = useState(false);
+  const [uploadProgress, setUploadProgress] = useState<FileUploadProgress | null>(null);
 
   useEffect(() => () => uploadController.current?.abort(), []);
 
@@ -73,9 +75,10 @@ export function CredentialForm({
     lock.current = true;
     setLocked(true);
     setUploading(true);
+    setUploadProgress(null);
     setError(null);
     try {
-      const value = await pickCredentialFile(companyCode, controller.signal, source);
+      const value = await pickCredentialFile(companyCode, controller.signal, source, progress => { if (!controller.signal.aborted) setUploadProgress(progress); });
       if (!controller.signal.aborted && value) setUpload(value);
     } catch (err) {
       if (!controller.signal.aborted) setError(messageOf(err));
@@ -84,6 +87,7 @@ export function CredentialForm({
         lock.current = false;
         setLocked(false);
         setUploading(false);
+        setUploadProgress(null);
       }
     }
   };
@@ -498,7 +502,7 @@ export function CredentialForm({
                 <Text style={styles.fileName} numberOfLines={1}>
                   {upload.fileName || "Tệp mới chọn"}
                 </Text>
-                <Text style={styles.fileStatus}>Tệp mới chọn (sẽ lưu khi bấm Xác nhận)</Text>
+                <Text style={styles.fileStatus}>Đã tải lên (sẽ lưu khi bấm Xác nhận)</Text>
               </View>
               <Pressable
                 style={styles.removeFileBtn}
@@ -513,7 +517,7 @@ export function CredentialForm({
           {!readOnly && (
             <>
               <Text style={styles.helperText}>
-                Hỗ trợ 1 tệp dạng PDF, JPG, PNG hoặc WebP dung lượng tối đa 10 MB.
+                Hỗ trợ 1 tệp PDF, Word (DOC/DOCX), Excel (XLS/XLSX), JPG, PNG hoặc WebP, tối đa 10 MB.
               </Text>
               <Pressable
                 style={({ pressed }) => [
@@ -554,6 +558,7 @@ export function CredentialForm({
         </View>
       </ScrollView>
 
+      {uploadProgress && <View style={{ paddingHorizontal: 16, paddingVertical: 8, backgroundColor: "#ffffff" }}><UploadProgress progress={uploadProgress} /></View>}
       {/* Sticky Bottom Action Bar */}
       <View style={styles.actionBar}>
         {onDelete && (

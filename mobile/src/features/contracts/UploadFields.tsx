@@ -1,3 +1,4 @@
+import { UploadProgress, type FileUploadProgress } from "../../components/UploadProgress";
 import React, { useEffect, useRef, useState } from "react";
 import { ActivityIndicator, Pressable, StyleSheet, Text, View } from "react-native";
 import type { ContractScope, ContractUploadKind } from "../../../../src/services/hrContractService";
@@ -21,6 +22,8 @@ export function UploadFields({
   onBusy: (busy: boolean) => void;
 }) {
   const [busy, setBusy] = useState(false);
+  const [activeKind, setActiveKind] = useState<ContractUploadKind | null>(null);
+  const [progress, setProgress] = useState<FileUploadProgress | null>(null);
   const [error, setError] = useState<string | null>(null);
   const lock = useRef(false);
   const mounted = useRef(true);
@@ -36,10 +39,12 @@ export function UploadFields({
     if (lock.current || disabled) return;
     lock.current = true;
     setBusy(true);
+    setActiveKind(kind);
+    setProgress(null);
     onBusy(true);
     setError(null);
     try {
-      const file = await pickContractFile(scope, kind, source);
+      const file = await pickContractFile(scope, kind, source, value => { if (mounted.current) setProgress(value); });
       if (mounted.current && file) onChange({ ...value, [kind]: file });
     } catch (err) {
       if (mounted.current) setError(messageOf(err));
@@ -47,6 +52,8 @@ export function UploadFields({
       lock.current = false;
       if (mounted.current) {
         setBusy(false);
+        setActiveKind(null);
+        setProgress(null);
         onBusy(false);
       }
     }
@@ -57,13 +64,13 @@ export function UploadFields({
         {
           kind: "extension",
           title: "Tệp phụ lục gia hạn",
-          desc: "PDF hoặc tài liệu phụ lục (tối đa 10 MB)",
+          desc: "PDF, Word, Excel hoặc ảnh (tối đa 10 MB)",
           icon: "📄",
         },
         {
           kind: "extensionSigned",
-          title: "Ảnh phụ lục đã ký",
-          desc: "Ảnh chụp hợp đồng / phụ lục có chữ ký (tối đa 10 MB)",
+          title: "Tệp phụ lục đã ký",
+          desc: "PDF, Word, Excel hoặc ảnh phụ lục có chữ ký (tối đa 10 MB)",
           icon: "✍️",
         },
       ]
@@ -103,10 +110,11 @@ export function UploadFields({
                 </View>
               </View>
 
+              {activeKind === kind && <UploadProgress progress={progress} />}
               {selected ? (
                 <View style={styles.selectedBox}>
                   <View style={{ flex: 1 }}>
-                    <Text style={styles.selectedLabel}>Đã chọn:</Text>
+                    <Text style={styles.selectedLabel}>Đã tải lên:</Text>
                     <Text style={styles.selectedName} numberOfLines={1} ellipsizeMode="middle">
                       {selected.name || "Tệp đã tải lên"}
                     </Text>
@@ -136,7 +144,7 @@ export function UploadFields({
                 onPress={() => void pick(kind)}
               >
                 <Text style={[styles.pickBtnText, selected && styles.pickBtnSecondaryText]}>
-                  {selected ? "Đổi tệp khác" : "Chọn tệp từ máy..."}
+                  {activeKind === kind && progress ? "Đang tải tệp…" : selected ? "Đổi tệp khác" : "Chọn tệp từ máy..."}
                 </Text>
               </Pressable>
               <Pressable

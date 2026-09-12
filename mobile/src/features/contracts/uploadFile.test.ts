@@ -1,7 +1,8 @@
-import { beforeEach, expect, it, vi } from "vitest";
-const mocks = vi.hoisted(() => ({ pick: vi.fn(), upload: vi.fn(), remove: vi.fn(), base64: vi.fn(), size: 10, camera: vi.fn() }));
+import { afterEach, beforeEach, expect, it, vi } from "vitest";
+const mocks = vi.hoisted(() => ({ pick: vi.fn(), upload: vi.fn(), remove: vi.fn(), base64: vi.fn(), size: 10, camera: vi.fn(), legacyRead: vi.fn() }));
 vi.mock("../../files/captureDocumentPhoto", () => ({ captureDocumentPhoto: mocks.camera }));
 vi.mock("expo-document-picker", () => ({ getDocumentAsync: mocks.pick }));
+vi.mock("expo-file-system/legacy", () => ({ readAsStringAsync: mocks.legacyRead, EncodingType: { Base64: "base64" } }));
 vi.mock("expo-file-system", () => ({
   Paths: { cache: { uri: "file:///cache/" } },
   File: class {
@@ -89,4 +90,75 @@ it("does not upload a canceled camera photo", async () => {
   mocks.camera.mockResolvedValue(null);
   expect(await pickContractFile(scope, "signed", "camera")).toBeNull();
   expect(mocks.upload).not.toHaveBeenCalled();
+});
+it("reports the selected filename while reading and uploading", async () => {
+  const onProgress = vi.fn();
+  mocks.base64.mockImplementation(async () => {
+    expect(onProgress).toHaveBeenLastCalledWith({ stage: "preparing", name: "doc.pdf" });
+    return "dGVzdA==";
+  });
+  mocks.upload.mockImplementation(async () => {
+    expect(onProgress).toHaveBeenLastCalledWith({ stage: "uploading", name: "doc.pdf" });
+    return { url: "url", uploadToken: "token" };
+  });
+  await pickContractFile(scope, "contract", "file", onProgress);
+  expect(onProgress).toHaveBeenCalledTimes(2);
+});
+afterEach(() => { vi.unstubAllGlobals(); vi.restoreAllMocks(); });
+
+const extensionCases = [["extension","pdf","application/pdf"],["extension","doc","application/msword"],["extension","docx","application/vnd.openxmlformats-officedocument.wordprocessingml.document"],["extension","xls","application/vnd.ms-excel"],["extension","xlsx","application/vnd.openxmlformats-officedocument.spreadsheetml.sheet"],["extensionSigned","pdf","application/pdf"],["extensionSigned","doc","application/msword"],["extensionSigned","docx","application/vnd.openxmlformats-officedocument.wordprocessingml.document"],["extensionSigned","xls","application/vnd.ms-excel"],["extensionSigned","xlsx","application/vnd.openxmlformats-officedocument.spreadsheetml.sheet"]] as const;
+
+it.each(extensionCases)("uploads %s %s on device", async (kind, ext, mimeType) => {
+  const name = "appendix." + ext.toUpperCase();
+  mocks.pick.mockResolvedValue({ canceled: false, assets: [{ uri: "file:///cache/appendix", name }] });
+  const result = await pickContractFile(scope, kind);
+  expect(mocks.pick.mock.calls[0][0].type).toContain(mimeType);
+  expect(mocks.upload).toHaveBeenCalledWith(scope, { file: "data:" + mimeType + ";base64,dGVzdA==", name, mimeType, size: 10, kind });
+  expect(result).toMatchObject({ name, mimeType, uploadToken: "token" });
+});
+it.each(extensionCases)("uploads %s %s in the browser", async (kind, ext, mimeType) => {
+  const name = "appendix." + ext;
+  const browserFile = new globalThis.File(["test"], name, { type: mimeType });
+  vi.stubGlobal("FileReader", class {
+    result = "data:" + mimeType + ";base64,dGVzdA==";
+    readAsDataURL() { (this as any).onload(); }
+  });
+  const revoke = vi.spyOn(URL, "revokeObjectURL").mockImplementation(() => {});
+  mocks.pick.mockResolvedValue({ canceled: false, assets: [{ uri: "blob:appendix", name, file: browserFile, size: 999 }] });
+  await pickContractFile(scope, kind);
+  expect(mocks.upload).toHaveBeenCalledWith(scope, { file: "data:" + mimeType + ";base64,dGVzdA==", name, mimeType, size: 4, kind });
+  expect(mocks.base64).not.toHaveBeenCalled();
+  expect(mocks.remove).not.toHaveBeenCalled();
+  expect(revoke).toHaveBeenCalledWith("blob:appendix");
+});
+it("rejects oversized browser appendices before reading", async () => {
+  const read = vi.fn();
+  vi.stubGlobal("FileReader", class { readAsDataURL = read; });
+  const revoke = vi.spyOn(URL, "revokeObjectURL").mockImplementation(() => {});
+  mocks.pick.mockResolvedValue({ canceled: false, assets: [{ uri: "blob:large", name: "appendix.pdf", file: { size: 10485761 } }] });
+  await expect(pickContractFile(scope, "extensionSigned")).rejects.toThrow("10 MB");
+  expect(read).not.toHaveBeenCalled();
+  expect(mocks.upload).not.toHaveBeenCalled();
+  expect(revoke).toHaveBeenCalledWith("blob:large");
+});
+it("reports browser read failures without uploading", async () => {
+  vi.stubGlobal("FileReader", class { readAsDataURL() { (this as any).onerror(); } });
+  const revoke = vi.spyOn(URL, "revokeObjectURL").mockImplementation(() => {});
+  mocks.pick.mockResolvedValue({ canceled: false, assets: [{ uri: "blob:bad", name: "appendix.pdf", file: { size: 4 } }] });
+  await expect(pickContractFile(scope, "extension")).rejects.toThrow("Vui lòng chọn lại");
+  expect(mocks.upload).not.toHaveBeenCalled();
+  expect(revoke).toHaveBeenCalledWith("blob:bad");
+});
+
+it("uploads through the legacy reader when FileSystemFile.base64 is rejected", async () => {
+  mocks.base64.mockRejectedValue(new Error('Call to function "FileSystemFile.base64" has been rejected'));
+  mocks.legacyRead.mockResolvedValue("dGVzdA==");
+  const progress = vi.fn();
+  const result = await pickContractFile(scope, "contract", "file", progress);
+  expect(result).toMatchObject({ uploadToken: "token", name: "doc.pdf" });
+  expect(mocks.legacyRead).toHaveBeenCalledWith("file:///cache/doc.pdf", { encoding: "base64" });
+  expect(mocks.upload).toHaveBeenCalledOnce();
+  expect(mocks.upload.mock.calls[0][1].file).toBe("data:application/pdf;base64,dGVzdA==");
+  expect(progress).toHaveBeenLastCalledWith({ stage: "uploading", name: "doc.pdf" });
+  expect(mocks.remove).toHaveBeenCalledOnce();
 });
