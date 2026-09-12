@@ -1,7 +1,6 @@
 import { useCallback, useMemo, useState } from "react";
 import {
   ActivityIndicator,
-  Alert,
   Modal,
   Pressable,
   RefreshControl,
@@ -16,7 +15,8 @@ import { useFocusEffect, useLocalSearchParams, useRouter } from "expo-router";
 import { Ionicons } from "@expo/vector-icons";
 import * as DocumentPicker from "expo-document-picker";
 import { knowledge } from "../../src/api/services";
-import { useSession } from "../../src/auth/SessionProvider";
+import { messageOf, useSession } from "../../src/auth/SessionProvider";
+import { useAppAlert } from "../../src/components/AppAlert";
 import { hasPermission } from "../../src/auth/access";
 import type { KnowledgeDocument } from "../../../src/services/assistantKnowledgeService";
 
@@ -40,6 +40,7 @@ export default function KnowledgeScreen() {
   const router = useRouter();
   const params = useLocalSearchParams<{ from?: string }>();
   const { user } = useSession();
+  const { showAlert, alertView } = useAppAlert();
   const isManager = ["admin", "superadmin", "branch_owner", "manager"].includes(user?.role || "");
   const canRead = isManager || hasPermission(user, "knowledge:read") || hasPermission(user, "knowledge:manage");
   const canManage = isManager || hasPermission(user, "knowledge:manage");
@@ -72,6 +73,7 @@ export default function KnowledgeScreen() {
     mimeType?: string;
   } | null>(null);
   const [uploading, setUploading] = useState(false);
+  const [deletingId, setDeletingId] = useState<string | null>(null);
 
   const loadData = useCallback(async () => {
     if (!canRead) {
@@ -148,7 +150,7 @@ export default function KnowledgeScreen() {
       if (res.canceled || !res.assets || !res.assets.length) return;
       const file = res.assets[0];
       if (file.size && file.size > 10 * 1024 * 1024) {
-        Alert.alert("Tệp quá lớn", "Dung lượng tệp tối đa được hỗ trợ là 10 MB.");
+        showAlert("Tệp quá lớn", "Dung lượng tệp tối đa được hỗ trợ là 10 MB.", undefined, "error");
         return;
       }
       setPickedFile({
@@ -158,7 +160,7 @@ export default function KnowledgeScreen() {
         mimeType: file.mimeType,
       });
     } catch (err: any) {
-      Alert.alert("Lỗi", err.message || "Không thể chọn tệp tin.");
+      showAlert("Lỗi chọn tệp", messageOf(err), undefined, "error");
     }
   };
 
@@ -180,10 +182,10 @@ export default function KnowledgeScreen() {
       setCreateModalOpen(false);
       setPickedFile(null);
       setNewCategory("");
-      Alert.alert("Thành công", `Đã tải lên tệp “${pickedFile.name}” vào kho tri thức và nạp AI.`);
+      showAlert("Thành công", `Đã tải lên tệp “${pickedFile.name}” vào kho tri thức và nạp AI.`, undefined, "success");
       void loadData();
     } catch (e: any) {
-      Alert.alert("Lỗi tải tệp", e.message || "Không thể tải lên tệp tri thức.");
+      showAlert("Lỗi tải tệp", messageOf(e), undefined, "error");
     } finally {
       setUploading(false);
     }
@@ -205,13 +207,50 @@ export default function KnowledgeScreen() {
       setNewTitle("");
       setNewCategory("");
       setNewContent("");
-      Alert.alert("Thành công", `Đã lưu tài liệu “${newTitle.trim()}” vào kho tri thức.`);
+      showAlert("Thành công", `Đã lưu tài liệu “${newTitle.trim()}” vào kho tri thức.`, undefined, "success");
       void loadData();
     } catch (e: any) {
-      Alert.alert("Lỗi tạo tài liệu", e.message || "Không thể tạo tài liệu mới.");
+      showAlert("Lỗi tạo tài liệu", messageOf(e), undefined, "error");
     } finally {
       setCreating(false);
     }
+  };
+
+  const executeDelete = async (docId: string, title: string) => {
+    setDeletingId(docId);
+    try {
+      await knowledge.deleteDocument(docId);
+      if (selectedDoc?._id === docId) {
+        setSelectedDoc(null);
+      }
+      showAlert(
+        "Đã xóa tài liệu",
+        `Đã xóa tài liệu “${title}” khỏi kho tri thức thành công.`,
+        undefined,
+        "success",
+      );
+      void loadData();
+    } catch (err: any) {
+      showAlert("Lỗi xóa tài liệu", messageOf(err), undefined, "error");
+    } finally {
+      setDeletingId(null);
+    }
+  };
+
+  const handleConfirmDelete = (doc: KnowledgeDocument) => {
+    showAlert(
+      "Xác nhận xóa tài liệu",
+      `Bạn có chắc chắn muốn xóa tài liệu “${doc.title}” khỏi kho tri thức? Hệ thống sẽ gỡ tài liệu này và AI sẽ không còn sử dụng để tra cứu.`,
+      [
+        { text: "Hủy", style: "cancel" },
+        {
+          text: "Xóa tài liệu",
+          style: "destructive",
+          onPress: () => void executeDelete(doc._id, doc.title),
+        },
+      ],
+      "error",
+    );
   };
 
   const getDocTypeConfig = (type?: string) => {
@@ -382,20 +421,42 @@ export default function KnowledgeScreen() {
                         <Text style={[styles.docTypeBadgeText, { color: typeCfg.color }]}>{typeCfg.label}</Text>
                       </View>
 
-                      <View
-                        style={[
-                          styles.indexBadge,
-                          isIndexed ? styles.indexBadgeSuccess : styles.indexBadgePending,
-                        ]}
-                      >
-                        <Text
+                      <View style={styles.docCardHeaderRight}>
+                        <View
                           style={[
-                            styles.indexBadgeText,
-                            isIndexed ? styles.indexBadgeTextSuccess : styles.indexBadgeTextPending,
+                            styles.indexBadge,
+                            isIndexed ? styles.indexBadgeSuccess : styles.indexBadgePending,
                           ]}
                         >
-                          {isIndexed ? "ĐÃ ĐỒNG BỘ AI" : "ĐANG XỬ LÝ"}
-                        </Text>
+                          <Text
+                            style={[
+                              styles.indexBadgeText,
+                              isIndexed ? styles.indexBadgeTextSuccess : styles.indexBadgeTextPending,
+                            ]}
+                          >
+                            {isIndexed ? "ĐÃ ĐỒNG BỘ AI" : "ĐANG XỬ LÝ"}
+                          </Text>
+                        </View>
+
+                        {canManage && (
+                          <Pressable
+                            onPress={(e) => {
+                              e.stopPropagation?.();
+                              handleConfirmDelete(doc);
+                            }}
+                            disabled={deletingId === doc._id}
+                            style={styles.cardDeleteBtn}
+                            accessibilityRole="button"
+                            accessibilityLabel={`Xóa tài liệu ${doc.title}`}
+                            hitSlop={8}
+                          >
+                            {deletingId === doc._id ? (
+                              <ActivityIndicator size="small" color="#e11d48" />
+                            ) : (
+                              <Ionicons name="trash-outline" size={15} color="#e11d48" />
+                            )}
+                          </Pressable>
+                        )}
                       </View>
                     </View>
 
@@ -498,8 +559,31 @@ export default function KnowledgeScreen() {
             )}
 
             <View style={styles.modalFooter}>
-              <Pressable onPress={() => setSelectedDoc(null)} style={styles.modalPrimaryBtn}>
-                <Text style={styles.modalPrimaryBtnText}>Đóng</Text>
+              {canManage && selectedDoc && (
+                <Pressable
+                  onPress={() => handleConfirmDelete(selectedDoc)}
+                  disabled={deletingId === selectedDoc._id}
+                  style={styles.modalDeleteBtn}
+                  accessibilityRole="button"
+                  accessibilityLabel="Xóa tài liệu"
+                >
+                  {deletingId === selectedDoc._id ? (
+                    <ActivityIndicator size="small" color="#dc2626" />
+                  ) : (
+                    <>
+                      <Ionicons name="trash-outline" size={16} color="#dc2626" />
+                      <Text style={styles.modalDeleteBtnText}>Xóa tài liệu</Text>
+                    </>
+                  )}
+                </Pressable>
+              )}
+              <Pressable
+                onPress={() => setSelectedDoc(null)}
+                style={styles.modalSecondaryBtn}
+                accessibilityRole="button"
+                accessibilityLabel="Đóng chi tiết"
+              >
+                <Text style={styles.modalSecondaryBtnText}>Đóng</Text>
               </Pressable>
             </View>
           </View>
@@ -739,6 +823,7 @@ export default function KnowledgeScreen() {
           </View>
         </View>
       </Modal>
+      {alertView}
     </SafeAreaView>
   );
 }
@@ -1011,8 +1096,13 @@ const styles = StyleSheet.create({
     width: "100%",
     maxHeight: "85%",
     backgroundColor: "#ffffff",
-    borderRadius: 16,
+    borderRadius: 24,
     overflow: "hidden",
+    shadowColor: "#0f172a",
+    shadowOffset: { width: 0, height: 12 },
+    shadowOpacity: 0.16,
+    shadowRadius: 24,
+    elevation: 12,
   },
   modalHeader: {
     flexDirection: "row",
@@ -1200,15 +1290,67 @@ const styles = StyleSheet.create({
     lineHeight: 18,
   },
   modalFooter: {
+    flexDirection: "row",
+    alignItems: "center",
+    gap: 10,
     padding: 14,
     borderTopWidth: 1,
     borderTopColor: "#e2e8f0",
   },
   modalPrimaryBtn: {
+    flex: 1,
     backgroundColor: "#7c3aed",
-    borderRadius: 10,
-    paddingVertical: 12,
+    borderRadius: 14,
+    paddingVertical: 13,
     alignItems: "center",
+    justifyContent: "center",
+  },
+  modalSecondaryBtn: {
+    flex: 1,
+    backgroundColor: "#f1f5f9",
+    borderWidth: 1,
+    borderColor: "#e2e8f0",
+    borderRadius: 14,
+    paddingVertical: 13,
+    alignItems: "center",
+    justifyContent: "center",
+  },
+  modalSecondaryBtnText: {
+    color: "#475569",
+    fontWeight: "700",
+    fontSize: 14,
+  },
+  modalDeleteBtn: {
+    flex: 1,
+    flexDirection: "row",
+    alignItems: "center",
+    justifyContent: "center",
+    gap: 6,
+    paddingVertical: 13,
+    paddingHorizontal: 14,
+    borderRadius: 14,
+    backgroundColor: "#fff1f2",
+    borderWidth: 1,
+    borderColor: "#fecdd3",
+  },
+  modalDeleteBtnText: {
+    color: "#dc2626",
+    fontSize: 14,
+    fontWeight: "700",
+  },
+  docCardHeaderRight: {
+    flexDirection: "row",
+    alignItems: "center",
+    gap: 8,
+  },
+  cardDeleteBtn: {
+    padding: 5,
+    borderRadius: 8,
+    backgroundColor: "#fff1f2",
+    borderWidth: 1,
+    borderColor: "#ffe4e6",
+    alignItems: "center",
+    justifyContent: "center",
   },
   modalPrimaryBtnText: {
     color: "#ffffff",
