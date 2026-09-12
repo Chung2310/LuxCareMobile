@@ -8,6 +8,7 @@ import {
   View,
 } from "react-native";
 import { SafeAreaView } from "react-native-safe-area-context";
+import { X } from "lucide-react-native";
 
 export interface DateTimePickerModalProps {
   visible: boolean;
@@ -196,7 +197,7 @@ export function DateTimePickerModal({
               </Text>
             </View>
             <Pressable onPress={onClose} hitSlop={10} style={styles.closeBtn}>
-              <Text style={styles.closeBtnText}>✕</Text>
+              <X size={18} color="#64748b" />
             </Pressable>
           </View>
 

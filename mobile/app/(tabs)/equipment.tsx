@@ -1,3 +1,5 @@
+import { shareApiFile, resolveFileUrl } from "../../src/files/shareFile";
+import { resolveFileFormat } from "../../src/files/fileFormat";
 import { useCallback, useEffect, useRef, useState } from "react";
 import {
   ActivityIndicator,
@@ -195,8 +197,12 @@ function FilePreviewModal({
       return;
     }
     try {
+      if (/^https?:/i.test(uri) || uri.startsWith("/")) {
+        await shareApiFile(resolveFileUrl(uri), name);
+        return;
+      }
       if (await Sharing.isAvailableAsync()) {
-        await Sharing.shareAsync(uri);
+        await Sharing.shareAsync(uri, { mimeType: resolveFileFormat({ name, url: uri }).mimeType });
       } else {
         await Linking.openURL(uri);
       }

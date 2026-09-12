@@ -17,6 +17,7 @@ import { messageOf } from "../../auth/SessionProvider";
 import { projectDraft, projectPayload, PROJECT_STATUSES, PROJECT_PRIORITIES } from "./project";
 import { localDateTime } from "./model";
 import { DateTimePickerModal } from "./DateTimePickerModal";
+import { X, AlertCircle, Zap, Calendar, Target } from "lucide-react-native";
 
 function formatDisplayDate(str: string): string {
   if (!str) return "";
@@ -36,10 +37,10 @@ const STATUS_CONFIG: Record<string, { label: string; color: string; bg: string; 
 };
 
 const PRIORITY_CONFIG: Record<string, { label: string; color: string; bg: string; border: string }> = {
-  urgent: { label: "Khẩn cấp 🔴", color: "#b91c1c", bg: "#fef2f2", border: "#fca5a5" },
-  high: { label: "Cao 🟠", color: "#c2410c", bg: "#fff7ed", border: "#fed7aa" },
-  medium: { label: "Trung bình 🔵", color: "#1d4ed8", bg: "#eff6ff", border: "#bfdbfe" },
-  low: { label: "Thấp ⚪", color: "#475569", bg: "#f8fafc", border: "#e2e8f0" },
+  urgent: { label: "Khẩn cấp", color: "#b91c1c", bg: "#fef2f2", border: "#fca5a5" },
+  high: { label: "Cao", color: "#c2410c", bg: "#fff7ed", border: "#fed7aa" },
+  medium: { label: "Trung bình", color: "#1d4ed8", bg: "#eff6ff", border: "#bfdbfe" },
+  low: { label: "Thấp", color: "#475569", bg: "#f8fafc", border: "#e2e8f0" },
 };
 
 function formatNowPlusDays(days: number, hour = 18): string {
@@ -114,7 +115,7 @@ export function ProjectForm({
           style={({ pressed }) => [styles.closeBtn, pressed && { opacity: 0.7 }]}
           hitSlop={12}
         >
-          <Text style={styles.closeBtnText}>✕</Text>
+          <X size={18} color="#64748b" />
         </Pressable>
         <Text style={styles.titleText}>{project ? "Sửa dự án" : "Tạo dự án mới"}</Text>
         <Pressable
@@ -142,9 +143,9 @@ export function ProjectForm({
       >
         {/* Error Banner */}
         {!!error && (
-          <View style={styles.errorCard}>
-            <Text style={styles.errorIcon}>⚠️</Text>
-            <Text style={styles.errorText}>{error}</Text>
+          <View style={[styles.errorCard, { flexDirection: "row", alignItems: "center", gap: 8 }]}>
+            <AlertCircle size={16} color="#b91c1c" />
+            <Text style={[styles.errorText, { flex: 1 }]}>{error}</Text>
           </View>
         )}
 
@@ -265,7 +266,10 @@ export function ProjectForm({
                 }));
               }}
             >
-              <Text style={styles.quickPillText}>⚡ 1 tuần</Text>
+              <>
+                <Zap size={12} color="#2563eb" style={{ marginRight: 4 }} />
+                <Text style={styles.quickPillText}>1 tuần</Text>
+              </>
             </Pressable>
             <Pressable
               disabled={disabled}
@@ -278,7 +282,10 @@ export function ProjectForm({
                 }));
               }}
             >
-              <Text style={styles.quickPillText}>📅 1 tháng</Text>
+              <>
+                <Calendar size={12} color="#2563eb" style={{ marginRight: 4 }} />
+                <Text style={styles.quickPillText}>1 tháng</Text>
+              </>
             </Pressable>
             <Pressable
               disabled={disabled}
@@ -291,7 +298,10 @@ export function ProjectForm({
                 }));
               }}
             >
-              <Text style={styles.quickPillText}>🎯 1 quý</Text>
+              <>
+                <Target size={12} color="#2563eb" style={{ marginRight: 4 }} />
+                <Text style={styles.quickPillText}>1 quý</Text>
+              </>
             </Pressable>
           </View>
 
@@ -302,7 +312,7 @@ export function ProjectForm({
               disabled={disabled}
               style={styles.datePickerTrigger}
             >
-              <Text style={styles.datePickerIcon}>📅</Text>
+              <Calendar size={14} color="#64748b" style={{ marginRight: 6 }} />
               <Text
                 style={[
                   styles.datePickerValue,
@@ -318,7 +328,7 @@ export function ProjectForm({
                   hitSlop={8}
                   style={styles.dateClearBtn}
                 >
-                  <Text style={styles.dateClearText}>✕</Text>
+                  <X size={12} color="#94a3b8" />
                 </Pressable>
               )}
             </Pressable>
@@ -331,7 +341,7 @@ export function ProjectForm({
               disabled={disabled}
               style={styles.datePickerTrigger}
             >
-              <Text style={styles.datePickerIcon}>📅</Text>
+              <Calendar size={14} color="#64748b" style={{ marginRight: 6 }} />
               <Text
                 style={[
                   styles.datePickerValue,
@@ -347,7 +357,7 @@ export function ProjectForm({
                   hitSlop={8}
                   style={styles.dateClearBtn}
                 >
-                  <Text style={styles.dateClearText}>✕</Text>
+                  <X size={12} color="#94a3b8" />
                 </Pressable>
               )}
             </Pressable>

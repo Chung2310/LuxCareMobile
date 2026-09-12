@@ -1,3 +1,7 @@
+import { downloadRemoteFile } from "../../src/files/downloadRemoteFile";
+import { resolveFileFormat } from "../../src/files/fileFormat";
+import { resolveFileUrl, shareApiFile } from "../../src/files/shareFile";
+import { saveDownloadedMedia } from "../../src/features/blog/saveDownloadedMedia";
 import React, { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import {
   ActivityIndicator,
@@ -2435,209 +2439,42 @@ export default function ChatScreen() {
   // 6b. Tải về và lưu tệp tin / ghi âm / ảnh / excel về máy
   const handleDownloadAttachment = async (att: ChatAttachment) => {
     try {
-      let fileName = getCleanFileName(att);
-      if (!fileName || fileName === "Tệp tài liệu" || fileName === "Tệp đính kèm") {
-        if (att.type?.startsWith("image/")) fileName = `Anh_${Date.now()}.jpg`;
-        else if (att.type?.startsWith("audio/")) fileName = `Ghi_am_${Date.now()}.m4a`;
-        else fileName = `File_${Date.now()}`;
-      }
-      if (!fileName.includes(".")) {
-        if (att.type?.includes("pdf")) fileName += ".pdf";
-        else if (att.type?.includes("spreadsheet") || att.type?.includes("excel") || att.type?.includes("sheet")) fileName += ".xlsx";
-        else if (att.type?.includes("word") || att.type?.includes("document")) fileName += ".docx";
-        else if (att.type?.includes("image") || att.type?.includes("jpeg") || att.type?.includes("jpg")) fileName += ".jpg";
-        else if (att.type?.includes("png")) fileName += ".png";
-        else if (att.type?.includes("audio") || att.type?.includes("m4a") || att.type?.includes("mp3")) fileName += ".m4a";
-      }
-
-      const rawUrl = att.url;
-      if (!rawUrl) {
-        showCustomAlert("Lỗi tải tệp", "Không tìm thấy đường dẫn tệp tin.");
+      const url = att.url?.trim();
+      if (!url) throw new Error("Không tìm thấy đường dẫn tệp.");
+      const originalName = getCleanFileName(att);
+      const name = ["Tệp tài liệu", "Tệp đính kèm"].includes(originalName) ? undefined : originalName;
+      if (Platform.OS === "web" && (/^https?:/i.test(url) || url.startsWith("/"))) {
+        await shareApiFile(resolveFileUrl(url), name || "tai-lieu");
         return;
       }
-
-      let mimeType = att.type || "application/octet-stream";
-      if (fileName.endsWith(".pdf")) mimeType = "application/pdf";
-      else if (fileName.endsWith(".xlsx")) mimeType = "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet";
-      else if (fileName.endsWith(".xls")) mimeType = "application/vnd.ms-excel";
-      else if (fileName.endsWith(".docx")) mimeType = "application/vnd.openxmlformats-officedocument.wordprocessingml.document";
-      else if (fileName.endsWith(".doc")) mimeType = "application/msword";
-      else if (fileName.endsWith(".jpg") || fileName.endsWith(".jpeg")) mimeType = "image/jpeg";
-      else if (fileName.endsWith(".png")) mimeType = "image/png";
-      else if (fileName.endsWith(".m4a")) mimeType = "audio/m4a";
-      else if (fileName.endsWith(".mp3")) mimeType = "audio/mpeg";
-
-      const isMedia = mimeType.startsWith("image/") || mimeType.startsWith("audio/") || mimeType.startsWith("video/");
-
-      let resolvedUrl = rawUrl.trim();
-      if (resolvedUrl.startsWith("/")) {
-        const origin = (api.getOrigin && api.getOrigin()) || process.env.EXPO_PUBLIC_API_URL?.trim().replace(/\/$/, "") || "";
-        resolvedUrl = `${origin}${resolvedUrl}`;
-      }
-
-      // Thư mục lưu tệp nội bộ
-      const targetDir = FileSystem.documentDirectory || FileSystem.cacheDirectory || "";
-      const extMatch = fileName.match(/\.[a-zA-Z0-9]+$/);
-      const ext = extMatch ? extMatch[0] : "";
-      const basePart = ext ? fileName.substring(0, fileName.length - ext.length) : fileName;
-      const cleanBase = basePart.replace(/[^a-zA-Z0-9_-]/g, "_").slice(0, 40) || "file";
-      const safeFileName = `${cleanBase}_${Date.now()}${ext}`;
-      let targetPath = `${targetDir}${safeFileName}`;
-
-      if (resolvedUrl.startsWith("data:")) {
-        const commaIdx = resolvedUrl.indexOf(",");
-        const base64Data = commaIdx >= 0 ? resolvedUrl.substring(commaIdx + 1) : resolvedUrl;
-        if (base64Data) {
-          const cleanBase64 = base64Data.replace(/\s/g, "");
-          await FileSystem.writeAsStringAsync(targetPath, cleanBase64, { encoding: "base64" as any });
-        } else {
-          targetPath = "";
-        }
-      } else if (resolvedUrl.startsWith("http://") || resolvedUrl.startsWith("https://")) {
-        try {
-          showToast("Đang tải tệp xuống...");
-          const downloadRes = await FileSystem.downloadAsync(resolvedUrl, targetPath);
-          if (downloadRes.uri) {
-            targetPath = downloadRes.uri;
-          }
-        } catch (dlErr) {
-          console.warn("Lỗi downloadAsync:", dlErr);
-          targetPath = "";
-        }
-      } else if (resolvedUrl.startsWith("file://") || resolvedUrl.startsWith("content://")) {
-        // Tệp cục bộ tạm (nếu là tin nhắn cũ chưa đẩy lên Cloudinary)
-        try {
-          await FileSystem.copyAsync({ from: resolvedUrl, to: targetPath });
-        } catch (copyErr) {
-          console.warn("Lỗi sao chép tệp cục bộ:", copyErr);
-          // Tệp tạm trong DocumentPicker cache đã bị hệ điều hành xóa
-          targetPath = "";
-        }
+      let format = resolveFileFormat({ name, url, mimeType: /^data:([^;,]+)/.exec(url)?.[1] || att.type });
+      let localUri: string;
+      if (/^https?:/i.test(url) || url.startsWith("/")) {
+        showToast("Đang tải tệp xuống...");
+        const downloaded = await downloadRemoteFile(resolveFileUrl(url), name, att.type);
+        localUri = downloaded.uri;
+        format = downloaded;
       } else {
-        console.warn("Định dạng URL không hợp lệ:", resolvedUrl);
-        targetPath = "";
+        const directory = FileSystem.cacheDirectory;
+        if (!directory) throw new Error("Bộ nhớ tạm chưa sẵn sàng.");
+        localUri = directory + Date.now() + "-" + format.name;
+        if (url.startsWith("data:")) {
+          if (!/^data:[^,]*;base64,/i.test(url)) throw new Error("Dữ liệu tệp không phải Base64.");
+          await FileSystem.writeAsStringAsync(localUri, url.slice(url.indexOf(",") + 1), { encoding: "base64" });
+        } else if (/^(file|content):/.test(url)) {
+          await FileSystem.copyAsync({ from: url, to: localUri });
+        } else throw new Error("Liên kết tải tệp không hợp lệ.");
       }
-
-      // Đảm bảo targetPath có file:// scheme chuẩn cho Sharing
-      if (targetPath && !targetPath.startsWith("file://")) {
-        targetPath = `file://${targetPath}`;
+      if (format.mimeType.startsWith("image/") || format.mimeType.startsWith("video/")) {
+        const saved = await saveDownloadedMedia(localUri, format.mimeType.startsWith("video/") ? "video" : "image").catch(() => "unavailable");
+        if (saved === "saved") { showToast("Đã lưu vào thư viện"); return; }
       }
-
-      // Kiểm tra file có thực sự tồn tại
-      let fileExists = false;
-      if (targetPath) {
-        try {
-          const fileInfo = await FileSystem.getInfoAsync(targetPath);
-          fileExists = Boolean(fileInfo.exists);
-        } catch {}
-      }
-
-      // Nếu không có file cục bộ (ví dụ: tệp tạm cũ đã bị xóa khỏi cache):
-      if (!fileExists) {
-        if (resolvedUrl.startsWith("http://") || resolvedUrl.startsWith("https://")) {
-          // Vẫn còn link trên server/Cloudinary: mở ngay bằng trình duyệt để tải
-          try {
-            await Linking.openURL(resolvedUrl);
-            return;
-          } catch {}
-        }
-        showCustomAlert(
-          "Tệp không khả dụng",
-          "Tệp tin này được gửi từ phiên bản cũ và lưu tạm trong máy nên đã bị hệ điều hành xóa bộ nhớ đệm. Vui lòng gửi lại tệp mới để lưu trữ vĩnh viễn trên đám mây."
-        );
-        return;
-      }
-
-      if (isMedia) {
-        // Tải và lưu trực tiếp ảnh / video / âm thanh vào bộ sưu tập máy (chuẩn như Zalo)
-        try {
-          let perm = await MediaLibrary.getPermissionsAsync(true);
-          if (!perm.granted && perm.status !== "granted") {
-            perm = await MediaLibrary.requestPermissionsAsync(true);
-          }
-
-          if (perm.granted || perm.status === "granted") {
-            await MediaLibrary.saveToLibraryAsync(targetPath);
-            const isVideo = mimeType.startsWith("video/") || fileName.endsWith(".mp4") || fileName.endsWith(".mov");
-            const isAudio = mimeType.startsWith("audio/") || fileName.endsWith(".m4a") || fileName.endsWith(".mp3");
-            const label = isVideo ? "video" : isAudio ? "bản ghi âm" : "ảnh";
-            showToast(`Đã lưu ${label} vào máy`);
-            return;
-          } else {
-            showCustomAlert(
-              "Quyền truy cập",
-              "Vui lòng cấp quyền truy cập để ứng dụng lưu ảnh/video vào thiết bị của bạn."
-            );
-            return;
-          }
-        } catch (mediaErr: any) {
-          console.warn("Lỗi lưu MediaLibrary:", mediaErr);
-          // Fallback nếu không lưu được qua MediaLibrary và có URL trực tuyến: tải về bằng trình duyệt vào thư mục Download của máy
-          if (resolvedUrl.startsWith("http://") || resolvedUrl.startsWith("https://")) {
-            try {
-              await Linking.openURL(resolvedUrl);
-              showToast("Đang tải về qua trình duyệt...");
-              return;
-            } catch {}
-          }
-          showCustomAlert("Lỗi tải tệp", "Không thể lưu tệp vào máy. Vui lòng thử lại sau.");
-          return;
-        }
-      } else {
-        // Tài liệu (Word, Excel, PDF,...) - Popup bo góc hiện đại không dùng emoji
-        showCustomAlert(
-          fileName,
-          "Bạn muốn tải tệp về thư mục Tải về (Download) của máy hay mở qua ứng dụng?",
-          [
-            {
-              text: "Tải về máy (Download)",
-              style: "default",
-              onPress: async () => {
-                showToast("Đang bắt đầu tải tệp về máy...");
-                if (resolvedUrl.startsWith("http://") || resolvedUrl.startsWith("https://")) {
-                  try {
-                    await Linking.openURL(resolvedUrl);
-                  } catch {
-                    const canShare = await Sharing.isAvailableAsync();
-                    if (canShare) await Sharing.shareAsync(targetPath, { mimeType, dialogTitle: `Lưu ${fileName}` });
-                  }
-                } else {
-                  const canShare = await Sharing.isAvailableAsync();
-                  if (canShare) await Sharing.shareAsync(targetPath, { mimeType, dialogTitle: `Lưu ${fileName}` });
-                }
-              },
-            },
-            {
-              text: "Mở / Chia sẻ",
-              style: "secondary",
-              onPress: async () => {
-                try {
-                  const canShare = await Sharing.isAvailableAsync();
-                  if (canShare) {
-                    await Sharing.shareAsync(targetPath, { mimeType, dialogTitle: `Mở ${fileName}` });
-                    return;
-                  }
-                } catch (shareErr) {
-                  console.warn("Lỗi shareAsync doc:", shareErr);
-                }
-                if (resolvedUrl.startsWith("http://") || resolvedUrl.startsWith("https://")) {
-                  await Linking.openURL(resolvedUrl);
-                }
-              },
-            },
-            {
-              text: "Đóng",
-              style: "cancel",
-            },
-          ]
-        );
-      }
+      if (!(await Sharing.isAvailableAsync())) throw new Error("Thiết bị chưa hỗ trợ lưu hoặc chia sẻ tệp.");
+      await Sharing.shareAsync(localUri, { mimeType: format.mimeType, dialogTitle: "Lưu " + format.name });
     } catch (err: any) {
-      console.warn("Lỗi tải tệp:", err);
-      showCustomAlert("Lỗi", "Không thể tải tệp tin này.");
+      showCustomAlert("Lỗi tải tệp", err?.message || "Không thể tải tệp. Vui lòng thử lại.");
     }
   };
-
   // 6c. Tải toàn bộ tệp từ tin nhắn đang chọn
   const handleDownloadMessageFiles = async (msg: ChatMessage) => {
     setMessageActionModalVisible(false);

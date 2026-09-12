@@ -34,11 +34,37 @@ import {
   type TaskDraft,
 } from "./model";
 import { DateTimePickerModal } from "./DateTimePickerModal";
+import {
+  X,
+  AlertCircle,
+  Folder,
+  Check,
+  Trash2,
+  Paperclip,
+  Image as ImageIcon,
+  Link as LinkIcon,
+  Video as VideoIcon,
+  Music as MusicIcon,
+  FileText,
+  Calendar,
+  Zap,
+  RotateCw,
+  Search,
+  Ban,
+} from "lucide-react-native";
+
+function AttachmentTypeIcon({ type }: { type?: string }) {
+  if (type === "link") return <LinkIcon size={16} color="#2563eb" />;
+  if (type === "image") return <ImageIcon size={16} color="#059669" />;
+  if (type === "video") return <VideoIcon size={16} color="#d97706" />;
+  if (type === "audio") return <MusicIcon size={16} color="#8b5cf6" />;
+  return <FileText size={16} color="#64748b" />;
+}
 
 const PRIORITY_CONFIG: Record<string, { label: string; color: string; bg: string; border: string }> = {
-  High: { label: "Cao 🔴", color: "#b91c1c", bg: "#fef2f2", border: "#fca5a5" },
-  Medium: { label: "Trung bình 🟡", color: "#b45309", bg: "#fffbeb", border: "#fde68a" },
-  Low: { label: "Thấp ⚪", color: "#475569", bg: "#f8fafc", border: "#e2e8f0" },
+  High: { label: "Cao", color: "#b91c1c", bg: "#fef2f2", border: "#fca5a5" },
+  Medium: { label: "Trung bình", color: "#b45309", bg: "#fffbeb", border: "#fde68a" },
+  Low: { label: "Thấp", color: "#475569", bg: "#f8fafc", border: "#e2e8f0" },
 };
 
 const STATUS_CONFIG: Record<string, { label: string; color: string; bg: string; border: string }> = {
@@ -291,7 +317,7 @@ export function TaskForm({
           const fresh = list.find((t) => t.id === task.id);
           if (fresh && fresh.revision !== undefined) {
             task.revision = fresh.revision;
-            setError(`${msg}\n\n💡 Hệ thống đã tự động lấy phiên bản mới nhất từ máy chủ. Bạn có thể nhấn "Lưu công việc" để hoàn tất.`);
+            setError(`${msg}\n\nHệ thống đã tự động lấy phiên bản mới nhất từ máy chủ. Bạn có thể nhấn "Lưu công việc" để hoàn tất.`);
             return;
           }
         } catch {}
@@ -428,7 +454,7 @@ export function TaskForm({
           style={({ pressed }) => [styles.closeBtn, pressed && { opacity: 0.7 }]}
           hitSlop={12}
         >
-          <Text style={styles.closeBtnText}>✕</Text>
+          <X size={18} color="#64748b" />
         </Pressable>
         <Text style={styles.titleText}>{task ? "Cập nhật công việc" : "Giao việc mới"}</Text>
         <Pressable
@@ -457,9 +483,9 @@ export function TaskForm({
       >
         {/* Error Banner */}
         {!!error && (
-          <View style={styles.errorCard}>
-            <Text style={styles.errorIcon}>⚠️</Text>
-            <Text style={styles.errorText}>{error}</Text>
+          <View style={[styles.errorCard, { flexDirection: "row", alignItems: "center", gap: 8 }]}>
+            <AlertCircle size={16} color="#b91c1c" />
+            <Text style={[styles.errorText, { flex: 1 }]}>{error}</Text>
           </View>
         )}
 
@@ -543,7 +569,10 @@ export function TaskForm({
                 <Text style={styles.selectorChevron}>▾</Text>
               </Pressable>
               {!!peopleError && (
-                <Text style={styles.fieldErrorText}>⚠️ {peopleError}</Text>
+                <View style={{ flexDirection: "row", alignItems: "center", gap: 4, marginTop: 4 }}>
+                  <AlertCircle size={12} color="#dc2626" />
+                  <Text style={styles.fieldErrorText}>{peopleError}</Text>
+                </View>
               )}
             </View>
 
@@ -557,7 +586,7 @@ export function TaskForm({
               >
                 {draft.projectId && selectedProject ? (
                   <View style={styles.selectedProjectRow}>
-                    <Text style={styles.projectIcon}>📁</Text>
+                    <Folder size={15} color="#2563eb" style={{ marginRight: 6 }} />
                     <Text style={styles.selectedProjectName} numberOfLines={1}>
                       {selectedProject.name}
                     </Text>
@@ -706,7 +735,7 @@ export function TaskForm({
                     hitSlop={8}
                     style={styles.tagRemoveBtn}
                   >
-                    <Text style={styles.tagRemoveText}>✕</Text>
+                    <X size={11} color="#64748b" />
                   </Pressable>
                 </View>
               ))}
@@ -753,7 +782,7 @@ export function TaskForm({
                     onPress={() => handleToggleSubtask(st.id)}
                     style={[styles.subtaskCheckbox, st.completed && styles.subtaskCheckboxChecked]}
                   >
-                    {st.completed && <Text style={styles.subtaskCheckmark}>✓</Text>}
+                    {st.completed && <Check size={11} color="#ffffff" strokeWidth={3} />}
                   </Pressable>
                   <Text
                     style={[styles.subtaskTitle, st.completed && styles.subtaskTitleDone]}
@@ -766,7 +795,7 @@ export function TaskForm({
                     hitSlop={8}
                     style={styles.subtaskDeleteBtn}
                   >
-                    <Text style={styles.subtaskDeleteText}>🗑</Text>
+                    <Trash2 size={13} color="#dc2626" />
                   </Pressable>
                 </View>
               ))}
@@ -787,29 +816,29 @@ export function TaskForm({
           {/* Buttons to add attachment */}
           <View style={styles.attachmentBtnRow}>
             <Pressable
-              style={styles.attachActionBtn}
+              style={[styles.attachActionBtn, { flexDirection: "row", alignItems: "center", gap: 4 }]}
               onPress={() => void handlePickFile()}
               disabled={disabled}
             >
-              <Text style={styles.attachActionIcon}>📎</Text>
+              <Paperclip size={13} color="#334155" />
               <Text style={styles.attachActionText}>Chọn tệp</Text>
             </Pressable>
 
             <Pressable
-              style={styles.attachActionBtn}
+              style={[styles.attachActionBtn, { flexDirection: "row", alignItems: "center", gap: 4 }]}
               onPress={() => void handlePickImage()}
               disabled={disabled}
             >
-              <Text style={styles.attachActionIcon}>🖼</Text>
+              <ImageIcon size={13} color="#334155" />
               <Text style={styles.attachActionText}>Chọn ảnh</Text>
             </Pressable>
 
             <Pressable
-              style={styles.attachActionBtn}
+              style={[styles.attachActionBtn, { flexDirection: "row", alignItems: "center", gap: 4 }]}
               onPress={() => setLinkModal(true)}
               disabled={disabled}
             >
-              <Text style={styles.attachActionIcon}>🔗</Text>
+              <LinkIcon size={13} color="#334155" />
               <Text style={styles.attachActionText}>Thêm link</Text>
             </Pressable>
           </View>
@@ -818,19 +847,9 @@ export function TaskForm({
           {draft.attachments.length > 0 ? (
             <View style={styles.attachmentList}>
               {draft.attachments.map((att) => {
-                const icon =
-                  att.type === "link"
-                    ? "🔗"
-                    : att.type === "image"
-                    ? "🖼"
-                    : att.type === "video"
-                    ? "🎬"
-                    : att.type === "audio"
-                    ? "🎵"
-                    : "📄";
                 return (
                   <View key={att.id} style={styles.attachmentItem}>
-                    <Text style={styles.attachmentItemIcon}>{icon}</Text>
+                    <AttachmentTypeIcon type={att.type} />
                     <View style={styles.attachmentItemInfo}>
                       <Text style={styles.attachmentItemName} numberOfLines={1}>
                         {att.name}
@@ -862,7 +881,7 @@ export function TaskForm({
                       hitSlop={8}
                       style={styles.removeAttachBtn}
                     >
-                      <Text style={styles.removeAttachText}>✕</Text>
+                      <X size={13} color="#94a3b8" />
                     </Pressable>
                   </View>
                 );
@@ -919,7 +938,7 @@ export function TaskForm({
               disabled={disabled}
               style={styles.datePickerTrigger}
             >
-              <Text style={styles.datePickerIcon}>📅</Text>
+              <Calendar size={14} color="#64748b" style={{ marginRight: 6 }} />
               <Text
                 style={[
                   styles.datePickerValue,
@@ -935,7 +954,7 @@ export function TaskForm({
                   hitSlop={8}
                   style={styles.dateClearBtn}
                 >
-                  <Text style={styles.dateClearText}>✕</Text>
+                  <X size={12} color="#94a3b8" />
                 </Pressable>
               )}
             </Pressable>
@@ -950,7 +969,7 @@ export function TaskForm({
                 disabled={disabled}
                 style={styles.datePickerTrigger}
               >
-                <Text style={styles.datePickerIcon}>📅</Text>
+                <Calendar size={14} color="#64748b" style={{ marginRight: 6 }} />
                 <Text
                   style={[
                     styles.datePickerValue,
@@ -966,7 +985,7 @@ export function TaskForm({
                     hitSlop={8}
                     style={styles.dateClearBtn}
                   >
-                    <Text style={styles.dateClearText}>✕</Text>
+                    <X size={12} color="#94a3b8" />
                   </Pressable>
                 )}
               </Pressable>
@@ -978,7 +997,7 @@ export function TaskForm({
                 disabled={disabled}
                 style={styles.datePickerTrigger}
               >
-                <Text style={styles.datePickerIcon}>📅</Text>
+                <Calendar size={14} color="#64748b" style={{ marginRight: 6 }} />
                 <Text
                   style={[
                     styles.datePickerValue,
@@ -994,7 +1013,7 @@ export function TaskForm({
                     hitSlop={8}
                     style={styles.dateClearBtn}
                   >
-                    <Text style={styles.dateClearText}>✕</Text>
+                    <X size={12} color="#94a3b8" />
                   </Pressable>
                 )}
               </Pressable>
@@ -1003,14 +1022,15 @@ export function TaskForm({
 
           {/* Auto calculate hours indicator and manual recalculate */}
           <View style={styles.calcRow}>
-            <View style={styles.autoCalculatedBadge}>
+            <View style={[styles.autoCalculatedBadge, { flexDirection: "row", alignItems: "center", gap: 4 }]}>
+              <Zap size={12} color="#1d4ed8" />
               <Text style={styles.autoCalculatedBadgeText}>
-                ⚡ Tự động tính: Dự tính {draft.estTime || "0"}h · Thực tế {draft.actualTime || "0"}h
+                Tự động tính: Dự tính {draft.estTime || "0"}h · Thực tế {draft.actualTime || "0"}h
               </Text>
             </View>
             <Pressable
               disabled={disabled}
-              style={styles.recalcBtn}
+              style={[styles.recalcBtn, { flexDirection: "row", alignItems: "center", gap: 4 }]}
               onPress={() => {
                 const effectiveStart =
                   draft.startTime ||
@@ -1025,7 +1045,10 @@ export function TaskForm({
                 }));
               }}
             >
-              <Text style={styles.recalcBtnText}>🔄 Tính lại</Text>
+              <>
+                <RotateCw size={11} color="#1d4ed8" />
+                <Text style={styles.recalcBtnText}>Tính lại</Text>
+              </>
             </Pressable>
           </View>
 
@@ -1143,12 +1166,12 @@ export function TaskForm({
                 onPress={() => setAssigneeModal(false)}
                 style={styles.modalCloseBtn}
               >
-                <Text style={styles.modalCloseText}>✕</Text>
+                <X size={16} color="#64748b" />
               </Pressable>
             </View>
 
             <View style={styles.modalSearchBox}>
-              <Text style={styles.searchIcon}>🔍</Text>
+              <Search size={15} color="#94a3b8" style={{ marginRight: 6 }} />
               <TextInput
                 style={styles.modalSearchInput}
                 placeholder="Tìm nhân sự theo tên, email..."
@@ -1159,7 +1182,7 @@ export function TaskForm({
               />
               {assigneeSearch.length > 0 && (
                 <Pressable onPress={() => setAssigneeSearch("")}>
-                  <Text style={styles.clearSearchText}>✕</Text>
+                  <X size={14} color="#94a3b8" />
                 </Pressable>
               )}
             </View>
@@ -1189,7 +1212,7 @@ export function TaskForm({
                       </Text>
                       <Text style={styles.personRowEmail}>{item.email}</Text>
                     </View>
-                    {selected && <Text style={styles.checkIcon}>✓</Text>}
+                    {selected && <Check size={16} color="#059669" strokeWidth={2.5} />}
                   </Pressable>
                 );
               }}
@@ -1220,7 +1243,7 @@ export function TaskForm({
                 onPress={() => setProjectModal(false)}
                 style={styles.modalCloseBtn}
               >
-                <Text style={styles.modalCloseText}>✕</Text>
+                <X size={16} color="#64748b" />
               </Pressable>
             </View>
 
@@ -1233,14 +1256,14 @@ export function TaskForm({
                   setProjectModal(false);
                 }}
               >
-                <Text style={styles.projectChoiceIcon}>🚫</Text>
+                <Ban size={18} color="#94a3b8" style={{ marginRight: 6 }} />
                 <View style={{ flex: 1 }}>
                   <Text style={[styles.projectChoiceName, !draft.projectId && styles.projectChoiceNameSelected]}>
                     Không thuộc dự án nào
                   </Text>
                   <Text style={styles.projectChoiceSub}>Công việc độc lập</Text>
                 </View>
-                {!draft.projectId && <Text style={styles.checkIcon}>✓</Text>}
+                {!draft.projectId && <Check size={16} color="#059669" strokeWidth={2.5} />}
               </Pressable>
 
               {/* Projects list */}
@@ -1255,7 +1278,7 @@ export function TaskForm({
                       setProjectModal(false);
                     }}
                   >
-                    <Text style={styles.projectChoiceIcon}>📁</Text>
+                    <Folder size={18} color="#2563eb" style={{ marginRight: 6 }} />
                     <View style={{ flex: 1 }}>
                       <Text style={[styles.projectChoiceName, selected && styles.projectChoiceNameSelected]}>
                         {p.name}
@@ -1264,7 +1287,7 @@ export function TaskForm({
                         {p.progress ? `${p.progress.percent}% hoàn thành` : "Dự án"}
                       </Text>
                     </View>
-                    {selected && <Text style={styles.checkIcon}>✓</Text>}
+                    {selected && <Check size={16} color="#059669" strokeWidth={2.5} />}
                   </Pressable>
                 );
               })}
@@ -1288,13 +1311,16 @@ export function TaskForm({
                 onPress={() => setLinkModal(false)}
                 style={styles.modalCloseBtn}
               >
-                <Text style={styles.modalCloseText}>✕</Text>
+                <X size={16} color="#64748b" />
               </Pressable>
             </View>
 
             <View style={{ padding: 16, gap: 12 }}>
               {!!linkError && (
-                <Text style={{ color: "#dc2626", fontSize: 13 }}>⚠️ {linkError}</Text>
+                <View style={{ flexDirection: "row", alignItems: "center", gap: 5 }}>
+                  <AlertCircle size={14} color="#dc2626" />
+                  <Text style={{ color: "#dc2626", fontSize: 13 }}>{linkError}</Text>
+                </View>
               )}
 
               <View style={styles.fieldGroup}>

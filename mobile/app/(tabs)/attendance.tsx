@@ -82,6 +82,15 @@ export default function Attendance() {
   const [action, setAction] = useState<"check-in" | "check-out" | null>(null);
   const [submittingAction, setSubmittingAction] = useState<"check-in" | "check-out" | null>(null);
   const [submittingStep, setSubmittingStep] = useState<string | null>(null);
+  const [resultModal, setResultModal] = useState<{
+    visible: boolean;
+    type: "success" | "error" | "warning";
+    title: string;
+    message: string;
+    actionType?: "check-in" | "check-out";
+    time?: string;
+    showSettings?: boolean;
+  } | null>(null);
   const actionLock = useRef(false);
   const { user, selectedBranch } = useSession();
   const params = useLocalSearchParams<{ from?: string }>();
@@ -104,14 +113,14 @@ export default function Attendance() {
         if (!requestRes.granted) {
           setSubmittingAction(null);
           setSubmittingStep(null);
-          Alert.alert(
-            "Cần quyền vị trí",
-            "LuxCare cần quyền truy cập vị trí thiết bị để xác thực bạn đang có mặt tại cơ sở/chi nhánh khi chấm công.",
-            [
-              { text: "Để sau", style: "cancel" },
-              { text: "Mở Cài đặt", onPress: () => void Linking.openSettings() },
-            ],
-          );
+          setResultModal({
+            visible: true,
+            type: "warning",
+            title: "Cần quyền vị trí",
+            message:
+              "LuxCare cần quyền truy cập vị trí thiết bị để xác thực bạn đang có mặt tại cơ sở/chi nhánh khi chấm công.",
+            showSettings: true,
+          });
           return;
         }
       }
@@ -121,10 +130,12 @@ export default function Attendance() {
       if (!servicesEnabled) {
         setSubmittingAction(null);
         setSubmittingStep(null);
-        Alert.alert(
-          "Dịch vụ định vị đang tắt",
-          "Vui lòng bật dịch vụ định vị (GPS) trên điện thoại của bạn để thực hiện chấm công.",
-        );
+        setResultModal({
+          visible: true,
+          type: "warning",
+          title: "Dịch vụ định vị đang tắt",
+          message: "Vui lòng bật dịch vụ định vị (GPS) trên điện thoại của bạn để thực hiện chấm công.",
+        });
         return;
       }
 
@@ -151,22 +162,31 @@ export default function Attendance() {
         timeZone: "Asia/Ho_Chi_Minh",
       });
 
-      Alert.alert(
-        "Chấm công thành công",
-        type === "check-in"
-          ? `Đã ghi nhận Chấm công vào ca lúc ${timeNow}. Chúc bạn một ngày làm việc hiệu quả!`
-          : `Đã ghi nhận Chấm công ra ca lúc ${timeNow}. Hẹn gặp lại bạn vào ngày tiếp theo!`,
-      );
+      setResultModal({
+        visible: true,
+        type: "success",
+        title: type === "check-in" ? "Chấm công vào thành công!" : "Chấm công ra thành công!",
+        message:
+          type === "check-in"
+            ? `Đã ghi nhận Chấm công vào ca lúc ${timeNow}. Chúc bạn một ca làm việc tràn đầy năng lượng!`
+            : `Đã ghi nhận Chấm công ra ca lúc ${timeNow}. Hẹn gặp lại bạn vào ca làm việc tiếp theo!`,
+        actionType: type,
+        time: timeNow,
+      });
 
       // Auto reload today data & history
       await loadData(true);
       setRevision((v) => v + 1);
     } catch (err: any) {
       const msg = messageOf(err);
-      Alert.alert(
-        "Không thể chấm công",
-        msg || "Có lỗi xảy ra khi xác thực vị trí hoặc kết nối đến máy chủ. Vui lòng kiểm tra GPS và thử lại.",
-      );
+      setResultModal({
+        visible: true,
+        type: "error",
+        title: "Không thể chấm công",
+        message:
+          msg ||
+          "Có lỗi xảy ra khi xác thực vị trí hoặc kết nối đến máy chủ. Vui lòng kiểm tra GPS và thử lại.",
+      });
     } finally {
       setSubmittingAction(null);
       setSubmittingStep(null);
@@ -928,6 +948,96 @@ export default function Attendance() {
           </SafeAreaView>
         </Modal>
       )}
+
+      {/* Modal Thông báo Chấm công Bo tròn Cao cấp */}
+      <Modal
+        visible={resultModal?.visible ?? false}
+        transparent
+        animationType="fade"
+        onRequestClose={() => setResultModal(null)}
+      >
+        <View style={styles.resultModalOverlay}>
+          <View
+            style={[
+              styles.resultModalCard,
+              resultModal?.type === "success" && styles.resultModalCardSuccess,
+              resultModal?.type === "warning" && styles.resultModalCardWarning,
+              resultModal?.type === "error" && styles.resultModalCardError,
+            ]}
+          >
+            {/* Icon biểu tượng bo tròn */}
+            <View
+              style={[
+                styles.resultIconBox,
+                resultModal?.type === "success" && styles.resultIconBoxSuccess,
+                resultModal?.type === "warning" && styles.resultIconBoxWarning,
+                resultModal?.type === "error" && styles.resultIconBoxError,
+              ]}
+            >
+              <Ionicons
+                name={
+                  resultModal?.type === "success"
+                    ? "checkmark-circle"
+                    : resultModal?.type === "warning"
+                      ? "alert-circle"
+                      : "close-circle"
+                }
+                size={38}
+                color={
+                  resultModal?.type === "success"
+                    ? "#059669"
+                    : resultModal?.type === "warning"
+                      ? "#d97706"
+                      : "#dc2626"
+                }
+              />
+            </View>
+
+            {/* Badge giờ ghi nhận */}
+            {!!resultModal?.time && (
+              <View style={styles.resultTimeBadge}>
+                <Ionicons name="time" size={13} color="#059669" />
+                <Text style={styles.resultTimeText}>
+                  {resultModal.actionType === "check-in" ? "Vào ca lúc" : "Ra ca lúc"} {resultModal.time}
+                </Text>
+              </View>
+            )}
+
+            {/* Tiêu đề và Nội dung thông báo */}
+            <Text style={styles.resultTitle}>{resultModal?.title}</Text>
+            <Text style={styles.resultMessage}>{resultModal?.message}</Text>
+
+            {/* Hàng nút bấm bo tròn */}
+            <View style={styles.resultBtnRow}>
+              {resultModal?.showSettings && (
+                <Pressable
+                  style={({ pressed }) => [styles.resultSecondaryBtn, pressed && { opacity: 0.8 }]}
+                  onPress={() => {
+                    setResultModal(null);
+                    void Linking.openSettings();
+                  }}
+                >
+                  <Text style={styles.resultSecondaryBtnText}>Mở Cài đặt</Text>
+                </Pressable>
+              )}
+
+              <Pressable
+                style={({ pressed }) => [
+                  styles.resultPrimaryBtn,
+                  resultModal?.type === "warning" && styles.resultPrimaryBtnWarning,
+                  resultModal?.type === "error" && styles.resultPrimaryBtnError,
+                  pressed && { opacity: 0.85 },
+                ]}
+                onPress={() => setResultModal(null)}
+              >
+                <Text style={styles.resultPrimaryBtnText}>
+                  {resultModal?.type === "success" ? "Tuyệt vời" : "Đã hiểu"}
+                </Text>
+              </Pressable>
+            </View>
+          </View>
+        </View>
+      </Modal>
     </>
   );
 }
@@ -1106,21 +1216,25 @@ const styles = StyleSheet.create({
   workStatusBanner: {
     flexDirection: "row",
     alignItems: "center",
-    gap: 6,
-    paddingHorizontal: 12,
-    paddingVertical: 8,
-    borderRadius: 12,
+    gap: 8,
+    paddingHorizontal: 14,
+    paddingVertical: 10,
+    borderRadius: 16,
     width: "100%",
     justifyContent: "center",
+    borderWidth: 1,
   },
   statusBannerReady: {
     backgroundColor: "#fffbeb",
+    borderColor: "#fde68a",
   },
   statusBannerWorking: {
     backgroundColor: "#ecfdf5",
+    borderColor: "#a7f3d0",
   },
   statusBannerDone: {
     backgroundColor: "#eff6ff",
+    borderColor: "#bfdbfe",
   },
   workStatusText: {
     fontSize: 12,
@@ -1550,5 +1664,132 @@ const styles = StyleSheet.create({
   modalSafeArea: {
     flex: 1,
     backgroundColor: "#000000",
+  },
+
+  // Custom Rounded Attendance Result Modal
+  resultModalOverlay: {
+    flex: 1,
+    backgroundColor: "rgba(15, 23, 42, 0.6)",
+    justifyContent: "center",
+    alignItems: "center",
+    paddingHorizontal: 24,
+  },
+  resultModalCard: {
+    width: "100%",
+    maxWidth: 360,
+    backgroundColor: "#ffffff",
+    borderRadius: 24,
+    padding: 24,
+    alignItems: "center",
+    borderWidth: 1.5,
+    borderColor: "#e2e8f0",
+    shadowColor: "#0f172a",
+    shadowOffset: { width: 0, height: 10 },
+    shadowOpacity: 0.18,
+    shadowRadius: 20,
+    elevation: 10,
+    gap: 10,
+  },
+  resultModalCardSuccess: {
+    borderColor: "#a7f3d0",
+  },
+  resultModalCardWarning: {
+    borderColor: "#fde68a",
+  },
+  resultModalCardError: {
+    borderColor: "#fecdd3",
+  },
+  resultIconBox: {
+    width: 72,
+    height: 72,
+    borderRadius: 36,
+    alignItems: "center",
+    justifyContent: "center",
+    marginBottom: 4,
+  },
+  resultIconBoxSuccess: {
+    backgroundColor: "#ecfdf5",
+    borderWidth: 2,
+    borderColor: "#a7f3d0",
+  },
+  resultIconBoxWarning: {
+    backgroundColor: "#fffbeb",
+    borderWidth: 2,
+    borderColor: "#fde68a",
+  },
+  resultIconBoxError: {
+    backgroundColor: "#fef2f2",
+    borderWidth: 2,
+    borderColor: "#fecdd3",
+  },
+  resultTimeBadge: {
+    flexDirection: "row",
+    alignItems: "center",
+    gap: 5,
+    backgroundColor: "#f0fdf4",
+    borderWidth: 1,
+    borderColor: "#bbf7d0",
+    paddingHorizontal: 10,
+    paddingVertical: 4,
+    borderRadius: 12,
+  },
+  resultTimeText: {
+    fontSize: 12,
+    fontWeight: "700",
+    color: "#059669",
+  },
+  resultTitle: {
+    fontSize: 18,
+    fontWeight: "800",
+    color: "#0f172a",
+    textAlign: "center",
+    letterSpacing: -0.3,
+  },
+  resultMessage: {
+    fontSize: 13.5,
+    color: "#475569",
+    textAlign: "center",
+    lineHeight: 20,
+    paddingHorizontal: 6,
+  },
+  resultBtnRow: {
+    flexDirection: "row",
+    gap: 10,
+    width: "100%",
+    marginTop: 10,
+  },
+  resultPrimaryBtn: {
+    flex: 1,
+    height: 48,
+    borderRadius: 14,
+    backgroundColor: "#059669",
+    alignItems: "center",
+    justifyContent: "center",
+  },
+  resultPrimaryBtnWarning: {
+    backgroundColor: "#d97706",
+  },
+  resultPrimaryBtnError: {
+    backgroundColor: "#dc2626",
+  },
+  resultPrimaryBtnText: {
+    fontSize: 14,
+    fontWeight: "700",
+    color: "#ffffff",
+  },
+  resultSecondaryBtn: {
+    flex: 1,
+    height: 48,
+    borderRadius: 14,
+    backgroundColor: "#f1f5f9",
+    borderWidth: 1,
+    borderColor: "#cbd5e1",
+    alignItems: "center",
+    justifyContent: "center",
+  },
+  resultSecondaryBtnText: {
+    fontSize: 14,
+    fontWeight: "600",
+    color: "#334155",
   },
 });

@@ -79,7 +79,6 @@ export default function Home() {
   const [params, setParams] = useState<DashboardSummaryParams>({ filter: "day" });
   const [actions, setActions] = useState<DashboardActionItems | null>(null);
   const [searchQuery, setSearchQuery] = useState("");
-  const [showValues, setShowValues] = useState(true);
 
   // === Typewriter animation cho sub-text chào hỏi ===
   const TYPING_TEXT = "Chúc bạn một ngày làm việc thật hiệu quả!";
@@ -503,14 +502,6 @@ export default function Home() {
         <View style={uiStyles.floatingCardWrapper}>
           <View style={uiStyles.floatingCard}>
             <View style={uiStyles.floatingCardTop}>
-              <Pressable onPress={() => setShowValues(!showValues)} hitSlop={10} style={{ marginRight: 10 }}>
-                <Ionicons
-                  name={showValues ? "eye-outline" : "eye-off-outline"}
-                  size={20}
-                  color="#071629"
-                />
-              </Pressable>
-
               {/* Cột 1: Công hôm nay */}
               <View style={uiStyles.cardCol}>
                 <View style={uiStyles.colHeader}>
@@ -524,9 +515,7 @@ export default function Home() {
                   onPress={() => router.push("/(tabs)/attendance")}
                 >
                   <Text style={uiStyles.colValueBig}>
-                    {showValues
-                      ? `${data?.timekeeping?.checkedInToday || 0} người`
-                      : "••••••"}
+                    {data?.timekeeping?.checkedInToday || 0} người
                   </Text>
                   <Ionicons name="chevron-forward" size={13} color="#64748b" />
                 </Pressable>
@@ -550,9 +539,7 @@ export default function Home() {
                   onPress={() => router.push("/(tabs)/leave")}
                 >
                   <Text style={[uiStyles.colValueBig, { color: "#059669" }]}>
-                    {showValues
-                      ? `${actions?.pendingApprovals?.length || 0} đơn`
-                      : "••••••"}
+                    {actions?.pendingApprovals?.length || 0} đơn
                   </Text>
                   <Ionicons name="chevron-forward" size={13} color="#059669" />
                 </Pressable>
@@ -586,9 +573,7 @@ export default function Home() {
                       },
                     ]}
                   >
-                    {showValues
-                      ? `${actions?.overdueTasks?.length || 0} việc`
-                      : "••••••"}
+                    {actions?.overdueTasks?.length || 0} việc
                   </Text>
                   <Ionicons name="chevron-forward" size={13} color="#64748b" />
                 </Pressable>

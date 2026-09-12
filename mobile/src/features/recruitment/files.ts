@@ -1,3 +1,4 @@
+import { resolveFileFormat } from "../../files/fileFormat";
 import * as DocumentPicker from "expo-document-picker";
 import { File, Paths } from "expo-file-system";
 import * as Sharing from "expo-sharing";
@@ -66,10 +67,13 @@ export async function shareRecruitmentFile(id: string) {
     if (!response.ok) throw new Error("Không tải được tệp. Vui lòng tải lại để lấy liên kết mới.");
     const bytes = new Uint8Array(await response.arrayBuffer());
     recruitmentFileType(metadata.originalName, bytes.length);
-    const name = metadata.originalName.replace(/[^\p{L}\p{N}._-]/gu, "_").slice(-120);
+    const format = resolveFileFormat({ name: metadata.originalName, url: metadata.signedUrl, bytes,
+      contentType: response.headers.get("content-type") || "",
+      contentDisposition: response.headers.get("content-disposition") || "" });
+    const name = format.name;
     const file = new File(Paths.cache, `${randomUUID()}-${name}`);
     file.write(bytes);
-    await Sharing.shareAsync(file.uri, { dialogTitle: metadata.originalName });
+    await Sharing.shareAsync(file.uri, { dialogTitle: format.name, mimeType: format.mimeType });
   } finally {
     clearTimeout(timer);
   }

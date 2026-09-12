@@ -1,7 +1,8 @@
+import { useAppAlert } from "../../components/AppAlert";
 import React, { useRef, useState } from "react";
 import {
   ActivityIndicator,
-  Alert,
+  Linking,
   Pressable,
   ScrollView,
   StyleSheet,
@@ -16,7 +17,7 @@ import { REQUEST_KIND_OPTIONS } from "../../../../src/types/leave";
 import { leave } from "../../api/services";
 import { messageOf } from "../../auth/SessionProvider";
 import { ChoiceField } from "./ChoiceField";
-import { pickLeaveAttachment, shareLeaveFile } from "./files";
+import { pickLeaveAttachment, resolveFileUrl, shareLeaveFile, downloadLeaveFile } from "./files";
 
 const KIND_LABELS: Record<RequestKind, { label: string; color: string; bg: string }> = {
   leave: { label: "Nghỉ phép", color: "#059669", bg: "#ecfdf5" },
@@ -38,6 +39,7 @@ export function LeaveTemplates({
   onClose: () => void;
   setLocked: (value: boolean) => void;
 }) {
+  const { showAlert, alertView } = useAppAlert();
   const [name, setName] = useState("");
   const [kind, setKind] = useState<RequestKind>("leave");
   const [file, setFile] = useState<(LeaveAttachment & { uploadToken: string }) | null>(null);
@@ -61,6 +63,38 @@ export function LeaveTemplates({
       setLocked(false);
       lock.current = false;
     }
+  };
+
+  const handleDownload = (fileUrl: string, fileName: string) => {
+    void run(async () => {
+      const saved = await downloadLeaveFile(fileUrl, fileName);
+      if (saved) showAlert("Đã lưu tệp", saved.name + " đã được lưu vào thư mục bạn chọn.", undefined, "success");
+    });
+  };
+
+  const handleShare = (fileUrl: string, fileName: string) => {
+    void run(async () => {
+      try {
+        await shareLeaveFile(fileUrl, fileName);
+      } catch (err) {
+        const resolved = resolveFileUrl(fileUrl);
+        showAlert(
+          "Không thể chia sẻ trực tiếp",
+          `${messageOf(err)}\n\nBạn có muốn mở tệp bằng trình duyệt để tải xuống không?`,
+          [
+            { text: "Đóng", style: "cancel" },
+            {
+              text: "Mở trình duyệt",
+              onPress: () => {
+                void Linking.openURL(resolved).catch(() => {
+                  showAlert("Lỗi", "Không thể mở liên kết trên trình duyệt.", undefined, "error");
+                });
+              },
+            },
+          ]
+        );
+      }
+    });
   };
 
   return (
@@ -252,11 +286,20 @@ export function LeaveTemplates({
                   <View style={s.tplActionsRow}>
                     <Pressable
                       style={({ pressed }) => [s.downloadBtn, pressed && { opacity: 0.7 }]}
-                      onPress={() => void run(() => shareLeaveFile(item.fileUrl, item.fileName))}
+                      onPress={() => handleDownload(item.fileUrl, item.fileName)}
                       disabled={busy}
                     >
-                      <Ionicons name="download-outline" size={15} color="#0284c7" />
-                      <Text style={s.downloadBtnText}>Tải về / Chia sẻ</Text>
+                      <Ionicons name="download-outline" size={14} color="#0284c7" />
+                      <Text style={s.downloadBtnText}>Tải về</Text>
+                    </Pressable>
+
+                    <Pressable
+                      style={({ pressed }) => [s.shareBtn, pressed && { opacity: 0.7 }]}
+                      onPress={() => handleShare(item.fileUrl, item.fileName)}
+                      disabled={busy}
+                    >
+                      <Ionicons name="share-social-outline" size={14} color="#059669" />
+                      <Text style={s.shareBtnText}>Chia sẻ</Text>
                     </Pressable>
 
                     {canManage && (
@@ -264,7 +307,7 @@ export function LeaveTemplates({
                         style={({ pressed }) => [s.deleteBtn, pressed && { opacity: 0.7 }]}
                         disabled={busy}
                         onPress={() =>
-                          Alert.alert("Xóa biểu mẫu?", item.name, [
+                          showAlert("Xóa biểu mẫu?", item.name, [
                             { text: "Hủy", style: "cancel" },
                             {
                               text: "Xóa",
@@ -298,6 +341,7 @@ export function LeaveTemplates({
           <Text style={s.closeFooterText}>Đóng</Text>
         </Pressable>
       </SafeAreaView>
+      {alertView}
     </View>
   );
 }
@@ -544,6 +588,7 @@ const s = StyleSheet.create({
     flexDirection: "row",
     alignItems: "center",
     justifyContent: "flex-end",
+    flexWrap: "wrap",
     gap: 8,
     borderTopWidth: 1,
     borderTopColor: "#f1f5f9",
@@ -564,6 +609,22 @@ const s = StyleSheet.create({
     fontSize: 12,
     fontWeight: "600",
     color: "#0284c7",
+  },
+  shareBtn: {
+    flexDirection: "row",
+    alignItems: "center",
+    gap: 5,
+    backgroundColor: "#ecfdf5",
+    borderWidth: 1,
+    borderColor: "#a7f3d0",
+    paddingHorizontal: 10,
+    paddingVertical: 6,
+    borderRadius: 8,
+  },
+  shareBtnText: {
+    fontSize: 12,
+    fontWeight: "600",
+    color: "#059669",
   },
   deleteBtn: {
     flexDirection: "row",

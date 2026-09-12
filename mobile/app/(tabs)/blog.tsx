@@ -1,3 +1,6 @@
+import { downloadRemoteFile } from "../../src/files/downloadRemoteFile";
+import { resolveFileFormat } from "../../src/files/fileFormat";
+import { resolveFileUrl, shareApiFile } from "../../src/files/shareFile";
 import React, { useState, useEffect, useRef, useMemo, useCallback } from "react";
 import {
   StyleSheet,
@@ -544,26 +547,17 @@ export default function BlogScreen() {
     isSharingRef.current = true;
     try {
       let shareUri = url;
-      // If remote, download to cache directory so Sharing.shareAsync can open the system file share sheet
-      if (url.startsWith("http://") || url.startsWith("https://")) {
-        try {
-          const ext = url.split("?")[0].split(".").pop() || "dat";
-          const safeName = fileName
-            ? fileName.replace(/[^a-zA-Z0-9._-]/g, "_")
-            : `shared_${Date.now()}.${ext}`;
-          const localPath = `${FileSystem.cacheDirectory}${safeName}`;
-          const res = await FileSystem.downloadAsync(url, localPath);
-          if (res && res.status === 200) {
-            shareUri = res.uri;
-          }
-        } catch (dlErr) {
-          console.warn("Download cache failed, falling back to URL share:", dlErr);
-        }
+      let format = resolveFileFormat({ url, name: fileName });
+      if (Platform.OS !== "web" && (/^https?:/i.test(url) || url.startsWith("/"))) {
+        const downloaded = await downloadRemoteFile(resolveFileUrl(url), fileName);
+        shareUri = downloaded.uri;
+        format = downloaded;
       }
 
       const canShare = await Sharing.isAvailableAsync();
       if (canShare && shareUri.startsWith("file://")) {
         await Sharing.shareAsync(shareUri, {
+          mimeType: format.mimeType,
           dialogTitle: fileName ? `Chia sẻ ${fileName}` : "Chia sẻ tệp",
         });
       } else {
@@ -586,32 +580,6 @@ export default function BlogScreen() {
 
   const isDownloadingRef = useRef(false);
 
-  const getMimeType = (ext: string): string => {
-    const map: Record<string, string> = {
-      jpg: "image/jpeg",
-      jpeg: "image/jpeg",
-      png: "image/png",
-      gif: "image/gif",
-      webp: "image/webp",
-      bmp: "image/bmp",
-      mp4: "video/mp4",
-      mov: "video/quicktime",
-      avi: "video/x-msvideo",
-      mkv: "video/x-matroska",
-      webm: "video/webm",
-      pdf: "application/pdf",
-      doc: "application/msword",
-      docx: "application/vnd.openxmlformats-officedocument.wordprocessingml.document",
-      xls: "application/vnd.ms-excel",
-      xlsx: "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet",
-      ppt: "application/vnd.ms-powerpoint",
-      pptx: "application/vnd.openxmlformats-officedocument.presentationml.presentation",
-      zip: "application/zip",
-      txt: "text/plain",
-    };
-    return map[ext.toLowerCase()] || "application/octet-stream";
-  };
-
   const handleDownloadFile = async (
     url: string,
     fileName?: string,
@@ -620,28 +588,22 @@ export default function BlogScreen() {
     if (!url || isDownloadingRef.current) return;
     isDownloadingRef.current = true;
     try {
-      const ext = (url.split("?")[0].split(".").pop() || "dat").toLowerCase();
-      const safeName = fileName
-        ? fileName.replace(/[^a-zA-Z0-9._-]/g, "_")
-        : `luxcare_${Date.now()}.${ext}`;
+      let format = resolveFileFormat({ url, name: fileName,
+        mimeType: /^data:([^;,]+)/.exec(url)?.[1] });
+      let safeName = format.name;
 
-      const isImg = fileType === "image" || ["jpg", "jpeg", "png", "gif", "webp", "bmp", "heic"].includes(ext);
-      const isVid = fileType === "video" || ["mp4", "mov", "avi", "mkv", "webm", "m4v", "3gp"].includes(ext);
-
+      if (Platform.OS === "web" && url.startsWith("data:")) {
+        const anchor = document.createElement("a");
+        anchor.href = url;
+        anchor.download = safeName;
+        document.body.appendChild(anchor);
+        anchor.click();
+        anchor.remove();
+        return;
+      }
       if (Platform.OS === "web") {
-        try {
-          const a = document.createElement("a");
-          a.href = url;
-          a.download = fileName || safeName;
-          document.body.appendChild(a);
-          a.click();
-          document.body.removeChild(a);
-          showAlert("Tải xuống thành công", `Đã bắt đầu tải "${fileName || safeName}".`);
-          return;
-        } catch {
-          await Linking.openURL(url);
-          return;
-        }
+        await shareApiFile(resolveFileUrl(url), fileName || safeName);
+        return;
       }
 
       const targetDir = FileSystem.documentDirectory || FileSystem.cacheDirectory;
@@ -650,19 +612,17 @@ export default function BlogScreen() {
 
       let localUri = url;
 
-      if (url.startsWith("http://") || url.startsWith("https://")) {
-        showAlert("Đang tải xuống...", `Đang tải "${fileName || safeName}" về thiết bị...`);
-        const res = await FileSystem.downloadAsync(url, destPath);
-        if (!res || res.status !== 200) {
-          showAlert("Tải xuống thất bại", "Không thể tải tệp. Vui lòng kiểm tra kết nối mạng.");
-          return;
-        }
-        localUri = res.uri;
+      if (/^https?:/i.test(url) || url.startsWith("/")) {
+        const downloaded = await downloadRemoteFile(resolveFileUrl(url), fileName);
+        localUri = downloaded.uri;
+        format = downloaded;
+        safeName = downloaded.name;
       } else if (url.startsWith("file://") || url.startsWith("content://")) {
         localUri = await prepareLocalBlogFile(url, destPath, FileSystem);
       } else if (url.startsWith("data:")) {
         try {
-          const base64Data = url.includes(",") ? url.split(",")[1] : url;
+          if (!/^data:[^,]*;base64,/i.test(url)) throw new Error("Dữ liệu tệp không phải Base64.");
+          const base64Data = url.slice(url.indexOf(",") + 1);
           await FileSystem.writeAsStringAsync(destPath, base64Data, {
             encoding: "base64",
           });
@@ -672,6 +632,8 @@ export default function BlogScreen() {
         }
       }
 
+      const isImg = format.mimeType.startsWith("image/");
+      const isVid = format.mimeType.startsWith("video/");
       if (isImg || isVid) {
         try {
           const result = await saveDownloadedMedia(localUri, isVid ? "video" : "image");
@@ -704,9 +666,9 @@ export default function BlogScreen() {
             const base64 = await FileSystem.readAsStringAsync(localUri, {
               encoding: "base64",
             });
-            const mime = getMimeType(ext);
-            const nameWithoutExt = (fileName || safeName).replace(/\.[^/.]+$/, "");
-            const createdFileUri = await saf.createFileAsync(perm.directoryUri, nameWithoutExt, mime);
+            const mime = format.mimeType;
+            const downloadName = safeName;
+            const createdFileUri = await saf.createFileAsync(perm.directoryUri, downloadName, mime);
             await FileSystem.writeAsStringAsync(createdFileUri, base64, {
               encoding: "base64",
             });
@@ -722,7 +684,7 @@ export default function BlogScreen() {
       }
 
       if (await Sharing.isAvailableAsync()) {
-        await Sharing.shareAsync(localUri, { mimeType: getMimeType(ext), dialogTitle: "Lưu tệp đã tải" });
+        await Sharing.shareAsync(localUri, { mimeType: format.mimeType, dialogTitle: "Lưu tệp đã tải" });
         return;
       }
       // The sandbox copy is not necessarily accessible in Photos/Downloads.

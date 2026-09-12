@@ -1,4 +1,4 @@
-import React, { useCallback, useRef, useState } from "react";
+import React, { useCallback, useMemo, useRef, useState } from "react";
 import {
   ActivityIndicator,
   Alert,
@@ -164,6 +164,8 @@ export default function Notifications() {
   const totalPages = data ? Math.ceil(data.total / data.limit) || 1 : 1;
   const unreadCount = data?.unreadCount || 0;
 
+  const [selectedCategory, setSelectedCategory] = useState<string>("");
+
   const filterTabs: Array<{
     id: string;
     label: string;
@@ -172,13 +174,14 @@ export default function Notifications() {
   }> = [
     { id: "all", label: "Tất cả", icon: "grid-outline" },
     { id: "unread", label: "Chưa đọc", icon: "mail-unread-outline", badge: unreadCount },
+    { id: "attendance", label: "Chấm công", icon: "time-outline" },
     { id: "task", label: "Công việc", icon: "briefcase-outline" },
     { id: "training", label: "Đào tạo", icon: "school-outline" },
     { id: "kho", label: "Kho & Thiết bị", icon: "cube-outline" },
     { id: "he-thong", label: "Hệ thống", icon: "settings-outline" },
   ];
 
-  const currentTab = unreadOnly ? "unread" : type || "all";
+  const currentTab = unreadOnly ? "unread" : selectedCategory || type || "all";
 
   const handleSelectTab = (tabId: string) => {
     if (busy) return;
@@ -186,28 +189,52 @@ export default function Notifications() {
     if (tabId === "all") {
       setUnreadOnly(false);
       setType("");
+      setSelectedCategory("");
     } else if (tabId === "unread") {
       setUnreadOnly(true);
       setType("");
+      setSelectedCategory("");
+    } else if (tabId === "attendance") {
+      setUnreadOnly(false);
+      setType("");
+      setSelectedCategory("attendance");
     } else {
       setUnreadOnly(false);
+      setSelectedCategory("");
       setType(tabId as NotifType);
     }
   };
+
+  const displayList = useMemo(() => {
+    if (!data?.data) return [];
+    if (selectedCategory === "attendance") {
+      return data.data.filter(
+        (item) => detectNotificationCategory(item.title, item.body, item.action).category === "attendance"
+      );
+    }
+    return data.data;
+  }, [data?.data, selectedCategory]);
 
   const renderItem = ({ item }: { item: WebNotification }) => {
     const categoryInfo = detectNotificationCategory(item.title, item.body, item.action);
     const destination = item.action ? notificationTarget(item, user) : null;
     const isUnread = !item.read;
+    const isAttendance = categoryInfo.category === "attendance";
 
     return (
       <Pressable
         style={({ pressed }) => [
           styles.card,
           isUnread ? styles.cardUnread : styles.cardRead,
+          isAttendance && styles.attendanceCard,
+          isAttendance && isUnread && styles.attendanceCardUnread,
           pressed && styles.cardPressed,
         ]}
-        onPress={() => void openNotification(item)}
+        disabled={busy}
+        onPress={() => {
+          if (isAttendance && !destination?.target) router.push("/(tabs)/attendance");
+          else void openNotification(item);
+        }}
       >
         <View style={styles.cardRow}>
           {/* Left: Category Icon */}
@@ -275,9 +302,9 @@ export default function Notifications() {
                 </Text>
               </View>
 
-              {destination?.target ? (
-                <View style={styles.destinationLink}>
-                  <Text style={styles.destinationLinkText}>{destination.target.label}</Text>
+              {(destination?.target || isAttendance) ? (
+                <View style={[styles.destinationLink, isAttendance && { backgroundColor: "#ecfeff" }]}>
+                  <Text style={[styles.destinationLinkText, isAttendance && { color: "#0891b2" }]}>{destination?.target?.label || "Mở Chấm công"}</Text>
                   <Ionicons name="chevron-forward" size={11} color="#059669" />
                 </View>
               ) : isUnread ? (
@@ -400,7 +427,7 @@ export default function Notifications() {
       <FlatList
         style={styles.list}
         contentContainerStyle={styles.listContent}
-        data={data?.data || []}
+        data={displayList}
         keyExtractor={(item) => item._id}
         refreshControl={
           <RefreshControl
@@ -654,6 +681,22 @@ const styles = StyleSheet.create({
     shadowOpacity: 0.06,
     shadowRadius: 5,
     elevation: 1.5,
+  },
+  attendanceCard: {
+    borderRadius: 18,
+    borderWidth: 1.5,
+    borderColor: "#a5f3fc",
+    borderLeftColor: "#0891b2",
+    backgroundColor: "#ffffff",
+    shadowColor: "#0891b2",
+    shadowOffset: { width: 0, height: 2 },
+    shadowOpacity: 0.08,
+    shadowRadius: 6,
+    elevation: 2,
+  },
+  attendanceCardUnread: {
+    backgroundColor: "#f0fdfa",
+    borderColor: "#22d3ee",
   },
   cardRead: {
     backgroundColor: "#ffffff",

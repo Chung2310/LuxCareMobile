@@ -65,7 +65,6 @@ export const UserCreateModal: React.FC<UserCreateModalProps> = ({
   const [branchId, setBranchId] = useState(defaultBranchId || "");
   const [department, setDepartment] = useState("");
   const [phone, setPhone] = useState("");
-  const [jobTitle, setJobTitle] = useState("");
   const [birthDate, setBirthDate] = useState("");
   const [monthlySalary, setMonthlySalary] = useState("");
   const [parentId, setParentId] = useState("");
@@ -129,7 +128,6 @@ export const UserCreateModal: React.FC<UserCreateModalProps> = ({
     setBranchId(defaultBranchId || "");
     setDepartment("");
     setPhone("");
-    setJobTitle("");
     setBirthDate("");
     setMonthlySalary("");
     setParentId("");
@@ -207,7 +205,6 @@ export const UserCreateModal: React.FC<UserCreateModalProps> = ({
         phone: trimmedPhone || undefined,
         branchId: branchId || undefined,
         department: department || undefined,
-        division: jobTitle.trim() || undefined,
         birthDate: trimmedBirthDate || undefined,
         monthlySalary: parsedSalary,
         parentId: parentId || undefined,
@@ -358,18 +355,6 @@ export const UserCreateModal: React.FC<UserCreateModalProps> = ({
                 />
               </View>
             )}
-
-            {/* Chức danh / Vị trí */}
-            <View style={styles.fieldGroup}>
-              <Text style={styles.fieldLabel}>Chức danh / Vị trí chuyên môn</Text>
-              <TextInput
-                style={styles.input}
-                placeholder="VD: Bác sĩ điều trị, Điều dưỡng trưởng..."
-                placeholderTextColor="#94a3b8"
-                value={jobTitle}
-                onChangeText={setJobTitle}
-              />
-            </View>
 
             {/* Quản lý trực tiếp */}
             <DropdownSelectField
