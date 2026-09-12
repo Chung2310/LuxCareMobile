@@ -188,7 +188,7 @@ export default function Recruitment() {
   );
 
   const mutate = async (job: RecruitmentJob, action: string) => {
-    if (lock.current || !access.manage) return;
+    if (lock.current || !access.manage || uncertain || loading || !scopeReady) return;
     lock.current = true;
     setBusy(true);
     setMutationError(null);
@@ -199,6 +199,7 @@ export default function Recruitment() {
       else if (action === "restore") await recruitment.restoreJob(job._id, job.version);
       else await recruitment.changeJobStatus(job._id, job.version, action as RecruitmentJob["status"]);
 
+      if (action === "delete" || action === "restore") setPage(1);
       showAlert(
         "Thành công",
         action === "delete"
@@ -225,10 +226,11 @@ export default function Recruitment() {
   };
 
   const confirm = (job: RecruitmentJob, action: string, title: string) => {
-    showAlert(title, `Mã: ${job.code} · ${job.title}`, [
+    if (lock.current || !access.manage || uncertain || loading || !scopeReady) return;
+    showAlert(title, `Mã: ${job.code} · ${job.title}${action === "delete" ? "\nTin sẽ được chuyển vào thùng rác. Bạn có thể khôi phục lại sau." : ""}`, [
       { text: "Hủy", style: "cancel" },
       {
-        text: "Xác nhận",
+        text: action === "delete" ? "Xóa tin" : "Xác nhận",
         style: action === "delete" ? "destructive" : "default",
         onPress: () => void mutate(job, action),
       },
@@ -712,6 +714,23 @@ export default function Recruitment() {
                     </Pressable>
                   )}
 
+                  {access.manage && !deleted && (
+                    <Pressable
+                      accessibilityRole="button"
+                      accessibilityLabel={`Xóa tin tuyển dụng ${job.title}`}
+                      style={({ pressed }) => [
+                        uiStyles.deleteActionBtn,
+                        (disabled || uncertain) && uiStyles.btnDisabled,
+                        pressed && { opacity: 0.8 },
+                      ]}
+                      disabled={disabled || uncertain}
+                      onPress={() => confirm(job, "delete", "Xóa tin tuyển dụng?")}
+                    >
+                      <Trash2 size={14} color="#b91c1c" />
+                      <Text style={uiStyles.deleteActionBtnText}>Xóa tin</Text>
+                    </Pressable>
+                  )}
+
                   <Pressable
                     style={({ pressed }) => [
                       uiStyles.expandBtn,
@@ -820,19 +839,6 @@ export default function Recruitment() {
                                 </Pressable>
                               ))}
                             </View>
-
-                            <Pressable
-                              style={({ pressed }) => [
-                                uiStyles.deleteActionBtn,
-                                disabled && uiStyles.btnDisabled,
-                                pressed && { opacity: 0.8 },
-                              ]}
-                              disabled={disabled || uncertain}
-                              onPress={() => confirm(job, "delete", "Chuyển tin vào thùng rác?")}
-                            >
-                              <Trash2 size={14} color="#b91c1c" />
-                              <Text style={uiStyles.deleteActionBtnText}>Xóa vào thùng rác</Text>
-                            </Pressable>
                           </>
                         )}
                       </View>
@@ -1308,6 +1314,7 @@ const uiStyles = StyleSheet.create({
   // Card Action Row
   cardActionRow: {
     flexDirection: "row",
+    flexWrap: "wrap",
     alignItems: "center",
     gap: 8,
     paddingTop: 4,
@@ -1433,6 +1440,7 @@ const uiStyles = StyleSheet.create({
     color: "#334155",
   },
   deleteActionBtn: {
+    paddingHorizontal: 10,
     backgroundColor: "#fee2e2",
     borderWidth: 1,
     borderColor: "#fca5a5",
@@ -1440,7 +1448,6 @@ const uiStyles = StyleSheet.create({
     borderRadius: 8,
     alignItems: "center",
     justifyContent: "center",
-    marginTop: 4,
     flexDirection: "row",
     gap: 6,
   },

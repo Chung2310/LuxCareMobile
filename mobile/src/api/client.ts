@@ -74,6 +74,22 @@ export class MobileApi {
       input.startsWith("/api/v1/media/download?") ||
       input === "/api/v1/supplies/upload-files";
     const timeout = setTimeout(cancel, isFileTransfer ? 120000 : 20000);
+    const isFormData =
+      typeof XMLHttpRequest !== "undefined" &&
+      init.body &&
+      typeof (init.body as any).append === "function";
+
+    if (this.network === fetch && isFormData) {
+      try {
+        const headers = new Headers(init.headers);
+        headers.set("x-luxcare-client", "native");
+        return await sendWithXhr(`${this.origin}${input}`, { ...init, headers }, controller.signal);
+      } finally {
+        clearTimeout(timeout);
+        init.signal?.removeEventListener("abort", cancel);
+      }
+    }
+
     try {
       const headers = new Headers(init.headers);
       headers.set("x-luxcare-client", "native");
@@ -83,6 +99,16 @@ export class MobileApi {
         credentials: "omit",
         signal: controller.signal,
       });
+    } catch (err: any) {
+      if (
+        isFormData &&
+        (/FormDataPart/i.test(err?.message || "") || err?.name === "TypeError" || !err?.status)
+      ) {
+        const headers = new Headers(init.headers);
+        headers.set("x-luxcare-client", "native");
+        return await sendWithXhr(`${this.origin}${input}`, { ...init, headers }, controller.signal);
+      }
+      throw err;
     } finally {
       clearTimeout(timeout);
       init.signal?.removeEventListener("abort", cancel);
@@ -244,4 +270,64 @@ export class MobileApi {
       await this.clear();
     }
   }
+}
+
+function sendWithXhr(url: string, init: RequestInit, signal?: AbortSignal): Promise<Response> {
+  return new Promise((resolve, reject) => {
+    const xhr = new XMLHttpRequest();
+    const method = init.method || "GET";
+    xhr.open(method, url);
+
+    if (init.headers) {
+      const headers = new Headers(init.headers);
+      if (init.body && typeof (init.body as any).append === "function") {
+        headers.delete("content-type");
+        headers.delete("Content-Type");
+      }
+      headers.forEach((value, key) => {
+        try {
+          xhr.setRequestHeader(key, value);
+        } catch {}
+      });
+    }
+
+    if (signal) {
+      if (signal.aborted) {
+        xhr.abort();
+        reject(new DOMException("Aborted", "AbortError"));
+        return;
+      }
+      signal.addEventListener("abort", () => {
+        xhr.abort();
+        reject(new DOMException("Aborted", "AbortError"));
+      });
+    }
+
+    xhr.onload = () => {
+      const headerString = xhr.getAllResponseHeaders() || "";
+      const responseHeaders = new Headers();
+      headerString
+        .trim()
+        .split(/[\r\n]+/)
+        .forEach((line) => {
+          const parts = line.split(": ");
+          const key = parts.shift();
+          const value = parts.join(": ");
+          if (key) responseHeaders.append(key, value);
+        });
+
+      const response = new Response(xhr.response || xhr.responseText, {
+        status: xhr.status,
+        statusText: xhr.statusText,
+        headers: responseHeaders,
+      });
+      resolve(response);
+    };
+
+    xhr.onerror = () => reject(new TypeError("Network request failed"));
+    xhr.ontimeout = () => reject(new TypeError("Network request timed out"));
+    xhr.onabort = () => reject(new DOMException("Aborted", "AbortError"));
+
+    xhr.send(init.body as any);
+  });
 }
