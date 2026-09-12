@@ -1,3 +1,4 @@
+import { evaluateQuiz, parsePassingScore, passingScoreOf } from "../../src/features/training/quiz";
 import { useAppAlert } from "../../src/components/AppAlert";
 import { type ReactNode, useCallback, useMemo, useState } from "react";
 import { useFocusEffect } from "expo-router";
@@ -275,14 +276,18 @@ export default function TrainingPage() {
     const quizzes = activeCourse.quizzes || [];
     const enrollment = enrollments.find((item) => item.courseId === activeCourse.id);
     if (!enrollment || !quizzes.length) return;
-    if (quizzes.some((_, index) => answers[index] === undefined)) {
+    const result = evaluateQuiz(quizzes, answers, activeCourse.passingScore);
+    if (!result.answered) {
       showAlert("Chưa hoàn tất", "Vui lòng trả lời tất cả các câu hỏi trước khi nộp bài.", undefined, "error");
       return;
     }
-    const errors = quizzes.map((quiz, index) => answers[index] !== quiz.correctOptionIndex);
-    setQuizSubmitted(true);
-    setQuizErrors(errors);
-    if (errors.some(Boolean)) return;
+    const errors = result.errors;
+    if (!result.passed) {
+      setQuizSubmitted(true);
+      setQuizErrors(errors);
+      showAlert("Chưa đạt điểm yêu cầu", `Bạn đạt ${result.score}% (${result.correctCount}/${quizzes.length} câu đúng). Yêu cầu tối thiểu ${result.passingScore}%. Vui lòng thử lại.`, undefined, "error");
+      return;
+    }
     const totalItems = (activeCourse.lessons || []).length + 1;
     const progress = Math.round(
       (((enrollment.completedLessons || []).length + 1) / Math.max(totalItems, 1)) * 100,
@@ -290,11 +295,14 @@ export default function TrainingPage() {
     try {
       await updateEnrollment(enrollment, {
         quizPassed: true,
+        quizScore: result.score,
         progress,
         status: progress >= 100 ? "completed" : "in_progress",
         ...(progress >= 100 ? { completedAt: new Date().toISOString() } : {}),
       });
-      showAlert("Đạt sát hạch", `Chúc mừng! Bạn đã hoàn thành phần kiểm tra của “${activeCourse.title}”.`, [
+      setQuizSubmitted(true);
+      setQuizErrors(errors);
+      showAlert("Đạt sát hạch", `Bạn đạt ${result.score}% (${result.correctCount}/${quizzes.length} câu đúng), đáp ứng yêu cầu ${result.passingScore}% của khóa học “${activeCourse.title}”.`, [
         { text: "Đóng", onPress: () => setActiveCourse(null) },
       ], "success");
     } catch (saveError) {
@@ -619,6 +627,10 @@ export default function TrainingPage() {
                   {course.description || "Khóa học chuyên môn nâng cao kỹ năng và tiêu chuẩn LuxCare."}
                 </Text>
 
+                {quizzesCount > 0 && (
+                  <Text style={uiStyles.metaItemText}>Điểm đạt trắc nghiệm: {passingScoreOf(course.passingScore)}%</Text>
+                )}
+
                 {/* 2x2 Metadata Grid */}
                 <View style={uiStyles.metaGrid}>
                   <View style={uiStyles.metaItem}>
@@ -808,6 +820,7 @@ function StudyModal({
   const quizzes = course?.quizzes || [];
   const lesson = step >= 0 && step < lessons.length ? lessons[step] : undefined;
   const isQuiz = !!course && step >= lessons.length && quizzes.length > 0;
+  const quizResult = evaluateQuiz(quizzes, answers, course?.passingScore);
 
   if (!course) return null;
 
@@ -855,6 +868,9 @@ function StudyModal({
                   ]}
                 />
               </View>
+              {typeof enrollment.quizScore === "number" && (
+                <Text style={studyStyles.progressCardLabel}>Điểm trắc nghiệm: {enrollment.quizScore}% · Yêu cầu {passingScoreOf(course.passingScore)}%</Text>
+              )}
             </View>
           )}
 
@@ -914,11 +930,16 @@ function StudyModal({
                 <View style={{ flex: 1 }}>
                   <Text style={studyStyles.quizHeaderTitle}>Đánh giá sát hạch cuối khóa</Text>
                   <Text style={studyStyles.quizHeaderSubtitle}>
-                    Trả lời đúng tất cả các câu hỏi để được cấp chứng nhận hoàn thành.
+                    Đạt tối thiểu {passingScoreOf(course.passingScore)}% điểm trắc nghiệm và hoàn thành các bài giảng để hoàn thành khóa học.
                   </Text>
                 </View>
               </View>
 
+              {quizSubmitted && (
+                <Text style={[studyStyles.quizHeaderSubtitle, { color: quizResult.passed ? "#059669" : "#dc2626" }]}>
+                  Kết quả: {quizResult.score}% ({quizResult.correctCount}/{quizzes.length} câu đúng) · {quizResult.passed ? "Đạt" : "Chưa đạt"} · Yêu cầu {quizResult.passingScore}%
+                </Text>
+              )}
               {quizzes.map((quiz, qIdx) => (
                 <View
                   key={`${qIdx}-${quiz.question}`}
@@ -958,7 +979,7 @@ function StudyModal({
                     <View style={studyStyles.quizErrorBanner}>
                       <AlertCircle size={14} color="#dc2626" />
                       <Text style={studyStyles.quizErrorBannerText}>
-                        Câu trả lời chưa chính xác, vui lòng chọn lại.
+                        Câu trả lời chưa chính xác.
                       </Text>
                     </View>
                   )}
@@ -1029,6 +1050,7 @@ function CourseForm({
   const [autoAssign, setAutoAssign] = useState(!!course?.autoAssignOnboarding);
   const [lessons, setLessons] = useState<Lesson[]>(course?.lessons || []);
   const [quizzes, setQuizzes] = useState<QuizQuestion[]>(course?.quizzes || []);
+  const [passingScore, setPassingScore] = useState(String(course ? passingScoreOf(course.passingScore) : 80));
   const [busy, setBusy] = useState(false);
   const [error, setError] = useState<string | null>(null);
 
@@ -1066,6 +1088,7 @@ function CourseForm({
         autoAssignOnboarding: autoAssign,
         lessons: cleanLessons,
         quizzes: cleanQuizzes,
+        passingScore: parsePassingScore(passingScore),
       };
 
       const savedCourse = course
@@ -1277,6 +1300,21 @@ function CourseForm({
         ))}
 
         {/* Quiz section */}
+        <View style={formStyles.fieldGroup}>
+          <Text style={formStyles.fieldLabel}>Điểm trắc nghiệm tối thiểu để đạt (%)</Text>
+          <TextInput
+            style={formStyles.input}
+            value={passingScore}
+            onChangeText={setPassingScore}
+            keyboardType="decimal-pad"
+            placeholder="100"
+            editable={!busy}
+            accessibilityLabel="Điểm trắc nghiệm tối thiểu (%)"
+          />
+          <Text style={formStyles.switchCardDesc}>
+            Yêu cầu đạt {parsePassingScore(passingScore)}% điểm trắc nghiệm (0–100%). Để trống sẽ dùng 100%.
+          </Text>
+        </View>
         <View style={formStyles.sectionHeaderRow}>
           <Text style={formStyles.sectionHeaderTitle}>Câu hỏi trắc nghiệm ({quizzes.length})</Text>
           <TouchableOpacity onPress={addQuiz} activeOpacity={0.7}>

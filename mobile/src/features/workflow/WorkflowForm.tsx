@@ -28,7 +28,7 @@ import {
   User,
   X,
 } from "lucide-react-native";
-import type { Workflow, WorkflowEdge, WorkflowStep, WorkflowSubTask } from "../../../../src/types/hr";
+import type { TaskAttachment, Workflow, WorkflowEdge, WorkflowStep, WorkflowSubTask } from "../../../../src/types/hr";
 import { workflow } from "../../api/services";
 import { messageOf } from "../../auth/SessionProvider";
 import { Card, ErrorText, Field, colors, styles } from "../../ui";
@@ -36,6 +36,8 @@ import { ChoiceField } from "../leave/ChoiceField";
 import { moveWorkflowStep, newWorkflowStep, pruneWorkflowEdges, workflowPayload } from "./model";
 import { SafeAreaView } from "react-native-safe-area-context";
 import { WorkflowButton as Button } from "./WorkflowButton";
+import { WorkflowSubtasksField } from "./WorkflowSubtasksField";
+import { AttachmentsForm } from "../work/AttachmentsForm";
 
 export function WorkflowForm({
   initialWorkflow,
@@ -417,21 +419,14 @@ function WorkflowStepEditor({
   const [subTasks, setSubTasks] = useState<WorkflowSubTask[]>(() =>
     (step.subTasks || []).map((task) => ({ ...task })),
   );
-  const [newSubTask, setNewSubTask] = useState("");
+  const [attachments, setAttachments] = useState<TaskAttachment[]>(() => (step.attachments || []).map(item => ({ ...item })));
+  const [editingAttachments, setEditingAttachments] = useState(false);
+  const attachmentLock = useRef(false);
+  const [stepError, setStepError] = useState<string | null>(null);
   const [outgoingEdges, setOutgoingEdges] = useState<WorkflowEdge[]>(() =>
     edges.map((edge) => ({ ...edge })),
   );
   const otherSteps = steps.filter((candidate) => candidate.id !== step.id);
-
-  const addSubTask = () => {
-    const value = newSubTask.trim();
-    if (!value) return;
-    setSubTasks((current) => [
-      ...current,
-      { id: `sub_${Date.now().toString(36)}`, title: value, done: false },
-    ]);
-    setNewSubTask("");
-  };
 
   const addBranch = () => {
     if (!otherSteps.length) return;
@@ -465,6 +460,11 @@ function WorkflowStepEditor({
 
   const save = () => {
     if (!title.trim()) return;
+    if (subTasks.some(task => !task.title.trim())) {
+      setStepError("Mỗi công việc con cần có tên.");
+      return;
+    }
+    setStepError(null);
     const parsedDays = Number(estDays);
     onSave(
       {
@@ -475,6 +475,7 @@ function WorkflowStepEditor({
         estDays: Number.isFinite(parsedDays) && parsedDays >= 0 ? parsedDays : undefined,
         deliverable: deliverable.trim(),
         note: note.trim(),
+        attachments,
         subTasks: subTasks
           .filter((task) => task.title.trim())
           .map((task) => ({ ...task, title: task.title.trim() })),
@@ -570,54 +571,22 @@ function WorkflowStepEditor({
           />
         </View>
 
-        {/* SubTasks Section */}
+        <WorkflowSubtasksField items={subTasks} onChange={setSubTasks} />
         <View style={formStyles.card}>
-          <Text style={formStyles.cardHeading}>Công việc con ({subTasks.length})</Text>
-          <Text style={formStyles.mutedText}>
-            Các đầu việc cụ thể cần tích chọn hoàn thành trong bước này.
-          </Text>
-
-          {subTasks.map((task) => (
-            <View key={task.id} style={formStyles.subTaskItemRow}>
-              <CheckCircle2 size={16} color="#059669" />
-              <Text style={formStyles.subTaskItemText} numberOfLines={2}>
-                {task.title}
-              </Text>
-              <TouchableOpacity
-                onPress={() => setSubTasks((curr) => curr.filter((t) => t.id !== task.id))}
-                style={formStyles.subTaskDeleteBtn}
-                activeOpacity={0.7}
-              >
-                <Trash2 size={14} color="#dc2626" />
-              </TouchableOpacity>
-            </View>
-          ))}
-
-          <View style={formStyles.addSubTaskRow}>
-            <View style={{ flex: 1 }}>
-              <Field
-                label=""
-                value={newSubTask}
-                onChangeText={setNewSubTask}
-                onSubmitEditing={addSubTask}
-                placeholder="Nhập việc con và bấm thêm..."
-                returnKeyType="done"
-              />
-            </View>
-            <TouchableOpacity
-              style={[
-                formStyles.addSubTaskBtn,
-                !newSubTask.trim() && { opacity: 0.5 },
-              ]}
-              disabled={!newSubTask.trim()}
-              onPress={addSubTask}
-              activeOpacity={0.8}
-            >
-              <Plus size={16} color="#ffffff" />
-              <Text style={formStyles.addSubTaskBtnText}>Thêm</Text>
-            </TouchableOpacity>
-          </View>
+          <Text style={formStyles.cardHeading}>Tệp, ảnh, video, ghi âm và liên kết</Text>
+          <Text style={formStyles.mutedText}>{attachments.length} tệp / liên kết đính kèm giai đoạn</Text>
+          {attachments.map(item => <Text key={item.id} style={styles.text}>{item.name}</Text>)}
+          <Button variant="secondary" title="Quản lý đính kèm" onPress={() => setEditingAttachments(true)} />
         </View>
+        <Modal visible={editingAttachments} animationType="slide" onRequestClose={() => { if (!attachmentLock.current) setEditingAttachments(false); }}>
+          <SafeAreaView style={{ flex: 1, backgroundColor: colors.background }}>
+            {editingAttachments && <AttachmentsForm initial={attachments}
+              save={async items => { setAttachments(items); }}
+              onClose={() => setEditingAttachments(false)}
+              setLocked={value => { attachmentLock.current = value; }}
+            />}
+          </SafeAreaView>
+        </Modal>
 
         {/* Branching Logic Section */}
         <View style={formStyles.card}>
@@ -703,6 +672,7 @@ function WorkflowStepEditor({
           )}
         </View>
 
+        <ErrorText message={stepError} />
         {/* Step Bottom Actions */}
         <View style={formStyles.bottomActions}>
           <TouchableOpacity

@@ -1,3 +1,4 @@
+import { TaskSubtaskInfo } from "../../src/features/work/TaskSubtasksEditor";
 import React, { useCallback, useRef, useState } from "react";
 import {
   ActivityIndicator,
@@ -261,7 +262,7 @@ export default function Work() {
     const currentSubtasks = selected.subtasks || [];
     const prevTask = selected;
     const updatedSubtasks = currentSubtasks.map((s) =>
-      s.id === subtaskId ? { ...s, completed: !s.completed } : s,
+      s.id === subtaskId ? { ...s, completed: !s.completed, completedAt: !s.completed ? new Date().toISOString() : undefined } : s,
     );
     const updatedTask: HRTask = { ...selected, subtasks: updatedSubtasks };
     setSelected(updatedTask);
@@ -1006,12 +1007,7 @@ export default function Work() {
                             >
                               {sub.title}
                             </Text>
-                            {!!sub.assignee && (
-                              <View style={{ flexDirection: "row", alignItems: "center", gap: 4, marginTop: 2 }}>
-                                <User size={11} color="#64748b" />
-                                <Text style={styles.subtaskAssignee}>{sub.assignee}</Text>
-                              </View>
-                            )}
+                            <TaskSubtaskInfo item={sub} />
                           </View>
                         </Pressable>
                       );

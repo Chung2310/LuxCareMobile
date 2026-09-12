@@ -46,7 +46,7 @@ import { workflow } from "../../src/api/services";
 import { messageOf, useSession } from "../../src/auth/SessionProvider";
 import { workflowAccess } from "../../src/features/workflow/access";
 import { WorkflowForm } from "../../src/features/workflow/WorkflowForm";
-import { ErrorText, Loading } from "../../src/ui";
+import { ErrorText, Loading, styles } from "../../src/ui";
 
 export default function WorkflowPage() {
   const { showAlert, alertView } = useAppAlert();
@@ -900,7 +900,11 @@ function StepDetailModal({
                     {step.subTasks.map((task) => (
                       <View key={task.id} style={modalStyles.subTaskRow}>
                         <Check size={14} color="#059669" />
-                        <Text style={modalStyles.subTaskText}>{task.title}</Text>
+                        <View style={{ flex: 1, gap: 4 }}>
+                          <Text style={modalStyles.subTaskText}>{task.title}</Text>
+                          <Text style={styles.muted}>Người được giao: {task.assignee || (task.assigneeUid ? "Đã phân công" : "Chưa giao")}</Text>
+                          <Text style={styles.muted}>{task.done ? "Đã hoàn thành" : "Chưa hoàn thành"}</Text>
+                        </View>
                       </View>
                     ))}
                   </View>

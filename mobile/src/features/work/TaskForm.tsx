@@ -14,7 +14,7 @@ import {
   View,
 } from "react-native";
 import { randomUUID } from "expo-crypto";
-import type { HRTask, Project, TaskAttachment, TaskSubtask } from "../../../../src/types/hr";
+import type { HRTask, Project, TaskAttachment } from "../../../../src/types/hr";
 import type { UserProfile } from "../../../../src/types/common";
 import type { TaskInput } from "../../../../src/services/kanbanService";
 import { kanban, roster } from "../../api/services";
@@ -34,6 +34,7 @@ import {
   type TaskDraft,
 } from "./model";
 import { DateTimePickerModal } from "./DateTimePickerModal";
+import { TaskSubtasksEditor } from "./TaskSubtasksEditor";
 import {
   X,
   AlertCircle,
@@ -242,8 +243,6 @@ export function TaskForm({
   // Tags input
   const [tagInput, setTagInput] = useState("");
 
-  // Subtask input
-  const [subtaskInput, setSubtaskInput] = useState("");
 
   // Attachment link modal
   const [linkModal, setLinkModal] = useState(false);
@@ -364,31 +363,6 @@ export function TaskForm({
 
   const handleRemoveTag = (tagToRemove: string) => {
     setDraft((v) => ({ ...v, tags: v.tags.filter((t) => t !== tagToRemove) }));
-  };
-
-  // Subtask actions
-  const handleAddSubtask = () => {
-    const title = subtaskInput.trim();
-    if (!title) return;
-    const newSubtask: TaskSubtask = {
-      id: randomUUID(),
-      title,
-      completed: false,
-      assigneeUid: draft.assigneeUid || undefined,
-    };
-    setDraft((v) => ({ ...v, subtasks: [...v.subtasks, newSubtask] }));
-    setSubtaskInput("");
-  };
-
-  const handleToggleSubtask = (id: string) => {
-    setDraft((v) => ({
-      ...v,
-      subtasks: v.subtasks.map((s) => (s.id === id ? { ...s, completed: !s.completed } : s)),
-    }));
-  };
-
-  const handleRemoveSubtask = (id: string) => {
-    setDraft((v) => ({ ...v, subtasks: v.subtasks.filter((s) => s.id !== id) }));
   };
 
   // Attachment actions
@@ -744,65 +718,13 @@ export function TaskForm({
           )}
         </View>
 
-        {/* Section 5: Công việc nhỏ (Subtasks) */}
-        <View style={styles.card}>
-          <View style={styles.cardHeaderWithCount}>
-            <Text style={styles.cardSectionTitle}>
-              CÔNG VIỆC CON ({draft.subtasks.filter((s) => s.completed).length}/{draft.subtasks.length})
-            </Text>
-          </View>
-
-          {/* Add subtask input row */}
-          <View style={styles.subtaskInputRow}>
-            <TextInput
-              style={[styles.textInput, { flex: 1 }]}
-              placeholder="Thêm đầu việc nhỏ cần làm..."
-              placeholderTextColor="#94a3b8"
-              value={subtaskInput}
-              editable={!disabled}
-              onChangeText={setSubtaskInput}
-              onSubmitEditing={handleAddSubtask}
-            />
-            <Pressable
-              style={styles.addSubtaskBtn}
-              onPress={handleAddSubtask}
-              disabled={disabled || !subtaskInput.trim()}
-            >
-              <Text style={styles.addSubtaskBtnText}>+ Thêm việc</Text>
-            </Pressable>
-          </View>
-
-          {/* Subtasks list */}
-          {draft.subtasks.length > 0 ? (
-            <View style={styles.subtaskList}>
-              {draft.subtasks.map((st) => (
-                <View key={st.id} style={styles.subtaskItem}>
-                  <Pressable
-                    onPress={() => handleToggleSubtask(st.id)}
-                    style={[styles.subtaskCheckbox, st.completed && styles.subtaskCheckboxChecked]}
-                  >
-                    {st.completed && <Check size={11} color="#ffffff" strokeWidth={3} />}
-                  </Pressable>
-                  <Text
-                    style={[styles.subtaskTitle, st.completed && styles.subtaskTitleDone]}
-                    numberOfLines={2}
-                  >
-                    {st.title}
-                  </Text>
-                  <Pressable
-                    onPress={() => handleRemoveSubtask(st.id)}
-                    hitSlop={8}
-                    style={styles.subtaskDeleteBtn}
-                  >
-                    <Trash2 size={13} color="#dc2626" />
-                  </Pressable>
-                </View>
-              ))}
-            </View>
-          ) : (
-            <Text style={styles.emptyTipText}>Chưa có việc con nào. Chia nhỏ công việc để theo dõi tốt hơn.</Text>
-          )}
-        </View>
+        <TaskSubtasksEditor
+          items={draft.subtasks}
+          people={people}
+          disabled={disabled}
+          canManage={manager}
+          onChange={subtasks => setDraft(current => ({ ...current, subtasks }))}
+        />
 
         {/* Section 6: Danh sách tệp & Liên kết đính kèm */}
         <View style={styles.card}>
