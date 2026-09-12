@@ -199,7 +199,7 @@ export const CustomerCard: React.FC<CustomerCardProps> = ({ lead, onPress }) => 
 const styles = StyleSheet.create({
   card: {
     backgroundColor: "#ffffff",
-    borderRadius: 14,
+    borderRadius: 18,
     padding: 14,
     marginBottom: 10,
     borderWidth: 1,
