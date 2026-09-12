@@ -99,6 +99,7 @@ export const SupplyFormModal: React.FC<SupplyFormModalProps> = ({
   const [uploadingMedia, setUploadingMedia] = useState(false);
   const [uploadProgressText, setUploadProgressText] = useState("");
   const [docPickerOpen, setDocPickerOpen] = useState(false);
+  const [imagePickerOpen, setImagePickerOpen] = useState(false);
   const [notes, setNotes] = useState("");
 
   const [submitting, setSubmitting] = useState(false);
@@ -223,6 +224,60 @@ export const SupplyFormModal: React.FC<SupplyFormModalProps> = ({
       }
     } catch (err: any) {
       Alert.alert("Lỗi tải ảnh", err.message || "Không thể tải lên ảnh từ thư viện.");
+    } finally {
+      setUploadingMedia(false);
+      setUploadProgressText("");
+    }
+  };
+
+  // CHỤP ẢNH SẢN PHẨM TRỰC TIẾP QUA CAMERA
+  const handleCaptureProductPhoto = async () => {
+    try {
+      const permission = await ImagePicker.requestCameraPermissionsAsync();
+      if (!permission.granted) {
+        Alert.alert(
+          "Cần quyền máy ảnh",
+          "Vui lòng cho phép ứng dụng truy cập máy ảnh để chụp ảnh sản phẩm vật tư.",
+        );
+        return;
+      }
+
+      const result = await ImagePicker.launchCameraAsync({
+        quality: 0.85,
+        allowsEditing: false,
+      });
+
+      if (result.canceled || !result.assets || result.assets.length === 0) {
+        return;
+      }
+
+      setImagePickerOpen(false);
+      setUploadingMedia(true);
+      setUploadProgressText("Đang tải lên ảnh chụp sản phẩm...");
+
+      const asset = result.assets[0];
+      const fileName = asset.fileName || `product_photo_${Date.now()}.jpg`;
+      const uploaded = await supplyApi.uploadFiles([
+        {
+          uri: asset.uri,
+          name: fileName,
+          type: asset.mimeType || "image/jpeg",
+        },
+      ]);
+
+      if (uploaded.length > 0) {
+        const newUrl = uploaded[0].fileUrl;
+        setImages((prev) => {
+          const combined = [...prev, newUrl];
+          if (!imageUrl) {
+            setImageUrl(newUrl);
+          }
+          return combined;
+        });
+        Alert.alert("Thành công", "Đã chụp và lưu ảnh sản phẩm vật tư.");
+      }
+    } catch (err: any) {
+      Alert.alert("Lỗi chụp ảnh", err.message || "Không thể chụp ảnh sản phẩm.");
     } finally {
       setUploadingMedia(false);
       setUploadProgressText("");
@@ -918,7 +973,29 @@ export const SupplyFormModal: React.FC<SupplyFormModalProps> = ({
 
               {/* 6.1: BỘ SƯU TẬP HÌNH ẢNH */}
               <View style={styles.fieldGroup}>
-                <Text style={styles.label}>Ảnh sản phẩm ({images.length})</Text>
+                <View style={styles.fieldGroupHeaderRow}>
+                  <Text style={styles.label}>Ảnh sản phẩm ({images.length})</Text>
+                  <View style={styles.headerActionPills}>
+                    <TouchableOpacity
+                      style={styles.headerActionPillCamera}
+                      onPress={handleCaptureProductPhoto}
+                      disabled={uploadingMedia}
+                      activeOpacity={0.7}
+                    >
+                      <Ionicons name="camera" size={13} color="#059669" />
+                      <Text style={styles.headerActionPillCameraText}>Chụp ảnh</Text>
+                    </TouchableOpacity>
+                    <TouchableOpacity
+                      style={styles.headerActionPillLibrary}
+                      onPress={handlePickImagesFromLibrary}
+                      disabled={uploadingMedia}
+                      activeOpacity={0.7}
+                    >
+                      <Ionicons name="images" size={13} color="#0284c7" />
+                      <Text style={styles.headerActionPillLibraryText}>Tải ảnh lên</Text>
+                    </TouchableOpacity>
+                  </View>
+                </View>
 
                 {images.length > 0 ? (
                   <View style={styles.imagesGrid}>
@@ -951,28 +1028,53 @@ export const SupplyFormModal: React.FC<SupplyFormModalProps> = ({
                       );
                     })}
                     <TouchableOpacity
-                      style={styles.addImageCard}
+                      style={styles.addImageCardCamera}
+                      onPress={handleCaptureProductPhoto}
+                      disabled={uploadingMedia}
+                      activeOpacity={0.7}
+                    >
+                      <Ionicons name="camera" size={20} color="#059669" />
+                      <Text style={styles.addImageCardCameraText}>Chụp ảnh</Text>
+                    </TouchableOpacity>
+                    <TouchableOpacity
+                      style={styles.addImageCardLibrary}
                       onPress={handlePickImagesFromLibrary}
                       disabled={uploadingMedia}
                       activeOpacity={0.7}
                     >
-                      <Ionicons name="add" size={24} color="#059669" />
-                      <Text style={styles.addImageCardText}>Thêm ảnh</Text>
+                      <Ionicons name="images-outline" size={20} color="#0284c7" />
+                      <Text style={styles.addImageCardLibraryText}>Thêm ảnh</Text>
                     </TouchableOpacity>
                   </View>
                 ) : (
-                  <TouchableOpacity
-                    style={styles.emptyMediaBox}
-                    onPress={handlePickImagesFromLibrary}
-                    disabled={uploadingMedia}
-                    activeOpacity={0.7}
-                  >
-                    <Ionicons name="images-outline" size={26} color="#94a3b8" />
-                    <Text style={styles.emptyMediaTitle}>Chưa có hình ảnh nào</Text>
+                  <View style={styles.emptyMediaBox}>
+                    <Ionicons name="images-outline" size={28} color="#94a3b8" />
+                    <Text style={styles.emptyMediaTitle}>Chưa có hình ảnh sản phẩm</Text>
                     <Text style={styles.emptyMediaDesc}>
-                      Chạm để chọn một hoặc nhiều ảnh từ thư viện thiết bị
+                      Chụp ảnh trực tiếp bằng camera hoặc tải ảnh lên từ thư viện thiết bị
                     </Text>
-                  </TouchableOpacity>
+                    <View style={styles.emptyDualActionRow}>
+                      <TouchableOpacity
+                        style={styles.emptyCaptureBtn}
+                        onPress={handleCaptureProductPhoto}
+                        disabled={uploadingMedia}
+                        activeOpacity={0.75}
+                      >
+                        <Ionicons name="camera" size={16} color="#ffffff" />
+                        <Text style={styles.emptyCaptureBtnText}>Chụp ảnh trực tiếp</Text>
+                      </TouchableOpacity>
+
+                      <TouchableOpacity
+                        style={styles.emptyPickBtn}
+                        onPress={handlePickImagesFromLibrary}
+                        disabled={uploadingMedia}
+                        activeOpacity={0.75}
+                      >
+                        <Ionicons name="images-outline" size={16} color="#0284c7" />
+                        <Text style={styles.emptyPickBtnText}>Tải ảnh lên</Text>
+                      </TouchableOpacity>
+                    </View>
+                  </View>
                 )}
               </View>
 
@@ -1227,6 +1329,67 @@ export const SupplyFormModal: React.FC<SupplyFormModalProps> = ({
           setActiveDatePicker(null);
         }}
       />
+
+      {/* Modal chọn nguồn ảnh sản phẩm: Camera, Thư viện ảnh */}
+      <Modal
+        visible={imagePickerOpen}
+        transparent={true}
+        animationType="fade"
+        onRequestClose={() => setImagePickerOpen(false)}
+      >
+        <View style={styles.pickerBackdrop}>
+          <Pressable style={styles.pickerBackdropDismiss} onPress={() => setImagePickerOpen(false)} />
+          <View style={styles.pickerSheet}>
+            <View style={styles.pickerHeader}>
+              <View>
+                <Text style={styles.pickerTitle}>Thêm ảnh sản phẩm vật tư</Text>
+                <Text style={styles.pickerSubtitle}>Chụp ảnh thực tế sản phẩm hoặc chọn từ thư viện</Text>
+              </View>
+              <TouchableOpacity onPress={() => setImagePickerOpen(false)} hitSlop={8} style={styles.pickerCloseBtn}>
+                <Ionicons name="close" size={20} color="#64748b" />
+              </TouchableOpacity>
+            </View>
+
+            <View style={styles.pickerOptionsList}>
+              <TouchableOpacity
+                style={styles.pickerOptionCard}
+                onPress={() => {
+                  setImagePickerOpen(false);
+                  void handleCaptureProductPhoto();
+                }}
+                activeOpacity={0.7}
+              >
+                <View style={[styles.pickerOptionIconCircle, { backgroundColor: "#ecfdf5" }]}>
+                  <Ionicons name="camera" size={22} color="#059669" />
+                </View>
+                <View style={styles.pickerOptionTextContainer}>
+                  <Text style={styles.pickerOptionTitle}>Chụp ảnh trực tiếp</Text>
+                  <Text style={styles.pickerOptionDesc}>Mở máy ảnh chụp bao bì, tem nhãn, sản phẩm thực tế</Text>
+                </View>
+                <Ionicons name="chevron-forward" size={18} color="#94a3b8" />
+              </TouchableOpacity>
+
+              <TouchableOpacity
+                style={styles.pickerOptionCard}
+                onPress={() => {
+                  setImagePickerOpen(false);
+                  void handlePickImagesFromLibrary();
+                }}
+                activeOpacity={0.7}
+              >
+                <View style={[styles.pickerOptionIconCircle, { backgroundColor: "#f0fdf4" }]}>
+                  <Ionicons name="images" size={22} color="#16a34a" />
+                </View>
+                <View style={styles.pickerOptionTextContainer}>
+                  <Text style={styles.pickerOptionTitle}>Chọn ảnh từ thư viện</Text>
+                  <Text style={styles.pickerOptionDesc}>Tải lên 1 hoặc nhiều ảnh có sẵn trong thiết bị</Text>
+                </View>
+                <Ionicons name="chevron-forward" size={18} color="#94a3b8" />
+              </TouchableOpacity>
+            </View>
+          </View>
+        </View>
+      </Modal>
 
       {/* Modal chọn nguồn đính kèm: Camera, Thư viện ảnh, Tệp tin */}
       <Modal
@@ -1721,6 +1884,126 @@ const styles = StyleSheet.create({
     fontSize: 10,
     fontWeight: "700",
     color: "#059669",
+  },
+  addImageCardCamera: {
+    width: 76,
+    height: 76,
+    borderRadius: 10,
+    borderWidth: 1.5,
+    borderColor: "#a7f3d0",
+    borderStyle: "dashed",
+    backgroundColor: "#ecfdf5",
+    alignItems: "center",
+    justifyContent: "center",
+    gap: 3,
+  },
+  addImageCardCameraText: {
+    fontSize: 10,
+    fontWeight: "700",
+    color: "#059669",
+  },
+  addImageCardLibrary: {
+    width: 76,
+    height: 76,
+    borderRadius: 10,
+    borderWidth: 1.5,
+    borderColor: "#bae6fd",
+    borderStyle: "dashed",
+    backgroundColor: "#f0f9ff",
+    alignItems: "center",
+    justifyContent: "center",
+    gap: 3,
+  },
+  addImageCardLibraryText: {
+    fontSize: 10,
+    fontWeight: "700",
+    color: "#0284c7",
+  },
+  fieldGroupHeaderRow: {
+    flexDirection: "row",
+    alignItems: "center",
+    justifyContent: "space-between",
+    marginBottom: 6,
+  },
+  headerActionPills: {
+    flexDirection: "row",
+    alignItems: "center",
+    gap: 6,
+  },
+  headerActionPillCamera: {
+    flexDirection: "row",
+    alignItems: "center",
+    gap: 4,
+    backgroundColor: "#ecfdf5",
+    borderWidth: 1,
+    borderColor: "#a7f3d0",
+    paddingHorizontal: 8,
+    paddingVertical: 3,
+    borderRadius: 8,
+  },
+  headerActionPillCameraText: {
+    fontSize: 11,
+    fontWeight: "700",
+    color: "#059669",
+  },
+  headerActionPillLibrary: {
+    flexDirection: "row",
+    alignItems: "center",
+    gap: 4,
+    backgroundColor: "#f0f9ff",
+    borderWidth: 1,
+    borderColor: "#bae6fd",
+    paddingHorizontal: 8,
+    paddingVertical: 3,
+    borderRadius: 8,
+  },
+  headerActionPillLibraryText: {
+    fontSize: 11,
+    fontWeight: "700",
+    color: "#0284c7",
+  },
+  emptyDualActionRow: {
+    flexDirection: "row",
+    alignItems: "center",
+    gap: 10,
+    marginTop: 12,
+    flexWrap: "wrap",
+    justifyContent: "center",
+  },
+  emptyCaptureBtn: {
+    flexDirection: "row",
+    alignItems: "center",
+    gap: 6,
+    backgroundColor: "#059669",
+    paddingHorizontal: 14,
+    paddingVertical: 8,
+    borderRadius: 10,
+    shadowColor: "#059669",
+    shadowOffset: { width: 0, height: 1 },
+    shadowOpacity: 0.2,
+    shadowRadius: 2,
+    elevation: 2,
+  },
+  emptyCaptureBtnText: {
+    fontSize: 12,
+    fontWeight: "700",
+    color: "#ffffff",
+  },
+  emptyPickBtn: {
+    flexDirection: "row",
+    alignItems: "center",
+    gap: 6,
+    backgroundColor: "#ffffff",
+    borderWidth: 1,
+    borderColor: "#cbd5e1",
+    paddingHorizontal: 14,
+    paddingVertical: 8,
+    borderRadius: 10,
+  },
+  emptyPickBtnText: {
+    fontSize: 12,
+    fontWeight: "700",
+    color: "#0284c7",
   },
   docsList: {
     gap: 6,

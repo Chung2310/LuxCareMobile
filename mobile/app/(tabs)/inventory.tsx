@@ -95,8 +95,6 @@ export default function InventoryScreen() {
     visible: false,
     item: null,
   });
-  const [isScannerOpen, setIsScannerOpen] = useState(false);
-  const [barcodeInput, setBarcodeInput] = useState("");
 
   // Tải danh sách vật tư & thống kê từ server
   const loadSuppliesData = useCallback(async () => {
@@ -403,12 +401,6 @@ export default function InventoryScreen() {
     }
   };
 
-  const handleBarcodeSearch = () => {
-    if (!barcodeInput.trim()) return;
-    setSearchQuery(barcodeInput.trim());
-    setIsScannerOpen(false);
-    setBarcodeInput("");
-  };
 
   const params = useLocalSearchParams<{ from?: string }>();
 
@@ -447,15 +439,6 @@ export default function InventoryScreen() {
             activeOpacity={0.7}
           >
             <Ionicons name="add" size={20} color="#ffffff" />
-          </TouchableOpacity>
-
-          <TouchableOpacity
-            style={styles.headerIconBtnScan}
-            onPress={() => setIsScannerOpen(true)}
-            hitSlop={8}
-            activeOpacity={0.7}
-          >
-            <Ionicons name="barcode-outline" size={18} color="#059669" />
           </TouchableOpacity>
         </View>
       </View>
@@ -824,54 +807,6 @@ export default function InventoryScreen() {
           await loadSuppliersData();
         }}
       />
-
-      {/* 6. Modal Quét Barcode / QR Giả Lập Nhanh */}
-      <Modal visible={isScannerOpen} transparent animationType="fade">
-        <View style={styles.scannerOverlay}>
-          <View style={styles.scannerCard}>
-            <View style={styles.scannerHeader}>
-              <View style={styles.scannerTitleRow}>
-                <Ionicons name="scan-circle" size={24} color="#059669" />
-                <Text style={styles.scannerTitle}>Quét Mã Vạch Y Tế</Text>
-              </View>
-              <TouchableOpacity onPress={() => setIsScannerOpen(false)} hitSlop={10}>
-                <Ionicons name="close" size={22} color="#64748b" />
-              </TouchableOpacity>
-            </View>
-
-            <Text style={styles.scannerDesc}>
-              Nhập mã vạch sản phẩm, số lô LOT hoặc mã định danh để tra cứu ngay lập tức:
-            </Text>
-
-            <TextInput
-              style={styles.scannerInput}
-              placeholder="VD: LOT-2026B12 hoặc VT-GTYT-75"
-              placeholderTextColor="#94a3b8"
-              value={barcodeInput}
-              onChangeText={setBarcodeInput}
-              autoFocus
-              returnKeyType="search"
-              onSubmitEditing={handleBarcodeSearch}
-            />
-
-            <View style={styles.scannerActions}>
-              <TouchableOpacity
-                style={styles.scannerCancelBtn}
-                onPress={() => setIsScannerOpen(false)}
-              >
-                <Text style={styles.scannerCancelText}>Đóng</Text>
-              </TouchableOpacity>
-
-              <TouchableOpacity
-                style={styles.scannerConfirmBtn}
-                onPress={handleBarcodeSearch}
-              >
-                <Text style={styles.scannerConfirmText}>Tra Cứu</Text>
-              </TouchableOpacity>
-            </View>
-          </View>
-        </View>
-      </Modal>
     </SafeAreaView>
   );
 }
@@ -934,16 +869,6 @@ const styles = StyleSheet.create({
     shadowOpacity: 0.2,
     shadowRadius: 3,
     elevation: 2,
-  },
-  headerIconBtnScan: {
-    width: 36,
-    height: 36,
-    borderRadius: 18,
-    backgroundColor: "#ecfdf5",
-    alignItems: "center",
-    justifyContent: "center",
-    borderWidth: 1,
-    borderColor: "#a7f3d0",
   },
   fabBtn: {
     position: "absolute",
@@ -1171,82 +1096,5 @@ const styles = StyleSheet.create({
     fontSize: 13,
     color: "#64748b",
   },
-  scannerOverlay: {
-    flex: 1,
-    backgroundColor: "rgba(0, 0, 0, 0.5)",
-    justifyContent: "center",
-    alignItems: "center",
-    padding: 20,
-  },
-  scannerCard: {
-    width: "100%",
-    backgroundColor: "#ffffff",
-    borderRadius: 20,
-    padding: 20,
-    shadowColor: "#000",
-    shadowOffset: { width: 0, height: 4 },
-    shadowOpacity: 0.15,
-    shadowRadius: 10,
-    elevation: 8,
-  },
-  scannerHeader: {
-    flexDirection: "row",
-    justifyContent: "space-between",
-    alignItems: "center",
-    marginBottom: 12,
-  },
-  scannerTitleRow: {
-    flexDirection: "row",
-    alignItems: "center",
-    gap: 8,
-  },
-  scannerTitle: {
-    fontSize: 17,
-    fontWeight: "800",
-    color: "#0f172a",
-  },
-  scannerDesc: {
-    fontSize: 13,
-    color: "#64748b",
-    lineHeight: 18,
-    marginBottom: 14,
-  },
-  scannerInput: {
-    backgroundColor: "#f8fafc",
-    borderRadius: 12,
-    borderWidth: 1,
-    borderColor: "#cbd5e1",
-    paddingHorizontal: 14,
-    paddingVertical: 12,
-    fontSize: 14,
-    color: "#0f172a",
-    marginBottom: 18,
-  },
-  scannerActions: {
-    flexDirection: "row",
-    justifyContent: "flex-end",
-    gap: 10,
-  },
-  scannerCancelBtn: {
-    paddingHorizontal: 16,
-    paddingVertical: 10,
-    borderRadius: 10,
-    backgroundColor: "#f1f5f9",
-  },
-  scannerCancelText: {
-    fontSize: 13,
-    fontWeight: "600",
-    color: "#64748b",
-  },
-  scannerConfirmBtn: {
-    paddingHorizontal: 20,
-    paddingVertical: 10,
-    borderRadius: 10,
-    backgroundColor: "#059669",
-  },
-  scannerConfirmText: {
-    fontSize: 13,
-    fontWeight: "700",
-    color: "#ffffff",
-  },
 });
+
