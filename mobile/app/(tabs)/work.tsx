@@ -309,53 +309,6 @@ export default function Work() {
     }
   };
 
-  const handleQuickStatusChange = async (newStatus: string) => {
-    if (!selected || busy) return;
-    const prevTask = selected;
-    const updatedTask: HRTask = { ...selected, status: newStatus as any };
-    setSelected(updatedTask);
-    setItems((prev) => prev.map((t) => (t.id === selected.id ? updatedTask : t)));
-    setDetailError(null);
-    setBusy(true);
-
-    try {
-      const res = await kanban.updateTask(selected.id, {
-        status: newStatus as any,
-        expectedRevision: selected.revision !== undefined ? selected.revision : 0,
-      });
-      const nextRevision =
-        res?.revision !== undefined
-          ? res.revision
-          : (selected.revision !== undefined ? selected.revision + 1 : 1);
-      const syncedTask: HRTask = {
-        ...updatedTask,
-        ...(res?.id ? res : {}),
-        revision: nextRevision,
-      };
-      setSelected(syncedTask);
-      setItems((prev) => prev.map((t) => (t.id === selected.id ? syncedTask : t)));
-    } catch (err) {
-      const msg = messageOf(err);
-      if (/thay đổi|phiên bản|revision|version|409/i.test(msg)) {
-        try {
-          const freshTasks = await kanban.listTasks(branchId);
-          setItems(freshTasks);
-          const matched = freshTasks.find((t) => t.id === prevTask.id);
-          if (matched) {
-            setSelected(matched);
-            setDetailError("Công việc đã được đồng bộ phiên bản mới nhất từ máy chủ. Vui lòng thử lại.");
-            return;
-          }
-        } catch {}
-      }
-      setSelected(prevTask);
-      setItems((prev) => prev.map((t) => (t.id === selected.id ? prevTask : t)));
-      setDetailError(msg);
-    } finally {
-      setBusy(false);
-    }
-  };
-
   if (!allowed)
     return (
       <Page title="Công việc">
@@ -595,7 +548,7 @@ export default function Work() {
 
                   {/* KPI Status Badge (if has hours or done) */}
                   {(() => {
-                    const cardKpi = evaluateTaskKpi(item.estTime, item.actualTime, item.endTime, item.dueDate);
+                    const cardKpi = evaluateTaskKpi(item.estTime, item.actualTime, item.endTime, item.dueDate, item.startTime);
                     if (!cardKpi || (!item.actualTime && !isDone)) return null;
                     return (
                       <View
@@ -903,7 +856,7 @@ export default function Work() {
 
                   {/* KPI Evaluation in Detail */}
                   {(() => {
-                    const detailKpi = evaluateTaskKpi(selected.estTime, selected.actualTime, selected.endTime, selected.dueDate);
+                    const detailKpi = evaluateTaskKpi(selected.estTime, selected.actualTime, selected.endTime, selected.dueDate, selected.startTime);
                     if (!detailKpi) return null;
                     return (
                       <View style={[styles.detailGridItem, { width: "100%", marginTop: 4 }]}>
@@ -1107,15 +1060,7 @@ export default function Work() {
                       <Text style={styles.modalActionBtnTextPrimary}>Sửa công việc</Text>
                     </Pressable>
 
-                    {selected.status !== "Done" && (
-                      <Pressable
-                        style={[styles.modalActionBtn, styles.modalActionBtnSuccess, { flexDirection: "row", gap: 6 }]}
-                        onPress={() => void handleQuickStatusChange("Done")}
-                      >
-                        <Check size={14} color="#047857" strokeWidth={2.5} />
-                        <Text style={styles.modalActionBtnTextSuccess}>Hoàn thành</Text>
-                      </Pressable>
-                    )}
+
                   </View>
                 )}
 
@@ -1908,11 +1853,6 @@ const styles = StyleSheet.create({
     backgroundColor: "#059669",
     borderColor: "#059669",
   },
-  modalActionBtnSuccess: {
-    backgroundColor: "#ecfdf5",
-    borderWidth: 1,
-    borderColor: "#a7f3d0",
-  },
   modalActionBtnText: {
     fontSize: 12,
     fontWeight: "700",
@@ -1922,11 +1862,6 @@ const styles = StyleSheet.create({
     fontSize: 12,
     fontWeight: "700",
     color: "#ffffff",
-  },
-  modalActionBtnTextSuccess: {
-    color: "#047857",
-    fontWeight: "700",
-    fontSize: 13,
   },
   modalDeleteBtn: {
     paddingVertical: 10,

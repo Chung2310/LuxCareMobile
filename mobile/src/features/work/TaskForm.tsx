@@ -24,7 +24,8 @@ import { pickImageAttachment, pickWorkAttachment } from "./attachments";
 import {
   TASK_PRIORITIES,
   TASK_STATUSES,
-  calculateEstimatedHours,
+  taskDurationHours,
+  updateTaskTiming,
   draftForTask,
   evaluateTaskKpi,
   isTaskManager,
@@ -93,32 +94,6 @@ function formatDisplayDate(str: string): string {
   return str;
 }
 
-function parseDateToTime(str?: string): number {
-  if (!str || !str.trim()) return 0;
-  const s = str.trim();
-  const match = s.match(/^(\d{4})-(\d{2})-(\d{2})[ T](\d{2}):(\d{2})/);
-  if (match) {
-    const y = parseInt(match[1], 10);
-    const m = parseInt(match[2], 10) - 1;
-    const d = parseInt(match[3], 10);
-    const h = parseInt(match[4], 10);
-    const min = parseInt(match[5], 10);
-    return new Date(y, m, d, h, min, 0, 0).getTime();
-  }
-  const t = new Date(s).getTime();
-  return Number.isFinite(t) ? t : 0;
-}
-
-function calculateDurationHours(startStr?: string, endStr?: string): number {
-  const s = parseDateToTime(startStr);
-  const e = parseDateToTime(endStr);
-  if (s > 0 && e > 0 && e > s) {
-    const diffHours = (e - s) / (1000 * 60 * 60);
-    return Math.round(diffHours * 10) / 10;
-  }
-  return 0;
-}
-
 export function TaskForm({
   task,
   projects,
@@ -144,8 +119,8 @@ export function TaskForm({
         now.setHours(8, 0, 0, 0);
         d.startTime = localDateTime(now.toISOString());
       }
-      const initialEst = calculateDurationHours(d.startTime, d.dueDate);
-      if (initialEst > 0 && !d.estTime) d.estTime = String(initialEst);
+      const initialEst = taskDurationHours(d.startTime, d.dueDate);
+      if (initialEst !== null && initialEst > 0 && !d.estTime) d.estTime = String(Number(initialEst.toFixed(1)));
     }
     return d;
   });
@@ -158,75 +133,21 @@ export function TaskForm({
   const [error, setError] = useState<string | null>(null);
   const lock = useRef(false);
 
-  // Tự động tính toán lại Giờ dự tính và Giờ thực tế khi có thay đổi về ngày giờ
-  useEffect(() => {
-    const effectiveStart =
-      draft.startTime ||
-      localDateTime(new Date(new Date().setHours(8, 0, 0, 0)).toISOString());
-    const estTarget = draft.endTime || draft.dueDate;
-
-    let nextEst: string | undefined;
-    let nextActual: string | undefined;
-
-    if (estTarget) {
-      const estH = calculateDurationHours(effectiveStart, estTarget);
-      if (estH > 0) {
-        nextEst = String(estH);
-      }
-    }
-
-    if (draft.startTime && draft.endTime) {
-      const actH = calculateDurationHours(draft.startTime, draft.endTime);
-      if (actH > 0) {
-        nextActual = String(actH);
-      }
-    } else if (!draft.endTime) {
-      nextActual = "";
-    }
-
-    setDraft((prev) => {
-      let changed = false;
-      const patch: Partial<TaskDraft> = {};
-      if (nextEst !== undefined && prev.estTime !== nextEst) {
-        patch.estTime = nextEst;
-        changed = true;
-      }
-      if (nextActual !== undefined && prev.actualTime !== nextActual) {
-        patch.actualTime = nextActual;
-        changed = true;
-      }
-      return changed ? { ...prev, ...patch } : prev;
-    });
-  }, [draft.startTime, draft.endTime, draft.dueDate]);
-
-  // Cập nhật ngày và kích hoạt tính toán
+  // Recalculate only the values affected by an explicit date change.
   const updateDatesAndRecalculateTimes = (patch: Partial<TaskDraft>) => {
-    setDraft((prev) => ({ ...prev, ...patch }));
+    setDraft(prev => updateTaskTiming(prev, patch));
   };
 
   const handleStatusChange = (statusVal: string) => {
-    setDraft((prev) => {
-      const next = { ...prev, status: statusVal };
-      if (statusVal === "Done") {
-        if (!next.startTime) {
-          const now = new Date();
-          now.setHours(8, 0, 0, 0);
-          next.startTime = localDateTime(now.toISOString());
-        }
-        if (!next.endTime) {
-          next.endTime = localDateTime(new Date().toISOString());
-        }
-        const estTarget = next.endTime || next.dueDate;
-        if (next.startTime && estTarget) {
-          const estH = calculateDurationHours(next.startTime, estTarget);
-          if (estH > 0) next.estTime = String(estH);
-        }
-        if (next.startTime && next.endTime) {
-          const actH = calculateDurationHours(next.startTime, next.endTime);
-          if (actH > 0) next.actualTime = String(actH);
-        }
+    setDraft(prev => {
+      const patch: Partial<TaskDraft> = { status: statusVal };
+      if (statusVal === "In Progress" && !prev.startTime) {
+        patch.startTime = localDateTime(new Date().toISOString());
       }
-      return next;
+      if (statusVal === "Done" && !prev.endTime) {
+        patch.endTime = localDateTime(new Date().toISOString());
+      }
+      return updateTaskTiming(prev, patch);
     });
   };
 
@@ -946,7 +867,7 @@ export function TaskForm({
             <View style={[styles.autoCalculatedBadge, { flexDirection: "row", alignItems: "center", gap: 4 }]}>
               <Zap size={12} color="#1d4ed8" />
               <Text style={styles.autoCalculatedBadgeText}>
-                Tự động tính: Dự tính {draft.estTime || "0"}h · Thực tế {draft.actualTime || "0"}h
+                Dự tính: Bắt đầu → Hạn hoàn thành. Thực tế: Bắt đầu → Kết thúc.
               </Text>
             </View>
           </View>
@@ -981,7 +902,7 @@ export function TaskForm({
 
           {/* KPI Evaluation Banner based on hours & dates */}
           {(() => {
-            const kpiInfo = evaluateTaskKpi(draft.estTime, draft.actualTime, draft.endTime, draft.dueDate);
+            const kpiInfo = evaluateTaskKpi(draft.estTime, draft.actualTime, draft.endTime, draft.dueDate, draft.startTime);
             if (!kpiInfo) return null;
             return (
               <View
