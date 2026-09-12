@@ -106,11 +106,21 @@ export function JobForm({
       else await recruitment.createJob(payload);
       onClose();
     } catch (error) {
+      const msg = messageOf(error);
       const status = error && typeof error === "object" && "status" in error ? Number(error.status) : 0;
-      if (!status || status >= 500 || status === 409 || /phiên bản|version/i.test(messageOf(error))) {
+      if (!status || status >= 500 || status === 409 || /phiên bản|version/i.test(msg)) {
         setBlocked(true);
-        setError(`${messageOf(error)} Đóng và tải lại danh sách trước khi lưu tiếp.`);
-      } else setError(messageOf(error));
+        setError(`${msg} Đóng và tải lại danh sách trước khi lưu tiếp.`);
+        showAlert(
+          "Không thể lưu tin tuyển dụng",
+          `${msg}\nVui lòng đóng và tải lại danh sách trước khi thao tác tiếp.`,
+          [{ text: "Đã hiểu" }],
+          "error",
+        );
+      } else {
+        setError(msg);
+        showAlert("Lỗi lưu tin tuyển dụng", msg, [{ text: "Đã hiểu" }], "error");
+      }
     } finally {
       lock.current = false;
       setBusy(false);

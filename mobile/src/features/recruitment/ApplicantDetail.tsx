@@ -36,6 +36,7 @@ import { ErrorText, Field, Loading } from "../../ui";
 import { ChoiceField } from "../leave/ChoiceField";
 import { RecruitmentModal } from "./RecruitmentModal";
 import { formatDate, formatOutcome } from "./recruitmentModel";
+import { useAppAlert } from "../../components/AppAlert";
 
 export function ApplicantDetail({
   applicant,
@@ -56,6 +57,7 @@ export function ApplicantDetail({
   onChanged?: () => Promise<void> | void;
   setLocked?: (value: boolean) => void;
 }) {
+  const { showAlert, alertView } = useAppAlert();
   const isManage = canManage ?? manage ?? false;
   const [history, setHistory] = useState<RecruitmentHistory[]>([]);
   const [stageId, setStageId] = useState(applicant.stageId);
@@ -92,7 +94,9 @@ export function ApplicantDetail({
       await onChanged?.();
       onClose();
     } catch (err) {
-      setError(messageOf(err));
+      const msg = messageOf(err);
+      setError(msg);
+      showAlert("Không thể chuyển giai đoạn", msg, [{ text: "Đã hiểu" }], "error");
     } finally {
       setBusy(false);
     }
@@ -313,6 +317,7 @@ export function ApplicantDetail({
           <Text style={dtStyles.interviewBtnText}>Lên lịch phỏng vấn</Text>
         </Pressable>
       </View>
+      {alertView}
     </RecruitmentModal>
   );
 }

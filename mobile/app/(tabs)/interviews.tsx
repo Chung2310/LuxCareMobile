@@ -41,6 +41,7 @@ import { RecruitmentSubnav } from "../../src/features/recruitment/RecruitmentSub
 import { InterviewForm } from "../../src/features/recruitment/InterviewForm";
 import { formatDateTime, INTERVIEW_STATUS_CHOICES } from "../../src/features/recruitment/recruitmentModel";
 import { recruitmentAccess } from "../../src/features/recruitment/access";
+import { useAppAlert } from "../../src/components/AppAlert";
 
 function Pagination({ meta, onChange }: { meta: PaginationMeta; onChange: (page: number) => void }) {
   if (meta.totalPages <= 1) return null;
@@ -76,6 +77,7 @@ function interviewPlace(item: RecruitmentInterview) {
 }
 
 export default function Interviews() {
+  const { showAlert, alertView } = useAppAlert();
   const { user, selectedBranch } = useSession();
   const access = recruitmentAccess(user);
   const params = useLocalSearchParams<{ applicantId?: string; jobId?: string }>();
@@ -208,8 +210,10 @@ export default function Interviews() {
       });
 
       await load();
+      showAlert("Thành công", "Đã tạo 2 lịch phỏng vấn mẫu thành công.", [{ text: "Đóng" }], "success");
     } catch (err) {
       setError(messageOf(err));
+      showAlert("Không thể tạo dữ liệu mẫu", messageOf(err), [{ text: "Đã hiểu" }], "error");
     } finally {
       setSeeding(false);
     }
@@ -614,6 +618,7 @@ export default function Interviews() {
           </View>
         </RecruitmentModal>
       )}
+      {alertView}
     </>
   );
 }

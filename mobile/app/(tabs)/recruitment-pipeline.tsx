@@ -29,8 +29,11 @@ import { RecruitmentSubnav } from "../../src/features/recruitment/RecruitmentSub
 import { recruitmentAccess } from "../../src/features/recruitment/access";
 import { OUTCOMES } from "../../src/features/recruitment/applicantModel";
 import { PipelineForm } from "../../src/features/recruitment/PipelineForm";
+import { RecruitmentModal } from "../../src/features/recruitment/RecruitmentModal";
+import { useAppAlert } from "../../src/components/AppAlert";
 
 export default function Pipeline() {
+  const { showAlert, alertView } = useAppAlert();
   const { user, selectedBranch } = useSession();
   const access = recruitmentAccess(user);
   const scopeReady = user?.role === "admin" ? !!selectedBranch?._id : !!user?.branchId;
@@ -349,37 +352,26 @@ export default function Pipeline() {
       </SafeAreaView>
 
       {/* Modal for Editing Pipeline */}
-      <Modal visible={editing && access.manage} animationType="slide" onRequestClose={close}>
-        <SafeAreaView style={pipStyles.modalSafeArea} edges={["top", "bottom"]}>
-          <View style={pipStyles.modalHeader}>
-            <View>
-              <Text style={pipStyles.modalTitle}>Sửa quy trình tuyển dụng</Text>
-              <Text style={pipStyles.modalSubtitle}>
-                Sắp xếp thứ tự và cấu hình các bước trong quy trình
-              </Text>
-            </View>
-            <Pressable
-              style={({ pressed }) => [pipStyles.modalCloseBtn, pressed && { opacity: 0.7 }]}
-              onPress={close}
-            >
-              <X size={18} color="#64748b" />
-            </Pressable>
-          </View>
-
-          {editing && pipeline && access.manage && (
-            <PipelineForm
-              pipeline={pipeline}
-              setLocked={(value) => {
-                lock.current = value;
-              }}
-              onClose={() => {
-                setEditing(false);
-                setRevision((value) => value + 1);
-              }}
-            />
-          )}
-        </SafeAreaView>
-      </Modal>
+      {editing && pipeline && access.manage && (
+        <RecruitmentModal
+          title="Sửa quy trình tuyển dụng"
+          subtitle="Sắp xếp thứ tự và cấu hình các bước trong quy trình"
+          visible={editing}
+          onClose={close}
+        >
+          <PipelineForm
+            pipeline={pipeline}
+            setLocked={(value) => {
+              lock.current = value;
+            }}
+            onClose={() => {
+              setEditing(false);
+              setRevision((value) => value + 1);
+            }}
+          />
+        </RecruitmentModal>
+      )}
+      {alertView}
     </>
   );
 }

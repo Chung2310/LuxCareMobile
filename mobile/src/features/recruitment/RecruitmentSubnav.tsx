@@ -1,6 +1,6 @@
 import { Pressable, ScrollView, StyleSheet, Text, View } from "react-native";
 import { router } from "expo-router";
-import { Briefcase, Users, Calendar, GitFork, type LucideIcon } from "lucide-react-native";
+import { Briefcase, Users, Calendar, type LucideIcon } from "lucide-react-native";
 
 type RecruitmentSection = "jobs" | "applicants" | "interviews" | "pipeline";
 
@@ -8,12 +8,11 @@ const sections: Array<{
   key: RecruitmentSection;
   label: string;
   Icon: LucideIcon;
-  href: "/(tabs)/recruitment" | "/(tabs)/applicants" | "/(tabs)/interviews" | "/(tabs)/recruitment-pipeline";
+  href: "/(tabs)/recruitment" | "/(tabs)/applicants" | "/(tabs)/interviews";
 }> = [
   { key: "jobs", label: "Tin tuyển dụng", Icon: Briefcase, href: "/(tabs)/recruitment" },
   { key: "applicants", label: "Ứng viên", Icon: Users, href: "/(tabs)/applicants" },
   { key: "interviews", label: "Lịch phỏng vấn", Icon: Calendar, href: "/(tabs)/interviews" },
-  { key: "pipeline", label: "Quy trình", Icon: GitFork, href: "/(tabs)/recruitment-pipeline" },
 ];
 
 export function RecruitmentSubnav({ active }: { active: RecruitmentSection }) {

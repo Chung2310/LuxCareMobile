@@ -1,7 +1,6 @@
 import { useCallback, useMemo, useState } from "react";
 import {
   ActivityIndicator,
-  Alert,
   Pressable,
   RefreshControl,
   ScrollView,
@@ -10,6 +9,7 @@ import {
   TextInput,
   View,
 } from "react-native";
+import { useAppAlert } from "../../src/components/AppAlert";
 import { SafeAreaView } from "react-native-safe-area-context";
 import { router, useFocusEffect, useLocalSearchParams } from "expo-router";
 import type { RecruitmentApplicant, RecruitmentJob, RecruitmentPipeline } from "../../../src/types/recruitment";
@@ -71,6 +71,7 @@ function Pagination({ meta, onChange }: { meta: PaginationMeta; onChange: (page:
 }
 
 export default function Applicants() {
+  const { showAlert, alertView } = useAppAlert();
   const { user, selectedBranch } = useSession();
   const access = recruitmentAccess(user);
   const params = useLocalSearchParams<{ jobId?: string }>();
@@ -192,8 +193,10 @@ export default function Applicants() {
       });
 
       await load();
+      showAlert("Thành công", "Đã tạo 3 hồ sơ ứng viên mẫu thành công.", [{ text: "Đóng" }], "success");
     } catch (err) {
       setError(messageOf(err));
+      showAlert("Không thể tạo dữ liệu mẫu", messageOf(err), [{ text: "Đã hiểu" }], "error");
     } finally {
       setSeeding(false);
     }
@@ -205,8 +208,10 @@ export default function Applicants() {
     try {
       await recruitment.transitionApplicant(applicant._id, applicant.version, nextStage);
       await load();
+      showAlert("Thành công", `Đã chuyển ứng viên ${applicant.fullName} sang giai đoạn mới.`, [{ text: "Đóng" }], "success");
     } catch (err) {
       setError(messageOf(err));
+      showAlert("Không thể chuyển giai đoạn", messageOf(err), [{ text: "Đã hiểu" }], "error");
     } finally {
       setBusyId(null);
     }
@@ -672,6 +677,7 @@ export default function Applicants() {
           }}
         />
       )}
+      {alertView}
     </>
   );
 }

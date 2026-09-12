@@ -14,15 +14,16 @@ import { SafeAreaView } from "react-native-safe-area-context";
 import { router, useFocusEffect } from "expo-router";
 import type { RecruitmentJob } from "../../../src/types/recruitment";
 import { emptyPagination } from "../../../src/types/pagination";
-import { recruitment } from "../../src/api/services";
+import { branches, recruitment } from "../../src/api/services";
 import { messageOf, useSession } from "../../src/auth/SessionProvider";
+import { BranchSelector } from "../../src/features/branches/BranchSelector";
 import { RecruitmentSubnav } from "../../src/features/recruitment/RecruitmentSubnav";
 import { JOB_STATUSES, recruitmentAccess } from "../../src/features/recruitment/access";
 import { JobForm } from "../../src/features/recruitment/JobForm";
 import { AttachmentPanel } from "../../src/features/recruitment/AttachmentPanel";
 import { PublicDocumentLink } from "../../src/features/recruitment/PublicDocumentLink";
 import { EmptyState, ErrorText, Loading, Page, styles as baseStyles } from "../../src/ui";
-import { BranchSelector } from "../../src/features/branches/BranchSelector";
+
 import {
   AlertTriangle,
   Banknote,
@@ -48,7 +49,6 @@ import {
   RotateCcw,
   Search,
   Settings,
-  Sparkles,
   Target,
   Trash2,
   Users,
@@ -64,7 +64,10 @@ const WORKPLACE_LABELS: Record<string, string> = {
 
 export default function Recruitment() {
   const { showAlert, alertView } = useAppAlert();
-  const { user, selectedBranch } = useSession();
+  const { user, selectedBranch, selectBranch } = useSession();
+  const selectBranchRef = useRef(selectBranch);
+  selectBranchRef.current = selectBranch;
+  const [branchError, setBranchError] = useState<string | null>(null);
   const isOwner = ["admin", "superadmin", "branch_owner"].includes(user?.role || "");
   const access = recruitmentAccess(user);
 
@@ -96,73 +99,26 @@ export default function Recruitment() {
     setRevision((v) => v + 1);
   };
 
-  const scopeReady = Boolean(user?.companyCode || selectedBranch?._id || user?.branchId || isOwner);
+  const scopeReady = isOwner
+    ? Boolean(selectedBranch?._id)
+    : Boolean(user?.companyCode || selectedBranch?._id || user?.branchId);
 
-  const [seeding, setSeeding] = useState(false);
-  const handleSeedDemo = async () => {
-    if (seeding || !access.manage) return;
-    setSeeding(true);
-    try {
-      await recruitment.createJob({
-        code: `BS-${Date.now().toString().slice(-4)}`,
-        title: "Bác sĩ Đa khoa",
-        department: "Khám bệnh",
-        headcount: 2,
-        employmentType: "full_time",
-        workplaceType: "onsite",
-        location: selectedBranch?.name || "Cơ sở chính",
-        salaryMin: 25000000,
-        salaryMax: 40000000,
-        showSalary: true,
-        description: "Khám, chẩn đoán và điều trị bệnh nhân tại phòng khám theo đúng quy trình chuyên môn.",
-        requirements: "Tốt nghiệp Đại học Y Dược, có CCHN khám chữa bệnh, tối thiểu 2 năm kinh nghiệm.",
-        benefits: "Lương thưởng cạnh tranh, BHXH theo luật, hỗ trợ ăn trưa, đào tạo chuyên sâu.",
-        status: "open",
-        applicationDeadline: new Date(Date.now() + 30 * 86400000).toISOString(),
-      });
-      await recruitment.createJob({
-        code: `DD-${Date.now().toString().slice(-4)}`,
-        title: "Điều dưỡng viên Chăm sóc",
-        department: "Điều dưỡng",
-        headcount: 5,
-        employmentType: "full_time",
-        workplaceType: "onsite",
-        location: selectedBranch?.name || "Cơ sở chính",
-        salaryMin: 12000000,
-        salaryMax: 18000000,
-        showSalary: true,
-        description: "Thực hiện y lệnh của bác sĩ, chăm sóc bệnh nhân, tiêm truyền và xử lý vết thương.",
-        requirements: "Tốt nghiệp CĐ/ĐH Điều dưỡng, có CCHN, nhanh nhẹn, tận tâm.",
-        benefits: "Phụ cấp trực ca, thưởng KPI hàng tháng, đồng phục và bảo hiểm đầy đủ.",
-        status: "open",
-        applicationDeadline: new Date(Date.now() + 20 * 86400000).toISOString(),
-      });
-      await recruitment.createJob({
-        code: `DS-${Date.now().toString().slice(-4)}`,
-        title: "Dược sĩ Nhà thuốc",
-        department: "Dược",
-        headcount: 2,
-        employmentType: "full_time",
-        workplaceType: "onsite",
-        location: selectedBranch?.name || "Cơ sở chính",
-        salaryMin: 15000000,
-        salaryMax: 22000000,
-        showSalary: true,
-        description: "Tư vấn và bán thuốc theo đơn, quản lý tồn kho, kiểm soát hạn dùng thuốc.",
-        requirements: "Tốt nghiệp Đại học Dược, có CCHN dược, nắm vững quy chế bán lẻ.",
-        benefits: "Hoa hồng doanh số bán lẻ, du lịch hàng năm, phụ cấp trách nhiệm.",
-        status: "open",
-        applicationDeadline: new Date(Date.now() + 25 * 86400000).toISOString(),
-      });
-      setSuccess("Đã khởi tạo thành công 3 tin tuyển dụng mẫu!");
-      setTimeout(() => setSuccess(null), 4000);
-      setRevision((v) => v + 1);
-    } catch (err) {
-      setError(messageOf(err));
-    } finally {
-      setSeeding(false);
-    }
-  };
+  useFocusEffect(useCallback(() => {
+    if (!isOwner || !access.read || selectedBranch?._id) return;
+    let active = true;
+    setBranchError(null);
+    branches.list().then(items => {
+      if (!active) return;
+      const available = items.filter(item => item.isActive &&
+        item.companyCode.toUpperCase() === user?.companyCode?.toUpperCase());
+      const branch = available.find(item => item._id === user?.branchId) || available[0];
+      if (branch) selectBranchRef.current(branch);
+      else setBranchError("Chưa có chi nhánh đang hoạt động để chọn.");
+    }).catch(err => {
+      if (active) setBranchError(messageOf(err));
+    });
+    return () => { active = false; };
+  }, [isOwner, access.read, selectedBranch?._id, user?.uid, user?.companyCode, user?.branchId, revision]));
 
   const loadData = useCallback(
     async (isRefresh = false) => {
@@ -243,12 +199,25 @@ export default function Recruitment() {
       else if (action === "restore") await recruitment.restoreJob(job._id, job.version);
       else await recruitment.changeJobStatus(job._id, job.version, action as RecruitmentJob["status"]);
 
-      setSuccess("Đã cập nhật trạng thái tin tuyển dụng.");
-      setTimeout(() => setSuccess(null), 4000);
+      showAlert(
+        "Thành công",
+        action === "delete"
+          ? `Đã chuyển tin ${job.code} vào thùng rác.`
+          : action === "restore"
+          ? `Đã khôi phục tin ${job.code} thành công.`
+          : `Đã cập nhật trạng thái tin ${job.code} thành công.`,
+        [{ text: "Đóng" }],
+        "success",
+      );
       setRevision((v) => v + 1);
     } catch (err) {
       setUncertain(true);
-      setMutationError(`${messageOf(err)} Vui lòng tải lại dữ liệu trước khi thao tác.`);
+      showAlert(
+        "Thao tác không thành công",
+        `${messageOf(err)}\nVui lòng tải lại dữ liệu trước khi thao tác tiếp.`,
+        [{ text: "Đã hiểu" }],
+        "error",
+      );
     } finally {
       lock.current = false;
       setBusy(false);
@@ -352,11 +321,19 @@ export default function Recruitment() {
         <View style={uiStyles.emptyBox}>
           <Building2 size={40} color="#94a3b8" />
           <Text style={uiStyles.emptyTitle}>Chưa chọn chi nhánh</Text>
-          <Text style={uiStyles.emptyText}>
-            {user?.role === "admin"
-              ? "Vui lòng chọn chi nhánh làm việc trong mục Tài khoản để quản lý tin tuyển dụng."
-              : "Hồ sơ của bạn chưa được liên kết với chi nhánh làm việc."}
-          </Text>
+          {isOwner ? (
+            <>
+              <Text style={uiStyles.emptyText}>{branchError || "Đang chọn chi nhánh..."}</Text>
+              <BranchSelector allowAll={false} />
+              {!!branchError && (
+                <Pressable onPress={() => setRevision(v => v + 1)}>
+                  <Text style={uiStyles.emptyText}>Thử lại</Text>
+                </Pressable>
+              )}
+            </>
+          ) : (
+            <Text style={uiStyles.emptyText}>Hồ sơ của bạn chưa được liên kết với chi nhánh làm việc.</Text>
+          )}
         </View>
         {alertView}
       </Page>
@@ -410,37 +387,17 @@ export default function Recruitment() {
                 <Text style={uiStyles.headerTitle}>Tin tuyển dụng</Text>
                 {isOwner ? (
                   <BranchSelector
-                    renderCustomTrigger={(open) => (
-                      <Pressable
-                        onPress={open}
-                        style={[
-                          uiStyles.branchRow,
-                          {
-                            backgroundColor: "#f0fdf4",
-                            borderColor: "#bbf7d0",
-                            borderWidth: 1,
-                            paddingHorizontal: 8,
-                            paddingVertical: 2,
-                            borderRadius: 10,
-                            marginTop: 2,
-                          },
-                        ]}
-                      >
-                        <View style={[uiStyles.branchDot, { backgroundColor: "#16a34a" }]} />
-                        <Text style={[uiStyles.branchName, { color: "#15803d", fontWeight: "700" }]}>
-                          {selectedBranch?.name || "Toàn công ty"}
-                        </Text>
-                        <ChevronDown size={13} color="#15803d" style={{ marginLeft: 3 }} />
+                    allowAll={false}
+                    renderCustomTrigger={(open, currentName) => (
+                      <Pressable onPress={open} style={uiStyles.branchRow}>
+                        <View style={uiStyles.branchDot} />
+                        <Text style={uiStyles.branchName}>{currentName}</Text>
+                        <ChevronDown size={13} color="#15803d" />
                       </Pressable>
                     )}
                   />
                 ) : (
-                  <View style={uiStyles.branchRow}>
-                    <View style={uiStyles.branchDot} />
-                    <Text style={uiStyles.branchName}>
-                      {selectedBranch?.name || user?.branchName || "Toàn công ty"}
-                    </Text>
-                  </View>
+                  <Text style={uiStyles.branchName}>{selectedBranch?.name || user?.branchName}</Text>
                 )}
               </View>
             </View>
@@ -911,20 +868,7 @@ export default function Recruitment() {
                     <Plus size={14} color="#ffffff" style={{ marginRight: 4 }} />
                     <Text style={uiStyles.createBtnText}>Tạo tin mới</Text>
                   </Pressable>
-                  <Pressable
-                    style={[
-                      uiStyles.createBtn,
-                      { backgroundColor: "#0284c7", paddingHorizontal: 16, flexDirection: "row", alignItems: "center", gap: 5 },
-                      seeding && uiStyles.btnDisabled,
-                    ]}
-                    disabled={seeding}
-                    onPress={handleSeedDemo}
-                  >
-                    <Sparkles size={14} color="#ffffff" />
-                    <Text style={uiStyles.createBtnText}>
-                      {seeding ? "Đang tạo..." : "Thêm 3 tin mẫu"}
-                    </Text>
-                  </Pressable>
+
                 </View>
               ) : null}
             </View>

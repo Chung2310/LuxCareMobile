@@ -162,3 +162,36 @@ it("uploads through the legacy reader when FileSystemFile.base64 is rejected", a
   expect(progress).toHaveBeenLastCalledWith({ stage: "uploading", name: "doc.pdf" });
   expect(mocks.remove).toHaveBeenCalledOnce();
 });
+it("does not open the picker after cancellation", async () => {
+  const controller = new AbortController();
+  controller.abort();
+  expect(await pickContractFile(scope, "extension", "file", undefined, controller.signal)).toBeNull();
+  expect(mocks.pick).not.toHaveBeenCalled();
+});
+it("does not upload after the screen closes while reading a file", async () => {
+  const controller = new AbortController();
+  mocks.base64.mockImplementation(async () => { controller.abort(); return "dGVzdA=="; });
+  expect(await pickContractFile(scope, "extensionSigned", "file", undefined, controller.signal)).toBeNull();
+  expect(mocks.upload).not.toHaveBeenCalled();
+  expect(mocks.remove).toHaveBeenCalledOnce();
+});
+it("does not upload a camera result after cancellation", async () => {
+  const controller = new AbortController();
+  mocks.camera.mockImplementation(async () => { controller.abort(); return { file: "photo" }; });
+  expect(await pickContractFile(scope, "extension", "camera", undefined, controller.signal)).toBeNull();
+  expect(mocks.upload).not.toHaveBeenCalled();
+});
+it("passes cancellation to the upload and ignores a late server result", async () => {
+  const controller = new AbortController();
+  mocks.upload.mockImplementation(async () => { controller.abort(); return { url: "url", uploadToken: "token" }; });
+  expect(await pickContractFile(scope, "extension", "file", undefined, controller.signal)).toBeNull();
+  expect(mocks.upload.mock.calls[0][2]).toBe(controller.signal);
+});
+it("forwards cancellation through the contract service", async () => {
+  const { createHrContractService } = await import("../../../../src/services/hrContractService");
+  const fetch = vi.fn().mockResolvedValue(new Response(JSON.stringify({ data: { url: "url", uploadToken: "token" } })));
+  const service = createHrContractService({ fetch, getAccessToken: () => "access" });
+  const signal = new AbortController().signal;
+  await service.upload(scope, { file: "data", name: "file.pdf", mimeType: "application/pdf", size: 4, kind: "extension" }, signal);
+  expect(fetch.mock.calls[0][1].signal).toBe(signal);
+});

@@ -63,8 +63,9 @@ export function createHrContractService({ fetch, getAccessToken }: ServiceTransp
     async upload(
       scope: ContractScope,
       value: { file: string; name: string; mimeType: string; size: number; kind: ContractUploadKind },
+      signal?: AbortSignal,
     ): Promise<{ url: string; uploadToken: string }> {
-      return (await request("/upload", scope, { method: "POST", body: JSON.stringify(value) })).data;
+      return (await request("/upload", scope, { method: "POST", body: JSON.stringify(value), signal })).data;
     },
     async extend(
       scope: ContractScope,

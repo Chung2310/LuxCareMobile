@@ -1,6 +1,6 @@
 import React, { useCallback, useState } from "react";
 import { Modal, Pressable, ScrollView, StyleSheet, Text, View } from "react-native";
-import { Ionicons } from "@expo/vector-icons";
+import { AlertCircle, CheckCircle2, Info, X } from "lucide-react-native";
 
 type AlertTone = "info" | "success" | "error";
 type AlertButton = {
@@ -30,8 +30,8 @@ export function useAppAlert() {
   };
   const destructive = content?.buttons.some(button => button.style === "destructive");
   const error = content?.tone === "error" || destructive;
-  const color = error ? "#dc2626" : "#008852";
-  const icon = error ? "alert-circle-outline" : content?.tone === "success" ? "checkmark-circle" : "information-circle-outline";
+  const isSuccess = content?.tone === "success";
+  const color = error ? "#dc2626" : isSuccess ? "#059669" : "#0284c7";
   const alertView = (
     <Modal visible={content !== null} transparent animationType="fade" onRequestClose={dismiss} statusBarTranslucent>
       <View style={styles.overlay}>
@@ -39,10 +39,16 @@ export function useAppAlert() {
         <View style={styles.card} accessibilityViewIsModal>
           <Pressable onPress={dismiss} style={({ pressed }) => [styles.close, pressed && styles.pressed]}
             accessibilityRole="button" accessibilityLabel="Đóng thông báo" hitSlop={8}>
-            <Ionicons name="close" size={20} color="#64748b" />
+            <X size={18} color="#64748b" />
           </Pressable>
-          <View style={[styles.iconBadge, { backgroundColor: error ? "#fef2f2" : "#ecfdf5" }]}>
-            <Ionicons name={icon} size={34} color={color} />
+          <View style={[styles.iconBadge, { backgroundColor: error ? "#fef2f2" : isSuccess ? "#ecfdf5" : "#f0f9ff" }]}>
+            {error ? (
+              <AlertCircle size={34} color={color} />
+            ) : isSuccess ? (
+              <CheckCircle2 size={34} color={color} />
+            ) : (
+              <Info size={34} color={color} />
+            )}
           </View>
           <ScrollView style={styles.body} contentContainerStyle={styles.bodyContent} bounces={false}>
             <Text style={styles.title} accessibilityRole="header">{content?.title}</Text>
@@ -55,7 +61,7 @@ export function useAppAlert() {
                 <Pressable key={index} accessibilityRole="button"
                   onPress={() => { setContent(null); button.onPress?.(); }}
                   style={({ pressed }) => [
-                    styles.button, secondary ? styles.secondary : { backgroundColor: button.style === "destructive" ? "#dc2626" : "#008852" },
+                    styles.button, secondary ? styles.secondary : { backgroundColor: button.style === "destructive" ? "#dc2626" : "#059669" },
                     pressed && styles.pressed,
                   ]}>
                   <Text style={[styles.buttonText, secondary && styles.secondaryText]}>{button.text}</Text>

@@ -28,16 +28,20 @@ export function UploadFields({
   const [error, setError] = useState<string | null>(null);
   const lock = useRef(false);
   const mounted = useRef(true);
+  const uploadController = useRef<AbortController | null>(null);
 
   useEffect(() => {
     mounted.current = true;
     return () => {
       mounted.current = false;
+      uploadController.current?.abort();
     };
   }, []);
 
   const pick = async (kind: ContractUploadKind, source: "file" | "camera" = "file") => {
     if (lock.current || disabled) return;
+    const controller = new AbortController();
+    uploadController.current = controller;
     lock.current = true;
     setBusy(true);
     setActiveKind(kind);
@@ -45,10 +49,10 @@ export function UploadFields({
     onBusy(true);
     setError(null);
     try {
-      const file = await pickContractFile(scope, kind, source, value => { if (mounted.current) setProgress(value); });
-      if (mounted.current && file) onChange({ ...value, [kind]: file });
+      const file = await pickContractFile(scope, kind, source, value => { if (mounted.current && !controller.signal.aborted) setProgress(value); }, controller.signal);
+      if (mounted.current && !controller.signal.aborted && file) onChange({ ...value, [kind]: file });
     } catch (err) {
-      if (mounted.current) setError(messageOf(err));
+      if (mounted.current && !controller.signal.aborted) setError(messageOf(err));
     } finally {
       lock.current = false;
       if (mounted.current) {

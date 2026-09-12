@@ -73,9 +73,11 @@ export function PipelineForm({
       await recruitment.savePipeline(pipeline.version, input);
       onClose();
     } catch (error) {
+      const msg = messageOf(error);
       const status = error && typeof error === "object" && "status" in error ? Number(error.status) : 0;
-      if (!status || status >= 500 || status === 409 || /phiên bản|version/i.test(messageOf(error))) setBlocked(true);
-      setError(messageOf(error));
+      if (!status || status >= 500 || status === 409 || /phiên bản|version/i.test(msg)) setBlocked(true);
+      setError(msg);
+      showAlert("Không thể lưu quy trình", msg, [{ text: "Đã hiểu" }], "error");
     } finally {
       lock.current = false;
       setBusy(false);
