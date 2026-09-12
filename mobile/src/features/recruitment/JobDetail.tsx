@@ -11,6 +11,7 @@ import {
   Gift,
   Lock,
   MapPin,
+  Paperclip,
   PauseCircle,
   Pencil,
   RotateCcw,
@@ -177,20 +178,29 @@ export function JobDetail({
         </View>
       </View>
 
-      {/* Card 2: Tài liệu JD & Tệp đính kèm */}
-      <View style={styles.card}>
-        <View style={styles.cardHeader}>
-          <View style={styles.iconBox}>
-            <FileText size={16} color="#0284c7" />
+      {/* Card 2: Tài liệu đính kèm */}
+      {(Boolean(job.jdFileUrl) || (!deleted && canManage)) && (
+        <View style={styles.card}>
+          <View style={styles.cardHeader}>
+            <View style={styles.iconBox}>
+              <Paperclip size={16} color="#0284c7" />
+            </View>
+            <Text style={styles.cardTitle}>Tài liệu đính kèm</Text>
           </View>
-          <Text style={styles.cardTitle}>Tài liệu & Tệp đính kèm</Text>
-        </View>
 
-        <View style={{ gap: 10 }}>
-          <PublicDocumentLink title="Mô tả công việc (JD File)" url={job.jdFileUrl} />
-          {!deleted && <AttachmentPanel kind="job" id={job._id} manage={canManage} />}
+          <View style={{ gap: 8 }}>
+            <PublicDocumentLink title="Mô tả công việc (JD File)" url={job.jdFileUrl} />
+            {!deleted && (
+              <AttachmentPanel
+                kind="job"
+                id={job._id}
+                manage={canManage}
+                hasJdFile={Boolean(job.jdFileUrl)}
+              />
+            )}
+          </View>
         </View>
-      </View>
+      )}
 
       {/* Card 3: Mô tả công việc */}
       {!!job.description && (
