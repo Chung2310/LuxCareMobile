@@ -1,9 +1,17 @@
+import { captureDocumentPhoto } from "../../files/captureDocumentPhoto";
 import * as DocumentPicker from "expo-document-picker";
 import { File, Paths } from "expo-file-system";
 import type { ContractScope, ContractUploadKind } from "../../../../src/services/hrContractService";
 import { contracts } from "../../api/services";
 import { CONTRACT_MIMES, contractFileMime, type ContractUpload } from "./uploadModel";
-export async function pickContractFile(scope: ContractScope, kind: ContractUploadKind): Promise<ContractUpload | null> {
+export async function pickContractFile(scope: ContractScope, kind: ContractUploadKind, source: "file" | "camera" = "file"): Promise<ContractUpload | null> {
+  if (source === "camera") {
+    const photo = await captureDocumentPhoto();
+    if (!photo) return null;
+    const result = await contracts.upload(scope, { ...photo, kind });
+    if (!result?.url || !result?.uploadToken) throw new Error("Chưa xác nhận được ảnh tải lên. Vui lòng chụp lại.");
+    return { ...result, name: photo.name, mimeType: photo.mimeType, size: photo.size };
+  }
   const signed = kind === "signed" || kind === "extensionSigned";
   const picked = await DocumentPicker.getDocumentAsync({
     type: Object.values(CONTRACT_MIMES).filter((type) => !signed || type.startsWith("image/")),

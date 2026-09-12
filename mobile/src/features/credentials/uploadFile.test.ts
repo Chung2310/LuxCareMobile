@@ -1,5 +1,6 @@
 import { beforeEach, expect, it, vi } from "vitest";
-const mocks = vi.hoisted(() => ({ pick: vi.fn(), upload: vi.fn(), remove: vi.fn(), base64: vi.fn(), size: 10 }));
+const mocks = vi.hoisted(() => ({ pick: vi.fn(), upload: vi.fn(), remove: vi.fn(), base64: vi.fn(), size: 10, camera: vi.fn() }));
+vi.mock("../../files/captureDocumentPhoto", () => ({ captureDocumentPhoto: mocks.camera }));
 vi.mock("expo-document-picker", () => ({ getDocumentAsync: mocks.pick }));
 vi.mock("expo-file-system", () => ({
   Paths: { cache: { uri: "file:///cache/" } },
@@ -101,4 +102,19 @@ it("propagates failed upload without retrying", async () => {
     service.upload("A", { file: "data", name: "scan.pdf", mimeType: "application/pdf", size: 10 }),
   ).rejects.toMatchObject({ status: 403 });
   expect(fetch).toHaveBeenCalledOnce();
+});
+
+it("maps camera photo metadata to credential file fields", async () => {
+  const signal = new AbortController().signal;
+  const photo = { file: "data:image/jpeg;base64,dGVzdA==", name: "photo.jpg", mimeType: "image/jpeg", size: 4 };
+  mocks.camera.mockResolvedValue(photo);
+  expect(await pickCredentialFile("COMP", signal, "camera")).toMatchObject({ fileName: "photo.jpg", fileSize: 4, fileMimeType: "image/jpeg", uploadToken: "token" });
+  expect(mocks.upload).toHaveBeenCalledWith("COMP", photo, signal);
+  expect(mocks.pick).not.toHaveBeenCalled();
+});
+it("does not upload a camera photo after cancellation", async () => {
+  const controller = new AbortController();
+  mocks.camera.mockImplementation(async () => { controller.abort(); return { file: "photo" }; });
+  expect(await pickCredentialFile("COMP", controller.signal, "camera")).toBeNull();
+  expect(mocks.upload).not.toHaveBeenCalled();
 });

@@ -1,5 +1,6 @@
 import { beforeEach, expect, it, vi } from "vitest";
-const mocks = vi.hoisted(() => ({ pick: vi.fn(), upload: vi.fn(), remove: vi.fn(), base64: vi.fn(), size: 10 }));
+const mocks = vi.hoisted(() => ({ pick: vi.fn(), upload: vi.fn(), remove: vi.fn(), base64: vi.fn(), size: 10, camera: vi.fn() }));
+vi.mock("../../files/captureDocumentPhoto", () => ({ captureDocumentPhoto: mocks.camera }));
 vi.mock("expo-document-picker", () => ({ getDocumentAsync: mocks.pick }));
 vi.mock("expo-file-system", () => ({
   Paths: { cache: { uri: "file:///cache/" } },
@@ -75,4 +76,17 @@ it("rejects an incomplete server response and preserves original files outside c
   mocks.upload.mockResolvedValue({ url: "url" });
   await expect(pickContractFile(scope, "contract")).rejects.toThrow("Chưa xác nhận");
   expect(mocks.remove).not.toHaveBeenCalled();
+});
+
+it.each(["contract", "signed", "extension", "extensionSigned"] as const)("uploads a camera photo for %s", async kind => {
+  const photo = { file: "data:image/jpeg;base64,dGVzdA==", name: "photo.jpg", mimeType: "image/jpeg", size: 4 };
+  mocks.camera.mockResolvedValue(photo);
+  expect(await pickContractFile(scope, kind, "camera")).toMatchObject({ uploadToken: "token", name: "photo.jpg" });
+  expect(mocks.upload).toHaveBeenCalledWith(scope, { ...photo, kind });
+  expect(mocks.pick).not.toHaveBeenCalled();
+});
+it("does not upload a canceled camera photo", async () => {
+  mocks.camera.mockResolvedValue(null);
+  expect(await pickContractFile(scope, "signed", "camera")).toBeNull();
+  expect(mocks.upload).not.toHaveBeenCalled();
 });

@@ -9,6 +9,20 @@ import {
   View,
 } from "react-native";
 import { SafeAreaView } from "react-native-safe-area-context";
+import {
+  X,
+  AlertCircle,
+  User,
+  Check,
+  Calendar,
+  ChevronDown,
+  Info,
+  FileText,
+  Trash2,
+  Paperclip,
+  Camera,
+  Save,
+} from "lucide-react-native";
 import type { Credential } from "../../../../src/types/hrCredential";
 import type { CredentialFileFields, CredentialList } from "../../../../src/services/hrCredentialService";
 import { pickCredentialFile } from "./uploadFile";
@@ -52,7 +66,7 @@ export function CredentialForm({
 
   useEffect(() => () => uploadController.current?.abort(), []);
 
-  const pick = async () => {
+  const pick = async (source: "file" | "camera" = "file") => {
     if (lock.current || blocked || readOnly) return;
     const controller = new AbortController();
     uploadController.current = controller;
@@ -61,7 +75,7 @@ export function CredentialForm({
     setUploading(true);
     setError(null);
     try {
-      const value = await pickCredentialFile(companyCode, controller.signal);
+      const value = await pickCredentialFile(companyCode, controller.signal, source);
       if (!controller.signal.aborted && value) setUpload(value);
     } catch (err) {
       if (!controller.signal.aborted) setError(messageOf(err));
@@ -143,7 +157,7 @@ export function CredentialForm({
           hitSlop={10}
           style={({ pressed }) => [styles.closeBtn, pressed && { opacity: 0.7 }]}
         >
-          <Text style={styles.closeBtnText}>✕</Text>
+          <X size={18} color="#64748b" />
         </Pressable>
       </View>
 
@@ -155,8 +169,9 @@ export function CredentialForm({
       >
         {/* Error Alert */}
         {error && (
-          <View style={styles.errorCard}>
-            <Text style={styles.errorText}>⚠️ {error}</Text>
+          <View style={[styles.errorCard, { flexDirection: "row", alignItems: "center", gap: 6 }]}>
+            <AlertCircle size={15} color="#dc2626" />
+            <Text style={[styles.errorText, { flex: 1 }]}>{error}</Text>
           </View>
         )}
 
@@ -180,11 +195,13 @@ export function CredentialForm({
               onPress={() => !readOnly && setEmployeeModalOpen(true)}
             >
               <View style={[styles.selectAvatarCircle, selectedEmployee && styles.selectAvatarCircleFilled]}>
-                <Text style={[styles.selectAvatarText, selectedEmployee && styles.selectAvatarTextFilled]}>
-                  {selectedEmployee
-                    ? (selectedEmployee.displayName || selectedEmployee.email || "NV")[0].toUpperCase()
-                    : "👤"}
-                </Text>
+                {selectedEmployee ? (
+                  <Text style={[styles.selectAvatarText, styles.selectAvatarTextFilled]}>
+                    {(selectedEmployee.displayName || selectedEmployee.email || "NV")[0].toUpperCase()}
+                  </Text>
+                ) : (
+                  <User size={16} color="#64748b" />
+                )}
               </View>
               <View style={{ flex: 1 }}>
                 {selectedEmployee ? (
@@ -202,7 +219,8 @@ export function CredentialForm({
               </View>
               {!readOnly && (
                 <View style={styles.selectChevronBadge}>
-                  <Text style={styles.selectButtonChevron}>Chọn ▼</Text>
+                  <Text style={styles.selectButtonChevron}>Chọn</Text>
+                  <ChevronDown size={12} color="#059669" />
                 </View>
               )}
             </Pressable>
@@ -224,12 +242,13 @@ export function CredentialForm({
                       styles.typeChip,
                       isSelected && styles.typeChipSelected,
                       readOnly && { opacity: 1 },
+                      { flexDirection: "row", alignItems: "center", gap: 4 },
                     ]}
                     disabled={disabled}
                     onPress={() => !readOnly && setDraft((c) => ({ ...c, type: typeKey as Credential["type"] }))}
                   >
+                    {isSelected && <Check size={12} color="#059669" strokeWidth={3} />}
                     <Text style={[styles.typeChipText, isSelected && styles.typeChipTextSelected]}>
-                      {isSelected ? "✓ " : ""}
                       {typeLabel}
                     </Text>
                   </Pressable>
@@ -302,7 +321,7 @@ export function CredentialForm({
                 disabled={disabled}
                 onPress={() => !readOnly && setIssueDatePickerOpen(true)}
               >
-                <Text style={styles.datePickerIcon}>📅</Text>
+                <Calendar size={15} color="#059669" style={{ marginRight: 6 }} />
                 <View style={{ flex: 1 }}>
                   <Text
                     style={[
@@ -319,7 +338,7 @@ export function CredentialForm({
                     <Text style={styles.datePickerSub}>{draft.issueDate}</Text>
                   ) : null}
                 </View>
-                {!readOnly && <Text style={styles.datePickerChevron}>▼</Text>}
+                {!readOnly && <ChevronDown size={14} color="#94a3b8" />}
               </Pressable>
             </View>
 
@@ -336,7 +355,7 @@ export function CredentialForm({
                 disabled={disabled}
                 onPress={() => !readOnly && setExpiryDatePickerOpen(true)}
               >
-                <Text style={styles.datePickerIcon}>📅</Text>
+                <Calendar size={15} color="#059669" style={{ marginRight: 6 }} />
                 <View style={{ flex: 1 }}>
                   <Text
                     style={[
@@ -362,18 +381,21 @@ export function CredentialForm({
                     hitSlop={6}
                     style={styles.clearDateBtn}
                   >
-                    <Text style={styles.clearDateText}>✕</Text>
+                    <X size={13} color="#64748b" />
                   </Pressable>
                 ) : !readOnly ? (
-                  <Text style={styles.datePickerChevron}>▼</Text>
+                  <ChevronDown size={14} color="#94a3b8" />
                 ) : null}
               </Pressable>
             </View>
           </View>
           {!readOnly && (
-            <Text style={styles.helperText}>
-              💡 Để trống ngày hết hạn nếu văn bằng/chứng chỉ có giá trị vĩnh viễn (không thời hạn).
-            </Text>
+            <View style={{ flexDirection: "row", alignItems: "flex-start", gap: 5, marginTop: 4 }}>
+              <Info size={13} color="#64748b" style={{ marginTop: 2 }} />
+              <Text style={[styles.helperText, { flex: 1 }]}>
+                Để trống ngày hết hạn nếu văn bằng/chứng chỉ có giá trị vĩnh viễn (không thời hạn).
+              </Text>
+            </View>
           )}
 
           {/* Nhắc trước hạn */}
@@ -471,7 +493,7 @@ export function CredentialForm({
 
           {upload && (
             <View style={styles.fileCard}>
-              <Text style={styles.fileIcon}>📄</Text>
+              <FileText size={20} color="#059669" style={{ marginRight: 6 }} />
               <View style={{ flex: 1 }}>
                 <Text style={styles.fileName} numberOfLines={1}>
                   {upload.fileName || "Tệp mới chọn"}
@@ -483,7 +505,7 @@ export function CredentialForm({
                 disabled={disabled}
                 onPress={() => setUpload(null)}
               >
-                <Text style={styles.removeFileText}>✕ Bỏ</Text>
+                <Text style={styles.removeFileText}>Bỏ</Text>
               </Pressable>
             </View>
           )}
@@ -508,10 +530,24 @@ export function CredentialForm({
                     <Text style={styles.uploadDropzoneText}>Đang xử lý tệp tin...</Text>
                   </View>
                 ) : (
-                  <Text style={styles.uploadDropzoneText}>
-                    📎 {upload || item?.fileUrl ? "Chọn tệp khác để thay thế" : "Bấm để chọn tệp tài liệu từ thiết bị"}
-                  </Text>
+                  <View style={{ flexDirection: "row", alignItems: "center", justifyContent: "center", gap: 6 }}>
+                    <Paperclip size={15} color="#059669" />
+                    <Text style={styles.uploadDropzoneText}>
+                      {upload || item?.fileUrl ? "Chọn tệp khác để thay thế" : "Bấm để chọn tệp tài liệu từ thiết bị"}
+                    </Text>
+                  </View>
                 )}
+              </Pressable>
+              <Pressable
+                accessibilityRole="button"
+                accessibilityLabel="Chụp ảnh hồ sơ trực tiếp"
+                accessibilityState={{ disabled }}
+                style={({ pressed }) => [styles.uploadDropzone, disabled && { opacity: 0.45 }, pressed && { opacity: 0.8 }, { flexDirection: "row", alignItems: "center", justifyContent: "center", gap: 6 }]}
+                disabled={disabled}
+                onPress={() => void pick("camera")}
+              >
+                <Camera size={15} color="#059669" />
+                <Text style={styles.uploadDropzoneText}>Chụp ảnh trực tiếp</Text>
               </Pressable>
             </>
           )}
@@ -522,11 +558,12 @@ export function CredentialForm({
       <View style={styles.actionBar}>
         {onDelete && (
           <Pressable
-            style={({ pressed }) => [styles.deleteActionBtn, pressed && { opacity: 0.7 }]}
+            style={({ pressed }) => [styles.deleteActionBtn, pressed && { opacity: 0.7 }, { flexDirection: "row", alignItems: "center", justifyContent: "center", gap: 5 }]}
             disabled={busy || uploading}
             onPress={onDelete}
           >
-            <Text style={styles.deleteActionBtnText}>🗑️ Xóa</Text>
+            <Trash2 size={14} color="#dc2626" />
+            <Text style={styles.deleteActionBtnText}>Xóa</Text>
           </Pressable>
         )}
 
@@ -548,6 +585,7 @@ export function CredentialForm({
               styles.saveBtn,
               disabled && styles.saveBtnDisabled,
               pressed && { opacity: 0.85 },
+              { flexDirection: "row", alignItems: "center", justifyContent: "center", gap: 5 },
             ]}
             disabled={disabled}
             onPress={() => void save()}
@@ -555,7 +593,10 @@ export function CredentialForm({
             {busy ? (
               <ActivityIndicator size="small" color="#ffffff" />
             ) : (
-              <Text style={styles.saveBtnText}>💾 Lưu chứng chỉ</Text>
+              <>
+                <Save size={14} color="#ffffff" />
+                <Text style={styles.saveBtnText}>Lưu chứng chỉ</Text>
+              </>
             )}
           </Pressable>
         )}
@@ -814,6 +855,9 @@ const styles = StyleSheet.create({
     color: "#94a3b8",
   },
   selectChevronBadge: {
+    flexDirection: "row",
+    alignItems: "center",
+    gap: 3,
     backgroundColor: "#ffffff",
     paddingHorizontal: 8,
     paddingVertical: 4,

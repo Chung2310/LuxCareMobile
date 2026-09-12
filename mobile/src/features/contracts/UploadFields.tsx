@@ -32,14 +32,14 @@ export function UploadFields({
     };
   }, []);
 
-  const pick = async (kind: ContractUploadKind) => {
+  const pick = async (kind: ContractUploadKind, source: "file" | "camera" = "file") => {
     if (lock.current || disabled) return;
     lock.current = true;
     setBusy(true);
     onBusy(true);
     setError(null);
     try {
-      const file = await pickContractFile(scope, kind);
+      const file = await pickContractFile(scope, kind, source);
       if (mounted.current && file) onChange({ ...value, [kind]: file });
     } catch (err) {
       if (mounted.current) setError(messageOf(err));
@@ -138,6 +138,16 @@ export function UploadFields({
                 <Text style={[styles.pickBtnText, selected && styles.pickBtnSecondaryText]}>
                   {selected ? "Đổi tệp khác" : "Chọn tệp từ máy..."}
                 </Text>
+              </Pressable>
+              <Pressable
+                accessibilityRole="button"
+                accessibilityLabel={"Chụp ảnh trực tiếp: " + title}
+                accessibilityState={{ disabled: disabled || busy }}
+                style={({ pressed }) => [styles.pickBtn, styles.pickBtnSecondary, (disabled || busy) && styles.pickBtnDisabled, pressed && { opacity: 0.8 }]}
+                disabled={disabled || busy}
+                onPress={() => void pick(kind, "camera")}
+              >
+                <Text style={[styles.pickBtnText, styles.pickBtnSecondaryText]}>Chụp ảnh trực tiếp</Text>
               </Pressable>
             </View>
           );
