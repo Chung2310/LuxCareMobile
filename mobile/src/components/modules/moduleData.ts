@@ -142,6 +142,16 @@ export const LUXCARE_MODULES: ServiceModule[] = [
         moduleId: "popular",
         status: "active",
       },
+      {
+        id: "pop-departments",
+        title: "Quản lý\nphòng ban",
+        icon: "business",
+        color: "#0891b2",
+        bgColor: "#ecfeff",
+        route: "/(tabs)/departments",
+        moduleId: "popular",
+        status: "active",
+      },
     ],
   },
   {
@@ -216,6 +226,16 @@ export const LUXCARE_MODULES: ServiceModule[] = [
         color: "#6366f1",
         bgColor: "#eef2ff",
         route: "/(tabs)/org-chart",
+        moduleId: "hr",
+        status: "active",
+      },
+      {
+        id: "hr-departments",
+        title: "Quản lý\nphòng ban",
+        icon: "business",
+        color: "#0891b2",
+        bgColor: "#ecfeff",
+        route: "/(tabs)/departments",
         moduleId: "hr",
         status: "active",
       },
@@ -297,36 +317,6 @@ export const LUXCARE_MODULES: ServiceModule[] = [
         status: "active",
       },
       {
-        id: "op-stock",
-        title: "Xuất - Nhập\nTồn kho",
-        icon: "swap-vertical",
-        color: "#0d9488",
-        bgColor: "#f0fdfa",
-        route: "/(tabs)/inventory-stock",
-        moduleId: "operations",
-        status: "coming_soon",
-      },
-      {
-        id: "op-expiry",
-        title: "Cảnh báo\nhạn sử dụng",
-        icon: "alert-circle",
-        color: "#e11d48",
-        bgColor: "#fff1f2",
-        route: "/(tabs)/inventory-expiry",
-        moduleId: "operations",
-        status: "coming_soon",
-      },
-      {
-        id: "op-audit",
-        title: "Phiếu kiểm kê\nvật tư",
-        icon: "clipboard",
-        color: "#d97706",
-        bgColor: "#fffbeb",
-        route: "/(tabs)/inventory-audit",
-        moduleId: "operations",
-        status: "coming_soon",
-      },
-      {
         id: "op-equipment",
         title: "Quản lý\nthiết bị y tế",
         icon: "medkit",
@@ -335,26 +325,6 @@ export const LUXCARE_MODULES: ServiceModule[] = [
         route: "/(tabs)/equipment",
         moduleId: "operations",
         status: "active",
-      },
-      {
-        id: "op-maintenance",
-        title: "Lịch bảo trì\nmáy móc",
-        icon: "construct",
-        color: "#2563eb",
-        bgColor: "#eff6ff",
-        route: "/(tabs)/equipment-maintenance",
-        moduleId: "operations",
-        status: "coming_soon",
-      },
-      {
-        id: "op-repair",
-        title: "Báo hỏng\nthiết bị",
-        icon: "flash",
-        color: "#ea580c",
-        bgColor: "#fff7ed",
-        route: "/(tabs)/equipment-repair",
-        moduleId: "operations",
-        status: "coming_soon",
       },
       {
         id: "op-crm",
@@ -376,16 +346,6 @@ export const LUXCARE_MODULES: ServiceModule[] = [
         moduleId: "operations",
         status: "active",
       },
-      {
-        id: "op-survey",
-        title: "Khảo sát\nkhách hàng",
-        icon: "reader",
-        color: "#7c3aed",
-        bgColor: "#f5f3ff",
-        route: "/(tabs)/crm-survey",
-        moduleId: "operations",
-        status: "coming_soon",
-      },
     ],
   },
   {
@@ -400,6 +360,16 @@ export const LUXCARE_MODULES: ServiceModule[] = [
         color: "#2563eb",
         bgColor: "#eff6ff",
         route: "/(tabs)/work",
+        moduleId: "work",
+        status: "active",
+      },
+      {
+        id: "work-projects",
+        title: "Quản lý\ndự án",
+        icon: "briefcase",
+        color: "#6366f1",
+        bgColor: "#eef2ff",
+        route: "/(tabs)/projects",
         moduleId: "work",
         status: "active",
       },
@@ -471,6 +441,16 @@ export const LUXCARE_MODULES: ServiceModule[] = [
         status: "active",
       },
       {
+        id: "comm-resources",
+        title: "Quản lý\ntài nguyên",
+        icon: "folder-open",
+        color: "#0284c7",
+        bgColor: "#f0f9ff",
+        route: "/(tabs)/resources",
+        moduleId: "communication",
+        status: "active",
+      },
+      {
         id: "sys-users",
         title: "Quản lý\nngười dùng",
         icon: "people-circle",
@@ -510,7 +490,8 @@ export function isServiceAccessible(item: ServiceItem, user: UserProfile | null)
   const isManager = ["admin", "superadmin", "branch_owner", "manager"].includes(user.role || "");
 
   // Route-based permission checks
-  switch (item.route) {
+  const baseRoute = item.route.split("?")[0];
+  switch (baseRoute) {
     case "/(tabs)/roles":
       return user.role === "admin" || user.role === "superadmin";
     case "/(tabs)/users":
@@ -554,14 +535,9 @@ export function isServiceAccessible(item: ServiceItem, user: UserProfile | null)
       return isManager || canUseModule(user, "hr");
 
     case "/(tabs)/inventory":
-    case "/(tabs)/inventory-stock":
-    case "/(tabs)/inventory-expiry":
-    case "/(tabs)/inventory-audit":
       return isManager || canUseModule(user, "supply");
 
     case "/(tabs)/equipment":
-    case "/(tabs)/equipment-maintenance":
-    case "/(tabs)/equipment-repair":
       return isManager || canUseModule(user, "equipment");
 
     case "/(tabs)/chat":
@@ -576,7 +552,6 @@ export function isServiceAccessible(item: ServiceItem, user: UserProfile | null)
     case "/(tabs)/employees":
     case "/(tabs)/org-chart":
     case "/(tabs)/customers":
-    case "/(tabs)/crm-survey":
     case "/(tabs)/blog":
     case "/(tabs)/notifications":
       return true;
