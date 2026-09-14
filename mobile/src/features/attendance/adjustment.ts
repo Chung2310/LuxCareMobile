@@ -7,6 +7,10 @@ export const ATTENDANCE_STATUSES = [
   { value: "Absent", label: "Vắng" },
   { value: "Approved-Leave", label: "Nghỉ được duyệt" },
   { value: "Paid-Holiday", label: "Nghỉ lễ hưởng lương" },
+  { value: "Approved-WFH", label: "Làm từ xa (WFH)" },
+  { value: "Approved-Exception", label: "Ngoại lệ được duyệt" },
+  { value: "Incomplete", label: "Thiếu chấm công" },
+  { value: "Partial", label: "Thiếu công" },
 ];
 export function adjustmentPayload(status: string, note: string, reason: string) {
   if (!ATTENDANCE_STATUSES.some((item) => item.value === status)) throw new Error("Chọn trạng thái công hợp lệ.");

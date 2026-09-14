@@ -3,6 +3,7 @@ export type Credential = {
   _id: string;
   employeeId: string;
   employeeName: string;
+  employeeDeleted?: boolean;
   name: string;
   type: HRCredentialType;
   credentialNumber?: string;

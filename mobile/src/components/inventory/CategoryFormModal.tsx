@@ -11,6 +11,7 @@ import {
   View,
 } from "react-native";
 import { Ionicons } from "@expo/vector-icons";
+import { useAppAlert } from "../AppAlert";
 import type { InventoryCategory } from "./types";
 
 interface CategoryFormModalProps {
@@ -40,6 +41,7 @@ export const CategoryFormModal: React.FC<CategoryFormModalProps> = ({
   onClose,
   onSubmit,
 }) => {
+  const { showAlert, alertView } = useAppAlert();
   const [name, setName] = useState("");
   const [code, setCode] = useState("");
   const [description, setDescription] = useState("");
@@ -61,12 +63,17 @@ export const CategoryFormModal: React.FC<CategoryFormModalProps> = ({
   }, [item, visible]);
 
   const handleSubmit = async () => {
-    if (!name.trim()) {
-      alert("Vui lòng nhập tên danh mục phân loại.");
-      return;
-    }
-    if (!code.trim()) {
-      alert("Vui lòng nhập mã danh mục.");
+    const missing: string[] = [];
+    if (!name.trim()) missing.push("Tên danh mục phân loại");
+    if (!code.trim()) missing.push("Mã danh mục");
+
+    if (missing.length > 0) {
+      showAlert(
+        "Thiếu thông tin bắt buộc",
+        `Vui lòng bổ sung đầy đủ các thông tin sau:\n\n${missing.map((f) => `• ${f}`).join("\n")}`,
+        [{ text: "Đã hiểu" }],
+        "error",
+      );
       return;
     }
 
@@ -79,6 +86,13 @@ export const CategoryFormModal: React.FC<CategoryFormModalProps> = ({
         color,
       });
       onClose();
+    } catch (err: any) {
+      showAlert(
+        "Lỗi lưu danh mục",
+        err.message || "Không thể lưu thông tin danh mục phân loại.",
+        [{ text: "Đã hiểu" }],
+        "error",
+      );
     } finally {
       setSubmitting(false);
     }
@@ -196,6 +210,7 @@ export const CategoryFormModal: React.FC<CategoryFormModalProps> = ({
           </View>
         </View>
       </KeyboardAvoidingView>
+      {alertView}
     </Modal>
   );
 };

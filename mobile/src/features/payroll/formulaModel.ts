@@ -108,3 +108,21 @@ export function percentLabel(rate: number) {
     ) + "%"
   );
 }
+
+export const formulaDisplayStatuses = {
+  ...formulaStatuses,
+  expired: "Đã hết hiệu lực",
+  scheduled: "Chưa đến ngày áp dụng",
+  superseded: "Không áp dụng hiện tại",
+};
+
+export function policyDisplayStatus(
+  item: PayrollPolicyVersion,
+  items: PayrollPolicyVersion[],
+  date: string,
+): keyof typeof formulaDisplayStatuses {
+  if (item.status !== "active") return item.status;
+  if (item.effectiveFrom.slice(0, 10) > date) return "scheduled";
+  if (item.effectiveTo && item.effectiveTo.slice(0, 10) < date) return "expired";
+  return policyForDate(items, date)?._id === item._id ? "active" : "superseded";
+}

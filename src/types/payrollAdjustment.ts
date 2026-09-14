@@ -3,6 +3,7 @@ export interface PayrollAdjustment {
   periodKey: string;
   employeeId: string;
   employeeName?: string;
+  employeeDeleted?: boolean;
   kind: "allowance" | "bonus" | "deduction" | "correction";
   amount: number;
   reason: string;

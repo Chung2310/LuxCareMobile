@@ -11,15 +11,19 @@ import {
   canSyncRunAttendance,
   syncAttendanceSummary,
 } from "./syncAttendanceModel";
+import { CalculatePayrollRun } from "./CalculatePayrollRun";
+import { calculationSummary } from "./calculationModel";
 import { lockedAttendanceSummary } from "./lockAttendanceModel";
 
 export function SyncRunAttendance({
   run,
   onChanged,
   onUpdated,
+  onCalculate,
 }: {
   run: PayrollRun;
   onChanged: () => void;
+  onCalculate?: () => void;
   onUpdated?: (minimumVersion?: number) => Promise<void>;
 }) {
   const { user, selectedBranch } = useSession();
@@ -41,6 +45,9 @@ export function SyncRunAttendance({
   const [confirmLock, setConfirmLock] = useState(false);
   const [locked, setLocked] = useState<ReturnType<
     typeof lockedAttendanceSummary
+  > | null>(null);
+  const [calculated, setCalculated] = useState<ReturnType<
+    typeof calculationSummary
   > | null>(null);
   const { showAlert, alertView } = useAppAlert();
 
@@ -94,6 +101,14 @@ export function SyncRunAttendance({
   };
 
   if (!allowed) return null;
+  if (!run.activeRevisionId)
+    return (
+      <CalculatePayrollRun
+        run={run}
+        onChanged={onChanged}
+        onUpdated={onUpdated}
+      />
+    );
 
   const lockAttendance = async () => {
     if (
@@ -108,37 +123,67 @@ export function SyncRunAttendance({
     lockAttempted.current = true;
     setBusy(true);
     setError(null);
+    let completedVersion: number | undefined;
+    let failure: string | null = null;
+    let calculation: ReturnType<typeof calculationSummary> | null = null;
+    let didLock = false;
     try {
       const expectedVersion = syncedVersion.current!;
       const saved = await payroll.lockRunAttendance(run._id, expectedVersion);
       const summary = lockedAttendanceSummary(saved, run, expectedVersion);
+      didLock = true;
+      completedVersion = saved.run.version;
       if (active.current) setLocked(summary);
-      await onUpdated?.(saved.run.version);
-      if (active.current) {
-        showAlert(
-          "Khóa công thành công",
-          `Đã khóa bản công của ${summary.employeeCount} nhân viên. Vui lòng tính lương.`,
-          [{ text: "Đã hiểu" }],
-          "success",
-        );
-      }
+      const calculatedRun = await payroll.calculateOperationalRun(
+        run._id,
+        saved.run.version,
+        randomUUID(),
+      );
+      calculation = calculationSummary(calculatedRun, {
+        ...run,
+        version: saved.run.version,
+      });
+      completedVersion = calculatedRun.runVersion;
+      if (active.current) setCalculated(calculation);
     } catch (err) {
-      const msg = messageOf(err);
-      if (active.current) {
-        setError(msg);
-        lockAttempted.current = false;
+      failure = messageOf(err);
+    }
+    // Refresh even when locking succeeded but calculation failed.
+    if (completedVersion !== undefined) {
+      try {
+        await onUpdated?.(completedVersion);
+      } catch (err) {
+        failure = [failure, messageOf(err)].filter(Boolean).join("; ");
+      }
+    }
+    if (active.current) {
+      setBusy(false);
+      if (failure) {
+        setError(failure);
+        if (!didLock) lockAttempted.current = false;
         showAlert(
-          "Khóa công không thành công",
-          msg,
+          calculation
+            ? "Chưa tải được bảng lương mới"
+            : didLock
+              ? "Đã khóa công, tính lương chưa hoàn tất"
+              : "Khóa công không thành công",
+          failure,
           [
             { text: "Tải lại kỳ", onPress: onChanged },
             { text: "Đã hiểu", style: "cancel" },
           ],
           "error",
         );
+      } else if (calculation) {
+        showAlert(
+          "Khóa công & tính lương thành công",
+          "Đã tính lương cho " +
+            calculation.employeeCount +
+            " nhân viên. Bạn có thể kiểm tra & duyệt lương.",
+          [{ text: "Đã hiểu" }],
+          "success",
+        );
       }
-    } finally {
-      if (active.current) setBusy(false);
     }
   };
 
@@ -189,22 +234,27 @@ export function SyncRunAttendance({
       {result && !locked && result.blockingIssueCount === 0 && (
         <>
           <Text style={styles.muted}>
-            Khóa công sẽ lưu bản công vừa đồng bộ để dùng tính lương. Kỳ lương
-            vẫn là nháp.
+            Khóa bản công vừa đồng bộ và tự động tính lương ngay sau đó. Kỳ
+            lương vẫn là nháp để bạn kiểm tra & duyệt.
           </Text>
           {!confirmLock ? (
             <Button
-              title="Khóa bản công vừa đồng bộ"
+              title="Khóa công & tính lương"
+              disabled={busy}
               onPress={() => setConfirmLock(true)}
             />
           ) : (
             <>
               <Text style={styles.text}>
                 Xác nhận khóa công của {result.employeeCount} nhân viên cho kỳ{" "}
-                {run.periodKey}.
+                {run.periodKey} và tính lương ngay sau khi khóa công.
               </Text>
               <Button
-                title={busy ? "Đang khóa công…" : "Xác nhận khóa công"}
+                title={
+                  busy
+                    ? "Đang khóa công & tính lương…"
+                    : "Xác nhận khóa công & tính lương"
+                }
                 disabled={busy}
                 onPress={() => void lockAttendance()}
               />
@@ -221,12 +271,20 @@ export function SyncRunAttendance({
       {locked && (
         <>
           <Text style={styles.text}>
-            Đã khóa bản công của {locked.employeeCount} nhân viên. Chọn Tính /
-            tính lại lương để tiếp tục.
+            {calculated
+              ? "Đã khóa công và tính lương cho " +
+                calculated.employeeCount +
+                " nhân viên. Có thể kiểm tra & duyệt lương."
+              : busy
+                ? "Đã khóa công. Đang tính lương…"
+                : "Đã khóa công. Tính lương chưa hoàn tất, hãy mở bước tính lương để tiếp tục."}
           </Text>
           <Text selectable style={styles.muted}>
             Mã bản công: {locked.snapshotId}
           </Text>
+          {!busy && !calculated && onCalculate && (
+            <Button title="Tiếp tục tính lương" onPress={onCalculate} />
+          )}
         </>
       )}
       {(result || error) && (

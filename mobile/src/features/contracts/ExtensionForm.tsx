@@ -1,3 +1,4 @@
+import { historicalUserLabel } from "../../../../src/utils/historicalUser";
 import React, { useRef, useState } from "react";
 import {
   ActivityIndicator,
@@ -97,7 +98,7 @@ export function ExtensionForm({
 
           <View style={{ flex: 1, alignItems: "center" }}>
             <Text style={styles.headerTitle}>Gia hạn hợp đồng</Text>
-            <Text style={styles.headerSub}>{contract.employeeName}</Text>
+            <Text style={styles.headerSub}>{historicalUserLabel(contract.employeeName, contract.employeeDeleted)}</Text>
           </View>
 
           <Pressable
@@ -140,7 +141,7 @@ export function ExtensionForm({
             <View style={styles.contractSummaryBox}>
               <View style={styles.summaryRow}>
                 <Text style={styles.summaryLabel}>Nhân sự:</Text>
-                <Text style={styles.summaryValue}>{contract.employeeName}</Text>
+                <Text style={styles.summaryValue}>{historicalUserLabel(contract.employeeName, contract.employeeDeleted)}</Text>
               </View>
               <View style={styles.summaryRow}>
                 <Text style={styles.summaryLabel}>Loại hợp đồng:</Text>

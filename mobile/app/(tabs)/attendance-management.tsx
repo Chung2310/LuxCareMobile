@@ -126,7 +126,11 @@ export default function AttendanceManagement() {
             <Text style={styles.heading}>{log.date}</Text>
             <Text style={styles.text}>
               {ATTENDANCE_STATUSES.find((item) => item.value === log.status)?.label || log.status}
+              {log.manuallyAdjusted ? " • [Đã điều chỉnh]" : ""}
             </Text>
+            {Boolean(log.adjustmentReason) && (
+              <Text style={[styles.muted, { color: "#7c3aed" }]}>Lý do sửa: {log.adjustmentReason}</Text>
+            )}
             <Text style={styles.muted}>{log.note || "Không có ghi chú"}</Text>
             <Button title="Chỉnh công & lịch sử" onPress={() => setSelected(log)} />
           </Card>

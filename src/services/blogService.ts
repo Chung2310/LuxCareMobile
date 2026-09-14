@@ -29,6 +29,7 @@ export interface BlogPost {
   channelName: string;
   authorId: string;
   authorName: string;
+  authorDeleted?: boolean;
   authorAvatar?: string;
   authorRoleBadge?: string;
   createdAt: string;
@@ -116,6 +117,7 @@ export function createBlogService({ fetch, getAccessToken }: ServiceTransport) {
           raw.createdBy ||
           "Ban Biên Tập",
       ),
+      authorDeleted: raw.authorDeleted === true,
       authorAvatar: raw.authorAvatar || raw.author?.avatar,
       authorRoleBadge: raw.authorRole || raw.authorRoleBadge || "Ban Biên Tập",
       createdAt: formattedDate,

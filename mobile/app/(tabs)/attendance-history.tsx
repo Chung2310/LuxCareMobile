@@ -18,7 +18,6 @@ import type { AttendanceLog, AttendanceAdjustment, ShiftEmployee, WorkShift } fr
 import { currentKpiPeriod } from "../../../src/services/monthlyKpiService";
 import { messageOf, useSession } from "../../src/auth/SessionProvider";
 import { canUseModule, hasPermission } from "../../src/auth/access";
-import { AdjustmentForm } from "../../src/features/attendance/AdjustmentForm";
 import { EmptyState, ErrorText, Loading } from "../../src/ui";
 
 const STATUS_CONFIG: Record<string, { label: string; color: string; bg: string; icon: keyof typeof Ionicons.glyphMap }> = {
@@ -28,9 +27,53 @@ const STATUS_CONFIG: Record<string, { label: string; color: string; bg: string; 
   "Half-Day": { label: "Nửa ngày", color: "#7c3aed", bg: "#f5f3ff", icon: "hourglass-outline" },
   "Late-Left-Early": { label: "Muộn & Về sớm", color: "#e11d48", bg: "#fff1f2", icon: "warning-outline" },
   Absent: { label: "Vắng mặt", color: "#dc2626", bg: "#fef2f2", icon: "close-circle" },
-  "Approved-Leave": { label: "Nghỉ phép duyệt", color: "#2563eb", bg: "#eff6ff", icon: "document-text" },
+  "Approved-Leave": { label: "Nghỉ phép", color: "#2563eb", bg: "#eff6ff", icon: "document-text" },
   "Paid-Holiday": { label: "Nghỉ lễ", color: "#0891b2", bg: "#ecfeff", icon: "ribbon" },
+  "Approved-WFH": { label: "Làm từ xa (WFH)", color: "#0284c7", bg: "#f0f9ff", icon: "laptop-outline" },
+  "Approved-Exception": { label: "Ngoại lệ duyệt", color: "#8b5cf6", bg: "#f5f3ff", icon: "shield-checkmark-outline" },
+  Incomplete: { label: "Thiếu chấm công", color: "#f59e0b", bg: "#fffbeb", icon: "help-circle-outline" },
+  Partial: { label: "Thiếu công", color: "#f97316", bg: "#fff7ed", icon: "time-outline" },
 };
+
+function getStatusConfig(status?: string): { label: string; color: string; bg: string; icon: keyof typeof Ionicons.glyphMap } {
+  if (!status) {
+    return { label: "Chưa xác định", color: "#64748b", bg: "#f1f5f9", icon: "help-circle-outline" };
+  }
+  if (STATUS_CONFIG[status]) {
+    return STATUS_CONFIG[status];
+  }
+  const normalized = status.trim().toLowerCase().replace(/[\s_-]+/g, "");
+  if (normalized === "present" || normalized === "comat" || normalized === "dunggio") return STATUS_CONFIG.Present;
+  if (normalized === "late" || normalized === "dimuon" || normalized === "muon") return STATUS_CONFIG.Late;
+  if (normalized === "leftearly" || normalized === "vesom") return STATUS_CONFIG["Left-Early"];
+  if (normalized === "halfday" || normalized === "nuangay") return STATUS_CONFIG["Half-Day"];
+  if (normalized === "lateleftearly" || normalized === "muonvesom") return STATUS_CONFIG["Late-Left-Early"];
+  if (normalized === "absent" || normalized === "vangmat" || normalized === "vang") return STATUS_CONFIG.Absent;
+  if (normalized.includes("leave") || normalized.includes("phep")) return STATUS_CONFIG["Approved-Leave"];
+  if (normalized.includes("holiday") || normalized.includes("le")) return STATUS_CONFIG["Paid-Holiday"];
+  if (normalized.includes("wfh") || normalized.includes("tuxa")) return STATUS_CONFIG["Approved-WFH"];
+  if (normalized.includes("exception") || normalized.includes("ngoaile")) return STATUS_CONFIG["Approved-Exception"];
+  if (normalized.includes("incomplete") || normalized.includes("thieuchamcong")) return STATUS_CONFIG.Incomplete;
+  if (normalized.includes("partial") || normalized.includes("thieucong")) return STATUS_CONFIG.Partial;
+  return { label: status, color: "#64748b", bg: "#f1f5f9", icon: "help-circle-outline" };
+}
+
+function getStatusDescription(status?: string): string {
+  const norm = (status || "").toLowerCase().replace(/[\s_-]+/g, "");
+  if (norm === "present") return "Hoàn thành đầy đủ giờ công trong ngày";
+  if (norm === "late") return "Chấm vào ca muộn hơn giờ quy định";
+  if (norm === "leftearly") return "Chấm ra ca sớm hơn giờ quy định";
+  if (norm === "halfday") return "Ghi nhận nửa ngày công làm việc";
+  if (norm === "lateleftearly") return "Chấm vào muộn và ra sớm hơn giờ quy định";
+  if (norm.includes("leave")) return "Nghỉ phép theo đơn đã được ban lãnh đạo duyệt";
+  if (norm.includes("holiday")) return "Nghỉ lễ theo lịch doanh nghiệp hưởng nguyên lương";
+  if (norm.includes("wfh")) return "Làm việc từ xa theo phê duyệt của quản lý";
+  if (norm.includes("exception")) return "Được phê duyệt trường hợp ngoại lệ";
+  if (norm.includes("incomplete")) return "Thiếu dữ liệu lượt chấm vào hoặc ra ca";
+  if (norm.includes("partial")) return "Tổng thời lượng chưa đủ định mức ca làm việc";
+  if (norm === "absent") return "Vắng mặt không có đơn xin phép";
+  return "Ghi nhận từ nhật ký chấm công";
+}
 
 type FilterType = "all" | "present" | "late" | "leave" | "absent";
 
@@ -98,12 +141,10 @@ export default function AttendanceHistoryScreen() {
   const [error, setError] = useState<string | null>(null);
   const [revision, setRevision] = useState(0);
 
-  // Detail Modal & Adjustment
+  // Detail Modal
   const [detailLog, setDetailLog] = useState<AttendanceLog | null>(null);
   const [detailAdjustments, setDetailAdjustments] = useState<AttendanceAdjustment[]>([]);
   const [loadingAdjustments, setLoadingAdjustments] = useState(false);
-  const [adjustingLog, setAdjustingLog] = useState<AttendanceLog | null>(null);
-  const lock = useRef(false);
 
   // Employee Picker Modal (For managers)
   const [pickerVisible, setPickerVisible] = useState(false);
@@ -195,7 +236,11 @@ export default function AttendanceHistoryScreen() {
     let totalMinutesWorked = 0;
 
     logs.forEach((l) => {
-      const isPres = l.status === "Present" || (!l.status && l.checkIn);
+      const isPres =
+        l.status === "Present" ||
+        l.status === "Approved-WFH" ||
+        l.status === "Approved-Exception" ||
+        (!l.status && l.checkIn);
       const isLate = l.status === "Late" || l.status === "Left-Early" || l.status === "Late-Left-Early";
       const isLev = l.status === "Approved-Leave" || l.status === "Paid-Holiday";
       const isAbs = l.status === "Absent";
@@ -235,7 +280,13 @@ export default function AttendanceHistoryScreen() {
   const filteredLogs = useMemo(() => {
     return logs.filter((log) => {
       if (filter === "all") return true;
-      if (filter === "present") return log.status === "Present" || (!log.status && log.checkIn);
+      if (filter === "present")
+        return (
+          log.status === "Present" ||
+          log.status === "Approved-WFH" ||
+          log.status === "Approved-Exception" ||
+          (!log.status && log.checkIn)
+        );
       if (filter === "late")
         return log.status === "Late" || log.status === "Left-Early" || log.status === "Late-Left-Early";
       if (filter === "leave") return log.status === "Approved-Leave" || log.status === "Paid-Holiday";
@@ -729,41 +780,38 @@ export default function AttendanceHistoryScreen() {
                 </View>
 
                 {selectedDayLog ? (
-                  <View
-                    style={[
-                      styles.statusBadge,
-                      {
-                        backgroundColor:
-                          (STATUS_CONFIG[selectedDayLog.status || ""] || STATUS_CONFIG.Present).bg,
-                        borderColor: `${
-                          (STATUS_CONFIG[selectedDayLog.status || ""] || STATUS_CONFIG.Present).color
-                        }30`,
-                      },
-                    ]}
-                  >
-                    <Ionicons
-                      name={
-                        (STATUS_CONFIG[selectedDayLog.status || ""] || STATUS_CONFIG.Present).icon
-                      }
-                      size={13}
-                      color={
-                        (STATUS_CONFIG[selectedDayLog.status || ""] || STATUS_CONFIG.Present).color
-                      }
-                    />
-                    <Text
+                  <View style={{ flexDirection: "row", alignItems: "center", gap: 6 }}>
+                    {Boolean(selectedDayLog.manuallyAdjusted) && (
+                      <View style={styles.adjustedTag}>
+                        <Ionicons name="sparkles" size={11} color="#7c3aed" />
+                        <Text style={styles.adjustedTagText}>Đã chỉnh công</Text>
+                      </View>
+                    )}
+                    <View
                       style={[
-                        styles.statusText,
+                        styles.statusBadge,
                         {
-                          color: (
-                            STATUS_CONFIG[selectedDayLog.status || ""] || STATUS_CONFIG.Present
-                          ).color,
+                          backgroundColor: getStatusConfig(selectedDayLog.status).bg,
+                          borderColor: `${getStatusConfig(selectedDayLog.status).color}30`,
                         },
                       ]}
                     >
-                      {
-                        (STATUS_CONFIG[selectedDayLog.status || ""] || STATUS_CONFIG.Present).label
-                      }
-                    </Text>
+                      <Ionicons
+                        name={getStatusConfig(selectedDayLog.status).icon}
+                        size={13}
+                        color={getStatusConfig(selectedDayLog.status).color}
+                      />
+                      <Text
+                        style={[
+                          styles.statusText,
+                          {
+                            color: getStatusConfig(selectedDayLog.status).color,
+                          },
+                        ]}
+                      >
+                        {getStatusConfig(selectedDayLog.status).label}
+                      </Text>
+                    </View>
                   </View>
                 ) : (
                   <View style={styles.calEmptyBadge}>
@@ -922,12 +970,7 @@ export default function AttendanceHistoryScreen() {
               ) : (
                 filteredLogs.map((log) => {
                   const { dayOfWeek, dateFormatted } = formatDisplayDate(log.date);
-                  const statusCfg = STATUS_CONFIG[log.status || ""] || {
-                    label: log.status || (log.checkIn ? "Có mặt" : "Chưa xác định"),
-                    color: "#64748b",
-                    bg: "#f1f5f9",
-                    icon: "help-circle-outline",
-                  };
+                  const statusCfg = getStatusConfig(log.status || (log.checkIn ? "Present" : ""));
                   const duration = calculateWorkHours(log.checkIn?.time, log.checkOut?.time);
                   const shift = (log as any).shiftId ? shiftMap.get((log as any).shiftId) : null;
 
@@ -950,16 +993,24 @@ export default function AttendanceHistoryScreen() {
                           </View>
                         </View>
 
-                        <View
-                          style={[
-                            styles.statusBadge,
-                            { backgroundColor: statusCfg.bg, borderColor: `${statusCfg.color}35` },
-                          ]}
-                        >
-                          <Ionicons name={statusCfg.icon} size={13} color={statusCfg.color} />
-                          <Text style={[styles.statusText, { color: statusCfg.color }]}>
-                            {statusCfg.label}
-                          </Text>
+                        <View style={{ flexDirection: "row", alignItems: "center", gap: 6 }}>
+                          {Boolean(log.manuallyAdjusted) && (
+                            <View style={styles.adjustedTag}>
+                              <Ionicons name="sparkles" size={10} color="#7c3aed" />
+                              <Text style={styles.adjustedTagText}>Đã chỉnh công</Text>
+                            </View>
+                          )}
+                          <View
+                            style={[
+                              styles.statusBadge,
+                              { backgroundColor: statusCfg.bg, borderColor: `${statusCfg.color}35` },
+                            ]}
+                          >
+                            <Ionicons name={statusCfg.icon} size={13} color={statusCfg.color} />
+                            <Text style={[styles.statusText, { color: statusCfg.color }]}>
+                              {statusCfg.label}
+                            </Text>
+                          </View>
                         </View>
                       </View>
 
@@ -1085,35 +1136,63 @@ export default function AttendanceHistoryScreen() {
                 <ScrollView style={styles.modalSheetBody} showsVerticalScrollIndicator={false}>
                   {/* Status Banner */}
                   {(() => {
-                    const cfg = STATUS_CONFIG[detailLog.status || ""] || {
-                      label: detailLog.status || "Chưa xác định",
-                      color: "#64748b",
-                      bg: "#f1f5f9",
-                      icon: "help-circle-outline",
-                    };
+                    const effectiveStatus = detailAdjustments[0]?.after?.status || detailLog.status;
+                    const cfg = getStatusConfig(effectiveStatus);
+                    const isAdjusted = Boolean(detailLog.manuallyAdjusted || detailAdjustments.length > 0);
                     return (
-                      <View style={[styles.detailStatusBanner, { backgroundColor: cfg.bg }]}>
-                        <Ionicons name={cfg.icon} size={20} color={cfg.color} />
-                        <View style={{ flex: 1, gap: 2 }}>
-                          <Text style={[styles.detailStatusTitle, { color: cfg.color }]}>
-                            {cfg.label}
-                          </Text>
-                          <Text style={styles.detailStatusDesc}>
-                            {detailLog.status === "Present"
-                              ? "Hoàn thành đầy đủ giờ công trong ngày"
-                              : detailLog.status === "Late"
-                                ? "Chấm vào ca muộn hơn giờ quy định"
-                                : detailLog.status === "Left-Early"
-                                  ? "Chấm ra ca sớm hơn giờ quy định"
-                                  : detailLog.status === "Approved-Leave"
-                                    ? "Nghỉ phép theo đơn đã được ban lãnh đạo duyệt"
-                                    : detailLog.status === "Paid-Holiday"
-                                      ? "Nghỉ lễ theo lịch doanh nghiệp hưởng nguyên lương"
-                                      : detailLog.status === "Absent"
-                                        ? "Vắng mặt không có đơn xin phép"
-                                        : "Ghi nhận từ nhật ký chấm công"}
-                          </Text>
+                      <View style={{ gap: 10, marginBottom: 12 }}>
+                        <View style={[styles.detailStatusBanner, { backgroundColor: cfg.bg, marginBottom: 0 }]}>
+                          <Ionicons name={cfg.icon} size={20} color={cfg.color} />
+                          <View style={{ flex: 1, gap: 2 }}>
+                            <View style={{ flexDirection: "row", alignItems: "center", gap: 6 }}>
+                              <Text style={[styles.detailStatusTitle, { color: cfg.color }]}>
+                                {cfg.label}
+                              </Text>
+                              {isAdjusted && (
+                                <View style={styles.adjustedTag}>
+                                  <Ionicons name="sparkles" size={10} color="#7c3aed" />
+                                  <Text style={styles.adjustedTagText}>Đã chỉnh công</Text>
+                                </View>
+                              )}
+                            </View>
+                            <Text style={styles.detailStatusDesc}>
+                              {getStatusDescription(effectiveStatus)}
+                            </Text>
+                          </View>
                         </View>
+
+                        {/* Adjustment Alert Banner if manually adjusted */}
+                        {isAdjusted && (
+                          <View style={styles.adjustedAlertCard}>
+                            <View style={styles.adjustedAlertHeader}>
+                              <Ionicons name="sparkles" size={15} color="#7c3aed" />
+                              <Text style={styles.adjustedAlertTitle}>Ngày công đã được hiệu chỉnh</Text>
+                            </View>
+                            <Text style={styles.adjustedAlertDesc}>
+                              Dữ liệu ngày công đã được cập nhật đồng bộ với hệ thống.
+                            </Text>
+                            {Boolean(detailLog.adjustmentReason || detailAdjustments[0]?.reason) && (
+                              <View style={styles.adjustedReasonRow}>
+                                <Text style={styles.adjustedReasonLabel}>Lý do điều chỉnh:</Text>
+                                <Text style={styles.adjustedReasonVal}>
+                                  {detailLog.adjustmentReason || detailAdjustments[0]?.reason}
+                                </Text>
+                              </View>
+                            )}
+                            {Boolean(detailLog.adjustedAt || detailAdjustments[0]?.createdAt) && (
+                              <View style={styles.adjustedReasonRow}>
+                                <Text style={styles.adjustedReasonLabel}>Thời gian hiệu chỉnh:</Text>
+                                <Text style={styles.adjustedReasonVal}>
+                                  {new Date(
+                                    detailLog.adjustedAt || detailAdjustments[0]!.createdAt,
+                                  ).toLocaleString("vi-VN", {
+                                    timeZone: "Asia/Ho_Chi_Minh",
+                                  })}
+                                </Text>
+                              </View>
+                            )}
+                          </View>
+                        )}
                       </View>
                     );
                   })()}
@@ -1231,21 +1310,6 @@ export default function AttendanceHistoryScreen() {
 
                 {/* Modal Footer Actions */}
                 <View style={styles.modalSheetFooter}>
-                  {manage && (
-                    <TouchableOpacity
-                      style={styles.adjustActionBtn}
-                      onPress={() => {
-                        const logToAdjust = detailLog;
-                        setDetailLog(null);
-                        setAdjustingLog(logToAdjust);
-                      }}
-                      activeOpacity={0.8}
-                    >
-                      <Ionicons name="build-outline" size={16} color="#ffffff" />
-                      <Text style={styles.adjustActionBtnText}>Hiệu chỉnh công</Text>
-                    </TouchableOpacity>
-                  )}
-
                   <TouchableOpacity
                     style={styles.closeSheetBtn}
                     onPress={() => setDetailLog(null)}
@@ -1258,33 +1322,6 @@ export default function AttendanceHistoryScreen() {
             )}
           </View>
         </View>
-      </Modal>
-
-      {/* ADJUSTMENT MODAL FOR MANAGERS */}
-      <Modal
-        visible={adjustingLog !== null}
-        animationType="slide"
-        onRequestClose={() => {
-          if (!lock.current) {
-            setAdjustingLog(null);
-            setRevision((v) => v + 1);
-          }
-        }}
-      >
-        <SafeAreaView style={{ flex: 1, backgroundColor: "#ffffff" }} edges={["top", "bottom"]}>
-          {adjustingLog && (
-            <AdjustmentForm
-              log={adjustingLog}
-              onClose={() => {
-                setAdjustingLog(null);
-                setRevision((v) => v + 1);
-              }}
-              setLocked={(val) => {
-                lock.current = val;
-              }}
-            />
-          )}
-        </SafeAreaView>
       </Modal>
 
       {/* EMPLOYEE PICKER MODAL (FOR MANAGERS) */}
@@ -1968,22 +2005,8 @@ const styles = StyleSheet.create({
     paddingHorizontal: 20,
     paddingTop: 8,
   },
-  adjustActionBtn: {
-    flex: 1,
-    flexDirection: "row",
-    alignItems: "center",
-    justifyContent: "center",
-    gap: 6,
-    backgroundColor: "#0891b2",
-    borderRadius: 12,
-    paddingVertical: 12,
-  },
-  adjustActionBtnText: {
-    fontSize: 14,
-    fontWeight: "700",
-    color: "#ffffff",
-  },
   closeSheetBtn: {
+    flex: 1,
     paddingHorizontal: 20,
     paddingVertical: 12,
     borderRadius: 12,
@@ -1993,7 +2016,7 @@ const styles = StyleSheet.create({
   },
   closeSheetBtnText: {
     fontSize: 14,
-    fontWeight: "600",
+    fontWeight: "700",
     color: "#475569",
   },
   searchWrap: {
@@ -2382,5 +2405,60 @@ const styles = StyleSheet.create({
   noteTagText: {
     fontSize: 10.5,
     color: "#c2410c",
+  },
+  adjustedTag: {
+    flexDirection: "row",
+    alignItems: "center",
+    gap: 3,
+    backgroundColor: "#f5f3ff",
+    borderColor: "#ddd6fe",
+    borderWidth: 1,
+    paddingHorizontal: 6,
+    paddingVertical: 2,
+    borderRadius: 6,
+  },
+  adjustedTagText: {
+    fontSize: 10,
+    fontWeight: "700",
+    color: "#7c3aed",
+  },
+  adjustedAlertCard: {
+    backgroundColor: "#f5f3ff",
+    borderColor: "#ddd6fe",
+    borderWidth: 1,
+    borderRadius: 12,
+    padding: 12,
+    gap: 6,
+  },
+  adjustedAlertHeader: {
+    flexDirection: "row",
+    alignItems: "center",
+    gap: 6,
+  },
+  adjustedAlertTitle: {
+    fontSize: 13,
+    fontWeight: "700",
+    color: "#6d28d9",
+  },
+  adjustedAlertDesc: {
+    fontSize: 11.5,
+    color: "#5b21b6",
+    lineHeight: 16,
+  },
+  adjustedReasonRow: {
+    flexDirection: "row",
+    alignItems: "flex-start",
+    gap: 4,
+    marginTop: 2,
+  },
+  adjustedReasonLabel: {
+    fontSize: 11.5,
+    fontWeight: "600",
+    color: "#6d28d9",
+  },
+  adjustedReasonVal: {
+    fontSize: 11.5,
+    color: "#4c1d95",
+    flex: 1,
   },
 });

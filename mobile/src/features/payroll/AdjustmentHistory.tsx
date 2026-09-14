@@ -1,3 +1,4 @@
+import { historicalUserLabel } from "../../../../src/utils/historicalUser";
 import { useCallback, useRef, useState } from "react";
 import { useFocusEffect } from "expo-router";
 import { KeyboardAvoidingView, Modal, Platform, Pressable, Text, TextInput, View } from "react-native";
@@ -117,7 +118,7 @@ export function AdjustmentHistory({ period, onChanged, initialStatus = "" }: {
           <Card key={item._id}>
             <View style={s.header}>
               <View style={s.avatar}><Text style={s.avatarText}>{(item.employeeName || item.employeeId).slice(0, 1).toLocaleUpperCase("vi-VN")}</Text></View>
-              <View style={{ flex: 1 }}><Text style={s.name}>{item.employeeName || item.employeeId}</Text><Text style={s.subtitle}>{adjustmentKinds[item.kind] || item.kind}</Text></View>
+              <View style={{ flex: 1 }}><Text style={s.name}>{historicalUserLabel(item.employeeName, item.employeeDeleted, item.employeeId)}</Text><Text style={s.subtitle}>{adjustmentKinds[item.kind] || item.kind}</Text></View>
             </View>
             <View style={[s.badge, item.status === "pending" && { backgroundColor: "#fffbeb" }, item.status === "approved" && { backgroundColor: "#ecfdf5" }, item.status === "rejected" && { backgroundColor: "#fff1f2" }]}>
               <Text style={[s.badgeText, item.status === "pending" && { color: "#92400e" }, item.status === "approved" && { color: "#047857" }, item.status === "rejected" && { color: "#be123c" }]}>{adjustmentStatuses[item.status] || item.status}</Text>

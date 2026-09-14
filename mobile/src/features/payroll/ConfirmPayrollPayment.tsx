@@ -1,3 +1,4 @@
+import { historicalEmployeeLabel, historicalUserLabel } from "../../../../src/utils/historicalUser";
 import { useCallback, useRef, useState } from "react";
 import { useFocusEffect } from "expo-router";
 import { Text } from "react-native";
@@ -122,7 +123,7 @@ export function ConfirmPayrollPayment({
       </Text>
       {(payment.lines || []).map((line) => (
         <Text key={line.employeeId} style={styles.text}>
-          {employees.find((employee) => employee.employeeId === line.employeeId)?.employeeName || line.employeeId}:{" "}
+          {historicalEmployeeLabel(employees, line.employeeId)}:{" "}
           {payslipMoney(line.amount)}
         </Text>
       ))}

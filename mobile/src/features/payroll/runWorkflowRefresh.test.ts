@@ -141,6 +141,8 @@ function scenario() {
     periodKey: "2026-09",
     status: "draft",
     version: 0,
+    activeRevisionId: "rev",
+    activeRevisionChecksum: "checksum",
     effectiveLines: [],
   };
   let current = { ...server };
@@ -210,17 +212,13 @@ it("syncs, locks, calculates, reviews and closes with each new version without a
   sync.press("Xác nhận đồng bộ công");
   await vi.waitFor(() => expect(sync.showAlert).toHaveBeenCalledTimes(1));
   expect(flow.onUpdated).toHaveBeenLastCalledWith(1);
-  sync.press("Khóa bản công vừa đồng bộ");
-  sync.press("Xác nhận khóa công");
+  sync.press("Khóa công & tính lương");
+  sync.press("Xác nhận khóa công & tính lương");
   await vi.waitFor(() => expect(sync.showAlert).toHaveBeenCalledTimes(2));
   expect(flow.api.lockRunAttendance).toHaveBeenCalledWith("r", 1);
   sync.unmount();
-  const calculate = mount("CalculatePayrollRun", flow.api, flow.props);
-  calculate.press("Tính / tính lại lương");
-  calculate.press("Xác nhận tính lương");
-  await vi.waitFor(() => expect(calculate.showAlert).toHaveBeenCalledTimes(1));
   expect(flow.api.calculateOperationalRun).toHaveBeenCalledWith("r", 2, "key");
-  calculate.unmount();
+  expect(flow.onUpdated).toHaveBeenLastCalledWith(3);
   const review = mount("ReviewPayrollRun", flow.api, flow.props);
   review.press("Duyệt / chuyển sang kiểm tra");
   review.press("Xác nhận duyệt kỳ");
@@ -238,7 +236,7 @@ it("syncs, locks, calculates, reviews and closes with each new version without a
   expect(flow.api.closeRun).toHaveBeenCalledWith("r", 4);
   expect(flow.props().run).toMatchObject({ status: "closed", version: 5 });
   expect(flow.onChanged).not.toHaveBeenCalled();
-  expect(flow.api.getRun).toHaveBeenCalledTimes(5);
+  expect(flow.api.getRun).toHaveBeenCalledTimes(4);
 });
 it("still refreshes the parent when the sync dialog is closed before the response arrives", async () => {
   const flow = scenario();
@@ -273,6 +271,11 @@ it("requires calculation before review and offers the calculation step without m
   const onCalculate = vi.fn();
   const review = mount("ReviewPayrollRun", flow.api, () => ({
     ...flow.props(),
+    run: {
+      ...flow.props().run,
+      activeRevisionId: undefined,
+      activeRevisionChecksum: undefined,
+    },
     onCalculate,
   }));
   expect(() => review.press("Duyệt / chuyển sang kiểm tra")).toThrow(
@@ -287,7 +290,12 @@ it("offers reopening for a review run without a calculation instead of attemptin
   const onReopen = vi.fn();
   const close = mount("ReviewPayrollRun", flow.api, () => ({
     ...flow.props(),
-    run: { ...flow.props().run, status: "review" },
+    run: {
+      ...flow.props().run,
+      status: "review",
+      activeRevisionId: undefined,
+      activeRevisionChecksum: undefined,
+    },
     close: true,
     onReopen,
   }));
@@ -321,4 +329,81 @@ it("offers recovery when the server reports that the active revision is unavaila
   close.press("Mở lại kỳ để tính lương");
   expect(onReopen).toHaveBeenCalledOnce();
   expect(flow.api.closeRun).toHaveBeenCalledOnce();
+});
+
+it.each(["lock", "calculate"])(
+  "handles %s failure without repeating completed steps",
+  async (stage) => {
+    const flow = scenario();
+    const onCalculate = vi.fn();
+    if (stage === "lock")
+      flow.api.lockRunAttendance.mockRejectedValueOnce(Error("Lock failed"));
+    else
+      flow.api.calculateOperationalRun.mockRejectedValueOnce(
+        Error("Calculation failed"),
+      );
+    const sync = mount("SyncRunAttendance", flow.api, () => ({
+      ...flow.props(),
+      onCalculate,
+    }));
+    sync.press("Đồng bộ dữ liệu công");
+    sync.press("Xác nhận đồng bộ công");
+    await vi.waitFor(() => expect(sync.showAlert).toHaveBeenCalledTimes(1));
+    sync.press("Khóa công & tính lương");
+    sync.press("Xác nhận khóa công & tính lương");
+    await vi.waitFor(() => expect(sync.showAlert).toHaveBeenCalledTimes(2));
+    expect(flow.api.lockRunAttendance).toHaveBeenCalledOnce();
+    expect(flow.api.reviewRun).not.toHaveBeenCalled();
+    expect(flow.props().run.version).toBe(stage === "lock" ? 1 : 2);
+    if (stage === "lock")
+      expect(flow.api.calculateOperationalRun).not.toHaveBeenCalled();
+    else {
+      expect(flow.api.calculateOperationalRun).toHaveBeenCalledOnce();
+      sync.press("Tiếp tục tính lương");
+      expect(onCalculate).toHaveBeenCalledOnce();
+      expect(sync.showAlert.mock.calls.at(-1)?.[0]).toBe(
+        "Đã khóa công, tính lương chưa hoàn tất",
+      );
+      expect(sync.showAlert.mock.calls.at(-1)?.[3]).toBe("error");
+    }
+  },
+);
+
+it("reviews and closes payroll calculated on the web using period endpoints", async () => {
+  let run: PayrollRun = {
+    _id: "r",
+    periodKey: "2026-09",
+    status: "draft",
+    version: 2,
+    effectiveLines: [{ employeeId: "e", calculation: { net: 100 } }],
+  };
+  const api = {
+    review: vi.fn(async () => (run = { ...run, status: "review", version: 3 })),
+    close: vi.fn(async () => (run = { ...run, status: "closed" })),
+    reviewRun: vi.fn(),
+    closeRun: vi.fn(),
+  };
+  const props = () => ({
+    run,
+    onChanged: vi.fn(),
+    onUpdated: vi.fn(async () => {}),
+  });
+  const review = mount("ReviewPayrollRun", api, props);
+  review.press("Duyệt / chuyển sang kiểm tra");
+  review.press("Xác nhận duyệt kỳ");
+  await vi.waitFor(() => expect(review.showAlert).toHaveBeenCalledOnce());
+  expect(review.showAlert.mock.calls[0][0]).toBe("Thành công");
+  expect(api.review).toHaveBeenCalledWith("2026-09");
+  review.unmount();
+  const close = mount("ReviewPayrollRun", api, () => ({
+    ...props(),
+    close: true,
+  }));
+  close.press("Chốt kỳ lương");
+  close.press("Xác nhận chốt kỳ");
+  await vi.waitFor(() => expect(close.showAlert).toHaveBeenCalledOnce());
+  expect(close.showAlert.mock.calls[0][0]).toBe("Thành công");
+  expect(api.close).toHaveBeenCalledWith("2026-09");
+  expect(api.reviewRun).not.toHaveBeenCalled();
+  expect(api.closeRun).not.toHaveBeenCalled();
 });

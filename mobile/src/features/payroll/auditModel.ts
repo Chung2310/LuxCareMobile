@@ -23,7 +23,7 @@ export function filterPayrollAudit(items: PayrollAudit[], action: string, search
   return items.filter(
     (item) =>
       (!action || item.action === action) &&
-      `${item.actorId} ${item.action} ${auditActions[item.action] || ""}`.toLocaleLowerCase("vi-VN").includes(query),
+      `${item.actorId} ${item.actorName || ""} ${item.action} ${auditActions[item.action] || ""}`.toLocaleLowerCase("vi-VN").includes(query),
   );
 }
 export function auditTime(value?: string) {

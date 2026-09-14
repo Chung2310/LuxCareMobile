@@ -20,7 +20,7 @@ export function validateClosedRun(value: unknown, original: PayrollRun) {
     run._id !== original._id ||
     run.periodKey !== original.periodKey ||
     run.status !== "closed" ||
-    run.version !== original.version! + 1
+    run.version !== original.version! + (original.activeRevisionId ? 1 : 0)
   )
     throw new Error("Chưa xác nhận được kỳ đã chốt. Hãy tải lại trạng thái.");
 }
@@ -39,6 +39,9 @@ export function validateReviewedRun(value: unknown, original: PayrollRun) {
 }
 
 export function hasPayrollCalculation(run: PayrollRun) {
+  if (run.effectiveError) return false;
+  if (!run.activeRevisionId)
+    return Array.isArray(run.effectiveLines) && run.effectiveLines.length > 0;
   return (
     typeof run.activeRevisionId === "string" &&
     !!run.activeRevisionId.trim() &&

@@ -7,6 +7,7 @@ import {
   canDeletePolicy,
   parsePolicies,
   policyForDate,
+  policyDisplayStatus,
   overlappingPolicies,
 } from "./formulaModel";
 import {
@@ -182,3 +183,22 @@ it.each([403, 409, 500])(
     expect(fetch).toHaveBeenCalledOnce();
   },
 );
+
+it("marks only the effective version as currently applied after replacement", () => {
+  const old = { ...item, status: "active" as const, effectiveTo: "2026-08-31" };
+  const next = { ...item, _id: "next", status: "active" as const, effectiveFrom: "2026-09-01" };
+  const items = [old, next];
+  expect(policyDisplayStatus(old, items, "2026-09-14")).toBe("expired");
+  expect(policyDisplayStatus(next, items, "2026-09-14")).toBe("active");
+  expect(policyDisplayStatus(old, items, "2026-08-31")).toBe("active");
+  expect(policyDisplayStatus(next, items, "2026-08-31")).toBe("scheduled");
+});
+
+it("uses one effective version even when active date ranges overlap", () => {
+  const old = { ...item, status: "active" as const };
+  const next = { ...old, _id: "next", effectiveFrom: "2026-09-01" };
+  expect(policyDisplayStatus(old, [old, next], "2026-09-14")).toBe("superseded");
+  expect(policyDisplayStatus(next, [old, next], "2026-09-14")).toBe("active");
+  expect(policyDisplayStatus(item, [item, next], "2026-09-14")).toBe("draft");
+  expect(policyDisplayStatus({ ...old, status: "retired" }, [next], "2026-09-14")).toBe("retired");
+});

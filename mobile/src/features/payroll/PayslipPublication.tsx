@@ -1,3 +1,4 @@
+import { historicalEmployeeLabel, historicalUserLabel } from "../../../../src/utils/historicalUser";
 import { useCallback, useRef, useState } from "react";
 import { useFocusEffect } from "expo-router";
 import { Text } from "react-native";
@@ -126,7 +127,7 @@ export function PayslipPublication({ run, onChanged }: { run: PayrollRun; onChan
     return (
       <Card>
         <Text style={styles.heading}>Thu hồi phiếu lương · {run.periodKey}</Text>
-        <Text style={styles.text}>{employee?.employeeName || withdrawing}</Text>
+        <Text style={styles.text}>{historicalUserLabel(employee?.employeeName, employee?.employeeDeleted, withdrawing)}</Text>
         <Text style={styles.muted}>Chi nhánh: {selectedBranch?.name || "Chi nhánh của phiên đăng nhập"}</Text>
         {done ? (
           <Text style={styles.text}>Đã thu hồi phiếu lương. Tải lại để cập nhật trạng thái.</Text>
@@ -181,7 +182,7 @@ export function PayslipPublication({ run, onChanged }: { run: PayrollRun; onChan
           </Text>
           {rows.map((line) => (
             <Card key={line.employeeId}>
-              <Text style={styles.text}>{line.employeeName || line.employeeId}</Text>
+              <Text style={styles.text}>{historicalUserLabel(line.employeeName, line.employeeDeleted, line.employeeId)}</Text>
               <Text style={styles.muted}>
                 {!Array.isArray(run.publishedEmployeeIds)
                   ? "Chưa có thông tin phát hành"

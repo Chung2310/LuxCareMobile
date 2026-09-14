@@ -28,6 +28,7 @@ import Projects from "./projects";
 import Kpi from "./kpi";
 import { WorkSectionTabs, type WorkSection } from "../../src/features/work/WorkSectionTabs";
 import { TaskHistoryView } from "../../src/features/work/TaskHistoryView";
+import { lookupStatusBadge } from "../../src/features/work/taskHistoryModel";
 import {
   Search,
   X,
@@ -153,17 +154,7 @@ function getPriorityInfo(priority: string) {
 }
 
 function getStatusInfo(status: string) {
-  const norm = normalizeTaskStatus(status);
-  switch (norm) {
-    case "completed":
-      return { label: "Hoàn thành", color: "#059669", bg: "#ecfdf5" };
-    case "in_progress":
-      return { label: "Đang làm", color: "#d97706", bg: "#fffbeb" };
-    case "cancelled":
-      return { label: "Đã hủy", color: "#e11d48", bg: "#fff1f2" };
-    default:
-      return { label: "Chưa bắt đầu", color: "#475569", bg: "#f1f5f9" };
-  }
+  return lookupStatusBadge(status);
 }
 
 export default function Work() {
@@ -510,7 +501,7 @@ export default function Work() {
         renderItem={({ item }) => {
           const priorityInfo = getPriorityInfo(item.priority);
           const statusInfo = getStatusInfo(item.status);
-          const isDone = normalizeTaskStatus(item.status) === "completed";
+          const isDone = statusInfo.label === "Hoàn thành";
           const dueInfo = formatTaskDueDate(item.dueDate, isDone);
           const projectName = item.projectId ? projectMap.get(item.projectId) : undefined;
 
@@ -647,7 +638,7 @@ export default function Work() {
                     </Text>
                   </View>
                   <Text style={styles.assigneeName} numberOfLines={1}>
-                    {item.assignee || "Chưa phân công"}
+                    {item.assignee || (item.assigneeUid ? "Người thực hiện" : "Chưa phân công")}{item.assigneeDeleted ? " · Tài khoản đã xóa" : ""}
                   </Text>
                 </View>
 
@@ -806,7 +797,7 @@ export default function Work() {
                     <View style={{ flexDirection: "row", alignItems: "center", gap: 4 }}>
                       <User size={13} color="#475569" />
                       <Text style={styles.detailGridVal}>
-                        {selected.assignee || "Chưa phân công"}
+                        {selected.assignee || (selected.assigneeUid ? "Người thực hiện" : "Chưa phân công")}{selected.assigneeDeleted ? " · Tài khoản đã xóa" : ""}
                       </Text>
                     </View>
                   </View>

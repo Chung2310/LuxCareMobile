@@ -22,6 +22,7 @@ export interface ChatMessage {
   roomId: string;
   senderId: string | { _id: string; displayName: string; photoURL?: string; email: string };
   senderName: string;
+  senderDeleted?: boolean;
   senderPhoto?: string;
   content: string;
   attachments?: ChatAttachment[];
@@ -39,6 +40,7 @@ export interface ChatRoomMember {
     _id: string;
     uid?: string;
     displayName: string;
+    isDeleted?: boolean;
     photoURL?: string;
     email: string;
     role: string;

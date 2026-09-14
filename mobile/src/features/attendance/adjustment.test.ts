@@ -11,3 +11,9 @@ it("sends only status, note and reason without overwriting attendance evidence",
     adjustmentReason: "correction",
   });
 });
+it("accepts web-aligned adjustment statuses like Approved-WFH and Incomplete", () => {
+  expect(adjustmentPayload("Approved-WFH", "wfh", "Đăng ký WFH").status).toBe("Approved-WFH");
+  expect(adjustmentPayload("Approved-Exception", "ngoai le", "Duyệt bổ sung").status).toBe("Approved-Exception");
+  expect(adjustmentPayload("Incomplete", "", "Quên chấm công").status).toBe("Incomplete");
+  expect(adjustmentPayload("Partial", "", "Thiếu công").status).toBe("Partial");
+});

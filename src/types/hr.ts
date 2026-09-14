@@ -28,6 +28,7 @@ export interface WorkflowSubTask {
   title: string;
   assigneeUid?: string;
   assignee?: string;
+  assigneeDeleted?: boolean;
   done?: boolean;
 }
 
@@ -38,6 +39,7 @@ export interface WorkflowStep {
   /** Single assignee (legacy) */
   assigneeUid?: string;
   assignee?: string;
+  assigneeDeleted?: boolean;
   /** Multiple assignees */
   assigneeUids?: string[];
   /** Related persons (người liên quan) */
@@ -139,6 +141,7 @@ export interface TaskSubtask {
   title: string;
   assigneeUid?: string;
   assignee?: string;
+  assigneeDeleted?: boolean;
   assigneeAvatar?: string;
   dueDate?: string;
   completed: boolean;
@@ -181,6 +184,7 @@ export interface HRTask {
   workflowStepId?: string;
   participantId?: string;
   isFromWorkflow?: boolean;
+  assigneeDeleted?: boolean;
 }
 
 export interface Lesson {

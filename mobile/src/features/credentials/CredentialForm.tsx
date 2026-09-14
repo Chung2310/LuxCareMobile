@@ -211,7 +211,7 @@ export function CredentialForm({
                 {selectedEmployee ? (
                   <>
                     <Text style={styles.selectButtonTitle}>
-                      {selectedEmployee.displayName || selectedEmployee.email}
+                      {selectedEmployee.displayName || selectedEmployee.email || "Nhân viên"}{item?.employeeDeleted && item.employeeId === draft.employeeId ? " · Tài khoản đã xóa" : ""}
                     </Text>
                     {selectedEmployee.email ? (
                       <Text style={styles.selectButtonSubtitle}>{selectedEmployee.email}</Text>

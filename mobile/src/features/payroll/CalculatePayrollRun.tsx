@@ -16,7 +16,7 @@ import {
   fundLabels,
   type PayrollPolicyVersion,
 } from "./formulaModel";
-import { calculationSummary } from "./calculationModel";
+import { calculationSummary, calculateLikeWeb } from "./calculationModel";
 
 export function CalculatePayrollRun({
   run,
@@ -99,14 +99,9 @@ export function CalculatePayrollRun({
     setBusy(true);
     setError(null);
     try {
-      const saved = await payroll.calculateOperationalRun(
-        run._id,
-        run.version!,
-        randomUUID(),
-      );
-      const summary = calculationSummary(saved, run);
+      const summary = await calculateLikeWeb(payroll, run, randomUUID());
       if (active.current) setResult(summary);
-      await onUpdated?.(saved.runVersion);
+      await onUpdated?.(summary.runVersion);
       if (active.current) {
         showAlert(
           "Tính lương thành công",
@@ -154,18 +149,22 @@ export function CalculatePayrollRun({
             Đã hoàn tất bản tính cho {result.employeeCount} dòng lương. Kiểm tra
             số liệu và cảnh báo trước khi duyệt.
           </Text>
-          <Text selectable style={styles.muted}>
-            Mã bản tính: {result.revisionId}
-          </Text>
+          {!!result.revisionId && (
+            <Text selectable style={styles.muted}>
+              Mã bản tính: {result.revisionId}
+            </Text>
+          )}
         </>
       ) : (
         <>
           <Text style={styles.text}>
-            Cần có bản công đã khóa trước khi tính lương.
+            {run.activeRevisionId
+              ? "Cần có bản công đã khóa trước khi tính lương."
+              : "Hệ thống sẽ đồng bộ công, khóa công và tính lương trong một lần, giống trên web."}
           </Text>
           <Text style={styles.muted}>
-            Tính lại sẽ tạo bản tính mới từ bản công đã khóa và dữ liệu lương
-            hiện hành. Kỳ vẫn là nháp, chưa chốt hoặc thanh toán.
+            Kỳ vẫn là nháp sau khi tính lương. Kiểm tra số liệu trước khi duyệt
+            và chốt kỳ.
           </Text>
           <Text style={styles.heading}>Phiên bản công thức của kỳ</Text>
           {formulaLoading && <Loading />}
