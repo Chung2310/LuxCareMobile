@@ -23,6 +23,10 @@ import {
   type PayrollPolicyForm,
   type FundCode,
 } from "./payrollPolicyForm";
+export function canCorrectPolicySaveError(error: unknown) {
+  const failure = error as { status?: number; code?: string } | null;
+  return failure?.status === 400 || failure?.status === 422 || failure?.code === "PAYROLL_POLICY_DUPLICATE";
+}
 const steps = ["Thông tin", "Bảo hiểm", "Thuế TNCN", "Tăng ca", "Xem lại"];
 function Numeric({
   label,
@@ -192,8 +196,13 @@ export function PayrollFormulaEditor({
         );
       if (mounted.current) onSaved(saved);
     } catch (err) {
-      if (mounted.current)
-        setError(messageOf(err) + " Đóng và tải lại trước khi lưu tiếp.");
+      if (mounted.current) {
+        const canCorrect = canCorrectPolicySaveError(err);
+        if (canCorrect) attempted.current = false;
+        setError(messageOf(err) + (canCorrect
+          ? " Bạn có thể quay lại bước trước để sửa và lưu lại."
+          : " Đóng và tải lại trước khi lưu tiếp."));
+      }
     } finally {
       setLocked(false);
       if (mounted.current) setBusy(false);

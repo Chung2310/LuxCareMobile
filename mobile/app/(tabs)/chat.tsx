@@ -3036,6 +3036,7 @@ export default function ChatScreen() {
     );
   };
 
+  // Định dạng thời gian cho danh sách hội thoại phòng chat (bên ngoài)
   const formatMessageTime = (dateStr?: string) => {
     if (!dateStr) return "";
     const date = new Date(dateStr);
@@ -3050,6 +3051,60 @@ export default function ChatScreen() {
       return days[date.getDay()];
     }
     return `${date.getDate().toString().padStart(2, "0")}/${(date.getMonth() + 1).toString().padStart(2, "0")}`;
+  };
+
+  // Định dạng thời gian chi tiết cho từng tin nhắn trong khung chat (Chuẩn Zalo: Giờ:Phút, kèm Ngày/Tháng nếu khác hôm nay)
+  const formatChatMessageTime = (dateStr?: string) => {
+    if (!dateStr) return "";
+    const date = new Date(dateStr);
+    if (isNaN(date.getTime())) return "";
+    const now = new Date();
+
+    const hours = date.getHours().toString().padStart(2, "0");
+    const minutes = date.getMinutes().toString().padStart(2, "0");
+    const timeStr = `${hours}:${minutes}`;
+
+    const isToday = date.toDateString() === now.toDateString();
+    if (isToday) {
+      return timeStr;
+    }
+
+    const day = date.getDate().toString().padStart(2, "0");
+    const month = (date.getMonth() + 1).toString().padStart(2, "0");
+    const isSameYear = date.getFullYear() === now.getFullYear();
+
+    if (isSameYear) {
+      return `${timeStr} · ${day}/${month}`;
+    }
+    return `${timeStr} · ${day}/${month}/${date.getFullYear()}`;
+  };
+
+  // Định dạng thanh phân cách ngày tháng ở giữa khung chat (Chuẩn Zalo: Hôm nay, Hôm qua, Thứ [X], DD/MM/YYYY)
+  const formatZaloDateDivider = (dateStr?: string) => {
+    if (!dateStr) return "";
+    const d = new Date(dateStr);
+    if (isNaN(d.getTime())) return "";
+    const now = new Date();
+
+    const isToday = d.toDateString() === now.toDateString();
+    const yesterday = new Date(now);
+    yesterday.setDate(yesterday.getDate() - 1);
+    const isYesterday = d.toDateString() === yesterday.toDateString();
+
+    const day = String(d.getDate()).padStart(2, "0");
+    const month = String(d.getMonth() + 1).padStart(2, "0");
+    const year = d.getFullYear();
+
+    const days = ["Chủ Nhật", "Thứ Hai", "Thứ Ba", "Thứ Tư", "Thứ Năm", "Thứ Sáu", "Thứ Bảy"];
+    const dayOfWeek = days[d.getDay()];
+
+    if (isToday) {
+      return `Hôm nay, ${day}/${month}/${year}`;
+    }
+    if (isYesterday) {
+      return `Hôm qua, ${day}/${month}/${year}`;
+    }
+    return `${dayOfWeek}, ${day}/${month}/${year}`;
   };
 
   // Filtered Rooms
@@ -3426,7 +3481,7 @@ export default function ChatScreen() {
                   flatListRef.current?.scrollToEnd({ animated: false });
                 }
               }}
-              renderItem={({ item }) => {
+              renderItem={({ item, index }) => {
                 const senderIdStr = getSenderIdString(item.senderId);
                 const isMe =
                   senderIdStr === currentUserId ||
@@ -3439,11 +3494,104 @@ export default function ChatScreen() {
                 const rawContent = item.content || "";
                 const roomActivityText = !isDeleted ? getRoomActivityText(rawContent) : null;
 
+                // Tính toán thanh phân chia ngày tháng / mốc giờ chuẩn Zalo
+                const dividerInfo = (() => {
+                  if (!item.createdAt) return null;
+                  if (index === 0) {
+                    return { type: "date" as const, text: formatZaloDateDivider(item.createdAt) };
+                  }
+                  const prevMsg = displayedMessages[index - 1];
+                  if (!prevMsg?.createdAt) {
+                    return { type: "date" as const, text: formatZaloDateDivider(item.createdAt) };
+                  }
+                  const currD = new Date(item.createdAt);
+                  const prevD = new Date(prevMsg.createdAt);
+                  if (isNaN(currD.getTime()) || isNaN(prevD.getTime())) return null;
+
+                  if (currD.toDateString() !== prevD.toDateString()) {
+                    return { type: "date" as const, text: formatZaloDateDivider(item.createdAt) };
+                  }
+
+                  // Cùng ngày nhưng cách nhau hơn 2 giờ (mốc thời gian giữa các đoạn trò chuyện Zalo)
+                  const diffMs = currD.getTime() - prevD.getTime();
+                  if (diffMs > 2 * 60 * 60 * 1000) {
+                    const hh = currD.getHours().toString().padStart(2, "0");
+                    const mm = currD.getMinutes().toString().padStart(2, "0");
+                    return { type: "time" as const, text: `${hh}:${mm}` };
+                  }
+
+                  return null;
+                })();
+
+                // Phân tích cụm tin nhắn gần nhau (cùng người gửi và gửi sát nhau < 2 phút chuẩn Zalo)
+                const nextMsg = displayedMessages[index + 1];
+                const prevMsg = displayedMessages[index - 1];
+
+                const nextSenderId = nextMsg ? getSenderIdString(nextMsg.senderId) : null;
+                const prevSenderId = prevMsg ? getSenderIdString(prevMsg.senderId) : null;
+
+                const currTime = item.createdAt ? new Date(item.createdAt).getTime() : 0;
+                const nextTime = nextMsg?.createdAt ? new Date(nextMsg.createdAt).getTime() : 0;
+                const prevTime = prevMsg?.createdAt ? new Date(prevMsg.createdAt).getTime() : 0;
+
+                const nextHasDivider = Boolean(
+                  nextMsg?.createdAt &&
+                  item.createdAt &&
+                  new Date(nextMsg.createdAt).toDateString() !== new Date(item.createdAt).toDateString()
+                );
+
+                const isNextCloseAndSameSender = Boolean(
+                  nextMsg &&
+                  !nextMsg.isDeleted &&
+                  nextSenderId === senderIdStr &&
+                  currTime > 0 &&
+                  nextTime > 0 &&
+                  !nextHasDivider &&
+                  Math.abs(nextTime - currTime) < 2 * 60 * 1000
+                );
+
+                const isPrevCloseAndSameSender = Boolean(
+                  prevMsg &&
+                  !prevMsg.isDeleted &&
+                  prevSenderId === senderIdStr &&
+                  currTime > 0 &&
+                  prevTime > 0 &&
+                  !dividerInfo &&
+                  Math.abs(currTime - prevTime) < 2 * 60 * 1000
+                );
+
+                const isFirstInGroup = !isPrevCloseAndSameSender;
+                const isLastInGroup = !isNextCloseAndSameSender;
+                const hasReactions = Boolean(item.reactions && item.reactions.length > 0);
+
+                // Rút gọn: chỉ hiển thị mốc thời gian khi là tin cuối cụm, có cảm xúc, đang gửi/lỗi, hoặc tin sau cách trên 1 phút
+                const showMsgMeta =
+                  isLastInGroup ||
+                  hasReactions ||
+                  item.status === "sending" ||
+                  item.status === "failed" ||
+                  Math.abs(nextTime - currTime) >= 60 * 1000;
+
                 if (roomActivityText) {
                   return (
-                    <View style={styles.systemMessageRow}>
-                      <Ionicons name="information-circle-outline" size={15} color="#94a3b8" />
-                      <Text style={styles.systemMessageText}>{roomActivityText}</Text>
+                    <View key={item._id ? `activity-${item._id}-${index}` : `activity-${index}`}>
+                      {dividerInfo && (
+                        <View style={styles.dateDividerWrap}>
+                          <View style={styles.dateDividerPill}>
+                            <Ionicons
+                              name={dividerInfo.type === "date" ? "calendar-outline" : "time-outline"}
+                              size={11}
+                              color="#64748b"
+                              style={{ marginRight: 4 }}
+                            />
+                            <Text style={styles.dateDividerText}>{dividerInfo.text}</Text>
+                          </View>
+                        </View>
+                      )}
+                      <View style={styles.systemMessageRow}>
+                        <Ionicons name="information-circle-outline" size={15} color="#94a3b8" />
+                        <Text style={styles.systemMessageText}>{roomActivityText}</Text>
+                      </View>
                     </View>
                   );
                 }
@@ -3506,223 +3654,255 @@ export default function ChatScreen() {
                   : null;
 
                 return (
-                  <View style={[styles.msgRow, isMe ? styles.msgRowMe : styles.msgRowOther]}>
-                    {!isMe && (
-                      <View style={styles.msgSenderAvatar}>
-                        {!activeRoom.isGroup ? (
-                          <RoomAvatar
-                            room={activeRoom}
-                            avatarUrl={getRoomAvatarUrl(activeRoom)}
-                            roomName={getRoomDisplayName(activeRoom)}
-                            isBot={isChatbotRoom(activeRoom)}
-                            isCloud={isCloudRoom(activeRoom)}
-                            size={28}
-                            fontSize={11}
+                  <View key={item._id ? `msg-${item._id}-${index}` : `msg-${index}`}>
+                    {dividerInfo && (
+                      <View style={styles.dateDividerWrap}>
+                        <View style={styles.dateDividerPill}>
+                          <Ionicons
+                            name={dividerInfo.type === "date" ? "calendar-outline" : "time-outline"}
+                            size={11}
+                            color="#64748b"
+                            style={{ marginRight: 4 }}
                           />
-                        ) : (
-                          <UserAvatar
-                            photoURL={getMessageSenderPhoto(item)}
-                            name={item.senderName || "U"}
-                            size={28}
-                            fontSize={11}
-                          />
-                        )}
+                          <Text style={styles.dateDividerText}>{dividerInfo.text}</Text>
+                        </View>
                       </View>
                     )}
 
-                    <View style={{ maxWidth: "78%" }}>
-                      {!isMe && activeRoom.isGroup && (
-                        <Text style={styles.msgSenderName}>{historicalUserLabel(item.senderName, item.senderDeleted, "Đồng nghiệp")}</Text>
+                    <View
+                      style={[
+                        isLastInGroup ? styles.msgRow : styles.msgRowCompact,
+                        isMe ? styles.msgRowMe : styles.msgRowOther,
+                        hasReactions && { marginBottom: 8 },
+                      ]}
+                    >
+                      {!isMe && (
+                        isLastInGroup ? (
+                          <View style={[styles.msgSenderAvatar, { marginBottom: showMsgMeta ? 16 : 2 }]}>
+                            {!activeRoom.isGroup ? (
+                              <RoomAvatar
+                                room={activeRoom}
+                                avatarUrl={getRoomAvatarUrl(activeRoom)}
+                                roomName={getRoomDisplayName(activeRoom)}
+                                isBot={isChatbotRoom(activeRoom)}
+                                isCloud={isCloudRoom(activeRoom)}
+                                size={28}
+                                fontSize={11}
+                              />
+                            ) : (
+                              <UserAvatar
+                                photoURL={getMessageSenderPhoto(item)}
+                                name={item.senderName || "U"}
+                                size={28}
+                                fontSize={11}
+                              />
+                            )}
+                          </View>
+                        ) : (
+                          <View style={styles.msgSenderAvatarSpacer} />
+                        )
                       )}
 
-                      <TouchableOpacity
-                        style={[
-                          styles.msgBubble,
-                          isMe ? styles.msgBubbleMe : styles.msgBubbleOther,
-                          isDeleted && styles.msgBubbleDeleted,
-                          emojiMeta.isEmojiOnly && styles.msgBubbleEmojiOnly,
-                          item._id === highlightedMessageId && styles.msgBubbleHighlighted,
-                        ]}
-                        onLongPress={() => {
-                          setSelectedMessage(item);
-                          setMessageActionModalVisible(true);
-                        }}
-                        activeOpacity={0.85}
-                      >
-                        {isDeleted ? (
-                          <Text style={styles.msgDeletedText}>Tin nhắn đã được thu hồi</Text>
-                        ) : (
-                          <>
-                            {/* Khung hiển thị trích dẫn trả lời nếu có - Bấm để nhảy đến tin nhắn gốc */}
-                            {repliedMsg && (
-                              <TouchableOpacity
-                                style={styles.bubbleReplyWrap}
-                                onPress={() => handleScrollToRepliedMessage(repliedMsg._id)}
-                                activeOpacity={0.7}
-                              >
-                                <View style={{ flex: 1 }}>
-                                  <Text style={styles.bubbleReplySender} numberOfLines={1}>
-                                    {repliedMsg.senderName || "Đồng nghiệp"}
-                                  </Text>
-                                  <Text style={styles.bubbleReplyText} numberOfLines={1}>
-                                    {repliedMsg.content || (repliedMsg.attachments?.length ? "[Hình ảnh/Tệp tin]" : "")}
-                                  </Text>
-                                </View>
-                              </TouchableOpacity>
-                            )}
+                      <View style={{ maxWidth: "78%" }}>
+                        {!isMe && activeRoom.isGroup && isFirstInGroup && (
+                          <Text style={styles.msgSenderName}>{historicalUserLabel(item.senderName, item.senderDeleted, "Đồng nghiệp")}</Text>
+                        )}
 
-                            {effectiveAttachments && effectiveAttachments.length > 0 && (
-                              <View style={styles.msgAttachmentsWrap}>
-                                {effectiveAttachments.map((att: ChatAttachment, idx: number) => {
-                                  const isImg = isImageAttachment(att);
-                                  const isVid = isVideoAttachment(att);
-                                  const isAud = !isVid && isAudioAttachment(att);
+                        <TouchableOpacity
+                          style={[
+                            styles.msgBubble,
+                            isMe ? styles.msgBubbleMe : styles.msgBubbleOther,
+                            isDeleted && styles.msgBubbleDeleted,
+                            emojiMeta.isEmojiOnly && styles.msgBubbleEmojiOnly,
+                            item._id === highlightedMessageId && styles.msgBubbleHighlighted,
+                            isMe && !isLastInGroup && { borderBottomRightRadius: 6 },
+                            !isMe && !isLastInGroup && { borderBottomLeftRadius: 6 },
+                            isMe && !isFirstInGroup && { borderTopRightRadius: 6 },
+                            !isMe && !isFirstInGroup && { borderTopLeftRadius: 6 },
+                          ]}
+                          onLongPress={() => {
+                            setSelectedMessage(item);
+                            setMessageActionModalVisible(true);
+                          }}
+                          activeOpacity={0.85}
+                        >
+                          {isDeleted ? (
+                            <Text style={styles.msgDeletedText}>Tin nhắn đã được thu hồi</Text>
+                          ) : (
+                            <>
+                              {/* Khung hiển thị trích dẫn trả lời nếu có - Bấm để nhảy đến tin nhắn gốc */}
+                              {repliedMsg && (
+                                <TouchableOpacity
+                                  style={styles.bubbleReplyWrap}
+                                  onPress={() => handleScrollToRepliedMessage(repliedMsg._id)}
+                                  activeOpacity={0.7}
+                                >
+                                  <View style={{ flex: 1 }}>
+                                    <Text style={styles.bubbleReplySender} numberOfLines={1}>
+                                      {repliedMsg.senderName || "Đồng nghiệp"}
+                                    </Text>
+                                    <Text style={styles.bubbleReplyText} numberOfLines={1}>
+                                      {repliedMsg.content || (repliedMsg.attachments?.length ? "[Hình ảnh/Tệp tin]" : "")}
+                                    </Text>
+                                  </View>
+                                </TouchableOpacity>
+                              )}
 
-                                  if (isImg) {
+                              {effectiveAttachments && effectiveAttachments.length > 0 && (
+                                <View style={styles.msgAttachmentsWrap}>
+                                  {effectiveAttachments.map((att: ChatAttachment, idx: number) => {
+                                    const isImg = isImageAttachment(att);
+                                    const isVid = isVideoAttachment(att);
+                                    const isAud = !isVid && isAudioAttachment(att);
+
+                                    if (isImg) {
+                                      return (
+                                        <TouchableOpacity
+                                          key={`img-${idx}-${att.url}`}
+                                          style={styles.attItem}
+                                          onPress={() => setPreviewImageUri(att.url)}
+                                          activeOpacity={0.9}
+                                        >
+                                          <Image
+                                            source={{ uri: att.url }}
+                                            style={styles.attImage}
+                                            resizeMode="cover"
+                                          />
+                                          {item.status === "sending" && (
+                                            <View style={styles.attSpinnerCenterWrap}>
+                                              <View style={styles.attSpinnerBadge}>
+                                                <ActivityIndicator size="small" color="#ffffff" />
+                                              </View>
+                                            </View>
+                                          )}
+                                        </TouchableOpacity>
+                                      );
+                                    }
+
+                                    if (isVid) {
+                                      return (
+                                        <ChatVideoBubble
+                                          key={`vid-${idx}-${att.url}`}
+                                          att={att}
+                                          isMe={isMe}
+                                          isSending={item.status === "sending"}
+                                          onPress={() => {
+                                            setPreviewVideoName(getCleanFileName(att) || "Video");
+                                            setPreviewVideoUri(att.url);
+                                          }}
+                                        />
+                                      );
+                                    }
+
+                                    if (isAud) {
+                                      return (
+                                        <View key={`aud-${idx}-${att.url}`} style={styles.voiceNoteWrap}>
+                                          <VoiceNoteBubble att={att} isMe={isMe} />
+                                        </View>
+                                      );
+                                    }
+
                                     return (
                                       <TouchableOpacity
-                                        key={`img-${idx}-${att.url}`}
-                                        style={styles.attItem}
-                                        onPress={() => setPreviewImageUri(att.url)}
-                                        activeOpacity={0.9}
+                                        key={`file-${idx}-${att.url}`}
+                                        style={styles.attFileCard}
+                                        onPress={() => {
+                                          if (item.status !== "sending") {
+                                            void handleDownloadAttachment(att);
+                                          }
+                                        }}
+                                        activeOpacity={0.75}
                                       >
-                                        <Image
-                                          source={{ uri: att.url }}
-                                          style={styles.attImage}
-                                          resizeMode="cover"
-                                        />
-                                        {item.status === "sending" && (
-                                          <View style={styles.attSpinnerCenterWrap}>
-                                            <View style={styles.attSpinnerBadge}>
-                                              <ActivityIndicator size="small" color="#ffffff" />
-                                            </View>
-                                          </View>
-                                        )}
+                                        <View style={styles.attFileIconWrap}>
+                                          <Ionicons name="document-text" size={24} color={LUXCARE_PRIMARY} />
+                                        </View>
+                                        <View style={styles.attFileInfo}>
+                                          <Text style={styles.attFileName} numberOfLines={1} ellipsizeMode="middle">
+                                            {getCleanFileName(att)}
+                                          </Text>
+                                          <Text style={styles.attFileSize}>
+                                            {item.status === "sending" ? "Đang gửi..." : formatFileSize(att.size)}
+                                          </Text>
+                                        </View>
+                                        <View style={styles.attFileDownloadWrap}>
+                                          {item.status === "sending" ? (
+                                            <ActivityIndicator size="small" color={LUXCARE_PRIMARY} />
+                                          ) : (
+                                            <Ionicons name="arrow-down-outline" size={17} color="#475569" />
+                                          )}
+                                        </View>
                                       </TouchableOpacity>
                                     );
-                                  }
+                                  })}
+                                </View>
+                              )}
 
-                                  if (isVid) {
-                                    return (
-                                      <ChatVideoBubble
-                                        key={`vid-${idx}-${att.url}`}
-                                        att={att}
-                                        isMe={isMe}
-                                        isSending={item.status === "sending"}
-                                        onPress={() => {
-                                          setPreviewVideoName(getCleanFileName(att) || "Video");
-                                          setPreviewVideoUri(att.url);
-                                        }}
-                                      />
-                                    );
-                                  }
+                              {cleanContent ? (
+                                emojiMeta.isEmojiOnly ? (
+                                  <Text
+                                    style={[
+                                      styles.msgTextBigEmoji,
+                                      {
+                                        fontSize:
+                                          emojiMeta.count === 1
+                                            ? 42
+                                            : emojiMeta.count === 2
+                                            ? 36
+                                            : emojiMeta.count <= 4
+                                            ? 30
+                                            : 26,
+                                        lineHeight:
+                                          emojiMeta.count === 1
+                                            ? 52
+                                            : emojiMeta.count === 2
+                                            ? 46
+                                            : emojiMeta.count <= 4
+                                            ? 40
+                                            : 34,
+                                      },
+                                    ]}
+                                  >
+                                    {cleanContent}
+                                  </Text>
+                                ) : (
+                                  <Text style={[styles.msgText, isMe ? styles.msgTextMe : styles.msgTextOther]}>
+                                    {cleanContent}
+                                  </Text>
+                                )
+                              ) : null}
+                            </>
+                          )}
 
-                                  if (isAud) {
-                                    return (
-                                      <View key={`aud-${idx}-${att.url}`} style={styles.voiceNoteWrap}>
-                                        <VoiceNoteBubble att={att} isMe={isMe} />
-                                      </View>
-                                    );
-                                  }
+                          {item.reactions && item.reactions.length > 0 && (
+                            <View style={styles.reactionBadge}>
+                              <Text style={styles.reactionBadgeText}>
+                                {Array.from(new Set(item.reactions.map((r: any) => r.emoji))).join(" ")}
+                              </Text>
+                            </View>
+                          )}
+                        </TouchableOpacity>
 
-                                  return (
-                                    <TouchableOpacity
-                                      key={`file-${idx}-${att.url}`}
-                                      style={styles.attFileCard}
-                                      onPress={() => {
-                                        if (item.status !== "sending") {
-                                          void handleDownloadAttachment(att);
-                                        }
-                                      }}
-                                      activeOpacity={0.75}
-                                    >
-                                      <View style={styles.attFileIconWrap}>
-                                        <Ionicons name="document-text" size={24} color={LUXCARE_PRIMARY} />
-                                      </View>
-                                      <View style={styles.attFileInfo}>
-                                        <Text style={styles.attFileName} numberOfLines={1} ellipsizeMode="middle">
-                                          {getCleanFileName(att)}
-                                        </Text>
-                                        <Text style={styles.attFileSize}>
-                                          {item.status === "sending" ? "Đang gửi..." : formatFileSize(att.size)}
-                                        </Text>
-                                      </View>
-                                      <View style={styles.attFileDownloadWrap}>
-                                        {item.status === "sending" ? (
-                                          <ActivityIndicator size="small" color={LUXCARE_PRIMARY} />
-                                        ) : (
-                                          <Ionicons name="arrow-down-outline" size={17} color="#475569" />
-                                        )}
-                                      </View>
-                                    </TouchableOpacity>
-                                  );
-                                })}
-                              </View>
+                        {showMsgMeta && (
+                          <View style={[styles.msgMetaRow, isMe && { justifyContent: "flex-end" }]}>
+                            <Text style={styles.msgTimeText}>{formatChatMessageTime(item.createdAt)}</Text>
+                            {isMe && (
+                              <Text
+                                style={[
+                                  styles.msgStatusText,
+                                  item.status === "sending" && { color: "#d97706" },
+                                  item.status === "failed" && { color: "#ef4444" },
+                                ]}
+                              >
+                                {item.status === "sending"
+                                  ? "Đang gửi..."
+                                  : item.status === "failed"
+                                  ? "Lỗi gửi"
+                                  : item.readBy && item.readBy.length > 1
+                                  ? "✓✓ Đã xem"
+                                  : "✓ Đã gửi"}
+                              </Text>
                             )}
-
-                            {cleanContent ? (
-                              emojiMeta.isEmojiOnly ? (
-                                <Text
-                                  style={[
-                                    styles.msgTextBigEmoji,
-                                    {
-                                      fontSize:
-                                        emojiMeta.count === 1
-                                          ? 42
-                                          : emojiMeta.count === 2
-                                          ? 36
-                                          : emojiMeta.count <= 4
-                                          ? 30
-                                          : 26,
-                                      lineHeight:
-                                        emojiMeta.count === 1
-                                          ? 52
-                                          : emojiMeta.count === 2
-                                          ? 46
-                                          : emojiMeta.count <= 4
-                                          ? 40
-                                          : 34,
-                                    },
-                                  ]}
-                                >
-                                  {cleanContent}
-                                </Text>
-                              ) : (
-                                <Text style={[styles.msgText, isMe ? styles.msgTextMe : styles.msgTextOther]}>
-                                  {cleanContent}
-                                </Text>
-                              )
-                            ) : null}
-                          </>
-                        )}
-
-                        {item.reactions && item.reactions.length > 0 && (
-                          <View style={styles.reactionBadge}>
-                            <Text style={styles.reactionBadgeText}>
-                              {Array.from(new Set(item.reactions.map((r: any) => r.emoji))).join(" ")}
-                            </Text>
                           </View>
-                        )}
-                      </TouchableOpacity>
-
-                      <View style={[styles.msgMetaRow, isMe && { justifyContent: "flex-end" }]}>
-                        <Text style={styles.msgTimeText}>{formatMessageTime(item.createdAt)}</Text>
-                        {isMe && (
-                          <Text
-                            style={[
-                              styles.msgStatusText,
-                              item.status === "sending" && { color: "#d97706" },
-                              item.status === "failed" && { color: "#ef4444" },
-                            ]}
-                          >
-                            {item.status === "sending"
-                              ? "Đang gửi..."
-                              : item.status === "failed"
-                              ? "Lỗi gửi"
-                              : item.readBy && item.readBy.length > 1
-                              ? "✓✓ Đã xem"
-                              : "✓ Đã gửi"}
-                          </Text>
                         )}
                       </View>
                     </View>
@@ -5331,8 +5511,17 @@ const styles = StyleSheet.create({
   },
   msgRow: {
     flexDirection: "row",
-    marginBottom: 12,
+    marginBottom: 10,
     alignItems: "flex-end",
+  },
+  msgRowCompact: {
+    flexDirection: "row",
+    marginBottom: 3,
+    alignItems: "flex-end",
+  },
+  msgSenderAvatarSpacer: {
+    width: 28,
+    marginRight: 6,
   },
   msgRowMe: {
     justifyContent: "flex-end",
@@ -5367,6 +5556,29 @@ const styles = StyleSheet.create({
     color: "#64748b",
     marginBottom: 3,
     marginLeft: 4,
+  },
+  dateDividerWrap: {
+    alignItems: "center",
+    justifyContent: "center",
+    marginVertical: 10,
+  },
+  dateDividerPill: {
+    flexDirection: "row",
+    alignItems: "center",
+    backgroundColor: "#e2e8f0",
+    paddingHorizontal: 12,
+    paddingVertical: 3.5,
+    borderRadius: 14,
+    shadowColor: "#000",
+    shadowOffset: { width: 0, height: 1 },
+    shadowOpacity: 0.04,
+    shadowRadius: 1,
+    elevation: 0.5,
+  },
+  dateDividerText: {
+    fontSize: 11,
+    fontWeight: "600",
+    color: "#475569",
   },
   systemMessageRow: {
     flexDirection: "row",
