@@ -523,7 +523,9 @@ function BranchCardItem({
               <View key={loc.id || String(idx)} style={styles.locationItemCard}>
                 <View style={styles.locationItemTop}>
                   <View style={styles.locationNameBox}>
-                    <Text style={styles.locationItemName}>{loc.name || `Điểm #${idx + 1}`}</Text>
+                    <Text style={styles.locationItemName} numberOfLines={1}>
+                      {loc.name || `Điểm #${idx + 1}`}
+                    </Text>
                     <View
                       style={[
                         styles.locTypeTag,
@@ -560,21 +562,33 @@ function BranchCardItem({
                   </View>
                 </View>
 
+                {/* Toạ độ GPS */}
                 <View style={styles.locationCoordsRow}>
-                  <Text style={styles.coordText}>
-                    GPS: {loc.latitude ? `${loc.latitude}, ${loc.longitude}` : "Chưa cài"}
+                  <MapPin size={12} color="#059669" style={{ marginTop: 2 }} />
+                  <Text style={styles.coordText} numberOfLines={2}>
+                    <Text style={{ fontWeight: "600", color: "#334155" }}>GPS: </Text>
+                    {loc.latitude ? `${loc.latitude}, ${loc.longitude}` : "Chưa cài"}
                   </Text>
-                  <Text style={styles.radiusText}>Bán kính: {loc.allowedRadius || 100}m</Text>
                 </View>
 
-                {loc.type === "office" && !!loc.allowedPublicIps && (
-                  <View style={styles.locationIpRow}>
-                    <Globe size={12} color="#64748b" />
-                    <Text style={styles.ipListText} numberOfLines={1}>
-                      IP: {loc.allowedPublicIps.replace(/\n/g, ", ")}
+                {/* Badges: Bán kính & IP */}
+                <View style={styles.locationMetaBadgesRow}>
+                  <View style={styles.radiusBadge}>
+                    <Navigation size={11} color="#0284c7" />
+                    <Text style={styles.radiusText}>
+                      Bán kính: {loc.allowedRadius || 100}m
                     </Text>
                   </View>
-                )}
+
+                  {loc.type === "office" && !!loc.allowedPublicIps && (
+                    <View style={styles.ipBadge}>
+                      <Globe size={11} color="#64748b" />
+                      <Text style={styles.ipListText} numberOfLines={1}>
+                        IP: {loc.allowedPublicIps.replace(/\n/g, ", ")}
+                      </Text>
+                    </View>
+                  )}
+                </View>
               </View>
             ))
           )}
@@ -1596,11 +1610,13 @@ const styles = StyleSheet.create({
     borderWidth: 1,
     borderColor: "#e2e8f0",
     gap: 6,
+    overflow: "hidden",
   },
   locationItemTop: {
     flexDirection: "row",
     alignItems: "center",
     justifyContent: "space-between",
+    gap: 8,
   },
   locationNameBox: {
     flexDirection: "row",
@@ -1612,12 +1628,14 @@ const styles = StyleSheet.create({
     fontSize: 13,
     fontWeight: "700",
     color: "#0f172a",
+    flexShrink: 1,
   },
   locTypeTag: {
     paddingHorizontal: 6,
     paddingVertical: 1,
     borderRadius: 6,
     borderWidth: 1,
+    flexShrink: 0,
   },
   locTypeTagText: {
     fontSize: 10.5,
@@ -1627,6 +1645,7 @@ const styles = StyleSheet.create({
     paddingHorizontal: 6,
     paddingVertical: 2,
     borderRadius: 6,
+    flexShrink: 0,
   },
   locStatusMiniText: {
     fontSize: 11,
@@ -1634,27 +1653,54 @@ const styles = StyleSheet.create({
   },
   locationCoordsRow: {
     flexDirection: "row",
-    justifyContent: "space-between",
-    alignItems: "center",
+    alignItems: "flex-start",
+    gap: 5,
   },
   coordText: {
     fontSize: 11.5,
-    color: "#64748b",
+    color: "#475569",
+    lineHeight: 16,
+    flex: 1,
   },
-  radiusText: {
-    fontSize: 11.5,
-    color: "#0284c7",
-    fontWeight: "600",
+  locationMetaBadgesRow: {
+    flexDirection: "row",
+    flexWrap: "wrap",
+    alignItems: "center",
+    gap: 6,
+    marginTop: 2,
   },
-  locationIpRow: {
+  radiusBadge: {
     flexDirection: "row",
     alignItems: "center",
-    gap: 5,
+    gap: 4,
+    backgroundColor: "#f0f9ff",
+    paddingHorizontal: 7,
+    paddingVertical: 2.5,
+    borderRadius: 6,
+    borderWidth: 1,
+    borderColor: "#bae6fd",
+  },
+  radiusText: {
+    fontSize: 11,
+    color: "#0369a1",
+    fontWeight: "600",
+  },
+  ipBadge: {
+    flexDirection: "row",
+    alignItems: "center",
+    gap: 4,
+    backgroundColor: "#f8fafc",
+    paddingHorizontal: 7,
+    paddingVertical: 2.5,
+    borderRadius: 6,
+    borderWidth: 1,
+    borderColor: "#e2e8f0",
+    flexShrink: 1,
   },
   ipListText: {
     fontSize: 11,
     color: "#475569",
-    flex: 1,
+    flexShrink: 1,
   },
   cardActionsRow: {
     flexDirection: "row",
