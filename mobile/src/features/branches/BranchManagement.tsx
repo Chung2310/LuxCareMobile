@@ -899,10 +899,20 @@ function BranchEditorModal({
                 </View>
 
                 <View style={styles.tipNoticeBox}>
-                  <Text style={styles.tipNoticeText}>
-                    💡 <Text style={{ fontWeight: "700" }}>Văn phòng:</Text> Kiểm tra cả vị trí GPS và dải IP mạng Wi-Fi.{"\n"}
-                    🚗 <Text style={{ fontWeight: "700" }}>Công tác:</Text> Chỉ kiểm tra tọa độ GPS trong bán kính cho phép.
-                  </Text>
+                  <View style={styles.tipNoticeRow}>
+                    <Building2 size={13} color="#059669" style={{ marginTop: 2 }} />
+                    <Text style={styles.tipNoticeText}>
+                      <Text style={{ fontWeight: "700", color: "#0f172a" }}>Văn phòng: </Text>
+                      Kiểm tra cả vị trí GPS và dải IP mạng Wi-Fi.
+                    </Text>
+                  </View>
+                  <View style={[styles.tipNoticeRow, { marginTop: 4 }]}>
+                    <Briefcase size={13} color="#0284c7" style={{ marginTop: 2 }} />
+                    <Text style={styles.tipNoticeText}>
+                      <Text style={{ fontWeight: "700", color: "#0f172a" }}>Công tác: </Text>
+                      Chỉ kiểm tra tọa độ GPS trong bán kính cho phép.
+                    </Text>
+                  </View>
                 </View>
 
                 {draft.locations.map((location, index) => (
@@ -940,33 +950,42 @@ function BranchEditorModal({
 
                     {/* Chọn loại điểm: Văn phòng / Công tác */}
                     <View style={styles.locTypeSelectorRow}>
-                      {(["office", "business_trip"] as const).map((type) => (
-                        <TouchableOpacity
-                          key={type}
-                          disabled={disabled || !!pending}
-                          style={[
-                            styles.locTypeOption,
-                            location.type === type && styles.locTypeOptionSelected,
-                          ]}
-                          onPress={() =>
-                            changeLocation(location.id, {
-                              type,
-                              allowedPublicIps:
-                                type === "business_trip" ? "" : location.allowedPublicIps,
-                            })
-                          }
-                          activeOpacity={0.7}
-                        >
-                          <Text
+                      {(["office", "business_trip"] as const).map((type) => {
+                        const isSelected = location.type === type;
+                        const iconColor = isSelected ? "#059669" : "#64748b";
+                        return (
+                          <TouchableOpacity
+                            key={type}
+                            disabled={disabled || !!pending}
                             style={[
-                              styles.locTypeOptionText,
-                              location.type === type && styles.locTypeOptionTextSelected,
+                              styles.locTypeOption,
+                              isSelected && styles.locTypeOptionSelected,
                             ]}
+                            onPress={() =>
+                              changeLocation(location.id, {
+                                type,
+                                allowedPublicIps:
+                                  type === "business_trip" ? "" : location.allowedPublicIps,
+                              })
+                            }
+                            activeOpacity={0.7}
                           >
-                            {type === "office" ? "🏢 Văn phòng" : "🚗 Điểm công tác"}
-                          </Text>
-                        </TouchableOpacity>
-                      ))}
+                            {type === "office" ? (
+                              <Building2 size={15} color={iconColor} />
+                            ) : (
+                              <Briefcase size={15} color={iconColor} />
+                            )}
+                            <Text
+                              style={[
+                                styles.locTypeOptionText,
+                                isSelected && styles.locTypeOptionTextSelected,
+                              ]}
+                            >
+                              {type === "office" ? "Văn phòng" : "Điểm công tác"}
+                            </Text>
+                          </TouchableOpacity>
+                        );
+                      })}
                     </View>
 
                     {/* Tọa độ GPS */}
@@ -1882,11 +1901,18 @@ const styles = StyleSheet.create({
     borderColor: "#e2e8f0",
     borderRadius: 12,
     padding: 10,
+    gap: 4,
+  },
+  tipNoticeRow: {
+    flexDirection: "row",
+    alignItems: "flex-start",
+    gap: 6,
   },
   tipNoticeText: {
     fontSize: 12,
     color: "#475569",
     lineHeight: 18,
+    flex: 1,
   },
   locationEditorBox: {
     backgroundColor: "#f8fafc",
@@ -1948,12 +1974,15 @@ const styles = StyleSheet.create({
   },
   locTypeOption: {
     flex: 1,
+    flexDirection: "row",
+    gap: 6,
+    justifyContent: "center",
+    alignItems: "center",
     paddingVertical: 8,
     borderRadius: 10,
     borderWidth: 1,
     borderColor: "#e2e8f0",
     backgroundColor: "#ffffff",
-    alignItems: "center",
   },
   locTypeOptionSelected: {
     borderColor: "#059669",
