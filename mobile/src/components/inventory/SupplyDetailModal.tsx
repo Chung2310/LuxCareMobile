@@ -11,6 +11,7 @@ import {
 import { Ionicons } from "@expo/vector-icons";
 import type { InventorySupply } from "./types";
 import { formatDateVN } from "../../features/credentials/DatePickerModal";
+import { formatNumber } from "../../utils/numberFormat";
 
 interface SupplyDetailModalProps {
   item: InventorySupply | null;
@@ -62,21 +63,21 @@ export const SupplyDetailModal: React.FC<SupplyDetailModalProps> = ({
                 <View style={styles.statBox}>
                   <Text style={styles.statBoxLabel}>Số lượng tồn</Text>
                   <Text style={[styles.statBoxVal, { color: "#059669" }]}>
-                    {item.quantity} {item.unit}
+                    {formatNumber(item.quantity)} {item.unit}
                   </Text>
                 </View>
 
                 <View style={styles.statBox}>
                   <Text style={styles.statBoxLabel}>Tồn tối thiểu</Text>
                   <Text style={[styles.statBoxVal, { color: "#d97706" }]}>
-                    {item.minQuantity} {item.unit}
+                    {formatNumber(item.minQuantity)} {item.unit}
                   </Text>
                 </View>
 
                 <View style={styles.statBox}>
                   <Text style={styles.statBoxLabel}>Đơn giá nhập</Text>
                   <Text style={styles.statBoxVal}>
-                    {item.unitPrice ? item.unitPrice.toLocaleString("vi-VN") + " đ" : "--"}
+                    {item.unitPrice ? formatNumber(item.unitPrice) + " đ" : "--"}
                   </Text>
                 </View>
               </View>

@@ -31,6 +31,40 @@ import { SupplierFormModal } from "./SupplierFormModal";
 import { supplyApi } from "../../api/supplyApi";
 import { DatePickerModal, formatDateVN } from "../../features/credentials/DatePickerModal";
 import { AppButton } from "../common";
+import { formatIntegerInput, formatNumber, parseIntegerInput } from "../../utils/numberFormat";
+
+export interface SupplyFormDocument {
+  name: string;
+  fileUrl: string;
+  fileType?: string;
+  fileSize?: number;
+  uploadedAt?: string;
+}
+
+export interface SupplyFormDraft {
+  name: string;
+  code: string;
+  category: string;
+  unit: string;
+  unitPrice: string;
+  warehouseLocation: string;
+  warehouseId?: string;
+  supplierName: string;
+  supplierId?: string;
+  quantity: number;
+  minQuantity: string;
+  batchNumber: string;
+  manufactureDate: string;
+  expiryDate: string;
+  requiresExpiry: boolean;
+  inspectionDate: string;
+  nextInspectionDate: string;
+  inspectionCertificateNumber: string;
+  imageUrl: string;
+  images: string[];
+  documents: SupplyFormDocument[];
+  notes: string;
+}
 
 interface SupplyFormModalProps {
   visible: boolean;
@@ -43,6 +77,8 @@ interface SupplyFormModalProps {
   onAddCategory?: (data: any) => Promise<any>;
   onAddWarehouse?: (data: any) => Promise<any>;
   onAddSupplier?: (data: any) => Promise<any>;
+  draft?: SupplyFormDraft | null;
+  onDraftChange?: (draft: SupplyFormDraft) => void;
 }
 
 const COMMON_UNITS = ["Hộp", "Cái", "Gói", "Ống", "Chai", "Cuộn", "Bộ", "Thùng", "Vỉ", "Tép"];
@@ -58,6 +94,8 @@ export const SupplyFormModal: React.FC<SupplyFormModalProps> = ({
   onAddCategory,
   onAddWarehouse,
   onAddSupplier,
+  draft,
+  onDraftChange,
 }) => {
   // 1. Định danh & Phân loại
   const [name, setName] = useState("");
@@ -114,6 +152,9 @@ export const SupplyFormModal: React.FC<SupplyFormModalProps> = ({
 
   const prevVisibleRef = useRef(false);
   const prevItemRef = useRef<InventorySupply | null>(null);
+  const skipDraftSyncRef = useRef(false);
+  const onDraftChangeRef = useRef(onDraftChange);
+  onDraftChangeRef.current = onDraftChange;
 
   useEffect(() => {
     const prevVisible = prevVisibleRef.current;
@@ -127,12 +168,13 @@ export const SupplyFormModal: React.FC<SupplyFormModalProps> = ({
         (item && prevItem && (item.id || (item as any)._id) !== (prevItem.id || (prevItem as any)._id)));
 
     if (isOpening || isItemChanged) {
+      skipDraftSyncRef.current = true;
       if (item) {
         setName(item.name || "");
         setCode(item.code || "");
         setCategory(item.category || "Vật tư tiêu hao");
         setUnit(item.unit || "Hộp");
-        setUnitPrice(item.unitPrice ? String(item.unitPrice) : "");
+        setUnitPrice(item.unitPrice ? formatIntegerInput(String(item.unitPrice)) : "");
 
         setWarehouseLocation(item.warehouseLocation || "");
         setWarehouseId(item.warehouseId);
@@ -140,7 +182,7 @@ export const SupplyFormModal: React.FC<SupplyFormModalProps> = ({
         setSupplierId(item.supplierId);
 
         setQuantity(item.quantity || 0);
-        setMinQuantity(String(item.minQuantity ?? 10));
+        setMinQuantity(formatIntegerInput(String(item.minQuantity ?? 10)));
 
         setBatchNumber(item.batchNumber && item.batchNumber !== "N/A" ? item.batchNumber : "");
         setManufactureDate(item.manufactureDate || "");
@@ -155,6 +197,29 @@ export const SupplyFormModal: React.FC<SupplyFormModalProps> = ({
         setImages(item.images || (item.imageUrl ? [item.imageUrl] : []));
         setDocuments(item.documents || []);
         setNotes(item.notes || "");
+      } else if (draft) {
+        setName(draft.name);
+        setCode(draft.code);
+        setCategory(draft.category);
+        setUnit(draft.unit);
+        setUnitPrice(formatIntegerInput(draft.unitPrice));
+        setWarehouseLocation(draft.warehouseLocation);
+        setWarehouseId(draft.warehouseId);
+        setSupplierName(draft.supplierName);
+        setSupplierId(draft.supplierId);
+        setQuantity(draft.quantity);
+        setMinQuantity(formatIntegerInput(draft.minQuantity));
+        setBatchNumber(draft.batchNumber);
+        setManufactureDate(draft.manufactureDate);
+        setExpiryDate(draft.expiryDate);
+        setRequiresExpiry(draft.requiresExpiry);
+        setInspectionDate(draft.inspectionDate);
+        setNextInspectionDate(draft.nextInspectionDate);
+        setInspectionCertificateNumber(draft.inspectionCertificateNumber);
+        setImageUrl(draft.imageUrl);
+        setImages(draft.images);
+        setDocuments(draft.documents);
+        setNotes(draft.notes);
       } else {
         setName("");
         setCode(`VT-${Date.now().toString().slice(-4)}`);
@@ -188,7 +253,65 @@ export const SupplyFormModal: React.FC<SupplyFormModalProps> = ({
 
     prevVisibleRef.current = visible;
     prevItemRef.current = item;
-  }, [visible, item]);
+  }, [visible, item, draft]);
+
+  // Đồng bộ draft lên màn cha để không mất dữ liệu khi mở/đóng modal thêm nhanh.
+  useEffect(() => {
+    if (!visible || !onDraftChangeRef.current) return;
+    if (skipDraftSyncRef.current) {
+      skipDraftSyncRef.current = false;
+      return;
+    }
+
+    onDraftChangeRef.current({
+      name,
+      code,
+      category,
+      unit,
+      unitPrice,
+      warehouseLocation,
+      warehouseId,
+      supplierName,
+      supplierId,
+      quantity,
+      minQuantity,
+      batchNumber,
+      manufactureDate,
+      expiryDate,
+      requiresExpiry,
+      inspectionDate,
+      nextInspectionDate,
+      inspectionCertificateNumber,
+      imageUrl,
+      images,
+      documents,
+      notes,
+    });
+  }, [
+    visible,
+    name,
+    code,
+    category,
+    unit,
+    unitPrice,
+    warehouseLocation,
+    warehouseId,
+    supplierName,
+    supplierId,
+    quantity,
+    minQuantity,
+    batchNumber,
+    manufactureDate,
+    expiryDate,
+    requiresExpiry,
+    inspectionDate,
+    nextInspectionDate,
+    inspectionCertificateNumber,
+    imageUrl,
+    images,
+    documents,
+    notes,
+  ]);
 
   // Nếu mở form tạo mới lúc danh mục/kho/NCC chưa kịp load, tự điền giá trị mặc định đầu tiên khi dữ liệu tới mà không xóa nội dung user đã nhập
   useEffect(() => {
@@ -516,8 +639,8 @@ export const SupplyFormModal: React.FC<SupplyFormModalProps> = ({
         code: code.trim().toUpperCase(),
         category,
         unit: unit.trim(),
-        minQuantity: parseInt(minQuantity, 10) || 0,
-        unitPrice: parseFloat(unitPrice) || 0,
+        minQuantity: parseIntegerInput(minQuantity),
+        unitPrice: parseIntegerInput(unitPrice),
         warehouseLocation: warehouseLocation.trim(),
         warehouseId,
         supplierName: supplierName.trim() || undefined,
@@ -546,7 +669,7 @@ export const SupplyFormModal: React.FC<SupplyFormModalProps> = ({
     id: c.id,
     label: c.name,
     subLabel: `Mã: ${c.code}`,
-    badge: `${c.itemCount} SP`,
+    badge: `${formatNumber(c.itemCount)} SP`,
     badgeColor: c.color || "#059669",
     icon: "layers-outline",
   }));
@@ -707,7 +830,7 @@ export const SupplyFormModal: React.FC<SupplyFormModalProps> = ({
                     placeholder="VD: 85000"
                     placeholderTextColor="#94a3b8"
                     value={unitPrice}
-                    onChangeText={setUnitPrice}
+                    onChangeText={(value) => setUnitPrice(formatIntegerInput(value))}
                     keyboardType="numeric"
                   />
                   <Text style={styles.currencyBadge}>VNĐ</Text>
@@ -789,7 +912,7 @@ export const SupplyFormModal: React.FC<SupplyFormModalProps> = ({
                   <View style={styles.priceInputWrapper}>
                     <TextInput
                       style={[styles.input, styles.readOnlyInput]}
-                      value={String(quantity)}
+                      value={formatNumber(quantity)}
                       editable={false}
                     />
                     <Text style={styles.unitSuffix}>{unit || "đơn vị"}</Text>
@@ -805,7 +928,7 @@ export const SupplyFormModal: React.FC<SupplyFormModalProps> = ({
                       placeholder="10"
                       placeholderTextColor="#94a3b8"
                       value={minQuantity}
-                      onChangeText={setMinQuantity}
+                      onChangeText={(value) => setMinQuantity(formatIntegerInput(value))}
                       keyboardType="numeric"
                     />
                     <Text style={styles.unitSuffix}>{unit || "đơn vị"}</Text>

@@ -10,6 +10,7 @@ import {
 import { Ionicons } from "@expo/vector-icons";
 import type { InventoryBatchItem, InventorySupply } from "./types";
 import { formatDateVN } from "../../features/credentials/DatePickerModal";
+import { formatNumber } from "../../utils/numberFormat";
 import { DateFilterPill, SearchInput } from "../common";
 
 interface BatchesViewProps {
@@ -137,7 +138,7 @@ export function BatchesView({ supplies, loading, onRefresh }: BatchesViewProps) 
           </View>
 
           <View style={styles.quantityBox}>
-            <Text style={styles.quantityNum}>{item.quantity}</Text>
+            <Text style={styles.quantityNum}>{formatNumber(item.quantity)}</Text>
             <Text style={styles.unitText}>{item.unit} tồn</Text>
           </View>
         </View>

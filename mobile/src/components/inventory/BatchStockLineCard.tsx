@@ -5,6 +5,7 @@ import type { InventorySupply, InventoryWarehouse } from "./types";
 import { formatDateVN } from "../../features/credentials/DatePickerModal";
 import { QuantityStepper } from "../common";
 import { isSupplyInWarehouse } from "./constants";
+import { formatIntegerInput, formatNumber } from "../../utils/numberFormat";
 
 export interface BatchStockLineState {
   tempId: string;
@@ -74,7 +75,7 @@ export const BatchStockLineCard: React.FC<BatchStockLineCardProps> = ({
             <Text style={styles.supplyCode}>Mã: {line.supply.code}</Text>
             <Text style={styles.dot}>•</Text>
             <Text style={styles.supplyStock}>
-              Tồn kho: {line.supply.quantity} {line.supply.unit}
+              Tồn kho: {formatNumber(line.supply.quantity)} {line.supply.unit}
             </Text>
           </View>
         </View>
@@ -113,7 +114,7 @@ export const BatchStockLineCard: React.FC<BatchStockLineCardProps> = ({
         <View style={styles.overStockWarning}>
           <Ionicons name="alert-circle" size={13} color="#dc2626" />
           <Text style={styles.overStockText}>
-            Số lượng xuất ({line.quantity}) vượt tồn hiện có ({line.supply.quantity})
+            Số lượng xuất ({formatNumber(line.quantity)}) vượt tồn hiện có ({formatNumber(line.supply.quantity)})
           </Text>
         </View>
       )}
@@ -176,8 +177,8 @@ export const BatchStockLineCard: React.FC<BatchStockLineCardProps> = ({
               keyboardType="number-pad"
               placeholder="Giá nhập..."
               placeholderTextColor="#94a3b8"
-              value={line.unitPrice ? String(line.unitPrice) : ""}
-              onChangeText={(val) => onUpdateUnitPrice(line.tempId, val)}
+              value={line.unitPrice ? formatNumber(line.unitPrice) : ""}
+              onChangeText={(val) => onUpdateUnitPrice(line.tempId, formatIntegerInput(val))}
               onFocus={() => onFocusInput?.(line.tempId, "unitPrice")}
             />
           </View>

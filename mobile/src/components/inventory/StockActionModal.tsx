@@ -11,6 +11,7 @@ import {
 import { Ionicons } from "@expo/vector-icons";
 import type { InventorySupply } from "./types";
 import { AppButton, DatePickerField } from "../common";
+import { formatIntegerInput, formatNumber, parseIntegerInput } from "../../utils/numberFormat";
 
 interface StockActionModalProps {
   visible: boolean;
@@ -59,14 +60,14 @@ export const StockActionModal: React.FC<StockActionModalProps> = ({
   const isStockOut = type === "out";
 
   const handleConfirm = () => {
-    const qty = parseInt(quantity, 10);
+    const qty = parseIntegerInput(quantity);
     if (isNaN(qty) || qty <= 0) {
       setErrorMsg("Vui lòng nhập số lượng hợp lệ (lớn hơn 0).");
       return;
     }
 
     if (isStockOut && qty > item.quantity) {
-      setErrorMsg(`Số lượng xuất (${qty}) vượt quá số lượng tồn kho hiện tại (${item.quantity} ${item.unit}).`);
+      setErrorMsg(`Số lượng xuất (${formatNumber(qty)}) vượt quá số lượng tồn kho hiện tại (${formatNumber(item.quantity)} ${item.unit}).`);
       return;
     }
 
@@ -85,9 +86,9 @@ export const StockActionModal: React.FC<StockActionModalProps> = ({
   };
 
   const adjustQty = (delta: number) => {
-    const current = parseInt(quantity, 10) || 0;
+    const current = parseIntegerInput(quantity);
     const next = Math.max(current + delta, 1);
-    setQuantity(String(next));
+    setQuantity(formatNumber(next));
   };
 
   return (
@@ -132,7 +133,7 @@ export const StockActionModal: React.FC<StockActionModalProps> = ({
             <View style={styles.stockBanner}>
               <Text style={styles.stockBannerLabel}>Tồn kho hiện tại:</Text>
               <Text style={styles.stockBannerValue}>
-                {item.quantity} {item.unit}
+                {formatNumber(item.quantity)} {item.unit}
               </Text>
             </View>
 
@@ -163,7 +164,7 @@ export const StockActionModal: React.FC<StockActionModalProps> = ({
                   style={styles.qtyInput}
                   keyboardType="numeric"
                   value={quantity}
-                  onChangeText={setQuantity}
+                  onChangeText={(value) => setQuantity(formatIntegerInput(value))}
                 />
 
                 <TouchableOpacity

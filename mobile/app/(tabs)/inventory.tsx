@@ -34,6 +34,7 @@ import {
   type InventorySupply,
   type InventoryTransaction,
   type InventoryWarehouse,
+  type SupplyFormDraft,
 } from "../../src/components/inventory";
 import { SearchInput, PageLoadingView } from "../../src/components/common";
 import { supplyApi, type BatchStockPayload } from "../../src/api/supplyApi";
@@ -95,6 +96,7 @@ export default function InventoryScreen() {
     visible: false,
     item: null,
   });
+  const [formDraft, setFormDraft] = useState<SupplyFormDraft | null>(null);
 
   // Tải danh sách vật tư & thống kê từ server
   const loadSuppliesData = useCallback(async () => {
@@ -349,6 +351,7 @@ export default function InventoryScreen() {
   };
 
   const handleCreateSupply = () => {
+    setFormDraft(null);
     setFormModal({
       visible: true,
       item: null,
@@ -356,6 +359,7 @@ export default function InventoryScreen() {
   };
 
   const handleEditSupply = (item: InventorySupply) => {
+    setFormDraft(null);
     setFormModal({
       visible: true,
       item,
@@ -789,8 +793,13 @@ export default function InventoryScreen() {
       <SupplyFormModal
         visible={formModal.visible}
         item={formModal.item}
-        onClose={() => setFormModal({ visible: false, item: null })}
+        onClose={() => {
+          setFormDraft(null);
+          setFormModal({ visible: false, item: null });
+        }}
         onSubmit={handleFormSubmit}
+        draft={formDraft}
+        onDraftChange={setFormDraft}
         categories={categories}
         warehouses={warehouses}
         suppliers={suppliers}
