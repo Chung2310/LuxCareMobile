@@ -1,7 +1,7 @@
+import { useAppAlert } from "../../components/AppAlert";
 import React, { useRef, useState } from "react";
 import {
   ActivityIndicator,
-  Alert,
   Image,
   KeyboardAvoidingView,
   Linking,
@@ -39,6 +39,7 @@ export function AccountForm({
   onClose: () => void;
   setLocked: (value: boolean) => void;
 }) {
+  const { showAlert, alertView } = useAppAlert();
   const { user, updateDisplayName, updateUserProfile } = useSession();
   const [name, setName] = useState(user?.displayName || "");
   const [photoURL, setPhotoURL] = useState(user?.photoURL || "");
@@ -62,7 +63,7 @@ export function AccountForm({
       const { status } = await ImagePicker.requestCameraPermissionsAsync();
       if (status === "granted") return true;
 
-      Alert.alert(
+      showAlert(
         "Cần cấp quyền máy ảnh",
         "LuxCare cần quyền truy cập máy ảnh để chụp ảnh đại diện. Vui lòng cho phép trong Cài đặt thiết bị.",
         [
@@ -82,7 +83,7 @@ export function AccountForm({
       const { status } = await ImagePicker.requestMediaLibraryPermissionsAsync();
       if (status === "granted") return true;
 
-      Alert.alert(
+      showAlert(
         "Cần cấp quyền thư viện ảnh",
         "LuxCare cần quyền truy cập ảnh để chọn ảnh đại diện. Vui lòng cho phép trong Cài đặt thiết bị.",
         [
@@ -179,7 +180,7 @@ export function AccountForm({
 
   const promptAvatarChoice = () => {
     if (uploadingPhoto || busy) return;
-    Alert.alert(
+    showAlert(
       "Chọn ảnh đại diện",
       "Bạn muốn chụp ảnh mới hay chọn từ thư viện ảnh thiết bị?",
       [
@@ -253,7 +254,7 @@ export function AccountForm({
   const isPasswordValid = password.length >= 6 && password === confirmation;
 
   return (
-    <SafeAreaView edges={["top", "bottom"]} style={styles.safeArea}>
+    <SafeAreaView edges={[]} style={styles.safeArea}>
       <KeyboardAvoidingView
         style={{ flex: 1 }}
         behavior={Platform.OS === "ios" ? "padding" : undefined}
@@ -599,6 +600,7 @@ export function AccountForm({
           )}
         </ScrollView>
       </KeyboardAvoidingView>
+      {alertView}
     </SafeAreaView>
   );
 }

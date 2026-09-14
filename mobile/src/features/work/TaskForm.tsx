@@ -39,6 +39,8 @@ import { TaskSubtasksEditor } from "./TaskSubtasksEditor";
 import {
   X,
   AlertCircle,
+  AlertTriangle,
+  Target,
   Folder,
   Check,
   Trash2,
@@ -904,6 +906,7 @@ export function TaskForm({
           {(() => {
             const kpiInfo = evaluateTaskKpi(draft.estTime, draft.actualTime, draft.endTime, draft.dueDate, draft.startTime);
             if (!kpiInfo) return null;
+            const KpiIcon = kpiInfo.status === "overdue" ? AlertTriangle : Target;
             return (
               <View
                 style={[
@@ -912,7 +915,7 @@ export function TaskForm({
                 ]}
               >
                 <View style={styles.kpiBannerHeader}>
-                  <Text style={styles.kpiBannerIcon}>{kpiInfo.icon}</Text>
+                  <KpiIcon size={16} color={kpiInfo.color} />
                   <Text style={[styles.kpiBannerTitle, { color: kpiInfo.color }]}>
                     {kpiInfo.label}
                   </Text>
@@ -1711,9 +1714,6 @@ const styles = StyleSheet.create({
     flexDirection: "row",
     alignItems: "center",
     gap: 6,
-  },
-  kpiBannerIcon: {
-    fontSize: 16,
   },
   kpiBannerTitle: {
     fontSize: 13,

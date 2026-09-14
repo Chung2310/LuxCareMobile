@@ -726,12 +726,14 @@ export default function Employees() {
       {/* Employee Profile Detail & Edit Modal */}
       <Modal
         visible={selected !== null}
+        transparent
         animationType="slide"
         onRequestClose={() => {
           if (!lock.current) setSelected(null);
         }}
       >
-        <SafeAreaView style={styles.modalContainer} edges={["top", "bottom"]}>
+        <SafeAreaView style={styles.modalOverlay} edges={["top", "bottom"]}>
+          <View style={styles.modalContainer}>
           {/* Modal Header Bar */}
           <View style={styles.modalHeader}>
             <View>
@@ -1673,6 +1675,7 @@ export default function Employees() {
               </View>
             </TouchableOpacity>
           </Modal>
+          </View>
         </SafeAreaView>
       </Modal>
 
@@ -2051,7 +2054,14 @@ const styles = StyleSheet.create({
   },
 
   // Modal Container
+  modalOverlay: {
+    flex: 1,
+    padding: 12,
+    backgroundColor: "rgba(15, 23, 42, 0.5)",
+  },
   modalContainer: {
+    borderRadius: 24,
+    overflow: "hidden",
     flex: 1,
     backgroundColor: "#f8fafc",
   },
