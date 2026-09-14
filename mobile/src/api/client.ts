@@ -79,6 +79,8 @@ export class MobileApi {
       /^\/api\/v1\/recruitment\/(jobs|applicants)\/[^/]+\/attachment$/.test(input) ||
       input.startsWith("/api/v1/hr/leave-files/upload") ||
       input === "/api/v1/media/upload" ||
+      input === "/api/v1/blogs/files" ||
+      input.startsWith("/api/v1/blogs/files/") ||
       input.startsWith("/api/v1/media/download?") ||
       input === "/api/v1/assistant/knowledge/files" ||
       input.startsWith("/api/v1/assistant/knowledge/") ||

@@ -1,3 +1,5 @@
+import { BlogImage } from "../../src/features/blog/BlogImage";
+import { blogShareMessage } from "../../../src/services/blogShareMessage";
 import { historicalUserLabel } from "../../../src/utils/historicalUser";
 import { downloadRemoteFile } from "../../src/files/downloadRemoteFile";
 import { resolveFileFormat } from "../../src/files/fileFormat";
@@ -21,6 +23,7 @@ import {
   Linking,
   Image,
   Share,
+  Switch,
   ImageBackground,
 } from "react-native";
 import * as DocumentPicker from "expo-document-picker";
@@ -38,7 +41,7 @@ import { Ionicons } from "@expo/vector-icons";
 import Svg, { Path } from "react-native-svg";
 import { useSession } from "../../src/auth/SessionProvider";
 import { LogoutConfirmModal } from "../../src/components/common";
-import { blog, kanbanMedia } from "../../src/api/services";
+import { blog } from "../../src/api/services";
 import { isBlogEditorUser } from "../../../src/utils/permissionUtils";
 import {
   DEFAULT_BLOG_CHANNELS,
@@ -102,6 +105,10 @@ export default function BlogScreen() {
   const [newContent, setNewContent] = useState("");
   const [selectedTag, setSelectedTag] = useState("Thông báo");
   const [attachments, setAttachments] = useState<{ id: string; name: string; type: "file" | "image"; sizeBytes?: number; sizeLabel?: string; localUri?: string }[]>([]);
+  const [attachmentsPublic, setAttachmentsPublic] = useState(false);
+  const [visibilityPost, setVisibilityPost] = useState<BlogPost | null>(null);
+  const [visibilityBusy, setVisibilityBusy] = useState(false);
+  const [visibilityValue, setVisibilityValue] = useState(false);
   const [posting, setPosting] = useState(false);
 
   // Pinned Posts Modal & Layout Scrolling State
@@ -109,7 +116,10 @@ export default function BlogScreen() {
   const jumpRetry = useRef<ReturnType<typeof setTimeout> | null>(null);
   const jumpAttempts = useRef(0);
   const isSharingRef = useRef(false);
-  const [viewImageUrl, setViewImageUrl] = useState<string | null>(null);
+  const [viewImage, setViewImage] = useState<{ postId: string; attachment: BlogAttachment } | null>(null);
+  const viewImageUrl = viewImage?.attachment.url;
+  const viewedPost = postsScope === feedScope ? posts.find(post => post.id === viewImage?.postId) : undefined;
+  const canExportImage = viewedPost?.attachmentsPublic === true;
   const [showLogoutModal, setShowLogoutModal] = useState(false);
   const [logoutBusy, setLogoutBusy] = useState(false);
 
@@ -360,7 +370,7 @@ export default function BlogScreen() {
     setAttachments((prev) => prev.filter((a) => a.id !== id));
   };
 
-  const uploadAttachmentToCloudinary = async (att: {
+  const uploadBlogAttachment = async (att: {
     name: string;
     type: "file" | "image";
     sizeBytes?: number;
@@ -381,18 +391,16 @@ export default function BlogScreen() {
 
     if (base64) {
       const dataUri = base64.startsWith("data:") ? base64 : `data:${mimeType};base64,${base64}`;
-      const uploadRes = await kanbanMedia.upload({
+      const uploadRes = await blog.uploadFile({
         file: dataUri,
         fileName,
-        mimeType,
-        size: att.sizeBytes || Math.round((base64.length * 3) / 4),
       });
       if (uploadRes.url) {
         return {
           name: fileName,
           type: att.type,
           url: uploadRes.url,
-          size: att.sizeBytes ?? 0,
+          size: uploadRes.size,
         };
       }
     }
@@ -408,14 +416,14 @@ export default function BlogScreen() {
     try {
       const uploadedAttachments: { name: string; type: string; url: string; size: number }[] = [];
 
-      // 1. Tải toàn bộ tệp và ảnh lên Cloudinary để mọi thiết bị và Website đều xem được
+      // Upload through protected Blog storage.
       if (attachments.length > 0) {
         for (const att of attachments) {
           try {
-            const uploaded = await uploadAttachmentToCloudinary(att);
+            const uploaded = await uploadBlogAttachment(att);
             if (uploaded) {
               uploadedAttachments.push(uploaded);
-            } else if (att.localUri && (att.localUri.startsWith("http://") || att.localUri.startsWith("https://"))) {
+            } else if (attachmentsPublic && att.localUri && (att.localUri.startsWith("http://") || att.localUri.startsWith("https://"))) {
               uploadedAttachments.push({
                 name: att.name,
                 type: att.type,
@@ -431,18 +439,20 @@ export default function BlogScreen() {
         }
       }
 
-      // 2. Tạo bài viết với các đường dẫn đám mây công khai
+      // Save permissions together with the post.
       await blog.createPost({
         title: newTitle.trim() || undefined,
         content: newContent.trim(),
         tags: [selectedTag],
         attachments: uploadedAttachments,
+        attachmentsPublic,
       });
 
       showAlert("Thành công", "Đã đăng bài viết mới lên Kênh Blog cho toàn hệ thống!");
       setNewTitle("");
       setNewContent("");
       setAttachments([]);
+      setAttachmentsPublic(false);
       setShowTitleInput(false);
       setIsPinned(false);
       await loadBlogData();
@@ -521,16 +531,10 @@ export default function BlogScreen() {
     }
   };
 
-  const handleSharePost = async (post: BlogPost) => {
+  const handleSharePost = async (snapshot: BlogPost) => {
     try {
-      const title = post.title ? `📢 [${post.title}]\n\n` : "📢 [Bản tin LuxCare]\n\n";
-      const author = post.authorName ? `\n\n👤 Tác giả: ${post.authorName}` : "";
-      const channel = post.channelName ? `\n🏷️ Kênh: ${post.channelName}` : "";
-      const atts = (post.attachments || [])
-        .map((a) => (a.url ? `📎 ${a.name}: ${a.url}` : `📎 ${a.name}`))
-        .join("\n");
-      const attSection = atts ? `\n\n${atts}` : "";
-      const message = `${title}${post.content}${attSection}${author}${channel}\n🏥 LuxCare Medical System`;
+      const post = await blog.getPost(snapshot.id);
+      const message = blogShareMessage(post, resolveFileUrl);
 
       await Share.share(
         {
@@ -542,7 +546,37 @@ export default function BlogScreen() {
         }
       );
     } catch (err: any) {
-      console.warn("Lỗi khi chia sẻ bài viết:", err?.message || err);
+      showAlert("Không thể chia sẻ", err?.message || "Vui lòng thử lại.");
+    }
+  };
+
+  const saveVisibility = async () => {
+    if (!visibilityPost || visibilityBusy) return;
+    setVisibilityBusy(true);
+    try {
+      await blog.updateAttachmentVisibility(visibilityPost.id, visibilityValue);
+      setPosts(previous => previous.map(post => post.id === visibilityPost.id ? { ...post, attachmentsPublic: visibilityValue } : post));
+      setVisibilityPost(null);
+      await loadBlogData();
+    } catch (error: any) {
+      setVisibilityPost(null);
+      showAlert("Không thể lưu quyền tệp", error?.message || "Vui lòng thử lại.");
+    } finally { setVisibilityBusy(false); }
+  };
+
+  const exportAttachment = async (postId: string, attachment: BlogAttachment, action: "share" | "download") => {
+    const current = postsScope === feedScope ? posts.find(post => post.id === postId) : undefined;
+    if (current?.attachmentsPublic !== true) {
+      showAlert("Tệp không công khai", "Bài viết này không cho phép chia sẻ hoặc tải tệp.");
+      return;
+    }
+    try {
+      const url = resolveFileUrl(await blog.getAttachmentAccess(postId, attachment.id));
+      if (action === "share") await shareMediaOrFile(url, attachment.name);
+      else await handleDownloadFile(url, attachment.name, attachment.type === "milestone" ? "file" : attachment.type);
+    } catch (error: any) {
+      setViewImage(null);
+      showAlert("Không thể truy cập tệp", error?.message || "Vui lòng tải lại bài viết.");
     }
   };
 
@@ -903,6 +937,9 @@ export default function BlogScreen() {
                             color="#000000"
                           />
                         </Pressable>
+                        <Pressable style={styles.editorActionBtn} accessibilityLabel="Sửa quyền chia sẻ và tải tệp" onPress={() => { setVisibilityPost(post); setVisibilityValue(post.attachmentsPublic === true); }} hitSlop={6}>
+                          <Ionicons name="lock-closed-outline" size={16} color="#000000" />
+                        </Pressable>
                         <Pressable
                           style={styles.editorActionBtn}
                           onPress={() => handleDeletePost(post.id)}
@@ -914,6 +951,7 @@ export default function BlogScreen() {
                     )}
                   </View>
 
+                  {!!post.attachments?.length && <Text style={styles.webFileSize}>{post.attachmentsPublic ? "Tệp công khai · Cho phép chia sẻ và tải về" : "Tệp không công khai · Không cho phép chia sẻ hoặc tải về"}</Text>}
                   {/* Optional Title */}
                   {post.title && <Text style={styles.articleTitle}>{post.title}</Text>}
 
@@ -965,15 +1003,15 @@ export default function BlogScreen() {
                   {/* Inline Images with tap-to-zoom + download/share buttons */}
                   {post.attachments?.filter((att: BlogAttachment) => att.type === "image" && att.url).map((att: BlogAttachment) => {
                     const shareImage = () => {
-                      if (att.url) void shareMediaOrFile(att.url, att.name || "hinh_anh.jpg");
+                      if (att.url) void exportAttachment(post.id, att, "share");
                     };
                     const downloadImage = () => {
-                      if (att.url) void handleDownloadFile(att.url, att.name || "hinh_anh.jpg", "image");
+                      if (att.url) void exportAttachment(post.id, att, "download");
                     };
                     return (
-                      <Pressable key={att.id} style={styles.inlineImageWrap} onPress={() => setViewImageUrl(att.url || null)}>
-                        <Image
-                          source={{ uri: att.url }}
+                      <Pressable key={att.id} style={styles.inlineImageWrap} onPress={() => setViewImage({ postId: post.id, attachment: att })}>
+                        <BlogImage
+                          url={att.url!}
                           style={styles.inlineImage}
                           resizeMode="cover"
                         />
@@ -982,7 +1020,7 @@ export default function BlogScreen() {
                           <Ionicons name="expand-outline" size={13} color="#ffffff" />
                         </View>
                         {/* Action overlay buttons — bottom right */}
-                        <View style={styles.imageOverlayActions}>
+                        <View style={[styles.imageOverlayActions, !post.attachmentsPublic && { display: "none" }]}>
                           <Pressable
                             style={styles.imageDownloadBtn}
                             hitSlop={6}
@@ -1012,11 +1050,11 @@ export default function BlogScreen() {
                         <Text style={styles.webFileName} numberOfLines={1}>{att.name || "Video"}</Text>
                         <Text style={styles.webFileSize}>{att.size || "Video đính kèm"}</Text>
                       </View>
-                      <View style={styles.webFileActions}>
+                      <View style={[styles.webFileActions, !post.attachmentsPublic && { display: "none" }]}>
                         {att.url ? (
                           <Pressable
                             style={styles.webDownloadBtn}
-                            onPress={() => void handleDownloadFile(att.url!, att.name, "video")}
+                            onPress={() => void exportAttachment(post.id, att, "download")}
                           >
                             <Ionicons name="download-outline" size={14} color="#000000" />
                             <Text style={styles.webDownloadText}>Tải về</Text>
@@ -1024,7 +1062,7 @@ export default function BlogScreen() {
                         ) : null}
                         <Pressable
                           style={styles.webDownloadBtn}
-                          onPress={() => void shareMediaOrFile(att.url || "", att.name)}
+                          onPress={() => void exportAttachment(post.id, att, "share")}
                         >
                           <Ionicons name="share-social-outline" size={14} color="#000000" />
                           <Text style={styles.webDownloadText}>Chia sẻ</Text>
@@ -1036,7 +1074,7 @@ export default function BlogScreen() {
                   {/* File Attachments (non-image, non-video) */}
                   {post.attachments?.filter((att: BlogAttachment) => att.type !== "image" && att.type !== "video").map((att: BlogAttachment) => {
                     const shareOrOpenFile = () => {
-                      void shareMediaOrFile(att.url || "", att.name);
+                      void exportAttachment(post.id, att, "share");
                     };
                     return (
                       <View key={att.id} style={styles.webFileCard}>
@@ -1049,12 +1087,12 @@ export default function BlogScreen() {
                           </Text>
                           <Text style={styles.webFileSize}>{att.size || ""}</Text>
                         </View>
-                        <View style={styles.webFileActions}>
+                        <View style={[styles.webFileActions, !post.attachmentsPublic && { display: "none" }]}>
                           {/* Download button */}
                           {att.url ? (
                             <Pressable
                               style={styles.webDownloadBtn}
-                              onPress={() => void handleDownloadFile(att.url!, att.name, "file")}
+                              onPress={() => void exportAttachment(post.id, att, "download")}
                             >
                               <Ionicons name="download-outline" size={14} color="#000000" />
                               <Text style={styles.webDownloadText}>Tải về</Text>
@@ -1194,6 +1232,13 @@ export default function BlogScreen() {
               </View>
             )}
 
+            <View style={{ paddingHorizontal: 16, paddingVertical: 6, flexDirection: "row", alignItems: "center", gap: 12 }}>
+              <View style={{ flex: 1 }}>
+                <Text>Cho phép chia sẻ và tải tệp</Text>
+                <Text style={styles.webFileSize}>{attachmentsPublic ? "Công khai · Mọi tệp đính kèm" : "Không công khai · Mọi tệp đính kèm"}</Text>
+              </View>
+              <Switch accessibilityLabel="Cho phép chia sẻ và tải tệp" value={attachmentsPublic} onValueChange={setAttachmentsPublic} disabled={posting} />
+            </View>
             {/* Main Input Text Area & Circular Green Send Button */}
             <View style={styles.lightInputRow}>
               <TextInput
@@ -1210,10 +1255,10 @@ export default function BlogScreen() {
               <Pressable
                 style={[
                   styles.lightSendBtn,
-                  (!newContent.trim() || posting) && styles.lightSendBtnDisabled,
+                  ((!newContent.trim() && attachments.length === 0) || posting) && styles.lightSendBtnDisabled,
                 ]}
                 onPress={() => void handleCreatePost()}
-                disabled={!newContent.trim() || posting}
+                disabled={(!newContent.trim() && attachments.length === 0) || posting}
               >
                 {posting ? (
                   <ActivityIndicator size="small" color="#ffffff" />
@@ -1336,6 +1381,20 @@ export default function BlogScreen() {
           </Pressable>
         </Modal>
 
+        <Modal visible={!!visibilityPost} transparent animationType="fade" onRequestClose={() => { if (!visibilityBusy) setVisibilityPost(null); }}>
+          <View style={styles.modalOverlay}>
+            <View style={styles.channelModalCard}>
+              <Text style={styles.channelModalTitle}>Quyền tệp đính kèm</Text>
+              <Text style={{ marginVertical: 12 }}>Cho phép chia sẻ và tải mọi tệp trong bài viết</Text>
+              <Switch accessibilityLabel="Công khai tệp trong bài viết" value={visibilityValue} onValueChange={setVisibilityValue} disabled={visibilityBusy} />
+              <Text style={{ marginVertical: 12 }}>{visibilityValue ? "Công khai" : "Không công khai"}</Text>
+              <View style={{ flexDirection: "row", justifyContent: "flex-end", gap: 20 }}>
+                <Pressable disabled={visibilityBusy} onPress={() => setVisibilityPost(null)}><Text>Hủy</Text></Pressable>
+                <Pressable disabled={visibilityBusy} onPress={() => void saveVisibility()}>{visibilityBusy ? <ActivityIndicator /> : <Text>Lưu</Text>}</Pressable>
+              </View>
+            </View>
+          </View>
+        </Modal>
         {/* Custom Rounded Alert Modal */}
         <Modal
           visible={alertState.visible}
@@ -1416,12 +1475,12 @@ export default function BlogScreen() {
           transparent
           animationType="fade"
           statusBarTranslucent
-          onRequestClose={() => setViewImageUrl(null)}
+          onRequestClose={() => setViewImage(null)}
         >
           <View style={styles.imageViewerOverlay}>
             {viewImageUrl && (
-              <Image
-                source={{ uri: viewImageUrl }}
+              <BlogImage
+                url={viewImageUrl}
                 style={styles.imageViewerFull}
                 resizeMode="contain"
               />
@@ -1429,24 +1488,24 @@ export default function BlogScreen() {
             {/* Close button */}
             <Pressable
               style={styles.imageViewerClose}
-              onPress={() => setViewImageUrl(null)}
+              onPress={() => setViewImage(null)}
             >
               <Ionicons name="close" size={24} color="#ffffff" />
             </Pressable>
             {/* Download button */}
             <Pressable
-              style={styles.imageViewerDownload}
+              style={[styles.imageViewerDownload, !canExportImage && { display: "none" }]}
               onPress={() => {
-                if (viewImageUrl) void handleDownloadFile(viewImageUrl, "hinh_anh.jpg", "image");
+                if (viewImage) void exportAttachment(viewImage.postId, viewImage.attachment, "download");
               }}
             >
               <Ionicons name="download-outline" size={22} color="#ffffff" />
             </Pressable>
             {/* Share button */}
             <Pressable
-              style={styles.imageViewerShare}
+              style={[styles.imageViewerShare, !canExportImage && { display: "none" }]}
               onPress={() => {
-                if (viewImageUrl) void shareMediaOrFile(viewImageUrl, "hinh_anh.jpg");
+                if (viewImage) void exportAttachment(viewImage.postId, viewImage.attachment, "share");
               }}
             >
               <Ionicons name="share-social-outline" size={22} color="#ffffff" />

@@ -16,6 +16,7 @@ export interface BlogAttachment {
   name: string;
   size?: string;
   url?: string;
+  shareUrl?: string;
   milestoneData?: {
     fromLevel: number;
     toLevel: number;
@@ -39,6 +40,7 @@ export interface BlogPost {
   title?: string;
   content: string;
   isPinned?: boolean;
+  attachmentsPublic?: boolean;
   attachments?: BlogAttachment[];
   reactions?: { emoji: string; count: number; userReacted?: boolean }[];
 }
@@ -126,6 +128,7 @@ export function createBlogService({ fetch, getAccessToken }: ServiceTransport) {
       title: raw.title?.trim() || undefined,
       content: rawContent,
       isPinned: Boolean(raw.isPinned || raw.pinned || raw.is_pinned),
+      attachmentsPublic: raw.attachmentsPublic === undefined ? true : raw.attachmentsPublic === true,
       attachments: Array.isArray(rawAttachments)
         ? rawAttachments.map((att: any, idx: number) => {
             const rawUrl = att.url || att.uri || att.path || "";
@@ -149,6 +152,7 @@ export function createBlogService({ fetch, getAccessToken }: ServiceTransport) {
               name: rawName || (isImg ? "Hình ảnh đính kèm.jpg" : "Tài liệu đính kèm.pdf"),
               size: typeof att.size === "number" ? `${(att.size / 1024).toFixed(1)} KB` : att.size || "",
               url: rawUrl,
+              shareUrl: typeof att.shareUrl === "string" ? att.shareUrl : undefined,
             };
           })
         : undefined,
@@ -219,7 +223,31 @@ export function createBlogService({ fetch, getAccessToken }: ServiceTransport) {
       }
     },
 
-    createPost: async (payload: { title?: string; content: string; tags?: string[]; attachments?: any[] }): Promise<BlogPost> => {
+    uploadFile: async (payload: { file: string; fileName: string }): Promise<{ url: string; size: number }> => {
+      const response = await request("/api/v1/blogs/files", "POST", payload);
+      const body = await response.json();
+      const data = body.data || body;
+      if (typeof data.url !== "string" || !data.url.startsWith("/api/v1/blogs/files/")) throw new Error("Máy chủ chưa trả về tệp Blog hợp lệ.");
+      return data;
+    },
+    getPost: async (postId: string): Promise<BlogPost> => {
+      const response = await request('/api/v1/blogs/' + encodeURIComponent(postId));
+      const body = await response.json();
+      return normalizePost(body.data || body);
+    },
+    updateAttachmentVisibility: async (postId: string, attachmentsPublic: boolean): Promise<void> => {
+      const response = await request('/api/v1/blogs/' + encodeURIComponent(postId) + '/attachment-visibility', "PATCH", { attachmentsPublic });
+      const body = await response.json();
+      if ((body.data || body).attachmentsPublic !== attachmentsPublic) throw new Error("Máy chủ chưa xác nhận quyền tệp. Vui lòng tải lại bài viết.");
+    },
+    getAttachmentAccess: async (postId: string, attachmentId: string): Promise<string> => {
+      const response = await request('/api/v1/blogs/' + encodeURIComponent(postId) + '/attachments/' + encodeURIComponent(attachmentId) + '/access');
+      const body = await response.json();
+      const data = body.data || body;
+      if (typeof data.url !== "string" || !data.url) throw new Error("Không thể truy cập tệp.");
+      return data.url;
+    },
+    createPost: async (payload: { title?: string; content: string; tags?: string[]; attachments?: any[]; attachmentsPublic: boolean }): Promise<BlogPost> => {
       const response = await request("/api/v1/blogs", "POST", payload);
       const body = await response.json();
       const data = body.data || body;
