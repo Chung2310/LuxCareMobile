@@ -1,7 +1,7 @@
 import { describe, expect, it } from "vitest";
 import type { UserProfile } from "../../../../src/types/common";
 import type { HRTask } from "../../../../src/types/hr";
-import { canUpdateTask, draftForTask, localDateTime, parseDateTime, taskPayload } from "./model";
+import { canUpdateTask, countActiveWorkTasks, draftForTask, localDateTime, parseDateTime, taskPayload } from "./model";
 const employee = { uid: "u1", role: "staff" } as UserProfile;
 const task = { assigneeUid: "u2", subtasks: [{ assigneeUid: "u1" }] } as HRTask;
 const draft = () => ({ ...draftForTask(), title: "Task", assigneeUid: "u1", dueDate: "2026-09-10 18:00" });
@@ -46,4 +46,56 @@ it("keeps subtask assignment, notes and local deadlines through task editing", (
   expect(payload.subtasks?.[0]).toMatchObject({ title: "Prepare room", assigneeUid: "u2", assignee: "Lan", note: "Bring the checklist", completed: true, completedAt: "2026-09-10T06:00:00.000Z" });
   expect(localDateTime(payload.subtasks?.[0].dueDate)).toBe(dueDate);
   expect(draftForTask({ ...payload, id: "task" } as HRTask).subtasks[0]).toMatchObject({ dueDate, note: "Bring the checklist", assignee: "Lan" });
+});
+
+describe("countActiveWorkTasks", () => {
+  const staffUser = { uid: "u1", role: "staff" } as UserProfile;
+  const managerUser = { uid: "m1", role: "manager" } as UserProfile;
+
+  it("counts active tasks assigned directly or via subtasks, excluding closed tasks", () => {
+    const tasks = [
+      { id: "1", title: "T1", status: "In Progress", assigneeUid: "u1" },
+      { id: "2", title: "T2", status: "Done", assigneeUid: "u1" },
+      { id: "3", title: "T3", status: "Archived", assigneeUid: "u1" },
+      { id: "4", title: "T4", status: "Not Started", assigneeUid: "other", subtasks: [{ id: "s1", assigneeUid: "u1", title: "Sub" }] },
+      { id: "5", title: "T5", status: "In Progress", assigneeUid: "other" },
+    ] as HRTask[];
+
+    expect(countActiveWorkTasks(tasks, staffUser)).toBe(2); // T1 and T4
+  });
+
+  it("returns 0 for employee when no active tasks are assigned", () => {
+    const tasks = [
+      { id: "1", title: "T1", status: "In Progress", assigneeUid: "other" },
+      { id: "2", title: "T2", status: "Done", assigneeUid: "u1" },
+    ] as HRTask[];
+
+    expect(countActiveWorkTasks(tasks, staffUser)).toBe(0);
+  });
+
+  it("returns all open tasks for managers when they have no directly assigned tasks", () => {
+    const tasks = [
+      { id: "1", title: "T1", status: "In Progress", assigneeUid: "other" },
+      { id: "2", title: "T2", status: "Not Started", assigneeUid: "other2" },
+      { id: "3", title: "T3", status: "Done", assigneeUid: "other3" },
+    ] as HRTask[];
+
+    expect(countActiveWorkTasks(tasks, managerUser)).toBe(2);
+  });
+
+  it("prioritizes assigned tasks for manager when manager has their own assigned tasks", () => {
+    const tasks = [
+      { id: "1", title: "T1", status: "In Progress", assigneeUid: "m1" },
+      { id: "2", title: "T2", status: "Not Started", assigneeUid: "other" },
+      { id: "3", title: "T3", status: "Done", assigneeUid: "m1" },
+    ] as HRTask[];
+
+    expect(countActiveWorkTasks(tasks, managerUser)).toBe(1); // Only T1
+  });
+
+  it("handles null or empty tasks safely", () => {
+    expect(countActiveWorkTasks([], staffUser)).toBe(0);
+    expect(countActiveWorkTasks(null as any, staffUser)).toBe(0);
+    expect(countActiveWorkTasks([], null)).toBe(0);
+  });
 });

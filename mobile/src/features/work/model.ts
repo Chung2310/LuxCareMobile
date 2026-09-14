@@ -257,3 +257,43 @@ export function evaluateTaskKpi(
     icon: "target",
   };
 }
+
+export function isTaskClosed(status?: string): boolean {
+  if (!status) return false;
+  const s = normalizeTaskStatus(status).trim().toLowerCase();
+  return (
+    s === "done" ||
+    s === "hoàn thành" ||
+    s === "archived" ||
+    s === "lưu trữ" ||
+    s === "cancelled" ||
+    s === "canceled" ||
+    s === "đã hủy"
+  );
+}
+
+export function isTaskAssignedToUser(task: HRTask, uid?: string): boolean {
+  if (!uid) return false;
+  if (task.assigneeUid === uid) return true;
+  if (Array.isArray(task.subtasks) && task.subtasks.some((sub) => sub?.assigneeUid === uid)) {
+    return true;
+  }
+  return false;
+}
+
+export function countActiveWorkTasks(tasks: HRTask[], user: UserProfile | null): number {
+  if (!user || !Array.isArray(tasks) || tasks.length === 0) return 0;
+
+  const openTasks = tasks.filter((t) => !isTaskClosed(t.status));
+  const myOpenTasks = openTasks.filter((t) => isTaskAssignedToUser(t, user.uid));
+
+  if (myOpenTasks.length > 0) {
+    return myOpenTasks.length;
+  }
+
+  if (isTaskManager(user)) {
+    return openTasks.length;
+  }
+
+  return 0;
+}
