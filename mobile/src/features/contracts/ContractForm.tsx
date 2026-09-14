@@ -1,3 +1,4 @@
+import { historicalUserLabel } from "../../../../src/utils/historicalUser";
 import React, { useRef, useState } from "react";
 import {
   ActivityIndicator,
@@ -198,7 +199,7 @@ export function ContractForm({
               </View>
 
               <View style={{ flex: 1 }}>
-                <Text style={styles.employeeName}>{employeeDisplayName}</Text>
+                <Text style={styles.employeeName}>{historicalUserLabel(employeeDisplayName, contract?.employeeId === draft.employeeId && contract.employeeDeleted)}</Text>
                 <Text style={styles.employeeSub}>
                   {currentEmployee?.email || currentEmployee?.department || "Chạm để chọn nhân viên"}
                 </Text>

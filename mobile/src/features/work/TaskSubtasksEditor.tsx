@@ -19,7 +19,7 @@ export function TaskSubtaskInfo({ item }: { item: TaskSubtask }) {
         {!!item.assigneeAvatar && /^https?:\/\//i.test(item.assigneeAvatar) && (
           <Image source={{ uri: item.assigneeAvatar }} style={{ width: 22, height: 22, borderRadius: 11 }} />
         )}
-        <Text style={[styles.muted, { flexShrink: 1 }]}>Phụ trách: {item.assignee || (item.assigneeUid ? "Đã phân công" : "Chưa phân công")}</Text>
+        <Text style={[styles.muted, { flexShrink: 1 }]}>Phụ trách: {item.assignee || (item.assigneeUid ? "Đã phân công" : "Chưa phân công")}{item.assigneeDeleted ? " · Tài khoản đã xóa" : ""}</Text>
       </View>
       <Text style={[styles.muted, overdue && { color: "#be123c" }]}>
         {overdue ? "Quá hạn · " : "Hạn: "}{due ? due.toLocaleString("vi-VN", { day: "2-digit", month: "2-digit", year: "numeric", hour: "2-digit", minute: "2-digit", hour12: false }) : item.dueDate || "Chưa đặt"}

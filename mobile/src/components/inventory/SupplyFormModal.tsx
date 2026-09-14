@@ -1,7 +1,6 @@
 import React, { useEffect, useRef, useState } from "react";
 import {
   ActivityIndicator,
-  Alert,
   Image,
   KeyboardAvoidingView,
   Modal,
@@ -18,6 +17,7 @@ import {
 import { Ionicons } from "@expo/vector-icons";
 import * as ImagePicker from "expo-image-picker";
 import * as DocumentPicker from "expo-document-picker";
+import { useAppAlert } from "../AppAlert";
 import type {
   InventoryCategory,
   InventorySupplier,
@@ -141,6 +141,32 @@ export const SupplyFormModal: React.FC<SupplyFormModalProps> = ({
   const [notes, setNotes] = useState("");
 
   const [submitting, setSubmitting] = useState(false);
+
+  // App Alert & Validation state
+  const { showAlert, alertView } = useAppAlert();
+  const [missingFields, setMissingFields] = useState<string[]>([]);
+  const [submitAttempted, setSubmitAttempted] = useState(false);
+
+  const handleNameChange = (val: string) => {
+    setName(val);
+    if (submitAttempted && val.trim()) {
+      setMissingFields((prev) => prev.filter((f) => f !== "Tên vật tư tiêu hao"));
+    }
+  };
+
+  const handleCodeChange = (val: string) => {
+    setCode(val);
+    if (submitAttempted && val.trim()) {
+      setMissingFields((prev) => prev.filter((f) => f !== "Mã vật tư"));
+    }
+  };
+
+  const handleUnitChange = (val: string) => {
+    setUnit(val);
+    if (submitAttempted && val.trim()) {
+      setMissingFields((prev) => prev.filter((f) => f !== "Đơn vị tính"));
+    }
+  };
 
   // Dropdown Picker Modals
   const [pickerModal, setPickerModal] = useState<"category" | "warehouse" | "supplier" | null>(null);
@@ -334,14 +360,20 @@ export const SupplyFormModal: React.FC<SupplyFormModalProps> = ({
     }
   }, [visible, item, supplierName, suppliers]);
 
+  useEffect(() => {
+    setMissingFields([]);
+    setSubmitAttempted(false);
+  }, [item, visible, categories, warehouses, suppliers]);
   // CHỌN NHIỀU ẢNH TỪ THƯ VIỆN THIẾT BỊ
   const handlePickImagesFromLibrary = async () => {
     try {
       const permission = await ImagePicker.requestMediaLibraryPermissionsAsync();
       if (!permission.granted) {
-        Alert.alert(
+        showAlert(
           "Cần quyền truy cập",
           "Vui lòng cho phép ứng dụng truy cập thư viện ảnh để đính kèm hình ảnh vật tư.",
+          [{ text: "Đã hiểu" }],
+          "info",
         );
         return;
       }
@@ -382,10 +414,10 @@ export const SupplyFormModal: React.FC<SupplyFormModalProps> = ({
           }
           return combined;
         });
-        Alert.alert("Thành công", `Đã tải lên ${uploaded.length} hình ảnh từ thư viện.`);
+        showAlert("Thành công", `Đã tải lên ${uploaded.length} hình ảnh từ thư viện.`, [{ text: "Đóng" }], "success");
       }
     } catch (err: any) {
-      Alert.alert("Lỗi tải ảnh", err.message || "Không thể tải lên ảnh từ thư viện.");
+      showAlert("Lỗi tải ảnh", err.message || "Không thể tải lên ảnh từ thư viện.", [{ text: "Đóng" }], "error");
     } finally {
       setUploadingMedia(false);
       setUploadProgressText("");
@@ -397,9 +429,11 @@ export const SupplyFormModal: React.FC<SupplyFormModalProps> = ({
     try {
       const permission = await ImagePicker.requestCameraPermissionsAsync();
       if (!permission.granted) {
-        Alert.alert(
+        showAlert(
           "Cần quyền máy ảnh",
           "Vui lòng cho phép ứng dụng truy cập máy ảnh để chụp ảnh sản phẩm vật tư.",
+          [{ text: "Đã hiểu" }],
+          "info",
         );
         return;
       }
@@ -436,10 +470,10 @@ export const SupplyFormModal: React.FC<SupplyFormModalProps> = ({
           }
           return combined;
         });
-        Alert.alert("Thành công", "Đã chụp và lưu ảnh sản phẩm vật tư.");
+        showAlert("Thành công", "Đã chụp và lưu ảnh sản phẩm vật tư.", [{ text: "Đóng" }], "success");
       }
     } catch (err: any) {
-      Alert.alert("Lỗi chụp ảnh", err.message || "Không thể chụp ảnh sản phẩm.");
+      showAlert("Lỗi chụp ảnh", err.message || "Không thể chụp ảnh sản phẩm.", [{ text: "Đóng" }], "error");
     } finally {
       setUploadingMedia(false);
       setUploadProgressText("");
@@ -461,9 +495,11 @@ export const SupplyFormModal: React.FC<SupplyFormModalProps> = ({
     try {
       const permission = await ImagePicker.requestCameraPermissionsAsync();
       if (!permission.granted) {
-        Alert.alert(
+        showAlert(
           "Cần quyền máy ảnh",
           "Vui lòng cho phép ứng dụng truy cập máy ảnh để chụp giấy tờ, tem nhãn CO/CQ.",
+          [{ text: "Đã hiểu" }],
+          "info",
         );
         return;
       }
@@ -492,10 +528,10 @@ export const SupplyFormModal: React.FC<SupplyFormModalProps> = ({
 
       if (uploaded.length > 0) {
         setDocuments((prev) => [...prev, ...uploaded]);
-        Alert.alert("Thành công", "Đã đính kèm ảnh chụp tài liệu CO/CQ.");
+        showAlert("Thành công", "Đã đính kèm ảnh chụp tài liệu CO/CQ.", [{ text: "Đóng" }], "success");
       }
     } catch (err: any) {
-      Alert.alert("Lỗi chụp ảnh", err.message || "Không thể chụp ảnh tài liệu.");
+      showAlert("Lỗi chụp ảnh", err.message || "Không thể chụp ảnh tài liệu.", [{ text: "Đóng" }], "error");
     } finally {
       setUploadingMedia(false);
       setUploadProgressText("");
@@ -507,9 +543,11 @@ export const SupplyFormModal: React.FC<SupplyFormModalProps> = ({
     try {
       const permission = await ImagePicker.requestMediaLibraryPermissionsAsync();
       if (!permission.granted) {
-        Alert.alert(
+        showAlert(
           "Cần quyền thư viện ảnh",
           "Vui lòng cho phép ứng dụng truy cập thư viện ảnh để đính kèm giấy chứng nhận.",
+          [{ text: "Đã hiểu" }],
+          "info",
         );
         return;
       }
@@ -543,10 +581,10 @@ export const SupplyFormModal: React.FC<SupplyFormModalProps> = ({
 
       if (uploaded.length > 0) {
         setDocuments((prev) => [...prev, ...uploaded]);
-        Alert.alert("Thành công", `Đã đính kèm ${uploaded.length} ảnh tài liệu.`);
+        showAlert("Thành công", `Đã đính kèm ${uploaded.length} ảnh tài liệu.`, [{ text: "Đóng" }], "success");
       }
     } catch (err: any) {
-      Alert.alert("Lỗi tải ảnh", err.message || "Không thể tải lên ảnh tài liệu.");
+      showAlert("Lỗi tải ảnh", err.message || "Không thể tải lên ảnh tài liệu.", [{ text: "Đóng" }], "error");
     } finally {
       setUploadingMedia(false);
       setUploadProgressText("");
@@ -580,10 +618,10 @@ export const SupplyFormModal: React.FC<SupplyFormModalProps> = ({
 
       if (uploaded.length > 0) {
         setDocuments((prev) => [...prev, ...uploaded]);
-        Alert.alert("Thành công", `Đã đính kèm ${uploaded.length} tệp tài liệu.`);
+        showAlert("Thành công", `Đã đính kèm ${uploaded.length} tệp tài liệu.`, [{ text: "Đóng" }], "success");
       }
     } catch (err: any) {
-      Alert.alert("Lỗi đính kèm", err.message || "Không thể tải lên tài liệu.");
+      showAlert("Lỗi đính kèm", err.message || "Không thể tải lên tài liệu.", [{ text: "Đóng" }], "error");
     } finally {
       setUploadingMedia(false);
       setUploadProgressText("");
@@ -611,27 +649,26 @@ export const SupplyFormModal: React.FC<SupplyFormModalProps> = ({
   };
 
   const handleSubmit = async () => {
-    if (!name.trim()) {
-      alert("Vui lòng nhập tên vật tư tiêu hao.");
-      return;
-    }
-    if (!code.trim()) {
-      alert("Vui lòng nhập mã vật tư.");
-      return;
-    }
-    if (!category.trim()) {
-      alert("Vui lòng chọn danh mục phân loại.");
-      return;
-    }
-    if (!unit.trim()) {
-      alert("Vui lòng nhập đơn vị tính.");
-      return;
-    }
-    if (!warehouseLocation.trim()) {
-      alert("Vui lòng chọn kho lưu trữ.");
+    setSubmitAttempted(true);
+    const missing: string[] = [];
+    if (!name.trim()) missing.push("Tên vật tư tiêu hao");
+    if (!code.trim()) missing.push("Mã vật tư");
+    if (!category.trim()) missing.push("Danh mục phân loại");
+    if (!unit.trim()) missing.push("Đơn vị tính");
+    if (!warehouseLocation.trim()) missing.push("Kho lưu trữ");
+
+    if (missing.length > 0) {
+      setMissingFields(missing);
+      showAlert(
+        "Thiếu thông tin bắt buộc",
+        `Vui lòng bổ sung đầy đủ các thông tin sau trước khi lưu khai báo vật tư:\n\n${missing.map((f) => `• ${f}`).join("\n")}`,
+        [{ text: "Đã hiểu", style: "default" }],
+        "error",
+      );
       return;
     }
 
+    setMissingFields([]);
     setSubmitting(true);
     try {
       await onSubmit({
@@ -659,6 +696,13 @@ export const SupplyFormModal: React.FC<SupplyFormModalProps> = ({
         notes: notes.trim() || undefined,
       });
       onClose();
+    } catch (err: any) {
+      showAlert(
+        "Lỗi lưu vật tư",
+        err.message || "Không thể lưu thông tin vật tư. Vui lòng thử lại.",
+        [{ text: "Đã hiểu", style: "default" }],
+        "error",
+      );
     } finally {
       setSubmitting(false);
     }
@@ -727,6 +771,38 @@ export const SupplyFormModal: React.FC<SupplyFormModalProps> = ({
 
           {/* Form Scroll */}
           <ScrollView style={styles.formScroll} showsVerticalScrollIndicator={false}>
+            {/* THÔNG BÁO THIẾU THÔNG TIN BẮT BUỘC (BO GÓC & ĐỒNG BỘ) */}
+            {submitAttempted && missingFields.length > 0 && (
+              <View style={styles.missingInfoCard}>
+                <View style={styles.missingInfoHeader}>
+                  <View style={styles.missingInfoIconBox}>
+                    <Ionicons name="alert-circle" size={20} color="#dc2626" />
+                  </View>
+                  <View style={{ flex: 1 }}>
+                    <Text style={styles.missingInfoTitle}>Thiếu thông tin bắt buộc</Text>
+                    <Text style={styles.missingInfoSubtitle}>
+                      Vui lòng bổ sung đầy đủ các trường thông tin có dấu (*) bên dưới trước khi lưu:
+                    </Text>
+                  </View>
+                  <TouchableOpacity
+                    onPress={() => setMissingFields([])}
+                    hitSlop={8}
+                    style={styles.missingInfoCloseBtn}
+                  >
+                    <Ionicons name="close" size={16} color="#94a3b8" />
+                  </TouchableOpacity>
+                </View>
+                <View style={styles.missingFieldsList}>
+                  {missingFields.map((field, idx) => (
+                    <View key={idx} style={styles.missingFieldPill}>
+                      <Ionicons name="close-circle" size={12} color="#dc2626" />
+                      <Text style={styles.missingFieldPillText}>{field}</Text>
+                    </View>
+                  ))}
+                </View>
+              </View>
+            )}
+
             {/* ========================================================
                 NHÓM 1: THÔNG TIN ĐỊNH DANH & PHÂN LOẠI
             ======================================================== */}
@@ -745,11 +821,14 @@ export const SupplyFormModal: React.FC<SupplyFormModalProps> = ({
                   Tên vật tư tiêu hao <Text style={styles.required}>*</Text>
                 </Text>
                 <TextInput
-                  style={styles.input}
+                  style={[
+                    styles.input,
+                    submitAttempted && !name.trim() && styles.inputError,
+                  ]}
                   placeholder="VD: Găng tay y tế Nitrile không bột Vglove (Size M)"
                   placeholderTextColor="#94a3b8"
                   value={name}
-                  onChangeText={setName}
+                  onChangeText={handleNameChange}
                 />
               </View>
 
@@ -760,11 +839,15 @@ export const SupplyFormModal: React.FC<SupplyFormModalProps> = ({
                     Mã vật tư <Text style={styles.required}>*</Text>
                   </Text>
                   <TextInput
-                    style={[styles.input, { fontFamily: "monospace", fontWeight: "700" }]}
+                    style={[
+                      styles.input,
+                      { fontFamily: "monospace", fontWeight: "700" },
+                      submitAttempted && !code.trim() && styles.inputError,
+                    ]}
                     placeholder="VD: VT-GT-01"
                     placeholderTextColor="#94a3b8"
                     value={code}
-                    onChangeText={setCode}
+                    onChangeText={handleCodeChange}
                     autoCapitalize="characters"
                   />
                 </View>
@@ -774,11 +857,14 @@ export const SupplyFormModal: React.FC<SupplyFormModalProps> = ({
                     Đơn vị tính <Text style={styles.required}>*</Text>
                   </Text>
                   <TextInput
-                    style={styles.input}
+                    style={[
+                      styles.input,
+                      submitAttempted && !unit.trim() && styles.inputError,
+                    ]}
                     placeholder="Hộp, Cái, Lọ..."
                     placeholderTextColor="#94a3b8"
                     value={unit}
-                    onChangeText={setUnit}
+                    onChangeText={handleUnitChange}
                   />
                 </View>
               </View>
@@ -789,7 +875,7 @@ export const SupplyFormModal: React.FC<SupplyFormModalProps> = ({
                   <TouchableOpacity
                     key={u}
                     style={[styles.quickUnitChip, unit === u && styles.quickUnitChipActive]}
-                    onPress={() => setUnit(u)}
+                    onPress={() => handleUnitChange(u)}
                     activeOpacity={0.7}
                   >
                     <Text style={[styles.quickUnitText, unit === u && styles.quickUnitTextActive]}>
@@ -805,7 +891,10 @@ export const SupplyFormModal: React.FC<SupplyFormModalProps> = ({
                   Danh mục phân loại <Text style={styles.required}>*</Text>
                 </Text>
                 <TouchableOpacity
-                  style={styles.dropdownButton}
+                  style={[
+                    styles.dropdownButton,
+                    submitAttempted && !category.trim() && styles.dropdownButtonError,
+                  ]}
                   onPress={() => setPickerModal("category")}
                   activeOpacity={0.7}
                 >
@@ -877,7 +966,10 @@ export const SupplyFormModal: React.FC<SupplyFormModalProps> = ({
                   Vị trí kho lưu trữ <Text style={styles.required}>*</Text>
                 </Text>
                 <TouchableOpacity
-                  style={styles.dropdownButton}
+                  style={[
+                    styles.dropdownButton,
+                    submitAttempted && !warehouseLocation.trim() && styles.dropdownButtonError,
+                  ]}
                   onPress={() => setPickerModal("warehouse")}
                   activeOpacity={0.7}
                 >
@@ -1374,7 +1466,12 @@ export const SupplyFormModal: React.FC<SupplyFormModalProps> = ({
         placeholderSearch="Tìm danh mục phân loại..."
         options={categoryOptions}
         selectedValue={category}
-        onSelect={(opt) => setCategory(opt.label)}
+        onSelect={(opt) => {
+          setCategory(opt.label);
+          if (submitAttempted && opt.label.trim()) {
+            setMissingFields((prev) => prev.filter((f) => f !== "Danh mục phân loại"));
+          }
+        }}
         onClose={() => setPickerModal(null)}
         onAddNew={onAddCategory ? () => setQuickAddModal("category") : undefined}
         addNewLabel="+ Thêm phân loại"
@@ -1390,6 +1487,9 @@ export const SupplyFormModal: React.FC<SupplyFormModalProps> = ({
         onSelect={(opt) => {
           setWarehouseLocation(opt.label);
           setWarehouseId(opt.id);
+          if (submitAttempted && opt.label.trim()) {
+            setMissingFields((prev) => prev.filter((f) => f !== "Kho lưu trữ"));
+          }
         }}
         onClose={() => setPickerModal(null)}
         onAddNew={onAddWarehouse ? () => setQuickAddModal("warehouse") : undefined}
@@ -1630,6 +1730,7 @@ export const SupplyFormModal: React.FC<SupplyFormModalProps> = ({
           </View>
         </View>
       </Modal>
+      {alertView}
     </Modal>
   );
 };
@@ -1696,6 +1797,86 @@ const styles = StyleSheet.create({
   formScroll: {
     paddingHorizontal: 14,
     paddingTop: 12,
+  },
+  missingInfoCard: {
+    backgroundColor: "#fff5f5",
+    borderRadius: 18,
+    borderWidth: 1.5,
+    borderColor: "#fecdd3",
+    padding: 14,
+    marginBottom: 14,
+    shadowColor: "#dc2626",
+    shadowOffset: { width: 0, height: 2 },
+    shadowOpacity: 0.08,
+    shadowRadius: 8,
+    elevation: 2,
+    gap: 10,
+  },
+  missingInfoHeader: {
+    flexDirection: "row",
+    alignItems: "flex-start",
+    gap: 10,
+  },
+  missingInfoIconBox: {
+    width: 34,
+    height: 34,
+    borderRadius: 12,
+    backgroundColor: "#fee2e2",
+    alignItems: "center",
+    justifyContent: "center",
+    marginTop: 1,
+  },
+  missingInfoTitle: {
+    fontSize: 13.5,
+    fontWeight: "800",
+    color: "#991b1b",
+    lineHeight: 18,
+  },
+  missingInfoSubtitle: {
+    fontSize: 11.5,
+    color: "#7f1d1d",
+    lineHeight: 16,
+    marginTop: 2,
+  },
+  missingInfoCloseBtn: {
+    width: 24,
+    height: 24,
+    borderRadius: 12,
+    backgroundColor: "rgba(255, 255, 255, 0.85)",
+    alignItems: "center",
+    justifyContent: "center",
+  },
+  missingFieldsList: {
+    flexDirection: "row",
+    flexWrap: "wrap",
+    gap: 6,
+    paddingTop: 4,
+    borderTopWidth: 1,
+    borderTopColor: "rgba(220, 38, 38, 0.12)",
+  },
+  missingFieldPill: {
+    flexDirection: "row",
+    alignItems: "center",
+    gap: 4,
+    paddingHorizontal: 9,
+    paddingVertical: 4.5,
+    borderRadius: 10,
+    backgroundColor: "#ffffff",
+    borderWidth: 1,
+    borderColor: "#fca5a5",
+  },
+  missingFieldPillText: {
+    fontSize: 11,
+    fontWeight: "700",
+    color: "#b91c1c",
+  },
+  inputError: {
+    borderColor: "#ef4444",
+    backgroundColor: "#fffafa",
+  },
+  dropdownButtonError: {
+    borderColor: "#ef4444",
+    backgroundColor: "#fffafa",
   },
   sectionCard: {
     backgroundColor: "#ffffff",
@@ -1868,7 +2049,7 @@ const styles = StyleSheet.create({
     alignItems: "flex-start",
     gap: 8,
     backgroundColor: "#f0f9ff",
-    borderRadius: 14,
+    borderRadius: 16,
     padding: 12,
     borderWidth: 1,
     borderColor: "#bae6fd",
@@ -1903,7 +2084,7 @@ const styles = StyleSheet.create({
     alignItems: "center",
     gap: 8,
     backgroundColor: "#fffbeb",
-    borderRadius: 14,
+    borderRadius: 16,
     padding: 12,
     borderWidth: 1,
     borderColor: "#fde68a",
@@ -1933,7 +2114,7 @@ const styles = StyleSheet.create({
     paddingHorizontal: 9,
     paddingVertical: 5,
     backgroundColor: "#ecfdf5",
-    borderRadius: 8,
+    borderRadius: 10,
     borderWidth: 1,
     borderColor: "#a7f3d0",
     flexShrink: 0,
@@ -1949,7 +2130,7 @@ const styles = StyleSheet.create({
     gap: 8,
     padding: 10,
     backgroundColor: "#f0fdf4",
-    borderRadius: 10,
+    borderRadius: 14,
     borderWidth: 1,
     borderColor: "#86efac",
     marginBottom: 12,
@@ -1963,7 +2144,7 @@ const styles = StyleSheet.create({
     borderWidth: 1.5,
     borderColor: "#cbd5e1",
     borderStyle: "dashed",
-    borderRadius: 12,
+    borderRadius: 16,
     padding: 16,
     alignItems: "center",
     justifyContent: "center",

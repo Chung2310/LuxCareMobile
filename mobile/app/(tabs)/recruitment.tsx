@@ -21,11 +21,11 @@ import { RecruitmentSubnav } from "../../src/features/recruitment/RecruitmentSub
 import { JOB_STATUSES, recruitmentAccess } from "../../src/features/recruitment/access";
 import { JobForm } from "../../src/features/recruitment/JobForm";
 import { JobDetail } from "../../src/features/recruitment/JobDetail";
+import { EMPLOYMENT_TYPE_LABELS } from "../../src/features/recruitment/recruitmentModel";
 import { EmptyState, ErrorText, Loading, Page, styles as baseStyles } from "../../src/ui";
 
 import {
   AlertTriangle,
-  Banknote,
   Briefcase,
   Building2,
   Calendar,
@@ -252,6 +252,16 @@ export default function Recruitment() {
     if (job.salaryMin && !job.salaryMax) return `Từ ${formatMoney(job.salaryMin)}`;
     if (!job.salaryMin && job.salaryMax) return `Đến ${formatMoney(job.salaryMax)}`;
     return `${formatMoney(job.salaryMin)} - ${formatMoney(job.salaryMax)}`;
+  };
+
+  const formatWorkplaceType = (workplaceLabel: string, empType?: string | null) => {
+    if (!empType) return workplaceLabel;
+    const norm = empType.trim().toLowerCase().replace(/[\s_-]+/g, "");
+    if (norm === "fulltime" || norm === "toanthoigian") {
+      return workplaceLabel;
+    }
+    const label = EMPLOYMENT_TYPE_LABELS[empType] || empType;
+    return `${workplaceLabel} · ${label}`;
   };
 
   const formatDeadline = (deadlineStr?: string | null) => {
@@ -606,7 +616,7 @@ export default function Recruitment() {
                   </Text>
                 </View>
 
-                {/* 2x2 Key Info Grid */}
+                {/* Key Info Grid */}
                 <View style={uiStyles.gridContainer}>
                   <View style={uiStyles.gridItem}>
                     <Users size={15} color="#0284c7" style={uiStyles.gridItemIcon} />
@@ -617,31 +627,21 @@ export default function Recruitment() {
                   </View>
 
                   <View style={uiStyles.gridItem}>
-                    <Banknote size={15} color="#059669" style={uiStyles.gridItemIcon} />
+                    <Briefcase size={15} color="#7c3aed" style={uiStyles.gridItemIcon} />
                     <View style={uiStyles.gridItemContent}>
-                      <Text style={uiStyles.gridItemLabel}>Mức lương</Text>
+                      <Text style={uiStyles.gridItemLabel}>Hình thức</Text>
                       <Text style={uiStyles.gridItemVal} numberOfLines={1}>
-                        {formatSalaryRange(job)}
+                        {formatWorkplaceType(workplace, job.employmentType)}
                       </Text>
                     </View>
                   </View>
 
-                  <View style={uiStyles.gridItem}>
+                  <View style={uiStyles.gridItemFull}>
                     <MapPin size={15} color="#ea580c" style={uiStyles.gridItemIcon} />
                     <View style={uiStyles.gridItemContent}>
                       <Text style={uiStyles.gridItemLabel}>Địa điểm</Text>
                       <Text style={uiStyles.gridItemVal} numberOfLines={1}>
                         {job.location || "Tại chi nhánh"}
-                      </Text>
-                    </View>
-                  </View>
-
-                  <View style={uiStyles.gridItem}>
-                    <Briefcase size={15} color="#7c3aed" style={uiStyles.gridItemIcon} />
-                    <View style={uiStyles.gridItemContent}>
-                      <Text style={uiStyles.gridItemLabel}>Hình thức</Text>
-                      <Text style={uiStyles.gridItemVal} numberOfLines={1}>
-                        {workplace} · {job.employmentType || "Toàn thời gian"}
                       </Text>
                     </View>
                   </View>
@@ -680,23 +680,6 @@ export default function Recruitment() {
 
                 {/* Action Buttons Row */}
                 <View style={uiStyles.cardActionRow}>
-                  {!deleted && (
-                    <Pressable
-                      style={({ pressed }) => [
-                        uiStyles.applicantsBtn,
-                        pressed && { opacity: 0.8 },
-                      ]}
-                      onPress={() =>
-                        router.push({
-                          pathname: "/(tabs)/applicants",
-                          params: { jobId: job._id },
-                        })
-                      }
-                    >
-                      <Users size={14} color="#ffffff" />
-                      <Text style={uiStyles.applicantsBtnText}>Ứng viên</Text>
-                    </Pressable>
-                  )}
 
                   {access.manage && !deleted && (
                     <Pressable
@@ -1199,6 +1182,12 @@ const uiStyles = StyleSheet.create({
     alignItems: "flex-start",
     gap: 6,
   },
+  gridItemFull: {
+    width: "100%",
+    flexDirection: "row",
+    alignItems: "flex-start",
+    gap: 6,
+  },
   gridItemIcon: {
     fontSize: 13,
     marginTop: 1,
@@ -1291,6 +1280,7 @@ const uiStyles = StyleSheet.create({
     color: "#334155",
   },
   detailBtn: {
+    flex: 1,
     paddingHorizontal: 12,
     paddingVertical: 9,
     borderRadius: 10,
@@ -1299,6 +1289,7 @@ const uiStyles = StyleSheet.create({
     borderColor: "#bae6fd",
     flexDirection: "row",
     alignItems: "center",
+    justifyContent: "center",
     gap: 4,
   },
   detailBtnText: {

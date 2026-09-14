@@ -1,3 +1,4 @@
+import { historicalUserLabel } from "../../../src/utils/historicalUser";
 import React, { useCallback, useRef, useState } from "react";
 import { router, useFocusEffect, useLocalSearchParams } from "expo-router";
 import { Ionicons } from "@expo/vector-icons";
@@ -259,7 +260,7 @@ export default function Contracts() {
                   expiring && { color: "#b45309" },
                 ]}
               >
-                Sắp hết hạn (20 ngày)
+                Sắp hết hạn
               </Text>
             </Pressable>
           </View>
@@ -422,19 +423,19 @@ export default function Contracts() {
                   item.status === "active"
                     ? "#dcfce7"
                     : item.status === "expired"
-                    ? "#ffe4e6"
-                    : item.status === "terminated"
-                    ? "#f3e8ff"
-                    : "#f1f5f9";
+                      ? "#ffe4e6"
+                      : item.status === "terminated"
+                        ? "#f3e8ff"
+                        : "#f1f5f9";
 
                 const statusColor =
                   item.status === "active"
                     ? "#15803d"
                     : item.status === "expired"
-                    ? "#be123c"
-                    : item.status === "terminated"
-                    ? "#7e22ce"
-                    : "#475569";
+                      ? "#be123c"
+                      : item.status === "terminated"
+                        ? "#7e22ce"
+                        : "#475569";
 
                 return (
                   <Pressable
@@ -462,7 +463,7 @@ export default function Contracts() {
                       </View>
 
                       <View style={{ flex: 1 }}>
-                        <Text style={styles.cardEmployeeName}>{item.employeeName}</Text>
+                        <Text style={styles.cardEmployeeName}>{historicalUserLabel(item.employeeName, item.employeeDeleted)}</Text>
                         <View style={styles.contractTypePill}>
                           <Text style={styles.contractTypeText}>{item.contractType}</Text>
                         </View>
@@ -507,8 +508,8 @@ export default function Contracts() {
                             daysRemaining <= 0
                               ? styles.daysBadgeExpired
                               : daysRemaining <= 20
-                              ? styles.daysBadgeWarning
-                              : styles.daysBadgeNormal,
+                                ? styles.daysBadgeWarning
+                                : styles.daysBadgeNormal,
                           ]}
                         >
                           <Text
@@ -517,15 +518,15 @@ export default function Contracts() {
                               daysRemaining <= 0
                                 ? styles.daysBadgeTextExpired
                                 : daysRemaining <= 20
-                                ? styles.daysBadgeTextWarning
-                                : styles.daysBadgeTextNormal,
+                                  ? styles.daysBadgeTextWarning
+                                  : styles.daysBadgeTextNormal,
                             ]}
                           >
                             {daysRemaining <= 0
                               ? "Hết hạn"
                               : daysRemaining === 1
-                              ? "Còn 1 ngày"
-                              : `Còn ${daysRemaining} ngày`}
+                                ? "Còn 1 ngày"
+                                : `Còn ${daysRemaining} ngày`}
                           </Text>
                         </View>
                       )}
@@ -581,9 +582,9 @@ export default function Contracts() {
                   <Text style={styles.pageSubText} numberOfLines={1}>
                     {data.total > 0
                       ? `Hiển thị ${(page - 1) * data.limit + 1}–${Math.min(
-                          page * data.limit,
-                          data.total,
-                        )} / ${data.total} hợp đồng`
+                        page * data.limit,
+                        data.total,
+                      )} / ${data.total} hợp đồng`
                       : "0 hợp đồng"}
                   </Text>
                 </View>

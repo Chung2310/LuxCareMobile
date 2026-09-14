@@ -39,6 +39,7 @@ import {
 import { Ionicons } from "@expo/vector-icons";
 import { AppButton } from "../common/AppButton";
 import { DropdownSelectField } from "../common/DropdownSelectField";
+import { DatePickerField } from "../common/DatePickerField";
 import { ROLE_MAP } from "./UserCard";
 import type { UserProfile } from "../../../../src/types/common";
 import type { UpdateUserInput, UserRole } from "../../api/userManagementApi";
@@ -673,16 +674,14 @@ const UserDetailContent: React.FC<UserDetailContentProps> = ({
                   </View>
                 )}
 
-                <View style={styles.fieldGroup}>
-                  <Text style={styles.fieldLabel}>Ngày sinh (YYYY-MM-DD)</Text>
-                  <TextInput
-                    style={styles.input}
-                    value={draftBirthDate}
-                    onChangeText={setDraftBirthDate}
-                    placeholder="YYYY-MM-DD"
-                    placeholderTextColor="#94a3b8"
-                  />
-                </View>
+                <DatePickerField
+                  label="Ngày sinh"
+                  value={draftBirthDate}
+                  onChange={setDraftBirthDate}
+                  title="Chọn ngày sinh"
+                  placeholder="Chọn ngày sinh..."
+                  allowClear
+                />
 
                 <View style={styles.fieldGroup}>
                   <Text style={styles.fieldLabel}>Mức lương cơ bản (VNĐ)</Text>

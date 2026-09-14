@@ -26,6 +26,7 @@ vm.runInNewContext(source, {
     if (name === "@expo/vector-icons") return { Ionicons: View };
     if (name === "../common/AppButton") return { AppButton: View };
     if (name === "../common/DropdownSelectField") return { DropdownSelectField: View };
+    if (name === "../common/DatePickerField") return { DatePickerField: View };
     if (name === "../AppAlert") return { useAppAlert: () => ({ showAlert: vi.fn(), alertView: null }) };
     if (name === "../../auth/SessionProvider") return { useSession: () => ({ user: { uid: "actor", role: "admin" } }) };
     if (name === "../../features/roles/useRoleOptions") return { useRoleOptions: () => ({ roles: [], assignable: [], error: "" }) };

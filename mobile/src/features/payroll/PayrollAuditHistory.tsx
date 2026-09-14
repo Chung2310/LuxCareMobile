@@ -1,3 +1,4 @@
+import { historicalUserLabel } from "../../../../src/utils/historicalUser";
 import { useCallback, useState } from "react";
 import { useFocusEffect } from "expo-router";
 import { Text } from "react-native";
@@ -50,10 +51,10 @@ export function PayrollAuditHistory({ period }: { period: string }) {
     <Card>
       <Text style={styles.heading}>Nhật ký kỳ {period}</Text>
       <Text style={styles.muted}>
-        Các thao tác do API ghi nhận, mới nhất trước. Người thực hiện hiển thị bằng mã tài khoản do API cung cấp.
+        Các thao tác do API ghi nhận, mới nhất trước. Giữ thông tin người thực hiện kể cả khi tài khoản đã xóa.
       </Text>
       <Field
-        label="Tìm thao tác hoặc mã người thực hiện"
+        label="Tìm thao tác, tên hoặc mã người thực hiện"
         value={search}
         onChangeText={(value) => {
           setSearch(value);
@@ -92,7 +93,7 @@ export function PayrollAuditHistory({ period }: { period: string }) {
               <Text style={styles.heading}>{auditActions[item.action] || item.action}</Text>
               <Text style={styles.text}>{auditTime(item.createdAt)}</Text>
               <Text selectable style={styles.text}>
-                Người thực hiện: {item.actorId}
+                Người thực hiện: {historicalUserLabel(item.actorName, item.actorDeleted, item.actorId)}
               </Text>
               {typeof item.metadata?.reason === "string" && (
                 <Text style={styles.text}>Lý do: {item.metadata.reason}</Text>

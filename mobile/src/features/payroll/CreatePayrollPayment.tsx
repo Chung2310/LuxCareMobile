@@ -1,3 +1,4 @@
+import { historicalEmployeeLabel, historicalUserLabel } from "../../../../src/utils/historicalUser";
 import { useCallback, useRef, useState } from "react";
 import { useFocusEffect } from "expo-router";
 import { randomUUID } from "expo-crypto";
@@ -93,7 +94,7 @@ export function CreatePayrollPayment({ run, onChanged }: { run: PayrollRun; onCh
               {(run.effectiveLines || []).map((line) => (
                 <Field
                   key={line.employeeId}
-                  label={line.employeeName || line.employeeId}
+                  label={historicalUserLabel(line.employeeName, line.employeeDeleted, line.employeeId)}
                   value={amounts[line.employeeId] || ""}
                   keyboardType="numeric"
                   onChangeText={(value) => setAmounts((values) => ({ ...values, [line.employeeId]: value }))}
@@ -127,8 +128,7 @@ export function CreatePayrollPayment({ run, onChanged }: { run: PayrollRun; onCh
             <>
               {payload.lines.map((line) => (
                 <Text key={line.employeeId} style={styles.text}>
-                  {run.effectiveLines?.find((employee) => employee.employeeId === line.employeeId)?.employeeName ||
-                    line.employeeId}
+                  {historicalEmployeeLabel(run.effectiveLines, line.employeeId)}
                   : {payslipMoney(line.amount)}
                 </Text>
               ))}

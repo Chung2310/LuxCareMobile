@@ -39,6 +39,8 @@ import { TaskSubtasksEditor } from "./TaskSubtasksEditor";
 import {
   X,
   AlertCircle,
+  AlertTriangle,
+  Target,
   Folder,
   Check,
   Trash2,
@@ -49,7 +51,6 @@ import {
   Music as MusicIcon,
   FileText,
   Calendar,
-  Zap,
   Search,
   Ban,
 } from "lucide-react-native";
@@ -255,7 +256,7 @@ export function TaskForm({
   const selectedAssignee = people.find((p) => p.uid === draft.assigneeUid);
   const selectedAssigneeName =
     selectedAssignee?.displayName ||
-    (task?.assigneeUid === draft.assigneeUid ? task.assignee : "") ||
+    (task?.assigneeUid === draft.assigneeUid ? (task.assignee || "Người thực hiện") + (task.assigneeDeleted ? " · Tài khoản đã xóa" : "") : "") ||
     "";
 
   // Selected project info
@@ -862,15 +863,6 @@ export function TaskForm({
             </View>
           </View>
 
-          {/* Auto calculate hours indicator */}
-          <View style={styles.calcRow}>
-            <View style={[styles.autoCalculatedBadge, { flexDirection: "row", alignItems: "center", gap: 4 }]}>
-              <Zap size={12} color="#1d4ed8" />
-              <Text style={styles.autoCalculatedBadgeText}>
-                Dự tính: Bắt đầu → Hạn hoàn thành. Thực tế: Bắt đầu → Kết thúc.
-              </Text>
-            </View>
-          </View>
 
           {/* Hours inputs */}
           <View style={styles.twoColRow}>
@@ -904,6 +896,7 @@ export function TaskForm({
           {(() => {
             const kpiInfo = evaluateTaskKpi(draft.estTime, draft.actualTime, draft.endTime, draft.dueDate, draft.startTime);
             if (!kpiInfo) return null;
+            const KpiIcon = kpiInfo.status === "overdue" ? AlertTriangle : Target;
             return (
               <View
                 style={[
@@ -912,7 +905,7 @@ export function TaskForm({
                 ]}
               >
                 <View style={styles.kpiBannerHeader}>
-                  <Text style={styles.kpiBannerIcon}>{kpiInfo.icon}</Text>
+                  <KpiIcon size={16} color={kpiInfo.color} />
                   <Text style={[styles.kpiBannerTitle, { color: kpiInfo.color }]}>
                     {kpiInfo.label}
                   </Text>
@@ -1711,9 +1704,6 @@ const styles = StyleSheet.create({
     flexDirection: "row",
     alignItems: "center",
     gap: 6,
-  },
-  kpiBannerIcon: {
-    fontSize: 16,
   },
   kpiBannerTitle: {
     fontSize: 13,

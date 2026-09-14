@@ -1,3 +1,4 @@
+import { historicalUserLabel } from "../../../src/utils/historicalUser";
 import { createDirectChatOpener } from "../../src/features/chat/openDirectChat";
 import { downloadRemoteFile } from "../../src/files/downloadRemoteFile";
 import { resolveFileFormat } from "../../src/files/fileFormat";
@@ -2654,8 +2655,8 @@ export default function ChatScreen() {
         const uId = typeof m.userId === "object" ? m.userId?._id || m.userId?.uid : m.userId;
         return uId !== currentUserId;
       });
-      if (otherMember && typeof otherMember.userId === "object") {
-        return otherMember.userId.displayName || otherMember.userId.email || "Đồng nghiệp";
+      if (otherMember?.userId && typeof otherMember.userId === "object") {
+        return historicalUserLabel(otherMember.userId.displayName || otherMember.userId.email, otherMember.userId.isDeleted, "Đồng nghiệp");
       }
     }
     return "Cuộc trò chuyện";
@@ -3531,7 +3532,7 @@ export default function ChatScreen() {
 
                     <View style={{ maxWidth: "78%" }}>
                       {!isMe && activeRoom.isGroup && (
-                        <Text style={styles.msgSenderName}>{item.senderName || "Đồng nghiệp"}</Text>
+                        <Text style={styles.msgSenderName}>{historicalUserLabel(item.senderName, item.senderDeleted, "Đồng nghiệp")}</Text>
                       )}
 
                       <TouchableOpacity
@@ -4370,7 +4371,7 @@ export default function ChatScreen() {
                           />
                         </View>
                         <View style={{ flex: 1, marginLeft: 12 }}>
-                          <Text style={styles.memberName}>{mUser?.displayName || mUser?.email || "Thành viên"}</Text>
+                          <Text style={styles.memberName}>{historicalUserLabel(mUser?.displayName || mUser?.email, mUser?.isDeleted, "Thành viên")}</Text>
                           <Text style={styles.memberRole}>{m.role === "admin" ? "Trưởng nhóm" : m.role === "deputy" ? "Phó phòng" : "Thành viên"}</Text>
                         </View>
                         {canManageActiveGroup && mUser && (mUser._id || mUser.uid) !== currentUserId && (

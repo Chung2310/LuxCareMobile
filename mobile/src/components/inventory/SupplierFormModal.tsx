@@ -1,6 +1,5 @@
 import React, { useEffect, useState } from "react";
 import {
-  Alert,
   KeyboardAvoidingView,
   Modal,
   Platform,
@@ -12,6 +11,7 @@ import {
   View,
 } from "react-native";
 import { Ionicons } from "@expo/vector-icons";
+import { useAppAlert } from "../AppAlert";
 import type { InventorySupplier } from "./types";
 
 interface SupplierFormModalProps {
@@ -35,6 +35,7 @@ export const SupplierFormModal: React.FC<SupplierFormModalProps> = ({
   onClose,
   onSubmit,
 }) => {
+  const { showAlert, alertView } = useAppAlert();
   const [name, setName] = useState("");
   const [code, setCode] = useState("");
   const [contactPerson, setContactPerson] = useState("");
@@ -65,12 +66,17 @@ export const SupplierFormModal: React.FC<SupplierFormModalProps> = ({
   }, [item, visible]);
 
   const handleSubmit = async () => {
-    if (!name.trim()) {
-      Alert.alert("Thiếu thông tin", "Vui lòng nhập tên nhà cung cấp.");
-      return;
-    }
-    if (!code.trim()) {
-      Alert.alert("Thiếu thông tin", "Vui lòng nhập mã nhà cung cấp.");
+    const missing: string[] = [];
+    if (!name.trim()) missing.push("Tên nhà cung cấp");
+    if (!code.trim()) missing.push("Mã nhà cung cấp");
+
+    if (missing.length > 0) {
+      showAlert(
+        "Thiếu thông tin bắt buộc",
+        `Vui lòng bổ sung đầy đủ các thông tin sau:\n\n${missing.map((f) => `• ${f}`).join("\n")}`,
+        [{ text: "Đã hiểu" }],
+        "error",
+      );
       return;
     }
 
@@ -87,7 +93,12 @@ export const SupplierFormModal: React.FC<SupplierFormModalProps> = ({
       });
       onClose();
     } catch (err: any) {
-      Alert.alert("Lỗi", err?.message || "Không thể tạo nhà cung cấp.");
+      showAlert(
+        "Lỗi lưu nhà cung cấp",
+        err.message || "Không thể lưu thông tin nhà cung cấp.",
+        [{ text: "Đã hiểu" }],
+        "error",
+      );
     } finally {
       setSubmitting(false);
     }
@@ -235,6 +246,7 @@ export const SupplierFormModal: React.FC<SupplierFormModalProps> = ({
           </View>
         </View>
       </KeyboardAvoidingView>
+      {alertView}
     </Modal>
   );
 };

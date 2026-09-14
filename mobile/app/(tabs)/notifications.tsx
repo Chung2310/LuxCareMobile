@@ -198,6 +198,10 @@ export default function Notifications() {
       setUnreadOnly(false);
       setType("");
       setSelectedCategory("attendance");
+    } else if (tabId === "kho") {
+      setUnreadOnly(false);
+      setType("");
+      setSelectedCategory("kho");
     } else {
       setUnreadOnly(false);
       setSelectedCategory("");
@@ -212,14 +216,22 @@ export default function Notifications() {
         (item) => detectNotificationCategory(item.title, item.body, item.action).category === "attendance"
       );
     }
+    if (selectedCategory === "kho" || type === "kho") {
+      return data.data.filter(
+        (item) =>
+          item.type === "kho" ||
+          detectNotificationCategory(item.title, item.body, item.action).category === "warehouse"
+      );
+    }
     return data.data;
-  }, [data?.data, selectedCategory]);
+  }, [data?.data, selectedCategory, type]);
 
   const renderItem = ({ item }: { item: WebNotification }) => {
     const categoryInfo = detectNotificationCategory(item.title, item.body, item.action);
     const destination = item.action ? notificationTarget(item, user) : null;
     const isUnread = !item.read;
     const isAttendance = categoryInfo.category === "attendance";
+    const isWarehouse = categoryInfo.category === "warehouse" || item.type === "kho";
 
     return (
       <Pressable
@@ -228,11 +240,14 @@ export default function Notifications() {
           isUnread ? styles.cardUnread : styles.cardRead,
           isAttendance && styles.attendanceCard,
           isAttendance && isUnread && styles.attendanceCardUnread,
+          isWarehouse && styles.warehouseCard,
+          isWarehouse && isUnread && styles.warehouseCardUnread,
           pressed && styles.cardPressed,
         ]}
         disabled={busy}
         onPress={() => {
           if (isAttendance && !destination?.target) router.push("/(tabs)/attendance");
+          else if (isWarehouse && !destination?.target) router.push("/(tabs)/inventory");
           else void openNotification(item);
         }}
       >
@@ -302,10 +317,28 @@ export default function Notifications() {
                 </Text>
               </View>
 
-              {(destination?.target || isAttendance) ? (
-                <View style={[styles.destinationLink, isAttendance && { backgroundColor: "#ecfeff" }]}>
-                  <Text style={[styles.destinationLinkText, isAttendance && { color: "#0891b2" }]}>{destination?.target?.label || "Mở Chấm công"}</Text>
-                  <Ionicons name="chevron-forward" size={11} color="#059669" />
+              {(destination?.target || isAttendance || isWarehouse) ? (
+                <View
+                  style={[
+                    styles.destinationLink,
+                    isAttendance && { backgroundColor: "#ecfeff" },
+                    isWarehouse && { backgroundColor: "#fff7ed" },
+                  ]}
+                >
+                  <Text
+                    style={[
+                      styles.destinationLinkText,
+                      isAttendance && { color: "#0891b2" },
+                      isWarehouse && { color: "#ea580c" },
+                    ]}
+                  >
+                    {destination?.target?.label || (isAttendance ? "Mở Chấm công" : "Mở Kho & Vật tư")}
+                  </Text>
+                  <Ionicons
+                    name="chevron-forward"
+                    size={11}
+                    color={isAttendance ? "#0891b2" : isWarehouse ? "#ea580c" : "#059669"}
+                  />
                 </View>
               ) : isUnread ? (
                 <Pressable
@@ -698,6 +731,23 @@ const styles = StyleSheet.create({
   attendanceCardUnread: {
     backgroundColor: "#f0fdfa",
     borderColor: "#22d3ee",
+  },
+  warehouseCard: {
+    borderRadius: 18,
+    borderWidth: 1.5,
+    borderColor: "#fed7aa",
+    borderLeftWidth: 3.5,
+    borderLeftColor: "#ea580c",
+    backgroundColor: "#ffffff",
+    shadowColor: "#ea580c",
+    shadowOffset: { width: 0, height: 2 },
+    shadowOpacity: 0.08,
+    shadowRadius: 6,
+    elevation: 2,
+  },
+  warehouseCardUnread: {
+    backgroundColor: "#fffbf7",
+    borderColor: "#fdba74",
   },
   cardRead: {
     backgroundColor: "#ffffff",

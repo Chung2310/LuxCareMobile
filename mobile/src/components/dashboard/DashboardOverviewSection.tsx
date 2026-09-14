@@ -1,4 +1,4 @@
-import React from "react";
+import React, { useCallback, useEffect, useMemo, useState } from "react";
 import {
   ActivityIndicator,
   Dimensions,
@@ -8,6 +8,7 @@ import {
   View,
 } from "react-native";
 import { Ionicons } from "@expo/vector-icons";
+import { equipment } from "../../api/services";
 import type {
   DashboardActionItems,
   DashboardDateFilter,
@@ -79,6 +80,179 @@ export const DashboardOverviewSection: React.FC<DashboardOverviewSectionProps> =
   const pendingApprovalsList = actionItems?.pendingApprovals || [];
   const overdueTasksList = actionItems?.overdueTasks || [];
   const totalActionCount = pendingApprovalsList.length + overdueTasksList.length;
+
+  // 4. Số liệu Tài nguyên số
+  const resFileCount = summary?.resources?.fileCount ?? 0;
+  const resRecentUploads = summary?.resources?.recentUploads ?? 0;
+  const resTotalSize = summary?.resources?.totalSize ?? 0;
+
+  const formattedStorage = useMemo(() => {
+    if (!resTotalSize || resTotalSize <= 0) return "0 MB";
+    if (resTotalSize < 1024) return `${resTotalSize} B`;
+    if (resTotalSize < 1024 * 1024) return `${(resTotalSize / 1024).toFixed(1)} KB`;
+    if (resTotalSize < 1024 * 1024 * 1024) return `${(resTotalSize / (1024 * 1024)).toFixed(1)} MB`;
+    return `${(resTotalSize / (1024 * 1024 * 1024)).toFixed(1)} GB`;
+  }, [resTotalSize]);
+
+  const resSubtext = useMemo(() => {
+    if (resTotalSize > 0 && resRecentUploads > 0) {
+      return `${formattedStorage} • +${resRecentUploads} mới`;
+    }
+    if (resTotalSize > 0) {
+      return `${formattedStorage} lưu trữ`;
+    }
+    if (resRecentUploads > 0) {
+      return `+${resRecentUploads} mới tải lên`;
+    }
+    return "Đã đồng bộ";
+  }, [resTotalSize, resRecentUploads, formattedStorage]);
+
+  // 5. Số liệu Thiết bị y tế
+  const [localEquipment, setLocalEquipment] = useState<{
+    total: number;
+    byStatus: { status: string; count: number }[];
+    ready?: number;
+    using?: number;
+    maintenance?: number;
+    booked?: number;
+  } | null>(null);
+
+  useEffect(() => {
+    const raw = summary?.equipment as any;
+    const hasData =
+      (typeof raw?.total === "number" && raw.total > 0) ||
+      (Array.isArray(raw?.byStatus) && raw.byStatus.length > 0);
+    if (hasData) return;
+
+    let isMounted = true;
+    (async () => {
+      try {
+        const [sumRes, listRes] = await Promise.allSettled([
+          equipment.getSummary(),
+          equipment.list({ limit: 100 }),
+        ]);
+        if (!isMounted) return;
+        const sum = sumRes.status === "fulfilled" ? sumRes.value : null;
+        const list = listRes.status === "fulfilled" ? listRes.value : null;
+        const items = Array.isArray(list?.items) ? list.items : [];
+
+        const countStatus = (...kw: string[]) =>
+          items.filter((i) => {
+            const s = (i.status || "").toLowerCase();
+            return kw.some((k) => s.includes(k.toLowerCase()));
+          }).length;
+
+        const ready = Math.max(sum?.ready ?? 0, countStatus("sẵn", "ready", "avail", "available"));
+        const using = Math.max(sum?.using ?? 0, countStatus("dùng", "using", "in_use", "in-use"));
+        const maintenance = Math.max(sum?.maintenance ?? 0, countStatus("trì", "maint", "repair"));
+        const booked = Math.max(sum?.booked ?? 0, countStatus("đơn", "booked", "order", "request", "mượn"));
+        const total = Math.max(sum?.total ?? 0, list?.total ?? 0, items.length, ready + using + maintenance + booked);
+
+        const byStatus =
+          Array.isArray(sum?.byStatus) && sum.byStatus.length > 0
+            ? sum.byStatus
+            : [
+                { status: "ready", count: ready },
+                { status: "using", count: using },
+                { status: "maintenance", count: maintenance },
+                { status: "booked", count: booked },
+              ].filter((s) => s.count > 0);
+
+        if (total > 0) {
+          setLocalEquipment({ total, byStatus, ready, using, maintenance, booked });
+        }
+      } catch {
+        // Silently ignore
+      }
+    })();
+    return () => {
+      isMounted = false;
+    };
+  }, [summary?.equipment]);
+
+  const activeEq = useMemo(() => {
+    const raw = summary?.equipment as any;
+    if (
+      (typeof raw?.total === "number" && raw.total > 0) ||
+      (Array.isArray(raw?.byStatus) && raw.byStatus.length > 0)
+    ) {
+      return summary?.equipment;
+    }
+    return localEquipment || summary?.equipment;
+  }, [summary?.equipment, localEquipment]);
+
+  const rawEq = activeEq as any;
+  const eqByStatus = useMemo(
+    () => activeEq?.byStatus ?? [],
+    [activeEq?.byStatus],
+  );
+
+  const countEqStatus = useCallback(
+    (...keywords: string[]) => {
+      return eqByStatus
+        .filter((item) => {
+          const s = (item.status || "").toLowerCase();
+          return keywords.some((k) => s.includes(k.toLowerCase()));
+        })
+        .reduce((acc, cur) => acc + (cur.count || 0), 0);
+    },
+    [eqByStatus],
+  );
+
+  const eqBooked = useMemo(
+    () => Math.max(countEqStatus("đơn", "booked", "order", "request", "mượn"), rawEq?.booked ?? 0),
+    [countEqStatus, rawEq?.booked],
+  );
+  const eqReady = useMemo(
+    () => Math.max(countEqStatus("sẵn", "ready", "avail", "available"), rawEq?.ready ?? 0),
+    [countEqStatus, rawEq?.ready],
+  );
+  const eqUsing = useMemo(
+    () => Math.max(countEqStatus("dùng", "using", "in_use", "in-use"), rawEq?.using ?? 0),
+    [countEqStatus, rawEq?.using],
+  );
+  const eqMaintenance = useMemo(
+    () => Math.max(countEqStatus("trì", "maint", "repair"), rawEq?.maintenance ?? 0),
+    [countEqStatus, rawEq?.maintenance],
+  );
+
+  const computedEqTotal = useMemo(
+    () =>
+      Math.max(
+        eqByStatus.reduce((acc, cur) => acc + (cur.count || 0), 0),
+        eqReady + eqUsing + eqMaintenance + eqBooked,
+      ),
+    [eqByStatus, eqReady, eqUsing, eqMaintenance, eqBooked],
+  );
+
+  const eqTotal =
+    rawEq?.total && rawEq.total > 0
+      ? rawEq.total
+      : rawEq?.count && rawEq.count > 0
+      ? rawEq.count
+      : computedEqTotal;
+
+  const eqSubtext = useMemo(() => {
+    if (eqMaintenance > 0) {
+      return `${eqMaintenance} cần bảo trì`;
+    }
+    if (eqUsing > 0 && eqReady > 0) {
+      return `${eqReady} sẵn • ${eqUsing} dùng`;
+    }
+    if (eqReady > 0) {
+      return `${eqReady} sẵn sàng`;
+    }
+    if (eqUsing > 0) {
+      return `${eqUsing} đang dùng`;
+    }
+    if (eqBooked > 0) {
+      return `${eqBooked} đã đặt mượn`;
+    }
+    if (eqTotal > 0) {
+      return "Sẵn sàng";
+    }
+    return "0 thiết bị";
+  }, [eqMaintenance, eqUsing, eqReady, eqBooked, eqTotal]);
 
   return (
     <View style={styles.container}>
@@ -425,11 +599,13 @@ export const DashboardOverviewSection: React.FC<DashboardOverviewSectionProps> =
         {/* Đào tạo */}
         <TouchableOpacity
           style={styles.capsuleItem}
-          onPress={() => onNavigate("/(tabs)/modules", "Đào tạo")}
+          onPress={() => onNavigate("/(tabs)/training", "Đào tạo")}
           activeOpacity={0.8}
         >
-          <View style={[styles.capsuleIcon, { backgroundColor: "#fffbeb" }]}>
-            <Ionicons name="school" size={15} color="#d97706" />
+          <View style={styles.capsuleIconWrap}>
+            <View style={[styles.capsuleIcon, { backgroundColor: "#fffbeb" }]}>
+              <Ionicons name="school" size={15} color="#d97706" />
+            </View>
           </View>
           <View style={styles.capsuleContent}>
             <Text style={[styles.capsuleNum, { color: "#d97706" }]}>
@@ -438,7 +614,7 @@ export const DashboardOverviewSection: React.FC<DashboardOverviewSectionProps> =
             <Text style={styles.capsuleLabel} numberOfLines={1}>
               Khóa đào tạo
             </Text>
-            <Text style={styles.capsuleSub}>
+            <Text style={styles.capsuleSub} numberOfLines={1}>
               {summary?.training?.enrollments?.inProgress || 0} đang học
             </Text>
           </View>
@@ -450,18 +626,31 @@ export const DashboardOverviewSection: React.FC<DashboardOverviewSectionProps> =
           onPress={() => onNavigate("/(tabs)/resources", "Tài nguyên số")}
           activeOpacity={0.8}
         >
-          <View style={[styles.capsuleIcon, { backgroundColor: "#ecfeff" }]}>
-            <Ionicons name="folder-open" size={15} color="#0891b2" />
+          <View style={styles.capsuleIconWrap}>
+            <View style={[styles.capsuleIcon, { backgroundColor: "#ecfeff" }]}>
+              <Ionicons name="folder-open" size={15} color="#0891b2" />
+            </View>
+            {resRecentUploads > 0 && (
+              <View style={[styles.capsuleMiniBadge, styles.capsuleBadgeCyan]}>
+                <Text style={styles.capsuleMiniBadgeText}>+{resRecentUploads}</Text>
+              </View>
+            )}
           </View>
           <View style={styles.capsuleContent}>
             <Text style={[styles.capsuleNum, { color: "#0891b2" }]}>
-              {(summary?.resources?.fileCount || 0).toLocaleString("vi-VN")}
+              {resFileCount.toLocaleString("vi-VN")}
             </Text>
             <Text style={styles.capsuleLabel} numberOfLines={1}>
               Tài nguyên số
             </Text>
-            <Text style={styles.capsuleSub}>
-              +{summary?.resources?.recentUploads || 0} mới
+            <Text
+              style={[
+                styles.capsuleSub,
+                resRecentUploads > 0 && styles.capsuleSubActive,
+              ]}
+              numberOfLines={1}
+            >
+              {resSubtext}
             </Text>
           </View>
         </TouchableOpacity>
@@ -472,17 +661,32 @@ export const DashboardOverviewSection: React.FC<DashboardOverviewSectionProps> =
           onPress={() => onNavigate("/(tabs)/equipment", "Thiết bị y tế")}
           activeOpacity={0.8}
         >
-          <View style={[styles.capsuleIcon, { backgroundColor: "#f5f3ff" }]}>
-            <Ionicons name="medkit" size={15} color="#7c3aed" />
+          <View style={styles.capsuleIconWrap}>
+            <View style={[styles.capsuleIcon, { backgroundColor: "#f5f3ff" }]}>
+              <Ionicons name="medkit" size={15} color="#7c3aed" />
+            </View>
+            {eqMaintenance > 0 && (
+              <View style={[styles.capsuleMiniBadge, styles.capsuleBadgeAmber]}>
+                <Text style={styles.capsuleMiniBadgeText}>!</Text>
+              </View>
+            )}
           </View>
           <View style={styles.capsuleContent}>
             <Text style={[styles.capsuleNum, { color: "#7c3aed" }]}>
-              {(summary?.equipment?.total || 0).toLocaleString("vi-VN")}
+              {eqTotal.toLocaleString("vi-VN")}
             </Text>
             <Text style={styles.capsuleLabel} numberOfLines={1}>
               Thiết bị y tế
             </Text>
-            <Text style={styles.capsuleSub}>Đang chạy</Text>
+            <Text
+              style={[
+                styles.capsuleSub,
+                eqMaintenance > 0 && styles.capsuleSubWarning,
+              ]}
+              numberOfLines={1}
+            >
+              {eqSubtext}
+            </Text>
           </View>
         </TouchableOpacity>
       </View>
@@ -802,7 +1006,7 @@ const styles = StyleSheet.create({
   capsuleItem: {
     flex: 1,
     backgroundColor: "#ffffff",
-    borderRadius: 14,
+    borderRadius: 15,
     padding: 10,
     borderWidth: 1,
     borderColor: "#e2e8f0",
@@ -813,13 +1017,37 @@ const styles = StyleSheet.create({
     shadowRadius: 3,
     elevation: 1,
   },
+  capsuleIconWrap: {
+    position: "relative",
+    marginBottom: 6,
+  },
   capsuleIcon: {
     width: 28,
     height: 28,
     borderRadius: 8,
     justifyContent: "center",
     alignItems: "center",
-    marginBottom: 6,
+  },
+  capsuleMiniBadge: {
+    position: "absolute",
+    top: -4,
+    right: -7,
+    paddingHorizontal: 3.5,
+    paddingVertical: 1,
+    borderRadius: 6,
+    alignItems: "center",
+    justifyContent: "center",
+  },
+  capsuleBadgeCyan: {
+    backgroundColor: "#0891b2",
+  },
+  capsuleBadgeAmber: {
+    backgroundColor: "#d97706",
+  },
+  capsuleMiniBadgeText: {
+    color: "#ffffff",
+    fontSize: 8,
+    fontWeight: "800",
   },
   capsuleContent: {
     alignItems: "center",
@@ -842,5 +1070,13 @@ const styles = StyleSheet.create({
     color: "#94a3b8",
     marginTop: 2,
     textAlign: "center",
+  },
+  capsuleSubWarning: {
+    color: "#b45309",
+    fontWeight: "700",
+  },
+  capsuleSubActive: {
+    color: "#0891b2",
+    fontWeight: "600",
   },
 });
