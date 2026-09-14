@@ -428,21 +428,17 @@ function BranchCardItem({
             <Building2 size={20} color={branch.isActive ? "#059669" : "#64748b"} />
           </View>
           <View style={{ flex: 1 }}>
-            <View style={styles.branchTitleRow}>
-              <Text style={styles.branchName} numberOfLines={1}>
-                {branch.name}
-              </Text>
-              {isSelected && (
-                <View style={styles.selectedPill}>
-                  <Check size={11} color="#059669" />
-                  <Text style={styles.selectedPillText}>Đang chọn</Text>
-                </View>
-              )}
-            </View>
+            {/* Tên chi nhánh trọn vẹn trên hàng riêng */}
+            <Text style={styles.branchName} numberOfLines={2}>
+              {branch.name}
+            </Text>
+
+            {/* Dòng trạng thái & metadata xuống dòng bên dưới */}
             <View style={styles.branchMetaRow}>
               <View style={styles.branchCodeBadge}>
                 <Text style={styles.branchCodeText}>{branch.code}</Text>
               </View>
+
               <View
                 style={[
                   styles.statusPill,
@@ -464,9 +460,16 @@ function BranchCardItem({
                     { color: branch.isActive ? "#047857" : "#64748b" },
                   ]}
                 >
-                  {branch.isActive ? "Hoạt động" : "Tạm dừng"}
+                  {branch.isActive ? "Đang hoạt động" : "Tạm dừng"}
                 </Text>
               </View>
+
+              {isSelected && (
+                <View style={styles.selectedPill}>
+                  <Check size={11} color="#059669" />
+                  <Text style={styles.selectedPillText}>Đang chọn</Text>
+                </View>
+              )}
             </View>
           </View>
         </View>
@@ -1453,6 +1456,7 @@ const styles = StyleSheet.create({
     shadowOpacity: 0.05,
     shadowRadius: 5,
     gap: 12,
+    overflow: "hidden",
   },
   branchCardSelected: {
     borderColor: "#059669",
@@ -1476,17 +1480,11 @@ const styles = StyleSheet.create({
     justifyContent: "center",
     alignItems: "center",
   },
-  branchTitleRow: {
-    flexDirection: "row",
-    alignItems: "center",
-    gap: 8,
-    flexWrap: "wrap",
-  },
   branchName: {
-    fontSize: 16,
+    fontSize: 15.5,
     fontWeight: "700",
     color: "#0f172a",
-    flexShrink: 1,
+    lineHeight: 22,
   },
   selectedPill: {
     flexDirection: "row",
@@ -1507,8 +1505,9 @@ const styles = StyleSheet.create({
   branchMetaRow: {
     flexDirection: "row",
     alignItems: "center",
-    gap: 8,
-    marginTop: 4,
+    flexWrap: "wrap",
+    gap: 6,
+    marginTop: 6,
   },
   branchCodeBadge: {
     backgroundColor: "#f1f5f9",
