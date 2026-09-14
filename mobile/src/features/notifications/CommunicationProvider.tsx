@@ -135,7 +135,7 @@ export function CommunicationProvider({ children }: React.PropsWithChildren) {
       if (post?.authorId !== user.uid && post?.id && !path.current.endsWith("/blog"))
         show(`blog:${post.id}`, "Blog có bài viết mới", post.title || "Có nội dung mới trong Blog");
     })];
-    for (const event of ["blog_post_deleted", "blog_post_pinned", "blog_post_liked"]) removers.push(socketService.subscribe(event, () => setBlogRevision(v => v + 1)));
+    for (const event of ["blog_post_deleted", "blog_post_pinned", "blog_post_liked", "blog_post_updated"]) removers.push(socketService.subscribe(event, () => setBlogRevision(v => v + 1)));
     for (const event of ["internal_room_updated", "internal_room_deleted", "internal_message_deleted", "internal_message_edited", "internal_message_reaction"])
       removers.push(socketService.subscribe(event, () => { refreshChat(); setChatRevision(v => v + 1); }));
     removers.push(socketService.subscribe("internal_messages_read", refreshChat));

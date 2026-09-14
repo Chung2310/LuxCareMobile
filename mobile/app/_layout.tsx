@@ -10,6 +10,7 @@ import { CommunicationProvider } from "../src/features/notifications/Communicati
 import { LoadingProvider } from "../src/context/LoadingContext";
 import { Button, ErrorText, Page } from "../src/ui";
 import { api } from "../src/api/services";
+import { useSensitiveScreenProtection } from "../src/features/privacy/useSensitiveScreenProtection";
 
 function isSessionExpiredError(msg?: string | null): boolean {
   if (!msg) return false;
@@ -194,6 +195,7 @@ const sessionExpiredStyles = StyleSheet.create({
 import { ChatUnreadProvider } from "../src/context/ChatUnreadContext";
 
 export default function RootLayout() {
+  useSensitiveScreenProtection();
   return (
     <SafeAreaProvider>
       <SessionProvider>

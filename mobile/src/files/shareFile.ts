@@ -38,6 +38,12 @@ async function transferApiFile(url: string, name: string, action: "share" | "dow
   if (!["http:", "https:"].includes(parsed.protocol) || parsed.username || parsed.password)
     throw new Error("Liên kết tài liệu không hợp lệ.");
 
+  const originStr = api.getOrigin?.() || process.env.EXPO_PUBLIC_API_URL || "";
+  let apiOrigin = "";
+  try {
+    apiOrigin = originStr ? new URL(originStr).origin : "";
+  } catch {}
+  const managedBlogFile = Boolean(apiOrigin && parsed.origin === apiOrigin && /^\/api\/v1\/blogs\/files\/[a-f0-9]{24}$/.test(parsed.pathname));
   const controller = new AbortController();
   const cancel = () => controller.abort();
   if (signal?.aborted) cancel();
@@ -59,7 +65,7 @@ async function transferApiFile(url: string, name: string, action: "share" | "dow
     let response: Response;
     try {
       response = await api.transport.fetch(
-        `/api/v1/media/download?url=${encodeURIComponent(resolvedUrl)}&filename=${encodeURIComponent(name)}`,
+        managedBlogFile ? parsed.pathname : `/api/v1/media/download?url=${encodeURIComponent(resolvedUrl)}&filename=${encodeURIComponent(name)}`,
         { signal: controller.signal },
       );
       if ((typeof response?.status === "number" && response.status >= 400) || response?.ok === false) {
@@ -67,7 +73,7 @@ async function transferApiFile(url: string, name: string, action: "share" | "dow
       }
     } catch (proxyError) {
       const status = (proxyError as { status?: number })?.status;
-      if (controller.signal.aborted || status === 401 || status === 403) throw proxyError;
+      if (managedBlogFile || controller.signal.aborted || status === 401 || status === 403) throw proxyError;
       try {
         const directResp = await fetch(resolvedUrl, { signal: controller.signal });
         if ((typeof directResp?.status === "number" && directResp.status >= 400) || directResp?.ok === false) {

@@ -233,3 +233,14 @@ it("does not time out while the user leaves the share sheet open and then return
   dismiss();
   await expect(sharing).resolves.toBeUndefined();
 });
+
+it("downloads managed Blog URLs through their own permission-checked API", async () => {
+  const id = "a".repeat(24);
+  await shareApiFile("https://example.com/api/v1/blogs/files/" + id, "file.pdf");
+  expect(mocks.fetch.mock.calls[0][0]).toBe("/api/v1/blogs/files/" + id);
+});
+it("does not retry revoked managed Blog files through a direct fallback", async () => {
+  mocks.fetch.mockResolvedValue(new Response("", { status: 403 }));
+  await expect(shareApiFile("https://example.com/api/v1/blogs/files/" + "a".repeat(24), "file.pdf")).rejects.toThrow("403");
+  expect(fetch).not.toHaveBeenCalled();
+});
