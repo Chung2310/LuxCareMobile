@@ -21,6 +21,7 @@ import type { HRTask, Project } from "../../../src/types/hr";
 import { kanban } from "../../src/api/services";
 import { messageOf, useSession } from "../../src/auth/SessionProvider";
 import { canUseModule, hasPermission } from "../../src/auth/access";
+import { useNotifications } from "../../src/features/notifications/NotificationProvider";
 import { EmptyState, Page } from "../../src/ui";
 import { shareLeaveFile } from "../../src/features/leave/files";
 import { TaskForm } from "../../src/features/work/TaskForm";
@@ -159,6 +160,7 @@ function getStatusInfo(status: string) {
 
 export default function Work() {
   const { user, selectedBranch } = useSession();
+  const { refresh: refreshNotifications } = useNotifications();
   const allowed = canUseModule(user, "hr");
   const manage = hasPermission(user, "work:manage");
 
@@ -247,6 +249,7 @@ export default function Work() {
     setSelected(null);
     setEditing(null);
     setRevision((value) => value + 1);
+    refreshNotifications();
   };
 
   const handleToggleSubtaskInDetail = async (subtaskId: string) => {
@@ -279,6 +282,7 @@ export default function Work() {
       };
       setSelected(syncedTask);
       setItems((prev) => prev.map((t) => (t.id === selected.id ? syncedTask : t)));
+      refreshNotifications();
     } catch (err) {
       const msg = messageOf(err);
       if (/thay đổi|phiên bản|revision|version|409/i.test(msg)) {

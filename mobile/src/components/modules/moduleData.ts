@@ -1,3 +1,4 @@
+import { canReadBranches } from "../../features/branches/model";
 import type { ServiceItem, ServiceModule } from "./types";
 import type { UserProfile } from "../../../../src/types/common";
 import { canUseModule, hasPermission } from "../../auth/access";
@@ -471,14 +472,14 @@ export const LUXCARE_MODULES: ServiceModule[] = [
         status: "active",
       },
       {
-        id: "sys-settings",
-        title: "Cài đặt\nhệ thống",
-        icon: "settings",
+        id: "sys-branches",
+        title: "Quản lý\nchi nhánh",
+        icon: "business",
         color: "#64748b",
         bgColor: "#f8fafc",
-        route: "/(tabs)/settings",
+        route: "/(tabs)/branches",
         moduleId: "communication",
-        status: "coming_soon",
+        status: "active",
       },
     ],
   },
@@ -495,8 +496,9 @@ export function isServiceAccessible(item: ServiceItem, user: UserProfile | null)
     case "/(tabs)/roles":
       return user.role === "admin" || user.role === "superadmin";
     case "/(tabs)/users":
-    case "/(tabs)/settings":
       return isManager || hasPermission(user, "user:read");
+    case "/(tabs)/branches":
+      return canReadBranches(user);
 
     case "/(tabs)/recruitment":
       return recruitmentAccess(user).read;

@@ -6,9 +6,11 @@ import { nativeNotifications as Notifications, nativeNotificationsUnavailableRea
 import Constants from "expo-constants";
 import { router, useRootNavigationState } from "expo-router";
 import { useSafeAreaInsets } from "react-native-safe-area-context";
-import { api, notifications } from "../../api/services";
+import { api, kanban, notifications } from "../../api/services";
 import { socketService } from "../../api/socketService";
 import { useSession } from "../../auth/SessionProvider";
+import { canUseModule } from "../../auth/access";
+import { countActiveWorkTasks } from "../work/model";
 import { notificationTarget } from "../navigation/notificationTarget";
 import { belongsToUser, parseNoticePayload, type NoticePayload } from "./payload";
 import { RealtimeNotificationToast } from "./RealtimeNotificationToast";
@@ -40,7 +42,7 @@ async function initialPermission() {
 const allowed = (p: NotificationPermissionsStatus) => p.granted || (Notifications !== null && p.ios?.status === Notifications.IosAuthorizationStatus.PROVISIONAL);
 
 export function NotificationProvider({ children }: React.PropsWithChildren) {
-  const { user, loading } = useSession();
+  const { user, loading, selectedBranch } = useSession();
   const navigation = useRootNavigationState();
   const insets = useSafeAreaInsets();
   const [revision, setRevision] = useState(0);
@@ -75,13 +77,25 @@ export function NotificationProvider({ children }: React.PropsWithChildren) {
 
   useEffect(() => {
     let active = true;
-    if (!user) { setWorkUnread(0); return; }
-    const timer = setTimeout(() => void notifications.getNotifications({ limit: 1, type: "task", read: false }).then(result => {
-      // unreadCount is global; total respects the task + unread filters.
-      if (active) setWorkUnread(result.total);
-    }).catch(() => {}), 150);
-    return () => { active = false; clearTimeout(timer); };
-  }, [user?.uid, user?.companyCode, revision]);
+    if (!user || !canUseModule(user, "hr")) {
+      setWorkUnread(0);
+      return;
+    }
+    const timer = setTimeout(() => {
+      void kanban
+        .listTasks(selectedBranch?._id)
+        .then((tasks) => {
+          if (active) setWorkUnread(countActiveWorkTasks(tasks, user));
+        })
+        .catch(() => {
+          if (active) setWorkUnread(0);
+        });
+    }, 150);
+    return () => {
+      active = false;
+      clearTimeout(timer);
+    };
+  }, [user?.uid, user?.companyCode, selectedBranch?._id, revision]);
 
   useEffect(() => {
     seen.current.clear();
