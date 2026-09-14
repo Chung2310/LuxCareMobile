@@ -2,6 +2,7 @@ import React from "react";
 import { StyleSheet, Text, TouchableOpacity, View } from "react-native";
 import { Ionicons } from "@expo/vector-icons";
 import type { InventorySupply } from "./types";
+import { formatNumber } from "../../utils/numberFormat";
 
 interface InventoryCardProps {
   item: InventorySupply;
@@ -92,9 +93,9 @@ export const InventoryCard: React.FC<InventoryCardProps> = ({
                 item.quantity === 0 && { color: "#dc2626" },
               ]}
             >
-              {item.quantity} {item.unit}
+              {formatNumber(item.quantity)} {item.unit}
             </Text>
-            <Text style={styles.stockMin}>/ Tối thiểu: {item.minQuantity}</Text>
+            <Text style={styles.stockMin}>/ Tối thiểu: {formatNumber(item.minQuantity)}</Text>
           </View>
         </View>
 

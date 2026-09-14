@@ -11,6 +11,7 @@ import {
 import { Ionicons } from "@expo/vector-icons";
 import type { InventoryTransaction } from "./types";
 import { formatDateVN } from "../../features/credentials/DatePickerModal";
+import { formatNumber } from "../../utils/numberFormat";
 import { AppButton, DateFilterPill, SearchInput } from "../common";
 
 interface TransactionsViewProps {
@@ -83,7 +84,7 @@ export function TransactionsView({
 
           <View style={styles.quantityBox}>
             <Text style={[styles.quantityBig, isIn ? styles.textIn : styles.textOut]}>
-              {isIn ? `+${item.quantity}` : `-${item.quantity}`}
+              {isIn ? `+${formatNumber(item.quantity)}` : `-${formatNumber(item.quantity)}`}
             </Text>
             <Text style={styles.unitText}>{item.unit}</Text>
           </View>

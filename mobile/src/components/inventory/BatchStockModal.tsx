@@ -20,6 +20,7 @@ import type {
 } from "./types";
 import type { BatchStockLineItem, BatchStockPayload } from "../../api/supplyApi";
 import { DatePickerModal } from "../../features/credentials/DatePickerModal";
+import { parseIntegerInput, formatNumber } from "../../utils/numberFormat";
 import { InventorySelectModal, type SelectOption } from "./InventorySelectModal";
 import {
   AppButton,
@@ -310,7 +311,7 @@ export const BatchStockModal: React.FC<BatchStockModalProps> = ({
         return {
           id: s.id,
           label: s.name,
-          subLabel: `Mã: ${s.code} • Tồn: ${s.quantity} ${s.unit}${s.supplierName ? ` • NCC: ${s.supplierName}` : ""}`,
+          subLabel: `Mã: ${s.code} • Tồn: ${formatNumber(s.quantity)} ${s.unit}${s.supplierName ? ` • NCC: ${s.supplierName}` : ""}`,
           badge: isFromCurrentSupplier ? "Đúng NCC" : s.category,
           badgeColor: isFromCurrentSupplier ? "#059669" : "#0d9488",
           icon: "cube-outline",
@@ -333,7 +334,7 @@ export const BatchStockModal: React.FC<BatchStockModalProps> = ({
         return {
           id: s.id,
           label: s.name,
-          subLabel: `Mã: ${s.code} • Khả dụng: ${s.quantity} ${s.unit} • Kho: ${s.warehouseLocation || s.warehouseName || "Chung"}`,
+          subLabel: `Mã: ${s.code} • Khả dụng: ${formatNumber(s.quantity)} ${s.unit} • Kho: ${s.warehouseLocation || s.warehouseName || "Chung"}`,
           badge: badgeText,
           badgeColor: badgeColor,
           icon: "cube-outline",
@@ -491,7 +492,7 @@ export const BatchStockModal: React.FC<BatchStockModalProps> = ({
       if (type === "out" && lines[existingIndex].quantity >= sup.quantity) {
         Alert.alert(
           "Đã đạt mức tồn tối đa",
-          `Số lượng đã thêm (${lines[existingIndex].quantity}) bằng toàn bộ tồn khả dụng (${sup.quantity} ${sup.unit}) trong kho.`
+          `Số lượng đã thêm ${formatNumber(lines[existingIndex].quantity)} bằng toàn bộ tồn khả dụng ${formatNumber(sup.quantity)} ${sup.unit} trong kho.`
         );
         return;
       }
@@ -522,7 +523,7 @@ export const BatchStockModal: React.FC<BatchStockModalProps> = ({
 
   // Cập nhật số lượng của 1 dòng
   const handleUpdateQuantity = (tempId: string, val: string | number) => {
-    const qty = typeof val === "string" ? parseInt(val, 10) || 0 : val;
+    const qty = typeof val === "string" ? parseIntegerInput(val) : val;
     setLines((prev) =>
       prev.map((l) => (l.tempId === tempId ? { ...l, quantity: Math.max(qty, 0) } : l))
     );
@@ -537,7 +538,7 @@ export const BatchStockModal: React.FC<BatchStockModalProps> = ({
 
   // Cập nhật đơn giá
   const handleUpdateUnitPrice = (tempId: string, val: string) => {
-    const price = parseFloat(val) || 0;
+    const price = parseIntegerInput(val);
     setLines((prev) =>
       prev.map((l) => (l.tempId === tempId ? { ...l, unitPrice: price } : l))
     );
@@ -574,7 +575,7 @@ export const BatchStockModal: React.FC<BatchStockModalProps> = ({
       }
       if (type === "out" && line.quantity > line.supply.quantity) {
         setErrorMsg(
-          `Mặt hàng "${line.supply.name}" xuất ${line.quantity} vượt quá tồn kho (${line.supply.quantity} ${line.supply.unit}).`
+          `Mặt hàng "${line.supply.name}" xuất ${formatNumber(line.quantity)} vượt quá tồn kho (${formatNumber(line.supply.quantity)} ${line.supply.unit}).`
         );
         return;
       }

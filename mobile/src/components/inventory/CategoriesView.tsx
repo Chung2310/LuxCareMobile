@@ -13,6 +13,7 @@ import {
 import { Ionicons } from "@expo/vector-icons";
 import type { InventoryCategory } from "./types";
 import { CategoryFormModal } from "./CategoryFormModal";
+import { formatNumber } from "../../utils/numberFormat";
 
 interface CategoriesViewProps {
   categories: InventoryCategory[];
@@ -115,7 +116,7 @@ export function CategoriesView({
                 {item.name}
               </Text>
               <View style={styles.badge}>
-                <Text style={styles.badgeText}>{item.itemCount} SP</Text>
+                <Text style={styles.badgeText}>{formatNumber(item.itemCount)} SP</Text>
               </View>
             </View>
 

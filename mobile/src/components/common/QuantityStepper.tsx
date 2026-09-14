@@ -8,6 +8,7 @@ import {
   ViewStyle,
 } from "react-native";
 import { Ionicons } from "@expo/vector-icons";
+import { formatIntegerInput, formatNumber, parseIntegerInput } from "../../utils/numberFormat";
 
 export interface QuantityStepperProps {
   value: number;
@@ -33,33 +34,33 @@ export const QuantityStepper: React.FC<QuantityStepperProps> = ({
   onBlur,
 }) => {
   const [isFocused, setIsFocused] = useState(false);
-  const [text, setText] = useState<string>(String(value ?? min));
+  const [text, setText] = useState<string>(formatNumber(value ?? min));
 
   useEffect(() => {
     if (!isFocused) {
-      setText(value !== undefined && value !== null ? String(value) : String(min));
+      setText(formatNumber(value !== undefined && value !== null ? value : min));
     }
   }, [value, isFocused, min]);
 
   const handleDecrease = () => {
-    const current = parseInt(text, 10);
-    const base = isNaN(current) ? (value ?? min) : current;
+    const current = parseIntegerInput(text);
+    const base = current || (value ?? min);
     const next = Math.max(base - step, min);
-    setText(String(next));
+    setText(formatNumber(next));
     onChange(next);
   };
 
   const handleIncrease = () => {
-    const current = parseInt(text, 10);
-    const base = isNaN(current) ? (value ?? min) : current;
+    const current = parseIntegerInput(text);
+    const base = current || (value ?? min);
     const next = max !== undefined ? Math.min(base + step, max) : base + step;
-    setText(String(next));
+    setText(formatNumber(next));
     onChange(next);
   };
 
   const handleTextChange = (newText: string) => {
-    // Chỉ giữ lại các chữ số 0-9
-    const clean = newText.replace(/[^0-9]/g, "");
+    // Chỉ giữ lại các chữ số 0-9 và hiển thị phân tách mỗi 3 số.
+    const clean = formatIntegerInput(newText);
 
     if (clean === "") {
       // Cho phép người dùng xóa hết để gõ số mới nhanh và chính xác
@@ -83,14 +84,14 @@ export const QuantityStepper: React.FC<QuantityStepperProps> = ({
       return;
     }
 
-    const parsed = parseInt(clean, 10);
+    const parsed = parseIntegerInput(clean);
     if (!isNaN(parsed)) {
       let finalVal = parsed;
       if (max !== undefined && finalVal > max) {
         finalVal = max;
-        setText(String(max));
+        setText(formatNumber(max));
       } else {
-        setText(clean);
+        setText(formatNumber(finalVal));
       }
       onChange(finalVal);
     }
@@ -103,16 +104,16 @@ export const QuantityStepper: React.FC<QuantityStepperProps> = ({
 
   const handleBlur = () => {
     setIsFocused(false);
-    const parsed = parseInt(text, 10);
+    const parsed = parseIntegerInput(text);
     if (isNaN(parsed) || parsed < min) {
       // Nếu người dùng xóa hết hoặc gõ < min mà bấm ra ngoài luôn thì mới mặc định là min (1)
-      setText(String(min));
+      setText(formatNumber(min));
       onChange(min);
     } else if (max !== undefined && parsed > max) {
-      setText(String(max));
+      setText(formatNumber(max));
       onChange(max);
     } else {
-      setText(String(parsed));
+      setText(formatNumber(parsed));
       onChange(parsed);
     }
     onBlur?.();

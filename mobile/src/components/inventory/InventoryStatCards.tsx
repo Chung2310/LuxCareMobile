@@ -2,6 +2,7 @@ import React from "react";
 import { ScrollView, StyleSheet, Text, TouchableOpacity, View } from "react-native";
 import { Ionicons } from "@expo/vector-icons";
 import type { InventoryStats } from "./types";
+import { formatNumber } from "../../utils/numberFormat";
 
 interface InventoryStatCardsProps {
   stats: InventoryStats;
@@ -15,21 +16,15 @@ export const InventoryStatCards: React.FC<InventoryStatCardsProps> = ({
   onSelectFilter,
 }) => {
   const formatCurrency = (val: number) => {
-    if (val >= 1_000_000_000) {
-      return `${(val / 1_000_000_000).toFixed(1)}Tỷ`;
-    }
-    if (val >= 1_000_000) {
-      return `${(val / 1_000_000).toFixed(1)}Tr`;
-    }
-    return val.toLocaleString("vi-VN") + "đ";
+    return formatNumber(val) + "đ";
   };
 
   const cards = [
     {
       id: "all",
       label: "Mặt hàng",
-      value: `${stats.totalItems}`,
-      sub: `${stats.totalQuantity} tồn`,
+      value: formatNumber(stats.totalItems),
+      sub: `${formatNumber(stats.totalQuantity)} tồn`,
       icon: "cube" as const,
       color: "#059669",
       bgColor: "#ecfdf5",
@@ -37,8 +32,8 @@ export const InventoryStatCards: React.FC<InventoryStatCardsProps> = ({
     {
       id: "low-stock",
       label: "Sắp hết",
-      value: `${stats.lowStockCount + stats.outOfStockCount}`,
-      sub: `${stats.outOfStockCount} hết`,
+      value: formatNumber(stats.lowStockCount + stats.outOfStockCount),
+      sub: `${formatNumber(stats.outOfStockCount)} hết`,
       icon: "alert-circle" as const,
       color: "#d97706",
       bgColor: "#fffbeb",
@@ -46,8 +41,8 @@ export const InventoryStatCards: React.FC<InventoryStatCardsProps> = ({
     {
       id: "expiring",
       label: "Cận hạn/Quá hạn",
-      value: `${stats.expiringSoonCount + stats.expiredCount}`,
-      sub: `${stats.expiredCount} hết hạn`,
+      value: formatNumber(stats.expiringSoonCount + stats.expiredCount),
+      sub: `${formatNumber(stats.expiredCount)} hết hạn`,
       icon: "time" as const,
       color: "#e11d48",
       bgColor: "#fff1f2",

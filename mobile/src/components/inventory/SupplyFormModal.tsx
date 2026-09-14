@@ -1,4 +1,4 @@
-import React, { useEffect, useState } from "react";
+import React, { useEffect, useRef, useState } from "react";
 import {
   ActivityIndicator,
   Image,
@@ -31,6 +31,40 @@ import { SupplierFormModal } from "./SupplierFormModal";
 import { supplyApi } from "../../api/supplyApi";
 import { DatePickerModal, formatDateVN } from "../../features/credentials/DatePickerModal";
 import { AppButton } from "../common";
+import { formatIntegerInput, formatNumber, parseIntegerInput } from "../../utils/numberFormat";
+
+export interface SupplyFormDocument {
+  name: string;
+  fileUrl: string;
+  fileType?: string;
+  fileSize?: number;
+  uploadedAt?: string;
+}
+
+export interface SupplyFormDraft {
+  name: string;
+  code: string;
+  category: string;
+  unit: string;
+  unitPrice: string;
+  warehouseLocation: string;
+  warehouseId?: string;
+  supplierName: string;
+  supplierId?: string;
+  quantity: number;
+  minQuantity: string;
+  batchNumber: string;
+  manufactureDate: string;
+  expiryDate: string;
+  requiresExpiry: boolean;
+  inspectionDate: string;
+  nextInspectionDate: string;
+  inspectionCertificateNumber: string;
+  imageUrl: string;
+  images: string[];
+  documents: SupplyFormDocument[];
+  notes: string;
+}
 
 interface SupplyFormModalProps {
   visible: boolean;
@@ -40,9 +74,11 @@ interface SupplyFormModalProps {
   categories?: InventoryCategory[];
   warehouses?: InventoryWarehouse[];
   suppliers?: InventorySupplier[];
-  onAddCategory?: (data: any) => Promise<void>;
-  onAddWarehouse?: (data: any) => Promise<void>;
-  onAddSupplier?: (data: any) => Promise<void>;
+  onAddCategory?: (data: any) => Promise<any>;
+  onAddWarehouse?: (data: any) => Promise<any>;
+  onAddSupplier?: (data: any) => Promise<any>;
+  draft?: SupplyFormDraft | null;
+  onDraftChange?: (draft: SupplyFormDraft) => void;
 }
 
 const COMMON_UNITS = ["Hộp", "Cái", "Gói", "Ống", "Chai", "Cuộn", "Bộ", "Thùng", "Vỉ", "Tép"];
@@ -58,6 +94,8 @@ export const SupplyFormModal: React.FC<SupplyFormModalProps> = ({
   onAddCategory,
   onAddWarehouse,
   onAddSupplier,
+  draft,
+  onDraftChange,
 }) => {
   // 1. Định danh & Phân loại
   const [name, setName] = useState("");
@@ -138,68 +176,194 @@ export const SupplyFormModal: React.FC<SupplyFormModalProps> = ({
 
   const todayStr = new Date().toISOString().slice(0, 10);
 
+  const prevVisibleRef = useRef(false);
+  const prevItemRef = useRef<InventorySupply | null>(null);
+  const skipDraftSyncRef = useRef(false);
+  const onDraftChangeRef = useRef(onDraftChange);
+  onDraftChangeRef.current = onDraftChange;
+
   useEffect(() => {
-    if (item) {
-      setName(item.name || "");
-      setCode(item.code || "");
-      setCategory(item.category || "Vật tư tiêu hao");
-      setUnit(item.unit || "Hộp");
-      setUnitPrice(item.unitPrice ? String(item.unitPrice) : "");
+    const prevVisible = prevVisibleRef.current;
+    const prevItem = prevItemRef.current;
 
-      setWarehouseLocation(item.warehouseLocation || "");
-      setWarehouseId(item.warehouseId);
-      setSupplierName(item.supplierName && item.supplierName !== "Chưa xác định" ? item.supplierName : "");
-      setSupplierId(item.supplierId);
+    const isOpening = visible && !prevVisible;
+    const isItemChanged =
+      visible &&
+      ((item && !prevItem) ||
+        (!item && prevItem) ||
+        (item && prevItem && (item.id || (item as any)._id) !== (prevItem.id || (prevItem as any)._id)));
 
-      setQuantity(item.quantity || 0);
-      setMinQuantity(String(item.minQuantity ?? 10));
+    if (isOpening || isItemChanged) {
+      skipDraftSyncRef.current = true;
+      if (item) {
+        setName(item.name || "");
+        setCode(item.code || "");
+        setCategory(item.category || "Vật tư tiêu hao");
+        setUnit(item.unit || "Hộp");
+        setUnitPrice(item.unitPrice ? formatIntegerInput(String(item.unitPrice)) : "");
 
-      setBatchNumber(item.batchNumber && item.batchNumber !== "N/A" ? item.batchNumber : "");
-      setManufactureDate(item.manufactureDate || "");
-      setExpiryDate(item.expiryDate || "");
-      setRequiresExpiry(item.requiresExpiry !== false);
+        setWarehouseLocation(item.warehouseLocation || "");
+        setWarehouseId(item.warehouseId);
+        setSupplierName(item.supplierName && item.supplierName !== "Chưa xác định" ? item.supplierName : "");
+        setSupplierId(item.supplierId);
 
-      setInspectionDate(item.inspectionDate || todayStr);
-      setNextInspectionDate(item.nextInspectionDate || "");
-      setInspectionCertificateNumber(item.inspectionCertificateNumber || "");
+        setQuantity(item.quantity || 0);
+        setMinQuantity(formatIntegerInput(String(item.minQuantity ?? 10)));
 
-      setImageUrl(item.imageUrl || "");
-      setImages(item.images || (item.imageUrl ? [item.imageUrl] : []));
-      setDocuments(item.documents || []);
-      setNotes(item.notes || "");
-    } else {
-      setName("");
-      setCode(`VT-${Date.now().toString().slice(-4)}`);
-      setCategory(categories[0]?.name || "");
-      setUnit("Hộp");
-      setUnitPrice("");
+        setBatchNumber(item.batchNumber && item.batchNumber !== "N/A" ? item.batchNumber : "");
+        setManufactureDate(item.manufactureDate || "");
+        setExpiryDate(item.expiryDate || "");
+        setRequiresExpiry(item.requiresExpiry !== false);
 
-      setWarehouseLocation(warehouses[0]?.name || "");
-      setWarehouseId(warehouses[0]?.id);
-      setSupplierName(suppliers[0]?.name || "");
-      setSupplierId(suppliers[0]?.id);
+        setInspectionDate(item.inspectionDate || todayStr);
+        setNextInspectionDate(item.nextInspectionDate || "");
+        setInspectionCertificateNumber(item.inspectionCertificateNumber || "");
 
-      setQuantity(0);
-      setMinQuantity("10");
+        setImageUrl(item.imageUrl || "");
+        setImages(item.images || (item.imageUrl ? [item.imageUrl] : []));
+        setDocuments(item.documents || []);
+        setNotes(item.notes || "");
+      } else if (draft) {
+        setName(draft.name);
+        setCode(draft.code);
+        setCategory(draft.category);
+        setUnit(draft.unit);
+        setUnitPrice(formatIntegerInput(draft.unitPrice));
+        setWarehouseLocation(draft.warehouseLocation);
+        setWarehouseId(draft.warehouseId);
+        setSupplierName(draft.supplierName);
+        setSupplierId(draft.supplierId);
+        setQuantity(draft.quantity);
+        setMinQuantity(formatIntegerInput(draft.minQuantity));
+        setBatchNumber(draft.batchNumber);
+        setManufactureDate(draft.manufactureDate);
+        setExpiryDate(draft.expiryDate);
+        setRequiresExpiry(draft.requiresExpiry);
+        setInspectionDate(draft.inspectionDate);
+        setNextInspectionDate(draft.nextInspectionDate);
+        setInspectionCertificateNumber(draft.inspectionCertificateNumber);
+        setImageUrl(draft.imageUrl);
+        setImages(draft.images);
+        setDocuments(draft.documents);
+        setNotes(draft.notes);
+      } else {
+        setName("");
+        setCode(`VT-${Date.now().toString().slice(-4)}`);
+        setCategory(categories[0]?.name || "");
+        setUnit("Hộp");
+        setUnitPrice("");
 
-      setBatchNumber("");
-      setManufactureDate("");
-      setExpiryDate("");
-      setRequiresExpiry(true);
+        setWarehouseLocation(warehouses[0]?.name || "");
+        setWarehouseId(warehouses[0]?.id);
+        setSupplierName(suppliers[0]?.name || "");
+        setSupplierId(suppliers[0]?.id);
 
-      setInspectionDate(todayStr);
-      setNextInspectionDate("");
-      setInspectionCertificateNumber("");
+        setQuantity(0);
+        setMinQuantity("10");
 
-      setImageUrl("");
-      setImages([]);
-      setDocuments([]);
-      setNotes("");
+        setBatchNumber("");
+        setManufactureDate("");
+        setExpiryDate("");
+        setRequiresExpiry(true);
+
+        setInspectionDate(todayStr);
+        setNextInspectionDate("");
+        setInspectionCertificateNumber("");
+
+        setImageUrl("");
+        setImages([]);
+        setDocuments([]);
+        setNotes("");
+      }
     }
+
+    prevVisibleRef.current = visible;
+    prevItemRef.current = item;
+  }, [visible, item, draft]);
+
+  // Đồng bộ draft lên màn cha để không mất dữ liệu khi mở/đóng modal thêm nhanh.
+  useEffect(() => {
+    if (!visible || !onDraftChangeRef.current) return;
+    if (skipDraftSyncRef.current) {
+      skipDraftSyncRef.current = false;
+      return;
+    }
+
+    onDraftChangeRef.current({
+      name,
+      code,
+      category,
+      unit,
+      unitPrice,
+      warehouseLocation,
+      warehouseId,
+      supplierName,
+      supplierId,
+      quantity,
+      minQuantity,
+      batchNumber,
+      manufactureDate,
+      expiryDate,
+      requiresExpiry,
+      inspectionDate,
+      nextInspectionDate,
+      inspectionCertificateNumber,
+      imageUrl,
+      images,
+      documents,
+      notes,
+    });
+  }, [
+    visible,
+    name,
+    code,
+    category,
+    unit,
+    unitPrice,
+    warehouseLocation,
+    warehouseId,
+    supplierName,
+    supplierId,
+    quantity,
+    minQuantity,
+    batchNumber,
+    manufactureDate,
+    expiryDate,
+    requiresExpiry,
+    inspectionDate,
+    nextInspectionDate,
+    inspectionCertificateNumber,
+    imageUrl,
+    images,
+    documents,
+    notes,
+  ]);
+
+  // Nếu mở form tạo mới lúc danh mục/kho/NCC chưa kịp load, tự điền giá trị mặc định đầu tiên khi dữ liệu tới mà không xóa nội dung user đã nhập
+  useEffect(() => {
+    if (visible && !item && !category && categories.length > 0) {
+      setCategory(categories[0].name);
+    }
+  }, [visible, item, category, categories]);
+
+  useEffect(() => {
+    if (visible && !item && !warehouseLocation && warehouses.length > 0) {
+      setWarehouseLocation(warehouses[0].name);
+      setWarehouseId(warehouses[0].id);
+    }
+  }, [visible, item, warehouseLocation, warehouses]);
+
+  useEffect(() => {
+    if (visible && !item && !supplierName && suppliers.length > 0) {
+      setSupplierName(suppliers[0].name);
+      setSupplierId(suppliers[0].id);
+    }
+  }, [visible, item, supplierName, suppliers]);
+
+  useEffect(() => {
     setMissingFields([]);
     setSubmitAttempted(false);
   }, [item, visible, categories, warehouses, suppliers]);
-
   // CHỌN NHIỀU ẢNH TỪ THƯ VIỆN THIẾT BỊ
   const handlePickImagesFromLibrary = async () => {
     try {
@@ -512,8 +676,8 @@ export const SupplyFormModal: React.FC<SupplyFormModalProps> = ({
         code: code.trim().toUpperCase(),
         category,
         unit: unit.trim(),
-        minQuantity: parseInt(minQuantity, 10) || 0,
-        unitPrice: parseFloat(unitPrice) || 0,
+        minQuantity: parseIntegerInput(minQuantity),
+        unitPrice: parseIntegerInput(unitPrice),
         warehouseLocation: warehouseLocation.trim(),
         warehouseId,
         supplierName: supplierName.trim() || undefined,
@@ -549,7 +713,7 @@ export const SupplyFormModal: React.FC<SupplyFormModalProps> = ({
     id: c.id,
     label: c.name,
     subLabel: `Mã: ${c.code}`,
-    badge: `${c.itemCount} SP`,
+    badge: `${formatNumber(c.itemCount)} SP`,
     badgeColor: c.color || "#059669",
     icon: "layers-outline",
   }));
@@ -755,7 +919,7 @@ export const SupplyFormModal: React.FC<SupplyFormModalProps> = ({
                     placeholder="VD: 85000"
                     placeholderTextColor="#94a3b8"
                     value={unitPrice}
-                    onChangeText={setUnitPrice}
+                    onChangeText={(value) => setUnitPrice(formatIntegerInput(value))}
                     keyboardType="numeric"
                   />
                   <Text style={styles.currencyBadge}>VNĐ</Text>
@@ -840,7 +1004,7 @@ export const SupplyFormModal: React.FC<SupplyFormModalProps> = ({
                   <View style={styles.priceInputWrapper}>
                     <TextInput
                       style={[styles.input, styles.readOnlyInput]}
-                      value={String(quantity)}
+                      value={formatNumber(quantity)}
                       editable={false}
                     />
                     <Text style={styles.unitSuffix}>{unit || "đơn vị"}</Text>
@@ -856,7 +1020,7 @@ export const SupplyFormModal: React.FC<SupplyFormModalProps> = ({
                       placeholder="10"
                       placeholderTextColor="#94a3b8"
                       value={minQuantity}
-                      onChangeText={setMinQuantity}
+                      onChangeText={(value) => setMinQuantity(formatIntegerInput(value))}
                       keyboardType="numeric"
                     />
                     <Text style={styles.unitSuffix}>{unit || "đơn vị"}</Text>
@@ -1355,7 +1519,7 @@ export const SupplyFormModal: React.FC<SupplyFormModalProps> = ({
           item={null}
           onClose={() => setQuickAddModal(null)}
           onSubmit={async (data) => {
-            await onAddCategory(data);
+            const res = await onAddCategory(data);
             setCategory(data.name);
             setQuickAddModal(null);
           }}
@@ -1369,8 +1533,12 @@ export const SupplyFormModal: React.FC<SupplyFormModalProps> = ({
           item={null}
           onClose={() => setQuickAddModal(null)}
           onSubmit={async (data) => {
-            await onAddWarehouse(data);
+            const res = await onAddWarehouse(data);
             setWarehouseLocation(data.name);
+            const newId = res?._id || res?.id || res?.data?._id || res?.data?.id;
+            if (newId) {
+              setWarehouseId(newId);
+            }
             setQuickAddModal(null);
           }}
         />
@@ -1383,8 +1551,12 @@ export const SupplyFormModal: React.FC<SupplyFormModalProps> = ({
           item={null}
           onClose={() => setQuickAddModal(null)}
           onSubmit={async (data) => {
-            await onAddSupplier(data);
+            const res = await onAddSupplier(data);
             setSupplierName(data.name);
+            const newId = res?._id || res?.id || res?.data?._id || res?.data?.id;
+            if (newId) {
+              setSupplierId(newId);
+            }
             setQuickAddModal(null);
           }}
         />
