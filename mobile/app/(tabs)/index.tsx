@@ -24,7 +24,7 @@ import type {
   DashboardDateFilter,
 } from "../../../src/types/dashboard";
 import type { DashboardSummaryParams } from "../../../src/services/dashboardService";
-import { dashboard, attendance, roster } from "../../src/api/services";
+import { dashboard, attendance, roster, equipment, resources } from "../../src/api/services";
 import type { TodayAttendance } from "../../../src/services/attendanceService";
 import { messageOf, useSession } from "../../src/auth/SessionProvider";
 import { useCommunication, communicationBadge } from "../../src/features/notifications/CommunicationProvider";
@@ -152,6 +152,8 @@ export default function Home() {
           user?.companyCode,
           selectedBranch?._id,
           roster,
+          equipment,
+          resources,
         );
         if (request !== dashboardRequest.current) return;
         setData(snapshot.summary);

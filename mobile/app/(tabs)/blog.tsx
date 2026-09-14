@@ -1,3 +1,4 @@
+import { historicalUserLabel } from "../../../src/utils/historicalUser";
 import { downloadRemoteFile } from "../../src/files/downloadRemoteFile";
 import { resolveFileFormat } from "../../src/files/fileFormat";
 import { resolveFileUrl, shareApiFile } from "../../src/files/shareFile";
@@ -872,7 +873,7 @@ export default function BlogScreen() {
 
                     <View style={styles.authorMetaCol}>
                       <View style={styles.authorNameRow}>
-                        <Text style={styles.authorName}>{post.authorName}</Text>
+                        <Text style={styles.authorName}>{historicalUserLabel(post.authorName, post.authorDeleted)}</Text>
                         <View style={styles.editorRoleBadge}>
                           <Text style={styles.editorRoleBadgeText}>
                             {post.authorRoleBadge || "Ban Biên Tập"}
@@ -1314,7 +1315,7 @@ export default function BlogScreen() {
                       onPress={() => jumpToPost(item.id)}
                     >
                       <View style={styles.pinnedItemHeader}>
-                        <Text style={styles.pinnedItemAuthor}>{item.authorName}</Text>
+                        <Text style={styles.pinnedItemAuthor}>{historicalUserLabel(item.authorName, item.authorDeleted)}</Text>
                         <Text style={styles.pinnedItemTime}>{item.createdAt}</Text>
                       </View>
 

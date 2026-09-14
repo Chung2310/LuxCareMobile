@@ -1,3 +1,4 @@
+import { historicalUserLabel } from "../../../src/utils/historicalUser";
 import { useAppAlert } from "../../src/components/AppAlert";
 import React, { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import {
@@ -404,7 +405,7 @@ export default function LeaveScreen() {
                   <Text style={s.userAvatarText}>{authorInitial}</Text>
                 </View>
                 <View style={{ flex: 1 }}>
-                  <Text style={s.cardUserName}>{item.employeeName}</Text>
+                  <Text style={s.cardUserName}>{historicalUserLabel(item.employeeName, item.employeeDeleted)}</Text>
                   <View style={s.dateRangeRow}>
                     <Ionicons name="calendar-outline" size={13} color="#64748b" />
                     <Text style={s.dateRangeText}>
@@ -636,7 +637,7 @@ export default function LeaveScreen() {
                     {decision?.type === "approved" ? "Phê duyệt đơn" : "Từ chối đơn"}
                   </Text>
                   <Text style={s.decisionSub}>
-                    {decision?.item.employeeName} · {decision?.item.type}
+                    {historicalUserLabel(decision?.item.employeeName, decision?.item.employeeDeleted)} · {decision?.item.type}
                   </Text>
                 </View>
                 <Pressable

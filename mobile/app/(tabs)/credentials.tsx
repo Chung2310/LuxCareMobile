@@ -530,7 +530,7 @@ export default function Credentials() {
                       <View style={{ flex: 1, paddingRight: 8 }}>
                         <Text style={uiStyles.cardTitle}>{item.name}</Text>
                         <View style={uiStyles.cardMetaRow}>
-                          <Text style={uiStyles.employeeName}>{item.employeeName}</Text>
+                          <Text style={uiStyles.employeeName}>{item.employeeName || "Nhân viên"}{item.employeeDeleted ? " · Tài khoản đã xóa" : ""}</Text>
                           <Text style={uiStyles.metaDot}>•</Text>
                           <View style={uiStyles.typePill}>
                             <Text style={uiStyles.typePillText}>

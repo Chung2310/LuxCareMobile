@@ -14,6 +14,7 @@ export type Contract = {
   contractType: string;
   employeeId: string;
   employeeName: string;
+  employeeDeleted?: boolean;
   startDate: string;
   endDate: string;
   status: ContractStatus;
@@ -43,6 +44,7 @@ export type Extension = {
   _id: string;
   contractId: string;
   employeeName: string;
+  employeeDeleted?: boolean;
   previousEndDate: string;
   newEndDate: string;
   extensionDate: string;

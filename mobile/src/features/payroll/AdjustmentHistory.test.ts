@@ -1,3 +1,4 @@
+import * as historicalUser from "../../../../src/utils/historicalUser";
 import { readFileSync } from "node:fs";
 import { createRequire } from "node:module";
 import vm from "node:vm";
@@ -35,6 +36,7 @@ function mount() {
   };
   const module = { exports: {} as any };
   vm.runInNewContext(source, { module, exports: module.exports, require(name: string) {
+    if (name === "../../../../src/utils/historicalUser") return historicalUser;
     if (name === "react") return react;
     if (name === "react/jsx-runtime") return { jsx, jsxs: jsx, Fragment: "Fragment" };
     if (name === "expo-router") return { useFocusEffect(fn: any) {
@@ -53,6 +55,7 @@ function mount() {
     if (name === "./model") return { payslipMoney: (value: number) => String(value) };
     if (name === "../contracts/model") return { contractDate: (value: string) => value };
     if (name === "react-native") return { Platform: { OS: "ios" }, ...Object.fromEntries(["Modal", "View", "Text", "TextInput", "Pressable", "KeyboardAvoidingView"].map(key => [key, key])) };
+    if (name.includes("historicalUser")) return { historicalUserLabel: (val: any) => typeof val === "string" ? val : val?.employeeName || "" };
     return new Proxy({}, { get: (_, key) => key === "styles" || key === "adjustmentStyles" ? {} : String(key) });
   } });
   const render = () => {

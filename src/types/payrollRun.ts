@@ -1,6 +1,7 @@
 export interface PayrollRunLine {
   employeeId: string;
   employeeName?: string;
+  employeeDeleted?: boolean;
   calculation: Record<string, number>;
   warnings?: string[];
 }

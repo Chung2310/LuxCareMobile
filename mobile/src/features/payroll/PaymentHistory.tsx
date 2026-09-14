@@ -1,3 +1,4 @@
+import { historicalEmployeeLabel, historicalUserLabel } from "../../../../src/utils/historicalUser";
 import { useCallback, useState } from "react";
 import { useFocusEffect } from "expo-router";
 import { Text } from "react-native";
@@ -63,7 +64,7 @@ export function PaymentHistory({
   );
   if (!allowed) return null;
   const rows = items.filter((item) => !status || item.status === status);
-  const nameOf = (id: string) => employees.find((employee) => employee.employeeId === id)?.employeeName || id;
+  const nameOf = (id: string) => historicalEmployeeLabel(employees, id);
   return (
     <Card>
       <Text style={styles.heading}>Lịch sử thanh toán</Text>

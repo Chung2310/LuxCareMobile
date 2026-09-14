@@ -11,6 +11,7 @@ import {
   View,
 } from "react-native";
 import { Ionicons } from "@expo/vector-icons";
+import { useAppAlert } from "../AppAlert";
 import type { InventoryWarehouse } from "./types";
 
 interface WarehouseFormModalProps {
@@ -33,6 +34,7 @@ export const WarehouseFormModal: React.FC<WarehouseFormModalProps> = ({
   onClose,
   onSubmit,
 }) => {
+  const { showAlert, alertView } = useAppAlert();
   const [name, setName] = useState("");
   const [code, setCode] = useState("");
   const [location, setLocation] = useState("");
@@ -60,16 +62,18 @@ export const WarehouseFormModal: React.FC<WarehouseFormModalProps> = ({
   }, [item, visible]);
 
   const handleSubmit = async () => {
-    if (!name.trim()) {
-      alert("Vui lòng nhập tên kho lưu trữ.");
-      return;
-    }
-    if (!code.trim()) {
-      alert("Vui lòng nhập mã kho.");
-      return;
-    }
-    if (!location.trim()) {
-      alert("Vui lòng nhập vị trí tầng / khu vực kho.");
+    const missing: string[] = [];
+    if (!name.trim()) missing.push("Tên kho lưu trữ");
+    if (!code.trim()) missing.push("Mã kho");
+    if (!location.trim()) missing.push("Vị trí tầng / khu vực kho");
+
+    if (missing.length > 0) {
+      showAlert(
+        "Thiếu thông tin bắt buộc",
+        `Vui lòng bổ sung đầy đủ các thông tin sau:\n\n${missing.map((f) => `• ${f}`).join("\n")}`,
+        [{ text: "Đã hiểu" }],
+        "error",
+      );
       return;
     }
 
@@ -84,6 +88,13 @@ export const WarehouseFormModal: React.FC<WarehouseFormModalProps> = ({
         description: description.trim() || undefined,
       });
       onClose();
+    } catch (err: any) {
+      showAlert(
+        "Lỗi lưu kho",
+        err.message || "Không thể lưu thông tin kho lưu trữ.",
+        [{ text: "Đã hiểu" }],
+        "error",
+      );
     } finally {
       setSubmitting(false);
     }
@@ -218,6 +229,7 @@ export const WarehouseFormModal: React.FC<WarehouseFormModalProps> = ({
           </View>
         </View>
       </KeyboardAvoidingView>
+      {alertView}
     </Modal>
   );
 };

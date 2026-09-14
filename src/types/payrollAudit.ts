@@ -3,6 +3,8 @@ export interface PayrollAudit {
   periodKey: string;
   action: string;
   actorId: string;
+  actorName?: string;
+  actorDeleted?: boolean;
   createdAt?: string;
   metadata?: Record<string, unknown>;
 }

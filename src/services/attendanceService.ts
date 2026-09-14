@@ -1,7 +1,15 @@
 import { browserTransport, type ServiceTransport } from "./serviceTransport";
 import { parseApiErrorResponse } from "./apiClientError";
 import type { AttendanceOverviewLog } from "../types/attendance";
-export type AttendanceLog = AttendanceOverviewLog & { _id: string; note?: string };
+export type AttendanceLog = AttendanceOverviewLog & {
+  _id: string;
+  note?: string;
+  manuallyAdjusted?: boolean;
+  adjustedAt?: string;
+  adjustedBy?: string;
+  adjustmentReason?: string;
+  shiftId?: string;
+};
 export type AttendanceAdjustment = {
   _id: string;
   actorName?: string;

@@ -13,6 +13,7 @@ export const WORKPLACE_LABELS: Record<string, string> = {
 
 export const EMPLOYMENT_TYPE_LABELS: Record<string, string> = {
   full_time: "Toàn thời gian",
+  fulltime: "Toàn thời gian",
   part_time: "Bán thời gian",
   contract: "Hợp đồng",
   intern: "Thực tập",

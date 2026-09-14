@@ -26,6 +26,7 @@ export interface LeaveApplication {
   _id: string;
   employeeId: string;
   employeeName: string;
+  employeeDeleted?: boolean;
   type: string;
   requestKind: RequestKind;
   startDate: string;

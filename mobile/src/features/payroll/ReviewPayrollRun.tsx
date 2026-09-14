@@ -60,9 +60,13 @@ export function ReviewPayrollRun({
     setBusy(true);
     setError(null);
     try {
-      const saved = close
-        ? await payroll.closeRun(run._id, run.version!)
-        : await payroll.reviewRun(run._id, run.version!);
+      const saved = run.activeRevisionId
+        ? close
+          ? await payroll.closeRun(run._id, run.version!)
+          : await payroll.reviewRun(run._id, run.version!)
+        : close
+          ? await payroll.close(run.periodKey)
+          : await payroll.review(run.periodKey);
       if (close) validateClosedRun(saved, run);
       else validateReviewedRun(saved, run);
       if (active.current) setDone(true);

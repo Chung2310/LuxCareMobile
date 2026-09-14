@@ -23,7 +23,8 @@ import {
   canDeletePolicy,
   canManageFormulas,
   canReadFormulas,
-  formulaStatuses,
+  formulaDisplayStatuses,
+  policyDisplayStatus,
   fundLabels,
   overlappingPolicies,
   parsePolicies,
@@ -41,6 +42,27 @@ type Pending = {
   item: PayrollPolicyVersion;
   kind: "delete" | "activate" | "retire" | "replace";
 };
+
+function translateFormulaError(message: string): string {
+  if (
+    message.includes("Another active payroll policy already covers this period") ||
+    message.toLowerCase().includes("covers this period") ||
+    message.toLowerCase().includes("overlap")
+  ) {
+    return "Đã có chính sách lương khác đang áp dụng trong khoảng thời gian này. Vui lòng bấm 'Thay thế phiên bản đang áp dụng' để tiếp tục.";
+  }
+  if (
+    message.includes("Cannot delete active policy") ||
+    message.includes("Ngưng áp dụng phiên bản trước khi xóa")
+  ) {
+    return "Phiên bản đang được áp dụng. Vui lòng ngưng áp dụng trước khi xóa.";
+  }
+  if (message.includes("Policy is used in closed payroll run")) {
+    return "Phiên bản này đã được dùng trong kỳ lương đã chốt, không thể xóa.";
+  }
+  return message;
+}
+
 export function PayrollFormulas({ onChanged }: { onChanged: () => void }) {
   const { user, selectedBranch } = useSession();
   const allowed = canReadFormulas(user),
@@ -88,6 +110,7 @@ export function PayrollFormulas({ onChanged }: { onChanged: () => void }) {
     }, [allowed, user?.companyCode, user?.uid, selectedBranch?._id, revision]),
   );
   const reload = () => {
+    setLoading(true);
     setRevision((value) => value + 1);
     onChanged();
   };
@@ -104,7 +127,7 @@ export function PayrollFormulas({ onChanged }: { onChanged: () => void }) {
       ...current.filter((row) => row._id !== item._id),
     ]);
     setSearch("");
-    setStatus(item.status);
+    setStatus("");
     setExpanded(item._id);
     setNotice("Đã lưu phiên bản “" + item.name + "”.");
     reload();
@@ -142,7 +165,7 @@ export function PayrollFormulas({ onChanged }: { onChanged: () => void }) {
             "Trạng thái trả về không khớp. Tải lại danh sách để kiểm tra.",
           );
         if (mounted.current) {
-          setStatus(updated.status);
+          setStatus("");
           setItems((current) =>
             current.map((row) => (row._id === updated._id ? updated : row)),
           );
@@ -159,13 +182,19 @@ export function PayrollFormulas({ onChanged }: { onChanged: () => void }) {
       }
     } catch (err) {
       if (mounted.current) {
-        if (
-          (err as { code?: string }).code === "PAYROLL_POLICY_OVERLAP" &&
-          pending.kind === "activate"
-        ) {
+        const rawMsg = messageOf(err);
+        const isOverlap =
+          (err as { code?: string }).code === "PAYROLL_POLICY_OVERLAP" ||
+          rawMsg.includes("Another active payroll policy already covers this period") ||
+          rawMsg.toLowerCase().includes("covers this period") ||
+          rawMsg.toLowerCase().includes("overlap");
+
+        if (isOverlap && pending.kind === "activate") {
           setPending({ ...pending, kind: "replace" });
           setActionError(null);
-        } else setActionError(messageOf(err));
+        } else {
+          setActionError(translateFormulaError(rawMsg));
+        }
       }
     } finally {
       lock.current = false;
@@ -176,15 +205,22 @@ export function PayrollFormulas({ onChanged }: { onChanged: () => void }) {
     return (
       <ErrorText message="Cần quyền đọc chính sách lương để xem phiên bản công thức." />
     );
+  const now = new Date();
+  const today = `${now.getFullYear()}-${String(now.getMonth() + 1).padStart(2, "0")}-${String(now.getDate()).padStart(2, "0")}`;
+  const displayStatus = (item: PayrollPolicyVersion) => policyDisplayStatus(item, items, today);
   const rows = items.filter(
     (item) =>
-      (!status || item.status === status) &&
+      (!status || displayStatus(item) === status) &&
       (item.code + " " + item.name)
         .toLocaleLowerCase("vi-VN")
         .includes(search.trim().toLocaleLowerCase("vi-VN")),
   );
   const requestAction = (item: PayrollPolicyVersion, kind: Pending["kind"]) => {
     setActionError(null);
+    if (kind === "activate" && overlappingPolicies(items, item).length > 0) {
+      setPending({ item, kind: "replace" });
+      return;
+    }
     setPending({ item, kind });
   };
   return (
@@ -214,7 +250,7 @@ export function PayrollFormulas({ onChanged }: { onChanged: () => void }) {
             setEditor({
               mode: "create",
               item:
-                policyForDate(items, new Date().toISOString().slice(0, 10)) ||
+                policyForDate(items, today) ||
                 items[0],
             })
           }
@@ -236,7 +272,7 @@ export function PayrollFormulas({ onChanged }: { onChanged: () => void }) {
         value={status}
         choices={[
           { value: "", label: "Tất cả phiên bản" },
-          ...Object.entries(formulaStatuses).map(([value, label]) => ({
+          ...Object.entries(formulaDisplayStatuses).map(([value, label]) => ({
             value,
             label,
           })),
@@ -251,7 +287,7 @@ export function PayrollFormulas({ onChanged }: { onChanged: () => void }) {
           <Text style={s.subtitle}>Thử đổi bộ lọc hoặc tạo phiên bản mới.</Text>
         </Card>
       )}
-      {!error &&
+      {!loading && !error &&
         rows.map((item) => (
           <Card key={item._id}>
             <Text style={s.name}>{item.name}</Text>
@@ -261,10 +297,10 @@ export function PayrollFormulas({ onChanged }: { onChanged: () => void }) {
             <View
               style={[
                 s.badge,
-                item.status === "active" && { backgroundColor: "#ecfdf5" },
+                displayStatus(item) === "active" && { backgroundColor: "#ecfdf5" },
               ]}
             >
-              <Text style={s.badgeText}>{formulaStatuses[item.status]}</Text>
+              <Text style={s.badgeText}>{formulaDisplayStatuses[displayStatus(item)]}</Text>
             </View>
             <Text style={s.subtitle}>
               Hiệu lực: {item.effectiveFrom.slice(0, 10)} →{" "}
@@ -459,13 +495,36 @@ export function PayrollFormulas({ onChanged }: { onChanged: () => void }) {
                       ? "Phiên bản sẽ áp dụng từ ngày bắt đầu và không giới hạn ngày kết thúc. Cần tính lại kỳ nháp để cập nhật bảng lương."
                       : "Phiên bản này sẽ ngưng áp dụng; hệ thống có thể sử dụng lại phiên bản trước đó cho thời gian tương ứng."}
               </Text>
-              {pending?.kind === "replace" &&
-                overlappingPolicies(items, pending.item).map((item) => (
-                  <Text key={item._id} style={styles.text}>
-                    • {item.name} ({item.code})
+              {pending?.kind === "replace" && (
+                <View style={{ gap: 4, marginVertical: 6 }}>
+                  <Text style={[styles.text, { fontWeight: "700" }]}>
+                    Các phiên bản trùng lặp sẽ được thay thế:
                   </Text>
-                ))}
+                  {overlappingPolicies(items, pending.item).length > 0 ? (
+                    overlappingPolicies(items, pending.item).map((item) => (
+                      <Text key={item._id} style={[styles.text, { color: "#d97706" }]}>
+                        • {item.name} ({item.code})
+                      </Text>
+                    ))
+                  ) : (
+                    <Text style={styles.muted}>
+                      • Phiên bản công thức đang áp dụng trong cùng khoảng thời gian
+                    </Text>
+                  )}
+                </View>
+              )}
               <ErrorText message={actionError} />
+              {pending?.kind === "activate" && !!actionError && (
+                <Action
+                  title="Thay thế phiên bản đang áp dụng"
+                  tone="primary"
+                  disabled={busy}
+                  onPress={() => {
+                    setActionError(null);
+                    setPending({ ...pending, kind: "replace" });
+                  }}
+                />
+              )}
               <Action
                 title={
                   busy
@@ -475,7 +534,7 @@ export function PayrollFormulas({ onChanged }: { onChanged: () => void }) {
                       : "Xác nhận"
                 }
                 tone={pending?.kind === "delete" ? "danger" : "primary"}
-                disabled={busy || !!actionError}
+                disabled={busy || (!!actionError && pending?.kind !== "replace")}
                 onPress={() => void perform()}
               />
               <Action

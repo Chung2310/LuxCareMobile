@@ -1,3 +1,4 @@
+import { historicalUserLabel } from "../../../src/utils/historicalUser";
 import React, { useCallback, useRef, useState } from "react";
 import { router, useFocusEffect, useLocalSearchParams } from "expo-router";
 import { Ionicons } from "@expo/vector-icons";
@@ -462,7 +463,7 @@ export default function Contracts() {
                       </View>
 
                       <View style={{ flex: 1 }}>
-                        <Text style={styles.cardEmployeeName}>{item.employeeName}</Text>
+                        <Text style={styles.cardEmployeeName}>{historicalUserLabel(item.employeeName, item.employeeDeleted)}</Text>
                         <View style={styles.contractTypePill}>
                           <Text style={styles.contractTypeText}>{item.contractType}</Text>
                         </View>

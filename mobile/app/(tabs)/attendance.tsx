@@ -33,9 +33,36 @@ const STATUS_LABELS: Record<string, { label: string; color: string; bg: string; 
   "Half-Day": { label: "Nửa ngày", color: "#7c3aed", bg: "#f5f3ff", icon: "hourglass-outline" },
   "Late-Left-Early": { label: "Muộn & Về sớm", color: "#e11d48", bg: "#fff1f2", icon: "warning-outline" },
   Absent: { label: "Vắng mặt", color: "#dc2626", bg: "#fef2f2", icon: "close-circle" },
-  "Approved-Leave": { label: "Nghỉ phép duyệt", color: "#2563eb", bg: "#eff6ff", icon: "document-text" },
+  "Approved-Leave": { label: "Nghỉ phép", color: "#2563eb", bg: "#eff6ff", icon: "document-text" },
   "Paid-Holiday": { label: "Nghỉ lễ", color: "#0891b2", bg: "#ecfeff", icon: "ribbon" },
+  "Approved-WFH": { label: "Làm từ xa (WFH)", color: "#0284c7", bg: "#f0f9ff", icon: "laptop-outline" },
+  "Approved-Exception": { label: "Ngoại lệ duyệt", color: "#8b5cf6", bg: "#f5f3ff", icon: "shield-checkmark-outline" },
+  Incomplete: { label: "Thiếu chấm công", color: "#f59e0b", bg: "#fffbeb", icon: "help-circle-outline" },
+  Partial: { label: "Thiếu công", color: "#f97316", bg: "#fff7ed", icon: "time-outline" },
 };
+
+function getAttendanceStatusLabel(status?: string): { label: string; color: string; bg: string; icon: string } {
+  if (!status) {
+    return { label: "Chưa xác định", color: "#64748b", bg: "#f1f5f9", icon: "help-circle-outline" };
+  }
+  if (STATUS_LABELS[status]) {
+    return STATUS_LABELS[status];
+  }
+  const normalized = status.trim().toLowerCase().replace(/[\s_-]+/g, "");
+  if (normalized === "present" || normalized === "comat" || normalized === "dunggio") return STATUS_LABELS.Present;
+  if (normalized === "late" || normalized === "dimuon" || normalized === "muon") return STATUS_LABELS.Late;
+  if (normalized === "leftearly" || normalized === "vesom") return STATUS_LABELS["Left-Early"];
+  if (normalized === "halfday" || normalized === "nuangay") return STATUS_LABELS["Half-Day"];
+  if (normalized === "lateleftearly" || normalized === "muonvesom") return STATUS_LABELS["Late-Left-Early"];
+  if (normalized === "absent" || normalized === "vangmat" || normalized === "vang") return STATUS_LABELS.Absent;
+  if (normalized.includes("leave") || normalized.includes("phep")) return STATUS_LABELS["Approved-Leave"];
+  if (normalized.includes("holiday") || normalized.includes("le")) return STATUS_LABELS["Paid-Holiday"];
+  if (normalized.includes("wfh") || normalized.includes("tuxa")) return STATUS_LABELS["Approved-WFH"];
+  if (normalized.includes("exception") || normalized.includes("ngoaile")) return STATUS_LABELS["Approved-Exception"];
+  if (normalized.includes("incomplete") || normalized.includes("thieuchamcong")) return STATUS_LABELS.Incomplete;
+  if (normalized.includes("partial") || normalized.includes("thieucong")) return STATUS_LABELS.Partial;
+  return { label: status, color: "#64748b", bg: "#f1f5f9", icon: "help-circle-outline" };
+}
 
 function prevMonth(p: string): string {
   const [y, m] = p.split("-").map(Number);
@@ -658,12 +685,7 @@ export default function Attendance() {
               </View>
             ) : (
               logs.map((log) => {
-                const statusInfo = STATUS_LABELS[log.status || ""] || {
-                  label: log.status || "Chưa xác định",
-                  color: "#64748b",
-                  bg: "#f1f5f9",
-                  icon: "help-circle-outline",
-                };
+                const statusInfo = getAttendanceStatusLabel(log.status || (log.checkIn ? "Present" : ""));
                 const duration = calculateWorkHours(log.checkIn?.time, log.checkOut?.time);
 
                 return (
@@ -672,16 +694,24 @@ export default function Attendance() {
                       <View style={styles.logDateBox}>
                         <Text style={styles.logDateText}>{formatDisplayDate(log.date)}</Text>
                       </View>
-                      <View
-                        style={[
-                          styles.logStatusBadge,
-                          { backgroundColor: statusInfo.bg, borderColor: `${statusInfo.color}30` },
-                        ]}
-                      >
-                        <Ionicons name={statusInfo.icon as any} size={13} color={statusInfo.color} />
-                        <Text style={[styles.logStatusText, { color: statusInfo.color }]}>
-                          {statusInfo.label}
-                        </Text>
+                      <View style={{ flexDirection: "row", alignItems: "center", gap: 6 }}>
+                        {Boolean(log.manuallyAdjusted) && (
+                          <View style={styles.logAdjustedBadge}>
+                            <Ionicons name="sparkles" size={10} color="#7c3aed" />
+                            <Text style={styles.logAdjustedText}>Đã chỉnh công</Text>
+                          </View>
+                        )}
+                        <View
+                          style={[
+                            styles.logStatusBadge,
+                            { backgroundColor: statusInfo.bg, borderColor: `${statusInfo.color}30` },
+                          ]}
+                        >
+                          <Ionicons name={statusInfo.icon as any} size={13} color={statusInfo.color} />
+                          <Text style={[styles.logStatusText, { color: statusInfo.color }]}>
+                            {statusInfo.label}
+                          </Text>
+                        </View>
                       </View>
                     </View>
 
@@ -705,6 +735,15 @@ export default function Attendance() {
                         </View>
                       )}
                     </View>
+
+                    {Boolean(log.adjustmentReason) && (
+                      <View style={styles.adjustmentReasonBox}>
+                        <Ionicons name="sparkles-outline" size={12} color="#7c3aed" />
+                        <Text style={styles.adjustmentReasonText} numberOfLines={2}>
+                          Lý do hiệu chỉnh: {log.adjustmentReason}
+                        </Text>
+                      </View>
+                    )}
 
                     {Boolean(log.note) && (
                       <View style={styles.logNoteBox}>
@@ -1372,5 +1411,39 @@ const styles = StyleSheet.create({
   modalSafeArea: {
     flex: 1,
     backgroundColor: "#000000",
+  },
+  logAdjustedBadge: {
+    flexDirection: "row",
+    alignItems: "center",
+    gap: 3,
+    backgroundColor: "#f5f3ff",
+    borderColor: "#ddd6fe",
+    borderWidth: 1,
+    paddingHorizontal: 6,
+    paddingVertical: 2,
+    borderRadius: 6,
+  },
+  logAdjustedText: {
+    fontSize: 10,
+    fontWeight: "700",
+    color: "#7c3aed",
+  },
+  adjustmentReasonBox: {
+    flexDirection: "row",
+    alignItems: "center",
+    gap: 6,
+    backgroundColor: "#f5f3ff",
+    borderColor: "#ede9fe",
+    borderWidth: 1,
+    borderRadius: 8,
+    paddingHorizontal: 10,
+    paddingVertical: 6,
+    marginTop: 8,
+  },
+  adjustmentReasonText: {
+    fontSize: 11,
+    color: "#6d28d9",
+    flex: 1,
+    lineHeight: 15,
   },
 });

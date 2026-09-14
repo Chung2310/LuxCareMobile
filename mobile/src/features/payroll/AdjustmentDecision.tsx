@@ -1,3 +1,4 @@
+import { historicalUserLabel } from "../../../../src/utils/historicalUser";
 import { useRef, useState } from "react";
 import { Text, View } from "react-native";
 import type { PayrollAdjustment } from "../../../../src/types/payrollAdjustment";
@@ -47,7 +48,7 @@ export function AdjustmentDecision({
     <Page title={approve ? "Duyệt điều chỉnh" : "Từ chối điều chỉnh"} onBack={() => { if (!busy) onClose(); }}>
       <Card>
         <Text style={s.subtitle}>Kỳ {item.periodKey}</Text>
-        <Text style={styles.heading}>{item.employeeName || item.employeeId}</Text>
+        <Text style={styles.heading}>{historicalUserLabel(item.employeeName, item.employeeDeleted, item.employeeId)}</Text>
         <Text style={[s.amount, item.kind === "deduction" && { color: "#be123c" }]}>{payslipMoney(item.amount)}</Text>
         <Text style={styles.text}>
           {adjustmentKinds[item.kind]} · Chờ duyệt

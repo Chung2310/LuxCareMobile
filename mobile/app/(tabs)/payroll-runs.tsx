@@ -1,3 +1,4 @@
+import { historicalUserLabel } from "../../../src/utils/historicalUser";
 import { useCallback, useRef, useState } from "react";
 import { router, useFocusEffect, useLocalSearchParams } from "expo-router";
 import { Ionicons } from "@expo/vector-icons";
@@ -423,7 +424,7 @@ export default function PayrollRuns({ initialTab }: PayrollRunsProps = {}) {
   const submitCustomPeriod = () => {
     const val = draft.trim();
     if (!validPayrollPeriod(val)) {
-      setInputError("Định dạng kỳ dạng YYYY-MM, ví dụ 2026-09.");
+      setInputError("Vui lòng chọn tháng và năm hợp lệ.");
       return;
     }
     setInputError(null);
@@ -571,7 +572,7 @@ export default function PayrollRuns({ initialTab }: PayrollRunsProps = {}) {
 
               <Pressable
                 style={payrollStyles.navMonthLabelBtn}
-                onPress={() => setActiveModal("custom_period")}
+                onPress={() => { setDraft(period); setInputError(null); setActiveModal("custom_period"); }}
               >
                 <Text style={payrollStyles.navMonthText}>{formatPeriodLabel(period)}</Text>
                 <Text style={payrollStyles.navMonthSub}>Nhấn để đổi kỳ</Text>
@@ -1135,7 +1136,7 @@ export default function PayrollRuns({ initialTab }: PayrollRunsProps = {}) {
 
                           <View style={{ flex: 1, paddingRight: 8 }}>
                             <Text style={payrollStyles.employeeName} numberOfLines={1}>
-                              {line.employeeName || "Nhân viên"}
+                              {historicalUserLabel(line.employeeName, line.employeeDeleted, "Nhân viên")}
                             </Text>
                             <View style={payrollStyles.empMetaRow}>
                               {workedDays !== undefined ? (
@@ -1576,18 +1577,47 @@ export default function PayrollRuns({ initialTab }: PayrollRunsProps = {}) {
               {/* Modal Đổi kỳ */}
               {activeModal === "custom_period" && (
                 <View style={{ gap: 12 }}>
-                  <Text style={payrollStyles.inputLabel}>Nhập kỳ lương (YYYY-MM):</Text>
-                  <TextInput
-                    style={payrollStyles.customPeriodInput}
-                    value={draft}
-                    onChangeText={setDraft}
-                    placeholder="YYYY-MM (ví dụ 2026-09)"
-                    placeholderTextColor="#94a3b8"
-                    keyboardType="numbers-and-punctuation"
-                    maxLength={7}
-                    returnKeyType="search"
-                    onSubmitEditing={submitCustomPeriod}
-                  />
+                  <View style={payrollStyles.periodYearRow}>
+                    <Pressable
+                      accessibilityRole="button"
+                      accessibilityLabel="Năm trước"
+                      disabled={Number(draft.slice(0, 4)) <= 1900}
+                      style={payrollStyles.navArrowBtn}
+                      onPress={() => setDraft((value) => `${Number(value.slice(0, 4)) - 1}${value.slice(4)}`)}
+                    >
+                      <ChevronLeft size={20} color="#475569" />
+                    </Pressable>
+                    <Text style={payrollStyles.navMonthText}>Năm {draft.slice(0, 4)}</Text>
+                    <Pressable
+                      accessibilityRole="button"
+                      accessibilityLabel="Năm sau"
+                      disabled={Number(draft.slice(0, 4)) >= 9999}
+                      style={payrollStyles.navArrowBtn}
+                      onPress={() => setDraft((value) => `${Number(value.slice(0, 4)) + 1}${value.slice(4)}`)}
+                    >
+                      <ChevronRight size={20} color="#475569" />
+                    </Pressable>
+                  </View>
+                  <View style={payrollStyles.periodMonthGrid}>
+                    {Array.from({ length: 12 }, (_, index) => {
+                      const month = String(index + 1).padStart(2, "0");
+                      const selected = draft.slice(5) === month;
+                      return (
+                        <Pressable
+                          key={month}
+                          accessibilityRole="button"
+                          accessibilityLabel={`Tháng ${index + 1} năm ${draft.slice(0, 4)}`}
+                          accessibilityState={{ selected }}
+                          style={[payrollStyles.periodMonthButton, selected && payrollStyles.periodMonthSelected]}
+                          onPress={() => setDraft((value) => `${value.slice(0, 4)}-${month}`)}
+                        >
+                          <Text style={[payrollStyles.periodMonthText, selected && payrollStyles.periodMonthSelectedText]}>
+                            Tháng {index + 1}
+                          </Text>
+                        </Pressable>
+                      );
+                    })}
+                  </View>
                   {inputError && <Text style={payrollStyles.errorText}>{inputError}</Text>}
                   <Pressable
                     style={payrollStyles.primaryModalButton}
@@ -1676,6 +1706,7 @@ export default function PayrollRuns({ initialTab }: PayrollRunsProps = {}) {
               {/* Modal Đồng bộ công */}
               {activeModal === "sync" && run && (
                 <SyncRunAttendance
+                  onCalculate={() => setActiveModal("calculate")}
                   key={"sync:" + run._id + ":" + revision}
                   run={run}
                   onUpdated={onRunUpdated}
@@ -2622,15 +2653,38 @@ const payrollStyles = StyleSheet.create({
     fontWeight: "600",
     color: "#334155",
   },
-  customPeriodInput: {
+  periodYearRow: {
+    flexDirection: "row",
+    alignItems: "center",
+    justifyContent: "space-between",
+  },
+  periodMonthGrid: {
+    flexDirection: "row",
+    flexWrap: "wrap",
+    justifyContent: "space-between",
+    gap: 10,
+  },
+  periodMonthButton: {
+    width: "30%",
+    minHeight: 48,
+    alignItems: "center",
+    justifyContent: "center",
     backgroundColor: "#f8fafc",
     borderWidth: 1,
-    borderColor: "#cbd5e1",
+    borderColor: "#e2e8f0",
     borderRadius: 12,
-    paddingHorizontal: 14,
-    paddingVertical: 10,
-    fontSize: 15,
-    color: "#0f172a",
+  },
+  periodMonthSelected: {
+    backgroundColor: "#ecfdf5",
+    borderColor: "#059669",
+  },
+  periodMonthText: {
+    fontSize: 14,
+    fontWeight: "600",
+    color: "#475569",
+  },
+  periodMonthSelectedText: {
+    color: "#047857",
   },
   primaryModalButton: {
     backgroundColor: "#059669",

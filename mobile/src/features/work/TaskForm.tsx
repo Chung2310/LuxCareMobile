@@ -51,7 +51,6 @@ import {
   Music as MusicIcon,
   FileText,
   Calendar,
-  Zap,
   Search,
   Ban,
 } from "lucide-react-native";
@@ -257,7 +256,7 @@ export function TaskForm({
   const selectedAssignee = people.find((p) => p.uid === draft.assigneeUid);
   const selectedAssigneeName =
     selectedAssignee?.displayName ||
-    (task?.assigneeUid === draft.assigneeUid ? task.assignee : "") ||
+    (task?.assigneeUid === draft.assigneeUid ? (task.assignee || "Người thực hiện") + (task.assigneeDeleted ? " · Tài khoản đã xóa" : "") : "") ||
     "";
 
   // Selected project info
@@ -864,15 +863,6 @@ export function TaskForm({
             </View>
           </View>
 
-          {/* Auto calculate hours indicator */}
-          <View style={styles.calcRow}>
-            <View style={[styles.autoCalculatedBadge, { flexDirection: "row", alignItems: "center", gap: 4 }]}>
-              <Zap size={12} color="#1d4ed8" />
-              <Text style={styles.autoCalculatedBadgeText}>
-                Dự tính: Bắt đầu → Hạn hoàn thành. Thực tế: Bắt đầu → Kết thúc.
-              </Text>
-            </View>
-          </View>
 
           {/* Hours inputs */}
           <View style={styles.twoColRow}>

@@ -1,3 +1,4 @@
+import { historicalEmployeeLabel, historicalUserLabel } from "../../../../src/utils/historicalUser";
 import { useCallback, useState } from "react";
 import { useFocusEffect } from "expo-router";
 import { Text } from "react-native";
@@ -63,7 +64,7 @@ export function PayrollPeriodInputs({
     }, [allowed, period, branchId, user?.uid, user?.companyCode, revision]),
   );
   if (!allowed) return null;
-  const nameOf = (id: string) => employees.find((employee) => employee.employeeId === id)?.employeeName || id;
+  const nameOf = (id: string) => historicalEmployeeLabel(employees, id);
   const rows =
     data?.items.filter((item) =>
       `${nameOf(item.employeeId)} ${item.employeeId} ${item.reason || ""}`
