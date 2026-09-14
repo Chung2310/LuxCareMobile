@@ -1,7 +1,10 @@
 import type { ChatRoom } from "../../../../src/services/chatService";
 
 export function chatNotificationsMuted(room: ChatRoom, uid: string): boolean {
-  const member = room.members?.find(m => String(typeof m.userId === "object" ? m.userId._id : m.userId) === uid);
+  const member = room.members?.find((m) => {
+    const userId = typeof m.userId === "object" ? m.userId?._id : m.userId;
+    return String(userId ?? "") === uid;
+  });
   return !member || member.notificationsMuted === true;
 }
 
