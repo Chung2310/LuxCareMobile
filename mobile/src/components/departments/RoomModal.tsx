@@ -1,6 +1,6 @@
+import { useAppAlert } from "../AppAlert";
 import React, { useEffect, useState } from "react";
 import {
-  Alert,
   KeyboardAvoidingView,
   Modal,
   Platform,
@@ -54,9 +54,10 @@ export const RoomModal: React.FC<RoomModalProps> = ({
   onSave,
   onDelete,
 }) => {
+  const { showAlert, alertView } = useAppAlert();
   const insets = useSafeAreaInsets();
   const topInset = Math.max(insets.top, Platform.OS === "ios" ? 48 : (StatusBar.currentHeight || 0));
-  if (!editingRoom) return null;
+
 
   const isNew = editingRoom === "new";
 
@@ -92,17 +93,19 @@ export const RoomModal: React.FC<RoomModalProps> = ({
     }
   }, [editingRoom, currentBranchId]);
 
+  if (!editingRoom) return null;
+
   const handleSave = async () => {
     if (!code.trim()) {
-      Alert.alert("Lỗi", "Vui lòng nhập mã phòng (VD: P.101, PK-01).");
+      showAlert("Lỗi", "Vui lòng nhập mã phòng (VD: P.101, PK-01).");
       return;
     }
     if (!name.trim()) {
-      Alert.alert("Lỗi", "Vui lòng nhập tên phòng.");
+      showAlert("Lỗi", "Vui lòng nhập tên phòng.");
       return;
     }
     if (!branchId) {
-      Alert.alert("Lỗi", "Vui lòng chọn cơ sở/chi nhánh cho phòng này.");
+      showAlert("Lỗi", "Vui lòng chọn cơ sở/chi nhánh cho phòng này.");
       return;
     }
 
@@ -119,7 +122,7 @@ export const RoomModal: React.FC<RoomModalProps> = ({
       });
       onClose();
     } catch (err: any) {
-      Alert.alert("Lỗi lưu phòng chức năng", err.message || "Không thể lưu thông tin phòng.");
+      showAlert("Lỗi lưu phòng chức năng", err.message || "Không thể lưu thông tin phòng.");
     } finally {
       setSaving(false);
     }
@@ -129,7 +132,7 @@ export const RoomModal: React.FC<RoomModalProps> = ({
     if (isNew || !onDelete) return;
     const room = editingRoom as RoomRecord;
 
-    Alert.alert(
+    showAlert(
       "Xác nhận xóa phòng",
       `Bạn có chắc chắn muốn xóa phòng "${room.name}" (${room.code})?`,
       [
@@ -143,7 +146,7 @@ export const RoomModal: React.FC<RoomModalProps> = ({
               await onDelete(room._id);
               onClose();
             } catch (err: any) {
-              Alert.alert("Lỗi xóa phòng", err.message || "Không thể xóa phòng.");
+              showAlert("Lỗi xóa phòng", err.message || "Không thể xóa phòng.");
             } finally {
               setDeleting(false);
             }
@@ -157,11 +160,12 @@ export const RoomModal: React.FC<RoomModalProps> = ({
     <Modal
       visible={visible}
       animationType="slide"
-      transparent={false}
+      transparent
       onRequestClose={onClose}
     >
+      <View style={[styles.modalOverlay, { paddingTop: topInset + 12 }]}>
       <SafeAreaView
-        style={[styles.screen, { paddingTop: topInset }]}
+        style={styles.screen}
         edges={["bottom"]}
       >
         <KeyboardAvoidingView
@@ -416,13 +420,23 @@ export const RoomModal: React.FC<RoomModalProps> = ({
           </TouchableOpacity>
         </Modal>
         </KeyboardAvoidingView>
+        {alertView}
       </SafeAreaView>
+      </View>
     </Modal>
   );
 };
 
 const styles = StyleSheet.create({
+  modalOverlay: {
+    flex: 1,
+    backgroundColor: "rgba(15, 23, 42, 0.5)",
+    paddingHorizontal: 12,
+    paddingBottom: 12,
+  },
   screen: {
+    borderRadius: 24,
+    overflow: "hidden",
     flex: 1,
     backgroundColor: "#f8fafc",
   },
@@ -618,9 +632,10 @@ const styles = StyleSheet.create({
     padding: 24,
   },
   typeModalBox: {
+    overflow: "hidden",
     width: "100%",
     backgroundColor: "#ffffff",
-    borderRadius: 16,
+    borderRadius: 24,
     padding: 16,
   },
   typeModalTitle: {

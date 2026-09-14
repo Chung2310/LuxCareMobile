@@ -1,6 +1,6 @@
+import { useAppAlert } from "../AppAlert";
 import React, { useState } from "react";
 import {
-  Alert,
   KeyboardAvoidingView,
   Modal,
   Platform,
@@ -32,6 +32,7 @@ export const DepartmentCreateModal: React.FC<DepartmentCreateModalProps> = ({
   onClose,
   onCreate,
 }) => {
+  const { showAlert, alertView } = useAppAlert();
   const insets = useSafeAreaInsets();
   const topInset = Math.max(insets.top, Platform.OS === "ios" ? 48 : (StatusBar.currentHeight || 0));
   const [code, setCode] = useState("");
@@ -63,11 +64,11 @@ export const DepartmentCreateModal: React.FC<DepartmentCreateModalProps> = ({
 
   const handleCreate = async () => {
     if (!code.trim()) {
-      Alert.alert("Thiếu thông tin", "Vui lòng nhập mã phòng ban (VD: KHTH, GMHS).");
+      showAlert("Thiếu thông tin", "Vui lòng nhập mã phòng ban (VD: KHTH, GMHS).");
       return;
     }
     if (!name.trim()) {
-      Alert.alert("Thiếu thông tin", "Vui lòng nhập tên phòng ban.");
+      showAlert("Thiếu thông tin", "Vui lòng nhập tên phòng ban.");
       return;
     }
 
@@ -84,7 +85,7 @@ export const DepartmentCreateModal: React.FC<DepartmentCreateModalProps> = ({
       });
       handleClose();
     } catch (err: any) {
-      Alert.alert("Lỗi tạo phòng ban", err.message || "Không thể tạo phòng ban mới.");
+      showAlert("Lỗi tạo phòng ban", err.message || "Không thể tạo phòng ban mới.");
     } finally {
       setSaving(false);
     }
@@ -104,11 +105,12 @@ export const DepartmentCreateModal: React.FC<DepartmentCreateModalProps> = ({
     <Modal
       visible={visible}
       animationType="slide"
-      transparent={false}
+      transparent
       onRequestClose={handleClose}
     >
+      <View style={[styles.modalOverlay, { paddingTop: topInset + 12 }]}>
       <SafeAreaView
-        style={[styles.screen, { paddingTop: topInset }]}
+        style={styles.screen}
         edges={["bottom"]}
       >
         <KeyboardAvoidingView
@@ -292,7 +294,7 @@ export const DepartmentCreateModal: React.FC<DepartmentCreateModalProps> = ({
           transparent
           onRequestClose={() => setShowManagerPicker(false)}
         >
-          <View style={styles.pickerModalOverlay}>
+          <View style={[styles.pickerModalOverlay, { paddingBottom: Math.max(insets.bottom, 12) }]}>
             <View style={styles.pickerModalBox}>
               <View style={styles.pickerModalHeader}>
                 <Text style={styles.pickerModalTitle}>Chọn Trưởng bộ phận</Text>
@@ -368,13 +370,23 @@ export const DepartmentCreateModal: React.FC<DepartmentCreateModalProps> = ({
           </View>
         </Modal>
         </KeyboardAvoidingView>
+        {alertView}
       </SafeAreaView>
+      </View>
     </Modal>
   );
 };
 
 const styles = StyleSheet.create({
+  modalOverlay: {
+    flex: 1,
+    backgroundColor: "rgba(15, 23, 42, 0.5)",
+    paddingHorizontal: 12,
+    paddingBottom: 12,
+  },
   screen: {
+    borderRadius: 24,
+    overflow: "hidden",
     flex: 1,
     backgroundColor: "#f8fafc",
   },
@@ -545,14 +557,15 @@ const styles = StyleSheet.create({
     marginTop: 8,
   },
   pickerModalOverlay: {
+    paddingHorizontal: 12,
     flex: 1,
     backgroundColor: "rgba(0,0,0,0.45)",
     justifyContent: "flex-end",
   },
   pickerModalBox: {
     backgroundColor: "#ffffff",
-    borderTopLeftRadius: 20,
-    borderTopRightRadius: 20,
+    borderRadius: 24,
+    overflow: "hidden",
     maxHeight: "75%",
     paddingBottom: 24,
   },

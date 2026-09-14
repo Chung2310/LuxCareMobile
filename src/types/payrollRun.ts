@@ -9,6 +9,8 @@ export interface PayrollRun {
   periodKey: string;
   status: string;
   version?: number;
+  activeRevisionId?: string | null;
+  activeRevisionChecksum?: string | null;
   type?: "regular" | "supplemental";
   effectiveLines?: PayrollRunLine[];
   effectiveError?: { code?: string; message?: string };

@@ -425,7 +425,7 @@ export const DashboardOverviewSection: React.FC<DashboardOverviewSectionProps> =
         {/* Đào tạo */}
         <TouchableOpacity
           style={styles.capsuleItem}
-          onPress={() => onNavigate("/(tabs)/modules", "Đào tạo")}
+          onPress={() => onNavigate("/(tabs)/training", "Đào tạo")}
           activeOpacity={0.8}
         >
           <View style={[styles.capsuleIcon, { backgroundColor: "#fffbeb" }]}>

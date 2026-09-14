@@ -71,6 +71,7 @@ export default function InventoryScreen() {
   // Bộ lọc của tab Vật tư
   const [searchQuery, setSearchQuery] = useState("");
   const [selectedCategory, setSelectedCategory] = useState("all");
+  const [hideAlertNotice, setHideAlertNotice] = useState(false);
 
   // Bộ lọc của tab Giao dịch
   const [txTypeFilter, setTxTypeFilter] = useState<"all" | "in" | "out">("all");
@@ -510,56 +511,179 @@ export default function InventoryScreen() {
                   </TouchableOpacity>
                 </View>
 
-                {/* Thông báo cảnh báo tồn kho / cận hạn */}
-                {(stats.lowStockCount > 0 || stats.expiredCount > 0 || stats.expiringSoonCount > 0) && (
+                {/* Thông báo cảnh báo tồn kho & hạn dùng vật tư */}
+                {(stats.lowStockCount > 0 || stats.expiredCount > 0 || stats.expiringSoonCount > 0) && !hideAlertNotice && (
                   <View
                     style={[
-                      styles.alertNoticeBanner,
+                      styles.alertNoticeCard,
                       stats.expiredCount > 0
-                        ? styles.alertNoticeBannerDanger
-                        : styles.alertNoticeBannerWarning,
+                        ? styles.alertNoticeCardDanger
+                        : styles.alertNoticeCardWarning,
                     ]}
                   >
-                    <View
-                      style={[
-                        styles.alertNoticeIconBox,
-                        stats.expiredCount > 0
-                          ? styles.alertNoticeIconBoxDanger
-                          : styles.alertNoticeIconBoxWarning,
-                      ]}
-                    >
-                      <Ionicons
-                        name={stats.expiredCount > 0 ? "alert-circle" : "warning"}
-                        size={16}
-                        color={stats.expiredCount > 0 ? "#dc2626" : "#d97706"}
-                      />
-                    </View>
-                    <View style={styles.alertNoticeContent}>
-                      <Text
-                        style={[
-                          styles.alertNoticeTitle,
-                          stats.expiredCount > 0
-                            ? styles.alertNoticeTitleDanger
-                            : styles.alertNoticeTitleWarning,
-                        ]}
+                    {/* Header Row: Icon + Tag Badge + Title + Close */}
+                    <View style={styles.alertNoticeHeader}>
+                      <View style={styles.alertNoticeHeaderLeft}>
+                        <View
+                          style={[
+                            styles.alertNoticeIconBox,
+                            stats.expiredCount > 0
+                              ? styles.alertNoticeIconBoxDanger
+                              : styles.alertNoticeIconBoxWarning,
+                          ]}
+                        >
+                          <Ionicons
+                            name={stats.expiredCount > 0 ? "alert-circle" : "warning"}
+                            size={18}
+                            color={stats.expiredCount > 0 ? "#dc2626" : "#d97706"}
+                          />
+                        </View>
+                        <View style={{ flex: 1 }}>
+                          <View style={{ flexDirection: "row", alignItems: "center", gap: 6, marginBottom: 2 }}>
+                            <View
+                              style={[
+                                styles.alertNoticeTag,
+                                stats.expiredCount > 0
+                                  ? styles.alertNoticeTagDanger
+                                  : styles.alertNoticeTagWarning,
+                              ]}
+                            >
+                              <Text
+                                style={[
+                                  styles.alertNoticeTagText,
+                                  stats.expiredCount > 0
+                                    ? styles.alertNoticeTagTextDanger
+                                    : styles.alertNoticeTagTextWarning,
+                                ]}
+                              >
+                                {stats.expiredCount > 0 ? "CẢNH BÁO KHẨN CẤP" : "CẢNH BÁO TỒN KHO"}
+                              </Text>
+                            </View>
+                            <Text style={styles.alertNoticeScopeText}>Vật tư & Dược phẩm</Text>
+                          </View>
+                          <Text
+                            style={[
+                              styles.alertNoticeTitle,
+                              stats.expiredCount > 0
+                                ? styles.alertNoticeTitleDanger
+                                : styles.alertNoticeTitleWarning,
+                            ]}
+                          >
+                            {stats.expiredCount > 0
+                              ? `Phát hiện ${stats.expiredCount} mặt hàng vật tư đã quá hạn dùng!`
+                              : `Có ${stats.lowStockCount} mặt hàng chạm hoặc dưới mức tồn an toàn!`}
+                          </Text>
+                        </View>
+                      </View>
+
+                      <TouchableOpacity
+                        style={styles.alertNoticeCloseBtn}
+                        onPress={() => setHideAlertNotice(true)}
+                        hitSlop={{ top: 8, bottom: 8, left: 8, right: 8 }}
                       >
-                        {stats.expiredCount > 0
-                          ? `Cảnh báo: Có ${stats.expiredCount} mặt hàng đã hết hạn!`
-                          : `Thông báo: Có ${stats.lowStockCount} mặt hàng sắp hết tồn kho!`}
-                      </Text>
-                      <Text style={styles.alertNoticeSubtitle} numberOfLines={2}>
-                        {stats.expiringSoonCount > 0
-                          ? `Có ${stats.expiringSoonCount} mặt hàng cận hạn. Hãy ưu tiên xuất lô cận hạn trước theo quy tắc FEFO.`
-                          : "Kiểm tra danh sách để chủ động lập phiếu nhập kho hoặc điều chuyển kịp thời."}
-                      </Text>
+                        <Ionicons name="close" size={17} color="#94a3b8" />
+                      </TouchableOpacity>
                     </View>
-                    <TouchableOpacity
-                      style={styles.alertNoticeActionBtn}
-                      onPress={() => setSelectedCategory(stats.expiredCount > 0 ? "expiring" : "low-stock")}
-                      activeOpacity={0.8}
-                    >
-                      <Text style={styles.alertNoticeActionText}>Xem</Text>
-                    </TouchableOpacity>
+
+                    {/* Subtitle description */}
+                    <Text style={styles.alertNoticeSubtitle}>
+                      {stats.expiredCount > 0
+                        ? "Lô hàng hết hạn cần lập tức chuyển vào kho cách ly hoặc lập biên bản xuất hủy theo quy định an toàn y tế."
+                        : stats.expiringSoonCount > 0
+                        ? `Hệ thống ghi nhận ${stats.expiringSoonCount} mặt hàng cận hạn. Hãy ưu tiên xuất lô cận hạn trước theo nguyên tắc FEFO.`
+                        : "Vui lòng rà soát danh sách để chủ động lập phiếu nhập kho bổ sung hoặc điều chuyển vật tư kịp thời."}
+                    </Text>
+
+                    {/* Breakdown Chips */}
+                    <View style={styles.alertNoticePillsRow}>
+                      {stats.expiredCount > 0 && (
+                        <TouchableOpacity
+                          style={[styles.alertNoticeMiniPill, styles.alertNoticeMiniPillDanger]}
+                          onPress={() => setSelectedCategory("expiring")}
+                          activeOpacity={0.7}
+                        >
+                          <Ionicons name="time" size={12} color="#dc2626" />
+                          <Text style={styles.alertNoticeMiniPillTextDanger}>
+                            {stats.expiredCount} hết hạn
+                          </Text>
+                        </TouchableOpacity>
+                      )}
+                      {stats.expiringSoonCount > 0 && (
+                        <TouchableOpacity
+                          style={[styles.alertNoticeMiniPill, styles.alertNoticeMiniPillWarning]}
+                          onPress={() => setSelectedCategory("expiring")}
+                          activeOpacity={0.7}
+                        >
+                          <Ionicons name="hourglass-outline" size={12} color="#b45309" />
+                          <Text style={styles.alertNoticeMiniPillTextWarning}>
+                            {stats.expiringSoonCount} cận hạn
+                          </Text>
+                        </TouchableOpacity>
+                      )}
+                      {stats.lowStockCount > 0 && (
+                        <TouchableOpacity
+                          style={[styles.alertNoticeMiniPill, styles.alertNoticeMiniPillAmber]}
+                          onPress={() => setSelectedCategory("low-stock")}
+                          activeOpacity={0.7}
+                        >
+                          <Ionicons name="cube-outline" size={12} color="#c2410c" />
+                          <Text style={styles.alertNoticeMiniPillTextAmber}>
+                            {stats.lowStockCount} sắp hết
+                          </Text>
+                        </TouchableOpacity>
+                      )}
+                      {stats.outOfStockCount > 0 && (
+                        <TouchableOpacity
+                          style={[styles.alertNoticeMiniPill, styles.alertNoticeMiniPillRed]}
+                          onPress={() => setSelectedCategory("low-stock")}
+                          activeOpacity={0.7}
+                        >
+                          <Ionicons name="close-circle-outline" size={12} color="#e11d48" />
+                          <Text style={styles.alertNoticeMiniPillTextRed}>
+                            {stats.outOfStockCount} cạn kho
+                          </Text>
+                        </TouchableOpacity>
+                      )}
+                    </View>
+
+                    {/* Action Footer */}
+                    <View style={styles.alertNoticeFooter}>
+                      <TouchableOpacity
+                        style={[
+                          styles.alertNoticeActionBtn,
+                          stats.expiredCount > 0
+                            ? styles.alertNoticeActionBtnDanger
+                            : styles.alertNoticeActionBtnWarning,
+                        ]}
+                        onPress={() => setSelectedCategory(stats.expiredCount > 0 ? "expiring" : "low-stock")}
+                        activeOpacity={0.8}
+                      >
+                        <Text
+                          style={[
+                            styles.alertNoticeActionText,
+                            stats.expiredCount > 0
+                              ? styles.alertNoticeActionTextDanger
+                              : styles.alertNoticeActionTextWarning,
+                          ]}
+                        >
+                          {stats.expiredCount > 0 ? "Lọc mặt hàng hết hạn" : "Lọc mặt hàng sắp hết"}
+                        </Text>
+                        <Ionicons
+                          name="chevron-forward"
+                          size={14}
+                          color={stats.expiredCount > 0 ? "#dc2626" : "#b45309"}
+                        />
+                      </TouchableOpacity>
+
+                      <TouchableOpacity
+                        style={styles.alertNoticeCreateVoucherBtn}
+                        onPress={() => setBatchModal({ visible: true, type: "in", initialSupply: null })}
+                        activeOpacity={0.8}
+                      >
+                        <Ionicons name="add-circle" size={15} color="#059669" />
+                        <Text style={styles.alertNoticeCreateVoucherText}>+ Nhập kho bổ sung</Text>
+                      </TouchableOpacity>
+                    </View>
                   </View>
                 )}
 
@@ -926,67 +1050,211 @@ const styles = StyleSheet.create({
     marginTop: 12,
     marginBottom: 4,
   },
-  alertNoticeBanner: {
-    flexDirection: "row",
-    alignItems: "center",
-    padding: 10,
-    borderRadius: 14,
-    borderWidth: 1,
+  alertNoticeCard: {
+    borderRadius: 20,
+    borderWidth: 1.5,
     marginTop: 10,
-    gap: 10,
+    padding: 14,
+    gap: 8,
+    shadowOffset: { width: 0, height: 3 },
+    shadowOpacity: 0.08,
+    shadowRadius: 8,
+    elevation: 2.5,
   },
-  alertNoticeBannerDanger: {
+  alertNoticeCardDanger: {
     backgroundColor: "#fff5f5",
     borderColor: "#fecdd3",
+    shadowColor: "#dc2626",
   },
-  alertNoticeBannerWarning: {
-    backgroundColor: "#fffbeb",
-    borderColor: "#fde68a",
+  alertNoticeCardWarning: {
+    backgroundColor: "#fffbf0",
+    borderColor: "#fed7aa",
+    shadowColor: "#d97706",
+  },
+  alertNoticeHeader: {
+    flexDirection: "row",
+    alignItems: "flex-start",
+    justifyContent: "space-between",
+    gap: 8,
+  },
+  alertNoticeHeaderLeft: {
+    flex: 1,
+    flexDirection: "row",
+    alignItems: "flex-start",
+    gap: 10,
   },
   alertNoticeIconBox: {
-    width: 32,
-    height: 32,
-    borderRadius: 16,
+    width: 38,
+    height: 38,
+    borderRadius: 14,
     alignItems: "center",
     justifyContent: "center",
+    marginTop: 1,
   },
   alertNoticeIconBoxDanger: {
     backgroundColor: "#fee2e2",
+    borderWidth: 1,
+    borderColor: "#fca5a5",
   },
   alertNoticeIconBoxWarning: {
     backgroundColor: "#fef3c7",
+    borderWidth: 1,
+    borderColor: "#fcd34d",
   },
-  alertNoticeContent: {
-    flex: 1,
+  alertNoticeTag: {
+    paddingHorizontal: 7,
+    paddingVertical: 2.5,
+    borderRadius: 8,
   },
-  alertNoticeTitle: {
-    fontSize: 12.5,
-    fontWeight: "700",
+  alertNoticeTagDanger: {
+    backgroundColor: "#fee2e2",
   },
-  alertNoticeTitleDanger: {
+  alertNoticeTagWarning: {
+    backgroundColor: "#fef3c7",
+  },
+  alertNoticeTagText: {
+    fontSize: 9.5,
+    fontWeight: "800",
+    letterSpacing: 0.3,
+  },
+  alertNoticeTagTextDanger: {
     color: "#b91c1c",
   },
-  alertNoticeTitleWarning: {
+  alertNoticeTagTextWarning: {
     color: "#b45309",
   },
-  alertNoticeSubtitle: {
+  alertNoticeScopeText: {
     fontSize: 11,
-    color: "#64748b",
+    color: "#94a3b8",
+    fontWeight: "500",
+  },
+  alertNoticeTitle: {
+    fontSize: 13.5,
+    fontWeight: "700",
+    lineHeight: 18,
     marginTop: 2,
-    lineHeight: 15,
+  },
+  alertNoticeTitleDanger: {
+    color: "#991b1b",
+  },
+  alertNoticeTitleWarning: {
+    color: "#92400e",
+  },
+  alertNoticeCloseBtn: {
+    width: 26,
+    height: 26,
+    borderRadius: 13,
+    backgroundColor: "rgba(255, 255, 255, 0.7)",
+    alignItems: "center",
+    justifyContent: "center",
+  },
+  alertNoticeSubtitle: {
+    fontSize: 12,
+    color: "#475569",
+    lineHeight: 17,
+  },
+  alertNoticePillsRow: {
+    flexDirection: "row",
+    flexWrap: "wrap",
+    gap: 6,
+    marginTop: 2,
+  },
+  alertNoticeMiniPill: {
+    flexDirection: "row",
+    alignItems: "center",
+    gap: 4,
+    paddingHorizontal: 9,
+    paddingVertical: 4.5,
+    borderRadius: 12,
+    borderWidth: 1,
+  },
+  alertNoticeMiniPillDanger: {
+    backgroundColor: "#fee2e2",
+    borderColor: "#fca5a5",
+  },
+  alertNoticeMiniPillTextDanger: {
+    fontSize: 11,
+    fontWeight: "700",
+    color: "#b91c1c",
+  },
+  alertNoticeMiniPillWarning: {
+    backgroundColor: "#fef3c7",
+    borderColor: "#fde68a",
+  },
+  alertNoticeMiniPillTextWarning: {
+    fontSize: 11,
+    fontWeight: "700",
+    color: "#b45309",
+  },
+  alertNoticeMiniPillAmber: {
+    backgroundColor: "#ffedd5",
+    borderColor: "#fed7aa",
+  },
+  alertNoticeMiniPillTextAmber: {
+    fontSize: 11,
+    fontWeight: "700",
+    color: "#c2410c",
+  },
+  alertNoticeMiniPillRed: {
+    backgroundColor: "#ffe4e6",
+    borderColor: "#fecdd3",
+  },
+  alertNoticeMiniPillTextRed: {
+    fontSize: 11,
+    fontWeight: "700",
+    color: "#be123c",
+  },
+  alertNoticeFooter: {
+    flexDirection: "row",
+    alignItems: "center",
+    justifyContent: "space-between",
+    gap: 8,
+    marginTop: 6,
+    paddingTop: 8,
+    borderTopWidth: 1,
+    borderTopColor: "rgba(0, 0, 0, 0.05)",
   },
   alertNoticeActionBtn: {
+    flexDirection: "row",
+    alignItems: "center",
+    gap: 4,
     backgroundColor: "#ffffff",
-    paddingHorizontal: 10,
-    paddingVertical: 6,
-    borderRadius: 10,
+    paddingHorizontal: 12,
+    paddingVertical: 7,
+    borderRadius: 12,
     borderWidth: 1,
-    borderColor: "#e2e8f0",
+  },
+  alertNoticeActionBtnDanger: {
+    borderColor: "#fca5a5",
+  },
+  alertNoticeActionBtnWarning: {
+    borderColor: "#fde68a",
   },
   alertNoticeActionText: {
     fontSize: 11.5,
     fontWeight: "700",
-    color: "#0f172a",
+  },
+  alertNoticeActionTextDanger: {
+    color: "#b91c1c",
+  },
+  alertNoticeActionTextWarning: {
+    color: "#b45309",
+  },
+  alertNoticeCreateVoucherBtn: {
+    flexDirection: "row",
+    alignItems: "center",
+    gap: 4,
+    backgroundColor: "#ffffff",
+    paddingHorizontal: 12,
+    paddingVertical: 7,
+    borderRadius: 12,
+    borderWidth: 1,
+    borderColor: "#a7f3d0",
+  },
+  alertNoticeCreateVoucherText: {
+    fontSize: 11.5,
+    fontWeight: "700",
+    color: "#059669",
   },
   quickVoucherBtnIn: {
     flex: 1,
