@@ -19,7 +19,7 @@ export const DEFAULT_PINNED_IDS = [
 export const LUXCARE_MODULES: ServiceModule[] = [
   {
     id: "popular",
-    title: "Dịch vụ phổ biến",
+    title: "Tính năng phổ biến",
     shortTitle: "Phổ biến",
     items: [
       {
