@@ -27,6 +27,7 @@ import { TaskForm } from "../../src/features/work/TaskForm";
 import Projects from "./projects";
 import Kpi from "./kpi";
 import { WorkSectionTabs, type WorkSection } from "../../src/features/work/WorkSectionTabs";
+import { TaskHistoryView } from "../../src/features/work/TaskHistoryView";
 import {
   Search,
   X,
@@ -1024,26 +1025,8 @@ export default function Work() {
               </View>
 
               {/* History Timeline */}
-              {!!selected.history?.length && (
-                <View style={styles.detailCard}>
-                  <Text style={styles.detailSectionTitle}>Lịch sử thao tác</Text>
-                  <View style={styles.historyList}>
-                    {selected.history.map((entry, idx) => (
-                      <View key={idx} style={styles.historyItem}>
-                        <View style={styles.historyDot} />
-                        <View style={{ flex: 1 }}>
-                          <Text style={styles.historyText}>
-                            <Text style={{ fontWeight: "700" }}>{entry.user}</Text>: {entry.action}
-                          </Text>
-                          <Text style={styles.historyTime}>
-                            {new Date(entry.time).toLocaleString("vi-VN")}
-                          </Text>
-                        </View>
-                      </View>
-                    ))}
-                  </View>
-                </View>
-              )}
+              <TaskHistoryView history={selected.history} />
+
 
               {/* Action Buttons in Modal (Cleaned up: No redundant 'Việc nhỏ' / 'Đính kèm' buttons) */}
               <View style={styles.modalActionButtons}>

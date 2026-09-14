@@ -277,12 +277,14 @@ export default function Profile() {
       {/* Account Form Modal */}
       <Modal
         visible={editing !== null}
+        transparent
         animationType="slide"
         onRequestClose={() => {
           if (!formLock.current) setEditing(null);
         }}
       >
-        <SafeAreaView style={{ flex: 1, backgroundColor: "#f8fafc" }}>
+        <SafeAreaView style={styles.modalOverlay}>
+          <View style={styles.modalCard}>
           {editing && (
             <AccountForm
               mode={editing}
@@ -292,6 +294,7 @@ export default function Profile() {
               }}
             />
           )}
+          </View>
         </SafeAreaView>
       </Modal>
     </View>
@@ -299,6 +302,17 @@ export default function Profile() {
 }
 
 const styles = StyleSheet.create({
+  modalOverlay: {
+    flex: 1,
+    padding: 12,
+    backgroundColor: "rgba(15, 23, 42, 0.5)",
+  },
+  modalCard: {
+    flex: 1,
+    borderRadius: 24,
+    overflow: "hidden",
+    backgroundColor: "#f8fafc",
+  },
   container: {
     flex: 1,
     backgroundColor: "#f8fafc",

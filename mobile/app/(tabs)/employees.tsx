@@ -1,6 +1,7 @@
 import { useAppAlert } from "../../src/components/AppAlert";
 import { useCallback, useMemo, useRef, useState } from "react";
 import {
+  ActivityIndicator,
   FlatList,
   KeyboardAvoidingView,
   Linking,
@@ -22,6 +23,8 @@ import type { EmployeeProfileInput } from "../../../src/services/rosterService";
 import type { DepartmentRecord } from "../../../src/services/departmentService";
 import type { BranchRecord } from "../../../src/services/branchService";
 import { UserCreateModal } from "../../src/components/users";
+import { DatePickerField } from "../../src/components/common/DatePickerField";
+import { DropdownSelectField } from "../../src/components/common/DropdownSelectField";
 import { userManagementApi, type CreateUserInput } from "../../src/api/userManagementApi";
 import { getRoleDisplayName } from "../../../src/utils/permissionUtils";
 import { branches, departments, roster } from "../../src/api/services";
@@ -166,6 +169,67 @@ export default function Employees() {
   const lock = useRef(false);
   const [formError, setFormError] = useState<string | null>(null);
 
+  // Department selection state for edit modal
+  const [loadingDepts, setLoadingDepts] = useState(false);
+  const [showDeptPickerModal, setShowDeptPickerModal] = useState(false);
+  const [deptSearchText, setDeptSearchText] = useState("");
+  const [customDeptMode, setCustomDeptMode] = useState(false);
+
+  // Branch selection state for edit modal
+  const [loadingBranches, setLoadingBranches] = useState(false);
+  const [showBranchPickerModal, setShowBranchPickerModal] = useState(false);
+  const [branchSearchText, setBranchSearchText] = useState("");
+
+  const fetchDepartments = useCallback(async () => {
+    setLoadingDepts(true);
+    try {
+      const data = await departments.list();
+      if (Array.isArray(data)) {
+        setDeptList(data);
+      }
+    } catch {
+      // Retain existing list on network failure
+    } finally {
+      setLoadingDepts(false);
+    }
+  }, []);
+
+  const fetchBranches = useCallback(async () => {
+    setLoadingBranches(true);
+    try {
+      const data = await branches.list();
+      if (Array.isArray(data)) {
+        setBranchList(data);
+      }
+    } catch {
+      // Retain existing list on network failure
+    } finally {
+      setLoadingBranches(false);
+    }
+  }, []);
+
+  const filteredDepartments = useMemo(() => {
+    if (!deptSearchText.trim()) return deptList;
+    const term = deptSearchText.trim().toLowerCase();
+    return deptList.filter(
+      (d) =>
+        (d.name && d.name.toLowerCase().includes(term)) ||
+        (d.code && d.code.toLowerCase().includes(term)) ||
+        (d.managerName && d.managerName.toLowerCase().includes(term)),
+    );
+  }, [deptList, deptSearchText]);
+
+  const filteredBranches = useMemo(() => {
+    if (!branchSearchText.trim()) return branchList;
+    const term = branchSearchText.trim().toLowerCase();
+    return branchList.filter(
+      (b) =>
+        (b.name && b.name.toLowerCase().includes(term)) ||
+        (b.code && b.code.toLowerCase().includes(term)) ||
+        (b.address && b.address.toLowerCase().includes(term)),
+    );
+  }, [branchList, branchSearchText]);
+
   const handleCreateUser = async (data: CreateUserInput) => {
     await userManagementApi.createUser(data);
     showAlert("Thành công", "Đã thêm nhân sự mới vào hệ thống.", undefined, "success");
@@ -254,6 +318,9 @@ export default function Employees() {
     });
     setEditTab("general");
     setFormError(null);
+    setCustomDeptMode(false);
+    setDeptSearchText("");
+    setBranchSearchText("");
   };
 
   const save = async () => {
@@ -659,12 +726,14 @@ export default function Employees() {
       {/* Employee Profile Detail & Edit Modal */}
       <Modal
         visible={selected !== null}
+        transparent
         animationType="slide"
         onRequestClose={() => {
           if (!lock.current) setSelected(null);
         }}
       >
-        <SafeAreaView style={styles.modalContainer} edges={["top", "bottom"]}>
+        <SafeAreaView style={styles.modalOverlay} edges={["top", "bottom"]}>
+          <View style={styles.modalContainer}>
           {/* Modal Header Bar */}
           <View style={styles.modalHeader}>
             <View>
@@ -733,7 +802,7 @@ export default function Employees() {
                 {/* TAB 1: THÔNG TIN CÁ NHÂN */}
                 {editTab === "general" && (
                   <View style={styles.editSectionBox}>
-                    <Text style={styles.editSectionTitle}>👤 Thông tin cá nhân cơ bản</Text>
+                    <Text style={styles.editSectionTitle}>Thông tin cá nhân cơ bản</Text>
 
                     <View style={styles.fieldGroup}>
                       <Text style={styles.fieldLabel}>Họ và tên *</Text>
@@ -771,64 +840,105 @@ export default function Employees() {
                       />
                     </View>
 
-                    <View style={styles.fieldGroup}>
-                      <Text style={styles.fieldLabel}>Ngày sinh (YYYY-MM-DD)</Text>
-                      <TextInput
-                        style={styles.formInput}
-                        placeholder="Chưa cập nhật (Ví dụ: 1990-05-20)"
-                        placeholderTextColor="#94a3b8"
-                        value={draft.birthDate && draft.birthDate !== "Chưa cập nhật" ? draft.birthDate : ""}
-                        onChangeText={(val) => setDraft((curr) => ({ ...curr, birthDate: val }))}
-                      />
-                    </View>
+                    {/* Ngày sinh */}
+                    <DatePickerField
+                      label="Ngày sinh"
+                      value={draft.birthDate && draft.birthDate !== "Chưa cập nhật" ? draft.birthDate : ""}
+                      onChange={(val) => setDraft((curr) => ({ ...curr, birthDate: val }))}
+                      title="Chọn ngày sinh nhân sự"
+                      placeholder="Bấm để chọn ngày sinh..."
+                      allowClear
+                    />
                   </View>
                 )}
 
                 {/* TAB 2: CÔNG TÁC & PHÒNG BAN */}
                 {editTab === "work" && (
                   <View style={styles.editSectionBox}>
-                    <Text style={styles.editSectionTitle}>🏢 Phòng ban & Chuyên môn</Text>
+                    <Text style={styles.editSectionTitle}>Phòng ban công tác</Text>
 
-                    {/* Department Quick Select */}
+                    {/* Department Selector from API */}
                     <View style={styles.fieldGroup}>
-                      <Text style={styles.fieldLabel}>Phòng ban / Khoa</Text>
-                      <TextInput
-                        style={styles.formInput}
-                        placeholder="Nhập hoặc chọn phòng ban bên dưới"
-                        placeholderTextColor="#94a3b8"
-                        value={draft.department || ""}
-                        onChangeText={(val) => setDraft((curr) => ({ ...curr, department: val }))}
-                      />
-                      {deptList.length > 0 && (
-                        <ScrollView horizontal showsHorizontalScrollIndicator={false} style={{ marginTop: 6 }}>
-                          <View style={{ flexDirection: "row", gap: 6 }}>
-                            {deptList.map((d) => (
-                              <TouchableOpacity
-                                key={d._id}
-                                style={[
-                                  styles.miniPickerPill,
-                                  draft.department === d.name && styles.miniPickerPillActive,
-                                ]}
-                                onPress={() =>
-                                  setDraft((curr) => ({
-                                    ...curr,
-                                    department: d.name,
-                                    departmentId: d._id,
-                                  }))
-                                }
-                              >
-                                <Text
-                                  style={[
-                                    styles.miniPickerText,
-                                    draft.department === d.name && styles.miniPickerTextActive,
-                                  ]}
-                                >
-                                  {d.name}
-                                </Text>
-                              </TouchableOpacity>
-                            ))}
-                          </View>
-                        </ScrollView>
+                      <View style={styles.fieldHeaderRow}>
+                        <Text style={styles.fieldLabel}>Phòng ban / Khoa</Text>
+                        <TouchableOpacity
+                          onPress={() => setCustomDeptMode((prev) => !prev)}
+                          hitSlop={{ top: 8, bottom: 8, left: 8, right: 8 }}
+                        >
+                          <Text style={styles.fieldToggleLink}>
+                            {customDeptMode ? "Chọn từ danh mục hệ thống" : "Nhập tay phòng ban"}
+                          </Text>
+                        </TouchableOpacity>
+                      </View>
+
+                      {customDeptMode ? (
+                        <TextInput
+                          style={styles.formInput}
+                          placeholder="Nhập tên phòng ban / khoa..."
+                          placeholderTextColor="#94a3b8"
+                          value={draft.department || ""}
+                          onChangeText={(val) =>
+                            setDraft((curr) => ({
+                              ...curr,
+                              department: val,
+                              departmentId: "",
+                            }))
+                          }
+                        />
+                      ) : (
+                        <DropdownSelectField
+                          value={draft.department || undefined}
+                          placeholder="Bấm để chọn khoa / phòng ban từ hệ thống..."
+                          icon="layers-outline"
+                          iconColor="#7c3aed"
+                          iconBgColor="#f5f3ff"
+                          onPress={() => {
+                            if (deptList.length === 0) {
+                              void fetchDepartments();
+                            }
+                            setShowDeptPickerModal(true);
+                          }}
+                        />
+                      )}
+
+                      {/* Quick select pills from API list */}
+                      {deptList.length > 0 && !customDeptMode && (
+                        <View style={{ marginTop: 6 }}>
+                          <Text style={styles.miniPickerSectionTitle}>Gợi ý chọn nhanh:</Text>
+                          <ScrollView horizontal showsHorizontalScrollIndicator={false}>
+                            <View style={{ flexDirection: "row", gap: 6 }}>
+                              {deptList.map((d) => {
+                                const isSelected =
+                                  draft.department === d.name || draft.departmentId === d._id;
+                                return (
+                                  <TouchableOpacity
+                                    key={d._id}
+                                    style={[
+                                      styles.miniPickerPill,
+                                      isSelected && styles.miniPickerPillActive,
+                                    ]}
+                                    onPress={() => {
+                                      setDraft((curr) => ({
+                                        ...curr,
+                                        department: d.name,
+                                        departmentId: d._id,
+                                      }));
+                                    }}
+                                  >
+                                    <Text
+                                      style={[
+                                        styles.miniPickerText,
+                                        isSelected && styles.miniPickerTextActive,
+                                      ]}
+                                    >
+                                      {d.name}
+                                    </Text>
+                                  </TouchableOpacity>
+                                );
+                              })}
+                            </View>
+                          </ScrollView>
+                        </View>
                       )}
                     </View>
                   </View>
@@ -837,7 +947,7 @@ export default function Employees() {
                 {/* TAB 3: PHÂN QUYỀN & CHI NHÁNH */}
                 {editTab === "role" && (
                   <View style={styles.editSectionBox}>
-                    <Text style={styles.editSectionTitle}>🛡️ Phân quyền & Vai trò hệ thống</Text>
+                    <Text style={styles.editSectionTitle}>Phân quyền & Vai trò hệ thống</Text>
 
                     {/* Role options */}
                     <View style={styles.fieldGroup}>
@@ -869,46 +979,62 @@ export default function Employees() {
                       </View>
                     </View>
 
-                    {/* Branch Quick Select */}
+                    {/* Branch Dropdown Select (No manual typing) */}
                     <View style={styles.fieldGroup}>
                       <Text style={styles.fieldLabel}>Chi nhánh làm việc</Text>
-                      <TextInput
-                        style={styles.formInput}
-                        placeholder="Tên chi nhánh làm việc..."
-                        placeholderTextColor="#94a3b8"
-                        value={draft.branchName || ""}
-                        onChangeText={(val) => setDraft((curr) => ({ ...curr, branchName: val }))}
+                      <DropdownSelectField
+                        value={
+                          branchList.find((b) => b._id === draft.branchId)?.name ||
+                          draft.branchName ||
+                          undefined
+                        }
+                        placeholder="Bấm để chọn chi nhánh làm việc..."
+                        icon="business-outline"
+                        iconColor="#0284c7"
+                        iconBgColor="#e0f2fe"
+                        onPress={() => {
+                          if (branchList.length === 0) {
+                            void fetchBranches();
+                          }
+                          setShowBranchPickerModal(true);
+                        }}
                       />
                       {branchList.length > 0 && (
-                        <ScrollView horizontal showsHorizontalScrollIndicator={false} style={{ marginTop: 6 }}>
-                          <View style={{ flexDirection: "row", gap: 6 }}>
-                            {branchList.map((b) => (
-                              <TouchableOpacity
-                                key={b._id}
-                                style={[
-                                  styles.miniPickerPill,
-                                  draft.branchId === b._id && styles.miniPickerPillActive,
-                                ]}
-                                onPress={() =>
-                                  setDraft((curr) => ({
-                                    ...curr,
-                                    branchId: b._id,
-                                    branchName: b.name,
-                                  }))
-                                }
-                              >
-                                <Text
-                                  style={[
-                                    styles.miniPickerText,
-                                    draft.branchId === b._id && styles.miniPickerTextActive,
-                                  ]}
-                                >
-                                  {b.name}
-                                </Text>
-                              </TouchableOpacity>
-                            ))}
-                          </View>
-                        </ScrollView>
+                        <View style={{ marginTop: 6 }}>
+                          <Text style={styles.miniPickerSectionTitle}>Gợi ý chọn nhanh:</Text>
+                          <ScrollView horizontal showsHorizontalScrollIndicator={false}>
+                            <View style={{ flexDirection: "row", gap: 6 }}>
+                              {branchList.map((b) => {
+                                const isSelected = draft.branchId === b._id;
+                                return (
+                                  <TouchableOpacity
+                                    key={b._id}
+                                    style={[
+                                      styles.miniPickerPill,
+                                      isSelected && styles.miniPickerPillActive,
+                                    ]}
+                                    onPress={() =>
+                                      setDraft((curr) => ({
+                                        ...curr,
+                                        branchId: b._id,
+                                        branchName: b.name,
+                                      }))
+                                    }
+                                  >
+                                    <Text
+                                      style={[
+                                        styles.miniPickerText,
+                                        isSelected && styles.miniPickerTextActive,
+                                      ]}
+                                    >
+                                      {b.name}
+                                    </Text>
+                                  </TouchableOpacity>
+                                );
+                              })}
+                            </View>
+                          </ScrollView>
+                        </View>
                       )}
                     </View>
 
@@ -918,7 +1044,7 @@ export default function Employees() {
                 {/* TAB 4: LƯƠNG & TÀI LIỆU JD */}
                 {editTab === "salary" && (
                   <View style={styles.editSectionBox}>
-                    <Text style={styles.editSectionTitle}>💰 Chế độ đãi ngộ & Bản mô tả công việc</Text>
+                    <Text style={styles.editSectionTitle}>Chế độ đãi ngộ & Bản mô tả công việc</Text>
 
                     <View style={styles.fieldGroup}>
                       <Text style={styles.fieldLabel}>Mức lương cơ bản hàng tháng (VNĐ)</Text>
@@ -1171,6 +1297,385 @@ export default function Employees() {
               </TouchableOpacity>
             </ScrollView>
           )}
+
+          {/* Department Selection Modal */}
+          <Modal
+            visible={showDeptPickerModal}
+            transparent
+            animationType="fade"
+            onRequestClose={() => setShowDeptPickerModal(false)}
+          >
+            <TouchableOpacity
+              style={styles.pickerBackdrop}
+              activeOpacity={1}
+              onPress={() => setShowDeptPickerModal(false)}
+            >
+              <View style={styles.pickerCard} onStartShouldSetResponder={() => true}>
+                {/* Header */}
+                <View style={styles.pickerHeaderRow}>
+                  <View style={{ flex: 1 }}>
+                    <View style={{ flexDirection: "row", alignItems: "center", gap: 6 }}>
+                      <Ionicons name="business-outline" size={18} color="#059669" />
+                      <Text style={styles.pickerTitle}>Chọn khoa / phòng ban</Text>
+                    </View>
+                    <Text style={styles.pickerSubtitle}>
+                      {loadingDepts
+                        ? "Đang tải danh sách từ máy chủ..."
+                        : `Hệ thống ghi nhận ${deptList.length} phòng ban`}
+                    </Text>
+                  </View>
+
+                  <View style={{ flexDirection: "row", alignItems: "center", gap: 8 }}>
+                    <TouchableOpacity
+                      style={styles.pickerRefreshBtn}
+                      onPress={() => void fetchDepartments()}
+                      disabled={loadingDepts}
+                      activeOpacity={0.7}
+                    >
+                      {loadingDepts ? (
+                        <ActivityIndicator size="small" color="#059669" />
+                      ) : (
+                        <Ionicons name="reload-outline" size={18} color="#059669" />
+                      )}
+                    </TouchableOpacity>
+
+                    <TouchableOpacity
+                      style={styles.pickerCloseBtn}
+                      onPress={() => setShowDeptPickerModal(false)}
+                      activeOpacity={0.7}
+                    >
+                      <Ionicons name="close" size={20} color="#64748b" />
+                    </TouchableOpacity>
+                  </View>
+                </View>
+
+                {/* Search Input */}
+                <View style={styles.pickerSearchWrap}>
+                  <Ionicons name="search-outline" size={16} color="#94a3b8" />
+                  <TextInput
+                    style={styles.pickerSearchInput}
+                    placeholder="Tìm theo tên hoặc mã phòng ban..."
+                    placeholderTextColor="#94a3b8"
+                    value={deptSearchText}
+                    onChangeText={setDeptSearchText}
+                    autoCorrect={false}
+                  />
+                  {!!deptSearchText && (
+                    <TouchableOpacity
+                      onPress={() => setDeptSearchText("")}
+                      hitSlop={{ top: 8, bottom: 8, left: 8, right: 8 }}
+                    >
+                      <Ionicons name="close-circle" size={16} color="#94a3b8" />
+                    </TouchableOpacity>
+                  )}
+                </View>
+
+                {/* Scrollable list */}
+                <ScrollView style={styles.pickerScrollList} keyboardShouldPersistTaps="handled">
+                  {/* Option: Clear selection */}
+                  <TouchableOpacity
+                    style={[
+                      styles.pickerItem,
+                      !draft.department && styles.pickerItemActive,
+                    ]}
+                    onPress={() => {
+                      setDraft((curr) => ({ ...curr, department: "", departmentId: "" }));
+                      setShowDeptPickerModal(false);
+                    }}
+                  >
+                    <View style={{ flex: 1 }}>
+                      <Text
+                        style={[
+                          styles.pickerItemText,
+                          !draft.department && styles.pickerItemTextActive,
+                          { color: "#64748b" },
+                        ]}
+                      >
+                        -- Chưa phân phòng ban / Bỏ chọn --
+                      </Text>
+                    </View>
+                    {!draft.department && (
+                      <Ionicons name="checkmark-circle" size={18} color="#059669" />
+                    )}
+                  </TouchableOpacity>
+
+                  {/* Filtered Dept items */}
+                  {filteredDepartments.map((d) => {
+                    const isSelected =
+                      draft.department === d.name || draft.departmentId === d._id;
+                    return (
+                      <TouchableOpacity
+                        key={d._id}
+                        style={[
+                          styles.pickerItem,
+                          isSelected && styles.pickerItemActive,
+                        ]}
+                        onPress={() => {
+                          setDraft((curr) => ({
+                            ...curr,
+                            department: d.name,
+                            departmentId: d._id,
+                          }));
+                          setShowDeptPickerModal(false);
+                        }}
+                      >
+                        <View style={{ flex: 1 }}>
+                          <View
+                            style={{
+                              flexDirection: "row",
+                              alignItems: "center",
+                              gap: 6,
+                              flexWrap: "wrap",
+                            }}
+                          >
+                            <Text
+                              style={[
+                                styles.pickerItemText,
+                                isSelected && styles.pickerItemTextActive,
+                              ]}
+                            >
+                              {d.name}
+                            </Text>
+                            {!!d.code && (
+                              <View style={styles.deptCodeBadge}>
+                                <Text style={styles.deptCodeText}>{d.code}</Text>
+                              </View>
+                            )}
+                          </View>
+                          {!!d.managerName && (
+                            <Text style={styles.deptSubText}>
+                              Trưởng đơn vị: {d.managerName}
+                            </Text>
+                          )}
+                        </View>
+                        {isSelected && (
+                          <Ionicons name="checkmark-circle" size={18} color="#059669" />
+                        )}
+                      </TouchableOpacity>
+                    );
+                  })}
+
+                  {filteredDepartments.length === 0 && !loadingDepts && (
+                    <View style={styles.pickerEmptyWrap}>
+                      <Ionicons name="alert-circle-outline" size={28} color="#94a3b8" />
+                      <Text style={styles.pickerEmptyText}>
+                        {deptSearchText
+                          ? `Không tìm thấy phòng ban nào khớp "${deptSearchText}"`
+                          : "Chưa có danh sách phòng ban từ hệ thống."}
+                      </Text>
+                      {!!deptSearchText && (
+                        <TouchableOpacity
+                          style={styles.pickerUseSearchBtn}
+                          onPress={() => {
+                            setDraft((curr) => ({
+                              ...curr,
+                              department: deptSearchText.trim(),
+                              departmentId: "",
+                            }));
+                            setShowDeptPickerModal(false);
+                          }}
+                        >
+                          <Text style={styles.pickerUseSearchText}>
+                            Sử dụng "{deptSearchText.trim()}" làm phòng ban
+                          </Text>
+                        </TouchableOpacity>
+                      )}
+                    </View>
+                  )}
+                </ScrollView>
+
+                {/* Bottom Actions */}
+                <View style={styles.pickerFooterRow}>
+                  <TouchableOpacity
+                    style={styles.pickerManualInputBtn}
+                    onPress={() => {
+                      setCustomDeptMode(true);
+                      setShowDeptPickerModal(false);
+                    }}
+                  >
+                    <Ionicons name="create-outline" size={15} color="#0284c7" />
+                    <Text style={styles.pickerManualInputText}>
+                      Nhập tên phòng ban khác (thủ công)
+                    </Text>
+                  </TouchableOpacity>
+                </View>
+              </View>
+            </TouchableOpacity>
+          </Modal>
+
+          {/* Branch Selection Modal */}
+          <Modal
+            visible={showBranchPickerModal}
+            transparent
+            animationType="fade"
+            onRequestClose={() => setShowBranchPickerModal(false)}
+          >
+            <TouchableOpacity
+              style={styles.pickerBackdrop}
+              activeOpacity={1}
+              onPress={() => setShowBranchPickerModal(false)}
+            >
+              <View style={styles.pickerCard} onStartShouldSetResponder={() => true}>
+                {/* Header */}
+                <View style={styles.pickerHeaderRow}>
+                  <View style={{ flex: 1 }}>
+                    <View style={{ flexDirection: "row", alignItems: "center", gap: 6 }}>
+                      <Ionicons name="business-outline" size={18} color="#0284c7" />
+                      <Text style={styles.pickerTitle}>Chọn chi nhánh làm việc</Text>
+                    </View>
+                    <Text style={styles.pickerSubtitle}>
+                      {loadingBranches
+                        ? "Đang tải danh sách từ máy chủ..."
+                        : `Hệ thống ghi nhận ${branchList.length} chi nhánh`}
+                    </Text>
+                  </View>
+
+                  <View style={{ flexDirection: "row", alignItems: "center", gap: 8 }}>
+                    <TouchableOpacity
+                      style={styles.pickerRefreshBtn}
+                      onPress={() => void fetchBranches()}
+                      disabled={loadingBranches}
+                      activeOpacity={0.7}
+                    >
+                      {loadingBranches ? (
+                        <ActivityIndicator size="small" color="#0284c7" />
+                      ) : (
+                        <Ionicons name="reload-outline" size={18} color="#0284c7" />
+                      )}
+                    </TouchableOpacity>
+
+                    <TouchableOpacity
+                      style={styles.pickerCloseBtn}
+                      onPress={() => setShowBranchPickerModal(false)}
+                      activeOpacity={0.7}
+                    >
+                      <Ionicons name="close" size={20} color="#64748b" />
+                    </TouchableOpacity>
+                  </View>
+                </View>
+
+                {/* Search Input if more than 3 branches */}
+                {branchList.length > 3 && (
+                  <View style={styles.pickerSearchWrap}>
+                    <Ionicons name="search-outline" size={16} color="#94a3b8" />
+                    <TextInput
+                      style={styles.pickerSearchInput}
+                      placeholder="Tìm kiếm chi nhánh..."
+                      placeholderTextColor="#94a3b8"
+                      value={branchSearchText}
+                      onChangeText={setBranchSearchText}
+                      autoCorrect={false}
+                    />
+                    {!!branchSearchText && (
+                      <TouchableOpacity
+                        onPress={() => setBranchSearchText("")}
+                        hitSlop={{ top: 8, bottom: 8, left: 8, right: 8 }}
+                      >
+                        <Ionicons name="close-circle" size={16} color="#94a3b8" />
+                      </TouchableOpacity>
+                    )}
+                  </View>
+                )}
+
+                {/* Scrollable list */}
+                <ScrollView style={styles.pickerScrollList} keyboardShouldPersistTaps="handled">
+                  {/* Option: Unassigned / All branches */}
+                  <TouchableOpacity
+                    style={[
+                      styles.pickerItem,
+                      !draft.branchId && styles.pickerItemActive,
+                    ]}
+                    onPress={() => {
+                      setDraft((curr) => ({ ...curr, branchId: "", branchName: "" }));
+                      setShowBranchPickerModal(false);
+                    }}
+                  >
+                    <View style={{ flex: 1 }}>
+                      <Text
+                        style={[
+                          styles.pickerItemText,
+                          !draft.branchId && styles.pickerItemTextActive,
+                          { color: "#64748b" },
+                        ]}
+                      >
+                        -- Toàn viện / Chưa gán chi nhánh --
+                      </Text>
+                    </View>
+                    {!draft.branchId && (
+                      <Ionicons name="checkmark-circle" size={18} color="#059669" />
+                    )}
+                  </TouchableOpacity>
+
+                  {/* Filtered Branch items */}
+                  {filteredBranches.map((b) => {
+                    const isSelected = draft.branchId === b._id;
+                    return (
+                      <TouchableOpacity
+                        key={b._id}
+                        style={[
+                          styles.pickerItem,
+                          isSelected && styles.pickerItemActive,
+                        ]}
+                        onPress={() => {
+                          setDraft((curr) => ({
+                            ...curr,
+                            branchId: b._id,
+                            branchName: b.name,
+                          }));
+                          setShowBranchPickerModal(false);
+                        }}
+                      >
+                        <View style={{ flex: 1 }}>
+                          <View
+                            style={{
+                              flexDirection: "row",
+                              alignItems: "center",
+                              gap: 6,
+                              flexWrap: "wrap",
+                            }}
+                          >
+                            <Text
+                              style={[
+                                styles.pickerItemText,
+                                isSelected && styles.pickerItemTextActive,
+                              ]}
+                            >
+                              {b.name}
+                            </Text>
+                            {!!b.code && (
+                              <View style={styles.deptCodeBadge}>
+                                <Text style={styles.deptCodeText}>{b.code}</Text>
+                              </View>
+                            )}
+                          </View>
+                          {!!b.address && (
+                            <Text style={styles.deptSubText} numberOfLines={1}>
+                              {b.address}
+                            </Text>
+                          )}
+                        </View>
+                        {isSelected && (
+                          <Ionicons name="checkmark-circle" size={18} color="#059669" />
+                        )}
+                      </TouchableOpacity>
+                    );
+                  })}
+
+                  {filteredBranches.length === 0 && !loadingBranches && (
+                    <View style={styles.pickerEmptyWrap}>
+                      <Ionicons name="alert-circle-outline" size={28} color="#94a3b8" />
+                      <Text style={styles.pickerEmptyText}>
+                        {branchSearchText
+                          ? `Không tìm thấy chi nhánh nào khớp "${branchSearchText}"`
+                          : "Chưa có danh sách chi nhánh từ hệ thống."}
+                      </Text>
+                    </View>
+                  )}
+                </ScrollView>
+              </View>
+            </TouchableOpacity>
+          </Modal>
+          </View>
         </SafeAreaView>
       </Modal>
 
@@ -1549,7 +2054,14 @@ const styles = StyleSheet.create({
   },
 
   // Modal Container
+  modalOverlay: {
+    flex: 1,
+    padding: 12,
+    backgroundColor: "rgba(15, 23, 42, 0.5)",
+  },
   modalContainer: {
+    borderRadius: 24,
+    overflow: "hidden",
     flex: 1,
     backgroundColor: "#f8fafc",
   },
@@ -1991,5 +2503,185 @@ const styles = StyleSheet.create({
     color: "#64748b",
     fontSize: 13,
     fontWeight: "600",
+  },
+  fieldHeaderRow: {
+    flexDirection: "row",
+    justifyContent: "space-between",
+    alignItems: "center",
+    marginBottom: 2,
+  },
+  fieldToggleLink: {
+    fontSize: 12,
+    color: "#0284c7",
+    fontWeight: "600",
+  },
+  miniPickerSectionTitle: {
+    fontSize: 11,
+    color: "#64748b",
+    marginBottom: 4,
+    fontWeight: "500",
+  },
+  pickerBackdrop: {
+    flex: 1,
+    backgroundColor: "rgba(15, 23, 42, 0.6)",
+    justifyContent: "center",
+    alignItems: "center",
+    padding: 16,
+  },
+  pickerCard: {
+    backgroundColor: "#ffffff",
+    borderRadius: 20,
+    width: "100%",
+    maxWidth: 420,
+    maxHeight: "85%",
+    overflow: "hidden",
+    shadowColor: "#0f172a",
+    shadowOffset: { width: 0, height: 10 },
+    shadowOpacity: 0.15,
+    shadowRadius: 20,
+    elevation: 8,
+  },
+  pickerHeaderRow: {
+    flexDirection: "row",
+    alignItems: "center",
+    justifyContent: "space-between",
+    paddingHorizontal: 16,
+    paddingTop: 16,
+    paddingBottom: 12,
+    borderBottomWidth: 1,
+    borderBottomColor: "#f1f5f9",
+  },
+  pickerTitle: {
+    fontSize: 16,
+    fontWeight: "700",
+    color: "#0f172a",
+  },
+  pickerSubtitle: {
+    fontSize: 12,
+    color: "#64748b",
+    marginTop: 2,
+  },
+  pickerRefreshBtn: {
+    width: 32,
+    height: 32,
+    borderRadius: 16,
+    backgroundColor: "#ecfdf5",
+    alignItems: "center",
+    justifyContent: "center",
+  },
+  pickerCloseBtn: {
+    width: 32,
+    height: 32,
+    borderRadius: 16,
+    backgroundColor: "#f1f5f9",
+    alignItems: "center",
+    justifyContent: "center",
+  },
+  pickerSearchWrap: {
+    flexDirection: "row",
+    alignItems: "center",
+    gap: 8,
+    marginHorizontal: 16,
+    marginVertical: 12,
+    paddingHorizontal: 12,
+    height: 40,
+    backgroundColor: "#f8fafc",
+    borderRadius: 10,
+    borderWidth: 1,
+    borderColor: "#e2e8f0",
+  },
+  pickerSearchInput: {
+    flex: 1,
+    fontSize: 13,
+    color: "#0f172a",
+    paddingVertical: 0,
+  },
+  pickerScrollList: {
+    maxHeight: 320,
+    paddingHorizontal: 16,
+  },
+  pickerItem: {
+    flexDirection: "row",
+    alignItems: "center",
+    justifyContent: "space-between",
+    paddingVertical: 11,
+    paddingHorizontal: 12,
+    borderRadius: 10,
+    marginBottom: 4,
+    backgroundColor: "#ffffff",
+  },
+  pickerItemActive: {
+    backgroundColor: "#ecfdf5",
+  },
+  pickerItemText: {
+    fontSize: 13,
+    fontWeight: "600",
+    color: "#334155",
+  },
+  pickerItemTextActive: {
+    color: "#059669",
+    fontWeight: "700",
+  },
+  deptCodeBadge: {
+    backgroundColor: "#e0e7ff",
+    paddingHorizontal: 6,
+    paddingVertical: 2,
+    borderRadius: 4,
+  },
+  deptCodeText: {
+    fontSize: 10,
+    fontWeight: "700",
+    color: "#4338ca",
+  },
+  deptSubText: {
+    fontSize: 11,
+    color: "#94a3b8",
+    marginTop: 2,
+  },
+  pickerEmptyWrap: {
+    alignItems: "center",
+    justifyContent: "center",
+    paddingVertical: 24,
+    gap: 8,
+  },
+  pickerEmptyText: {
+    fontSize: 12,
+    color: "#94a3b8",
+    textAlign: "center",
+    paddingHorizontal: 16,
+  },
+  pickerUseSearchBtn: {
+    backgroundColor: "#ecfdf5",
+    borderWidth: 1,
+    borderColor: "#059669",
+    paddingHorizontal: 14,
+    paddingVertical: 8,
+    borderRadius: 8,
+    marginTop: 6,
+  },
+  pickerUseSearchText: {
+    fontSize: 12,
+    fontWeight: "600",
+    color: "#059669",
+  },
+  pickerFooterRow: {
+    borderTopWidth: 1,
+    borderTopColor: "#f1f5f9",
+    paddingHorizontal: 16,
+    paddingVertical: 12,
+    alignItems: "center",
+    backgroundColor: "#f8fafc",
+  },
+  pickerManualInputBtn: {
+    flexDirection: "row",
+    alignItems: "center",
+    gap: 6,
+    paddingVertical: 6,
+    paddingHorizontal: 12,
+  },
+  pickerManualInputText: {
+    fontSize: 12,
+    fontWeight: "600",
+    color: "#0284c7",
   },
 });

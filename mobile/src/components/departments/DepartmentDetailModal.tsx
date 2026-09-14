@@ -1,6 +1,6 @@
+import { useAppAlert } from "../AppAlert";
 import React, { useEffect, useState } from "react";
 import {
-  Alert,
   KeyboardAvoidingView,
   Modal,
   Platform,
@@ -44,17 +44,18 @@ export const DepartmentDetailModal: React.FC<DepartmentDetailModalProps> = ({
   onDelete,
   onViewOrgChart,
 }) => {
+  const { showAlert, alertView } = useAppAlert();
   const insets = useSafeAreaInsets();
   const topInset = Math.max(insets.top, Platform.OS === "ios" ? 48 : (StatusBar.currentHeight || 0));
-  if (!department) return null;
 
-  const [code, setCode] = useState(department.code);
-  const [name, setName] = useState(department.name);
-  const [description, setDescription] = useState(department.description || "");
-  const [managerUid, setManagerUid] = useState(department.managerUid || "");
-  const [managerName, setManagerName] = useState(department.managerName || "");
-  const [sortOrder, setSortOrder] = useState(department.sortOrder || 0);
-  const [isActive, setIsActive] = useState(department.isActive);
+
+  const [code, setCode] = useState(department?.code ?? "");
+  const [name, setName] = useState(department?.name ?? "");
+  const [description, setDescription] = useState(department?.description || "");
+  const [managerUid, setManagerUid] = useState(department?.managerUid || "");
+  const [managerName, setManagerName] = useState(department?.managerName || "");
+  const [sortOrder, setSortOrder] = useState(department?.sortOrder || 0);
+  const [isActive, setIsActive] = useState(department?.isActive ?? true);
 
   const [saving, setSaving] = useState(false);
   const [deleting, setDeleting] = useState(false);
@@ -74,6 +75,8 @@ export const DepartmentDetailModal: React.FC<DepartmentDetailModalProps> = ({
     }
   }, [department]);
 
+  if (!department) return null;
+
   const palette = getDepartmentCodePalette(code || name);
 
   // Filter colleagues for manager selector
@@ -89,11 +92,11 @@ export const DepartmentDetailModal: React.FC<DepartmentDetailModalProps> = ({
 
   const handleSave = async () => {
     if (!code.trim()) {
-      Alert.alert("Lỗi", "Vui lòng nhập mã phòng ban.");
+      showAlert("Lỗi", "Vui lòng nhập mã phòng ban.");
       return;
     }
     if (!name.trim()) {
-      Alert.alert("Lỗi", "Vui lòng nhập tên phòng ban.");
+      showAlert("Lỗi", "Vui lòng nhập tên phòng ban.");
       return;
     }
 
@@ -110,14 +113,14 @@ export const DepartmentDetailModal: React.FC<DepartmentDetailModalProps> = ({
       });
       onClose();
     } catch (err: any) {
-      Alert.alert("Lỗi lưu phòng ban", err.message || "Không thể cập nhật phòng ban.");
+      showAlert("Lỗi lưu phòng ban", err.message || "Không thể cập nhật phòng ban.");
     } finally {
       setSaving(false);
     }
   };
 
   const handleDelete = () => {
-    Alert.alert(
+    showAlert(
       "Xác nhận xóa phòng ban",
       `Bạn có chắc chắn muốn xóa phòng ban "${department.name}" (${department.code})? Hành động này không thể hoàn tác.`,
       [
@@ -131,7 +134,7 @@ export const DepartmentDetailModal: React.FC<DepartmentDetailModalProps> = ({
               await onDelete(department._id);
               onClose();
             } catch (err: any) {
-              Alert.alert("Lỗi xóa phòng ban", err.message || "Không thể xóa phòng ban.");
+              showAlert("Lỗi xóa phòng ban", err.message || "Không thể xóa phòng ban.");
             } finally {
               setDeleting(false);
             }
@@ -145,11 +148,12 @@ export const DepartmentDetailModal: React.FC<DepartmentDetailModalProps> = ({
     <Modal
       visible={visible}
       animationType="slide"
-      transparent={false}
+      transparent
       onRequestClose={onClose}
     >
+      <View style={[styles.modalOverlay, { paddingTop: topInset + 12 }]}>
       <SafeAreaView
-        style={[styles.screen, { paddingTop: topInset }]}
+        style={styles.screen}
         edges={["bottom"]}
       >
         <KeyboardAvoidingView
@@ -436,7 +440,7 @@ export const DepartmentDetailModal: React.FC<DepartmentDetailModalProps> = ({
           transparent
           onRequestClose={() => setShowManagerPicker(false)}
         >
-          <View style={styles.pickerModalOverlay}>
+          <View style={[styles.pickerModalOverlay, { paddingBottom: Math.max(insets.bottom, 12) }]}>
             <View style={styles.pickerModalBox}>
               <View style={styles.pickerModalHeader}>
                 <Text style={styles.pickerModalTitle}>Chọn Trưởng bộ phận</Text>
@@ -513,13 +517,23 @@ export const DepartmentDetailModal: React.FC<DepartmentDetailModalProps> = ({
           </View>
         </Modal>
         </KeyboardAvoidingView>
+        {alertView}
       </SafeAreaView>
+      </View>
     </Modal>
   );
 };
 
 const styles = StyleSheet.create({
+  modalOverlay: {
+    flex: 1,
+    backgroundColor: "rgba(15, 23, 42, 0.5)",
+    paddingHorizontal: 12,
+    paddingBottom: 12,
+  },
   screen: {
+    borderRadius: 24,
+    overflow: "hidden",
     flex: 1,
     backgroundColor: "#f8fafc",
   },
@@ -801,14 +815,15 @@ const styles = StyleSheet.create({
     color: "#dc2626",
   },
   pickerModalOverlay: {
+    paddingHorizontal: 12,
     flex: 1,
     backgroundColor: "rgba(0,0,0,0.45)",
     justifyContent: "flex-end",
   },
   pickerModalBox: {
     backgroundColor: "#ffffff",
-    borderTopLeftRadius: 20,
-    borderTopRightRadius: 20,
+    borderRadius: 24,
+    overflow: "hidden",
     maxHeight: "75%",
     paddingBottom: 24,
   },

@@ -3,18 +3,20 @@ import { ActivityIndicator, Pressable, StyleSheet, Text, View } from "react-nati
 import { Ionicons } from "@expo/vector-icons";
 import { useFocusEffect } from "expo-router";
 import type { ContractFileItem } from "../../../../src/types/hrContract";
-import { shareApiFile, MAX_SHARED_FILE_BYTES } from "../../files/shareFile";
+import { downloadApiFile, MAX_SHARED_FILE_BYTES } from "../../files/shareFile";
 import { messageOf } from "../../auth/SessionProvider";
 
 export function ContractFiles({ title, files }: { title: string; files: ContractFileItem[] }) {
   const pending = useRef<AbortController | null>(null);
   const [busy, setBusy] = useState<number | null>(null);
   const [error, setError] = useState<string | null>(null);
+  const [savedName, setSavedName] = useState<string | null>(null);
 
   useFocusEffect(
     useCallback(() => {
       setBusy(null);
       setError(null);
+      setSavedName(null);
       return () => {
         pending.current?.abort();
         pending.current = null;
@@ -22,16 +24,18 @@ export function ContractFiles({ title, files }: { title: string; files: Contract
     }, []),
   );
 
-  const open = async (file: ContractFileItem, index: number) => {
+  const download = async (file: ContractFileItem, index: number) => {
     if (pending.current) return;
     const request = new AbortController();
     pending.current = request;
     setBusy(index);
     setError(null);
+    setSavedName(null);
     try {
       if (file.size && file.size > MAX_SHARED_FILE_BYTES)
         throw new Error("Tệp vượt quá 20 MB. Vui lòng tải từ LuxCare web.");
-      await shareApiFile(file.url, file.name || "tai-lieu", request.signal);
+      const saved = await downloadApiFile(file.url, file.name || "tai-lieu", request.signal);
+      if (saved && !request.signal.aborted) setSavedName(saved.name);
     } catch (error) {
       if (!request.signal.aborted) setError(messageOf(error));
     } finally {
@@ -81,18 +85,22 @@ export function ContractFiles({ title, files }: { title: string; files: Contract
                   isLoading && styles.openBtnLoading,
                 ]}
                 disabled={busy !== null || !file.url}
-                onPress={() => void open(file, index)}
+                onPress={() => void download(file, index)}
               >
                 {isLoading ? (
                   <ActivityIndicator size="small" color="#ffffff" />
                 ) : (
-                  <Text style={styles.openBtnText}>Mở / Tải</Text>
+                  <Text style={styles.openBtnText}>Tải tệp</Text>
                 )}
               </Pressable>
             </View>
           );
         })}
       </View>
+
+      {!!savedName && (
+        <Text style={styles.successText}>Đã lưu tệp: {savedName}</Text>
+      )}
 
       {!!error && (
         <View style={styles.errorBox}>
@@ -185,6 +193,11 @@ const styles = StyleSheet.create({
     color: "#ffffff",
     fontSize: 12,
     fontWeight: "700",
+  },
+  successText: {
+    color: "#059669",
+    fontSize: 12,
+    fontWeight: "500",
   },
   errorBox: {
     backgroundColor: "#fff1f2",

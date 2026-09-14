@@ -1,7 +1,11 @@
 import type { PayrollRun } from "../../../../src/types/payrollRun";
 import type { UserProfile } from "../../../../src/types/common";
 import { canCreatePayrollRun } from "./createRunModel";
-export function canClosePayrollRun(user: UserProfile | null, branchId: string | undefined, run: PayrollRun) {
+export function canClosePayrollRun(
+  user: UserProfile | null,
+  branchId: string | undefined,
+  run: PayrollRun,
+) {
   return (
     canCreatePayrollRun(user, branchId) &&
     run.status === "review" &&
@@ -29,5 +33,16 @@ export function validateReviewedRun(value: unknown, original: PayrollRun) {
     run.status !== "review" ||
     run.version !== original.version! + 1
   )
-    throw new Error("Chưa xác nhận được kỳ đã chuyển sang kiểm tra. Hãy tải lại trạng thái.");
+    throw new Error(
+      "Chưa xác nhận được kỳ đã chuyển sang kiểm tra. Hãy tải lại trạng thái.",
+    );
+}
+
+export function hasPayrollCalculation(run: PayrollRun) {
+  return (
+    typeof run.activeRevisionId === "string" &&
+    !!run.activeRevisionId.trim() &&
+    typeof run.activeRevisionChecksum === "string" &&
+    !!run.activeRevisionChecksum.trim()
+  );
 }

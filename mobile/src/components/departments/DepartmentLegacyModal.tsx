@@ -1,7 +1,7 @@
+import { useAppAlert } from "../AppAlert";
 import React, { useEffect, useState } from "react";
 import {
   ActivityIndicator,
-  Alert,
   Modal,
   Platform,
   ScrollView,
@@ -30,6 +30,7 @@ export const DepartmentLegacyModal: React.FC<DepartmentLegacyModalProps> = ({
   onClose,
   onMergedSuccess,
 }) => {
+  const { showAlert, alertView } = useAppAlert();
   const insets = useSafeAreaInsets();
   const topInset = Math.max(insets.top, Platform.OS === "ios" ? 48 : (StatusBar.currentHeight || 0));
   const [unmappedList, setUnmappedList] = useState<Array<{ name: string; count: number }>>([]);
@@ -53,7 +54,7 @@ export const DepartmentLegacyModal: React.FC<DepartmentLegacyModalProps> = ({
       })
       .catch((err) => {
         if (active) {
-          Alert.alert("Lỗi nạp dữ liệu", err.message || "Không thể tải danh sách tên phòng ban cũ.");
+          showAlert("Lỗi nạp dữ liệu", err.message || "Không thể tải danh sách tên phòng ban cũ.");
         }
       })
       .finally(() => {
@@ -63,7 +64,7 @@ export const DepartmentLegacyModal: React.FC<DepartmentLegacyModalProps> = ({
     return () => {
       active = false;
     };
-  }, [visible]);
+  }, [visible, showAlert]);
 
   const toggleSelect = (name: string) => {
     setSelectedNames((prev) =>
@@ -81,17 +82,17 @@ export const DepartmentLegacyModal: React.FC<DepartmentLegacyModalProps> = ({
 
   const handleMerge = async () => {
     if (selectedNames.length === 0) {
-      Alert.alert("Chưa chọn phòng ban", "Vui lòng chọn ít nhất một tên phòng ban cũ cần chuẩn hóa.");
+      showAlert("Chưa chọn phòng ban", "Vui lòng chọn ít nhất một tên phòng ban cũ cần chuẩn hóa.");
       return;
     }
     if (!targetDeptId) {
-      Alert.alert("Chưa chọn đích", "Vui lòng chọn phòng ban chuẩn đích để gộp vào.");
+      showAlert("Chưa chọn đích", "Vui lòng chọn phòng ban chuẩn đích để gộp vào.");
       return;
     }
 
     const targetDept = departmentList.find((d) => d._id === targetDeptId);
 
-    Alert.alert(
+    showAlert(
       "Xác nhận hợp nhất",
       `Bạn có chắc chắn muốn chuẩn hóa ${selectedNames.length} tên phòng ban cũ vào phòng ban "${targetDept?.name}"?`,
       [
@@ -103,14 +104,15 @@ export const DepartmentLegacyModal: React.FC<DepartmentLegacyModalProps> = ({
             setMerging(true);
             try {
               const res = await departments.merge(selectedNames, targetDeptId);
-              Alert.alert(
+              showAlert(
                 "Chuẩn hóa thành công!",
-                `Đã cập nhật ${res?.modifiedCount ?? selectedNames.length} hồ sơ nhân sự sang phòng ban "${targetDept?.name}".`
+                `Đã cập nhật ${res?.modifiedCount ?? selectedNames.length} hồ sơ nhân sự sang phòng ban "${targetDept?.name}".`,
+                [{ text: "Đã hiểu", onPress: onClose }],
+                "success"
               );
               onMergedSuccess();
-              onClose();
             } catch (err: any) {
-              Alert.alert("Lỗi hợp nhất", err.message || "Không thể chuẩn hóa tên phòng ban.");
+              showAlert("Lỗi hợp nhất", err.message || "Không thể chuẩn hóa tên phòng ban.");
             } finally {
               setMerging(false);
             }
@@ -124,11 +126,12 @@ export const DepartmentLegacyModal: React.FC<DepartmentLegacyModalProps> = ({
     <Modal
       visible={visible}
       animationType="slide"
-      transparent={false}
+      transparent
       onRequestClose={onClose}
     >
+      <View style={[styles.modalOverlay, { paddingTop: topInset + 12 }]}>
       <SafeAreaView
-        style={[styles.screen, { paddingTop: topInset }]}
+        style={styles.screen}
         edges={["bottom"]}
       >
         {/* Header Bar */}
@@ -285,13 +288,23 @@ export const DepartmentLegacyModal: React.FC<DepartmentLegacyModalProps> = ({
             <View style={{ height: 40 }} />
           </ScrollView>
         )}
+        {alertView}
       </SafeAreaView>
+      </View>
     </Modal>
   );
 };
 
 const styles = StyleSheet.create({
+  modalOverlay: {
+    flex: 1,
+    backgroundColor: "rgba(15, 23, 42, 0.5)",
+    paddingHorizontal: 12,
+    paddingBottom: 12,
+  },
   screen: {
+    borderRadius: 24,
+    overflow: "hidden",
     flex: 1,
     backgroundColor: "#f8fafc",
   },

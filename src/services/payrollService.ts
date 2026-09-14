@@ -72,7 +72,7 @@ export function createPayrollService({ fetch, getAccessToken }: ServiceTransport
     getFormulas: () => request("/formulas"),
     createFormula: (payload: unknown) => request("/formulas", { method: "POST", body: JSON.stringify(payload) }),
     updateFormula: (id: string, payload: unknown) =>
-      request(`/formulas/${id}`, { method: "PATCH", body: JSON.stringify(payload) }),
+      request(`/formulas/${encodeURIComponent(id)}`, { method: "PATCH", body: JSON.stringify(payload) }),
     cloneFormula: (id: string, code: string) =>
       request(`/formulas/${id}/clone`, { method: "POST", body: JSON.stringify({ code }) }),
     activateFormula: (id: string) => request(`/formulas/${id}/activate`, { method: "POST" }),
@@ -98,13 +98,13 @@ export function createPayrollService({ fetch, getAccessToken }: ServiceTransport
     getPolicies: () => request("/policies"),
     createPolicy: (payload: unknown) => request("/policies", { method: "POST", body: JSON.stringify(payload) }),
     updatePolicy: (id: string, payload: unknown) =>
-      request(`/policies/${id}`, { method: "PATCH", body: JSON.stringify(payload) }),
+      request(`/policies/${encodeURIComponent(id)}`, { method: "PATCH", body: JSON.stringify(payload) }),
     clonePolicy: (id: string, payload: { code: string; name?: string; definition?: unknown }) =>
-      request(`/policies/${id}/clone`, { method: "POST", body: JSON.stringify(payload) }),
+      request(`/policies/${encodeURIComponent(id)}/clone`, { method: "POST", body: JSON.stringify(payload) }),
     activatePolicy: (id: string, payload: { replaceOverlaps?: boolean } = {}) =>
-      request(`/policies/${id}/activate`, { method: "POST", body: JSON.stringify(payload) }),
-    retirePolicy: (id: string) => request(`/policies/${id}/retire`, { method: "POST" }),
-    deletePolicy: (id: string) => request(`/policies/${id}`, { method: "DELETE" }),
+      request(`/policies/${encodeURIComponent(id)}/activate`, { method: "POST", body: JSON.stringify(payload) }),
+    retirePolicy: (id: string) => request(`/policies/${encodeURIComponent(id)}/retire`, { method: "POST" }),
+    deletePolicy: (id: string) => request(`/policies/${encodeURIComponent(id)}`, { method: "DELETE" }),
     getRun: (periodKey: string): Promise<PayrollRun> => request(`/periods/${encodeURIComponent(periodKey)}/run`),
     getRunIssues: async (runId: string): Promise<PayrollIssue[]> => {
       const result = await request(`/runs/${encodeURIComponent(runId)}/issues`);
