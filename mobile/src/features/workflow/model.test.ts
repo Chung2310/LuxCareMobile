@@ -37,3 +37,13 @@ it("reorders steps and removes branches pointing to a deleted step", () => {
     ).map((edge) => edge.id),
   ).toEqual(["keep"]);
 });
+
+it("preserves subtask assignment, completion and staged attachments when saving", () => {
+  const attachments = [{ id: "file", name: "Guide.pdf", url: "https://example.com/guide.pdf", type: "file" as const, uploadToken: "pending-upload" }];
+  const payload = workflowPayload("Test", "", "", [{
+    ...step("one"), attachments,
+    subTasks: [{ id: "sub", title: " Edited task ", assigneeUid: "user-1", assignee: "Lan", done: true }],
+  }]);
+  expect(payload.steps[0].subTasks).toEqual([{ id: "sub", title: "Edited task", assigneeUid: "user-1", assignee: "Lan", done: true }]);
+  expect(payload.steps[0].attachments).toEqual(attachments);
+});

@@ -217,6 +217,7 @@ export interface TrainingCourse {
   autoAssignOnboarding: boolean;
   lessons?: Lesson[];
   quizzes?: QuizQuestion[];
+  passingScore?: number;
 }
 
 export interface TrainingEnrollment {
@@ -233,4 +234,5 @@ export interface TrainingEnrollment {
   createdAt: any;
   completedLessons?: string[];
   quizPassed?: boolean;
+  quizScore?: number;
 }

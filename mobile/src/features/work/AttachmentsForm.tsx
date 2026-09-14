@@ -42,7 +42,7 @@ export function AttachmentsForm({
   };
   const disabled = busy || uncertain;
   return (
-    <Page title="Tệp đính kèm">
+    <Page title="Tệp đính kèm" onBack={() => { if (!lock.current) onClose(); }}>
       <Text style={styles.muted}>
         {items.length} tệp/liên kết{save ? " · Bấm Lưu để áp dụng thay đổi" : ""}
       </Text>

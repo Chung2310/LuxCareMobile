@@ -14,7 +14,7 @@
         "NSPhotoLibraryAddUsageDescription": "LuxCare cần quyền lưu ảnh và video vào Thư viện thiết bị.",
         "UIFileSharingEnabled": true,
         "LSSupportsOpeningDocumentsInPlace": true,
-        "NSCameraUsageDescription": "LuxCare cần quyền truy cập máy ảnh để chụp ảnh chấm công và ảnh đại diện."
+        "NSCameraUsageDescription": "LuxCare cần quyền truy cập máy ảnh để chấm công, chụp ảnh đại diện, hồ sơ và hợp đồng."
       }
     },
     "android": {
@@ -45,7 +45,7 @@
       [
         "expo-camera",
         {
-          "cameraPermission": "LuxCare cần camera để chụp ảnh xác nhận chấm công.",
+          "cameraPermission": "LuxCare cần camera để chấm công, chụp ảnh đại diện, hồ sơ và hợp đồng.",
           "recordAudioAndroid": false,
           "barcodeScannerEnabled": false
         }
@@ -60,7 +60,7 @@
         "expo-image-picker",
         {
           "photosPermission": "LuxCare cần quyền truy cập thư viện ảnh để tải lên ảnh đại diện.",
-          "cameraPermission": "LuxCare cần quyền truy cập máy ảnh để chụp ảnh đại diện."
+          "cameraPermission": "LuxCare cần quyền truy cập máy ảnh để chấm công, chụp ảnh đại diện, hồ sơ và hợp đồng."
         }
       ],
       "expo-font",

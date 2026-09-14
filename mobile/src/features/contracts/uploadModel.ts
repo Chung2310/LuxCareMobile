@@ -11,6 +11,8 @@ export const CONTRACT_MIMES: Record<string, string> = {
   pdf: "application/pdf",
   doc: "application/msword",
   docx: "application/vnd.openxmlformats-officedocument.wordprocessingml.document",
+  xls: "application/vnd.ms-excel",
+  xlsx: "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet",
   png: "image/png",
   jpg: "image/jpeg",
   jpeg: "image/jpeg",
@@ -22,8 +24,8 @@ export function contractFileMime(name: string, size: number, kind: ContractUploa
   if (!Number.isFinite(size) || size <= 0 || size > 10 * 1024 * 1024)
     throw new Error("Tệp phải có nội dung và tối đa 10 MB.");
   const type = CONTRACT_MIMES[name.toLowerCase().split(".").pop() || ""];
-  if (!type || ((kind === "signed" || kind === "extensionSigned") && !type.startsWith("image/")))
-    throw new Error("Chọn PDF/DOC/DOCX hoặc ảnh; bản đã ký cần là ảnh PNG/JPG/GIF/WebP.");
+  if (!type || (kind === "signed" && !type.startsWith("image/")))
+    throw new Error("Chọn PDF/DOC/DOCX/XLS/XLSX hoặc ảnh; bản hợp đồng đã ký cần là ảnh PNG/JPG/GIF/WebP.");
   return type;
 }
 export function contractUploadFields(uploads: ContractUploads): ContractFileFields {

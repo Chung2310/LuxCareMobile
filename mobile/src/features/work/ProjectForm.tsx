@@ -2,22 +2,49 @@ import React, { useRef, useState } from "react";
 import {
   ActivityIndicator,
   KeyboardAvoidingView,
+  Linking,
+  Modal,
   Platform,
   Pressable,
   ScrollView,
   StyleSheet,
   Text,
   TextInput,
+  TouchableOpacity,
   View,
 } from "react-native";
-import type { Project } from "../../../../src/types/hr";
+import { randomUUID } from "expo-crypto";
+import type { Project, TaskAttachment } from "../../../../src/types/hr";
 import type { ProjectInput } from "../../../../src/services/kanbanService";
 import { kanban } from "../../api/services";
 import { messageOf } from "../../auth/SessionProvider";
 import { projectDraft, projectPayload, PROJECT_STATUSES, PROJECT_PRIORITIES } from "./project";
 import { localDateTime } from "./model";
 import { DateTimePickerModal } from "./DateTimePickerModal";
-import { X, AlertCircle, Zap, Calendar, Target } from "lucide-react-native";
+import {
+  pickMultipleImageAttachments,
+  pickMultipleWorkAttachments,
+  pickImageAttachment,
+  pickWorkAttachment,
+} from "./attachments";
+import { shareLeaveFile } from "../leave/files";
+import {
+  X,
+  AlertCircle,
+  Zap,
+  Calendar,
+  Target,
+  Paperclip,
+  Image as ImageIcon,
+  Link as LinkIcon,
+  Video as VideoIcon,
+  Music as MusicIcon,
+  FileText,
+  Plus,
+  Trash2,
+  ExternalLink,
+  Layers,
+} from "lucide-react-native";
 
 function formatDisplayDate(str: string): string {
   if (!str) return "";
@@ -26,6 +53,14 @@ function formatDisplayDate(str: string): string {
     return `${match[3]}/${match[2]}/${match[1]} lúc ${match[4]}:${match[5]}`;
   }
   return str;
+}
+
+function AttachmentTypeIcon({ type }: { type?: string }) {
+  if (type === "link") return <LinkIcon size={16} color="#2563eb" />;
+  if (type === "image") return <ImageIcon size={16} color="#059669" />;
+  if (type === "video") return <VideoIcon size={16} color="#d97706" />;
+  if (type === "audio") return <MusicIcon size={16} color="#8b5cf6" />;
+  return <FileText size={16} color="#475569" />;
 }
 
 const STATUS_CONFIG: Record<string, { label: string; color: string; bg: string; border: string }> = {
@@ -63,10 +98,155 @@ export function ProjectForm({
 }) {
   const [draft, setDraft] = useState(() => projectDraft(project));
   const [busy, setBusy] = useState(false);
+  const [uploading, setUploading] = useState(false);
+  const [uploadMessage, setUploadMessage] = useState("");
   const [uncertain, setUncertain] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [activeDatePicker, setActiveDatePicker] = useState<"startAt" | "dueAt" | null>(null);
+
+  // Link modal state
+  const [linkModalOpen, setLinkModalOpen] = useState(false);
+  const [linkMode, setLinkMode] = useState<"single" | "batch">("single");
+  const [linkName, setLinkName] = useState("");
+  const [linkUrl, setLinkUrl] = useState("");
+  const [batchLinks, setBatchLinks] = useState("");
+  const [linkError, setLinkError] = useState<string | null>(null);
+
   const lock = useRef(false);
+
+  // Attachment actions
+  const handlePickFiles = async () => {
+    setUploading(true);
+    setUploadMessage("Đang tải tệp lên...");
+    try {
+      let files = await pickMultipleWorkAttachments();
+      if (!files.length) {
+        // Fallback to single pick if multiple wasn't returned
+        const single = await pickWorkAttachment();
+        if (single) files = [single];
+      }
+      if (files.length > 0) {
+        setDraft((v) => ({ ...v, attachments: [...v.attachments, ...files] }));
+      }
+    } catch (err) {
+      setError(messageOf(err));
+    } finally {
+      setUploading(false);
+      setUploadMessage("");
+    }
+  };
+
+  const handlePickImages = async () => {
+    setUploading(true);
+    setUploadMessage("Đang tải ảnh/video lên...");
+    try {
+      let files = await pickMultipleImageAttachments();
+      if (!files.length) {
+        const single = await pickImageAttachment();
+        if (single) files = [single];
+      }
+      if (files.length > 0) {
+        setDraft((v) => ({ ...v, attachments: [...v.attachments, ...files] }));
+      }
+    } catch (err) {
+      setError(messageOf(err));
+    } finally {
+      setUploading(false);
+      setUploadMessage("");
+    }
+  };
+
+  const handleAddSingleLink = () => {
+    setLinkError(null);
+    try {
+      const trimmedUrl = linkUrl.trim();
+      const target = new URL(trimmedUrl);
+      if (!["https:", "http:"].includes(target.protocol)) {
+        throw new Error("Chỉ hỗ trợ liên kết web bắt đầu bằng http:// hoặc https://");
+      }
+      const newAttachment: TaskAttachment = {
+        id: randomUUID(),
+        name: linkName.trim() || target.hostname,
+        url: target.toString(),
+        type: "link",
+      };
+      setDraft((v) => ({ ...v, attachments: [...v.attachments, newAttachment] }));
+      setLinkName("");
+      setLinkUrl("");
+      setLinkModalOpen(false);
+    } catch (err) {
+      setLinkError(messageOf(err));
+    }
+  };
+
+  const handleAddBatchLinks = () => {
+    setLinkError(null);
+    const lines = batchLinks
+      .split("\n")
+      .map((l) => l.trim())
+      .filter(Boolean);
+
+    if (lines.length === 0) {
+      setLinkError("Vui lòng nhập ít nhất một liên kết.");
+      return;
+    }
+
+    const newAttachments: TaskAttachment[] = [];
+    const errors: string[] = [];
+
+    for (const line of lines) {
+      let name = "";
+      let url = "";
+
+      if (line.includes("|")) {
+        const parts = line.split("|");
+        name = parts[0].trim();
+        url = parts.slice(1).join("|").trim();
+      } else {
+        url = line;
+      }
+
+      try {
+        const target = new URL(url);
+        if (!["https:", "http:"].includes(target.protocol)) {
+          errors.push(`"${url}": Chỉ hỗ trợ liên kết http/https.`);
+          continue;
+        }
+        newAttachments.push({
+          id: randomUUID(),
+          name: name || target.hostname,
+          url: target.toString(),
+          type: "link",
+        });
+      } catch {
+        errors.push(`"${url}": URL không đúng định dạng.`);
+      }
+    }
+
+    if (newAttachments.length === 0) {
+      setLinkError(errors.join("\n") || "Không tìm thấy liên kết hợp lệ nào.");
+      return;
+    }
+
+    setDraft((v) => ({ ...v, attachments: [...v.attachments, ...newAttachments] }));
+    setBatchLinks("");
+    setLinkModalOpen(false);
+  };
+
+  const handleRemoveAttachment = (id: string) => {
+    setDraft((v) => ({
+      ...v,
+      attachments: v.attachments.filter((a) => a.id !== id),
+    }));
+  };
+
+  const handleOpenAttachment = (att: TaskAttachment) => {
+    if (att.type === "link") {
+      void Linking.openURL(att.url);
+    } else {
+      void shareLeaveFile(att.url, att.name);
+    }
+  };
 
   const save = async () => {
     if (lock.current) return;
@@ -80,7 +260,16 @@ export function ProjectForm({
         if (project) {
           if (Object.keys(input).length) await kanban.updateProject(project.id, input);
         } else {
-          await kanban.createProject(input as ProjectInput);
+          const created = await kanban.createProject(input as ProjectInput);
+          if (
+            created?.id &&
+            draft.attachments.length > 0 &&
+            (!created.attachments || created.attachments.length === 0)
+          ) {
+            try {
+              await kanban.updateProject(created.id, { attachments: draft.attachments });
+            } catch {}
+          }
         }
       } catch (err) {
         if (!(err && typeof err === "object" && "status" in err) || Number((err as any).status) >= 500) {
@@ -101,7 +290,7 @@ export function ProjectForm({
     }
   };
 
-  const disabled = busy || uncertain;
+  const disabled = busy || uploading || uncertain;
 
   return (
     <KeyboardAvoidingView
@@ -364,6 +553,103 @@ export function ProjectForm({
           </View>
         </View>
 
+        {/* Section: Tệp & Liên kết đính kèm */}
+        <View style={styles.card}>
+          <View style={styles.cardHeaderWithCount}>
+            <Text style={styles.cardSectionTitle}>
+              TỆP & LIÊN KẾT ĐÍNH KÈM ({draft.attachments.length})
+            </Text>
+          </View>
+          <Text style={styles.sectionSubtitle}>
+            Đính kèm tài liệu, hình ảnh hoặc danh sách liên kết tham chiếu cho dự án.
+          </Text>
+
+          {/* Action buttons */}
+          <View style={styles.attachmentBtnRow}>
+            <Pressable
+              style={[styles.attachActionBtn, { flexDirection: "row", alignItems: "center", gap: 5 }]}
+              onPress={() => void handlePickFiles()}
+              disabled={disabled}
+            >
+              <Paperclip size={14} color="#059669" />
+              <Text style={styles.attachActionText}>Tải tệp lên</Text>
+            </Pressable>
+
+            <Pressable
+              style={[styles.attachActionBtn, { flexDirection: "row", alignItems: "center", gap: 5 }]}
+              onPress={() => void handlePickImages()}
+              disabled={disabled}
+            >
+              <ImageIcon size={14} color="#0284c7" />
+              <Text style={styles.attachActionText}>Tải ảnh lên</Text>
+            </Pressable>
+
+            <Pressable
+              style={[styles.attachActionBtn, { flexDirection: "row", alignItems: "center", gap: 5 }]}
+              onPress={() => {
+                setLinkError(null);
+                setLinkModalOpen(true);
+              }}
+              disabled={disabled}
+            >
+              <LinkIcon size={14} color="#7c3aed" />
+              <Text style={styles.attachActionText}>Điền liên kết</Text>
+            </Pressable>
+          </View>
+
+          {/* Uploading progress indicator */}
+          {uploading && (
+            <View style={styles.uploadingBox}>
+              <ActivityIndicator size="small" color="#059669" />
+              <Text style={styles.uploadingText}>{uploadMessage || "Đang xử lý tệp đính kèm..."}</Text>
+            </View>
+          )}
+
+          {/* Attachments List */}
+          {draft.attachments.length > 0 ? (
+            <View style={styles.attachmentList}>
+              {draft.attachments.map((att) => (
+                <View key={att.id} style={styles.attachmentItem}>
+                  <View style={styles.attachmentIconWrap}>
+                    <AttachmentTypeIcon type={att.type} />
+                  </View>
+                  <View style={styles.attachmentItemInfo}>
+                    <Text style={styles.attachmentItemName} numberOfLines={1}>
+                      {att.name}
+                    </Text>
+                    <Text style={styles.attachmentItemSub} numberOfLines={1}>
+                      {att.type === "link"
+                        ? att.url
+                        : att.size
+                        ? `${Math.round(att.size / 1024)} KB`
+                        : "Tệp đính kèm"}
+                    </Text>
+                  </View>
+
+                  <Pressable
+                    style={styles.viewAttachBtn}
+                    onPress={() => handleOpenAttachment(att)}
+                  >
+                    <Text style={styles.viewAttachBtnText}>
+                      {att.type === "link" ? "Mở" : "Xem"}
+                    </Text>
+                  </Pressable>
+
+                  <Pressable
+                    onPress={() => handleRemoveAttachment(att.id)}
+                    hitSlop={8}
+                    style={styles.removeAttachBtn}
+                  >
+                    <X size={14} color="#94a3b8" />
+                  </Pressable>
+                </View>
+              ))}
+            </View>
+          ) : (
+            <Text style={styles.emptyTipText}>Chưa có tài liệu hoặc tệp đính kèm nào.</Text>
+          )}
+        </View>
+
         <View style={{ height: 40 }} />
       </ScrollView>
 
@@ -379,6 +665,155 @@ export function ProjectForm({
           }
         }}
       />
+
+      {/* Link Modal (Supports Single & Batch/Điền nhiều) */}
+      <Modal
+        visible={linkModalOpen}
+        animationType="fade"
+        transparent
+        onRequestClose={() => setLinkModalOpen(false)}
+      >
+        <View style={styles.modalOverlay}>
+          <View style={styles.linkModalBox}>
+            <View style={styles.linkModalHeader}>
+              <View style={{ flex: 1 }}>
+                <Text style={styles.linkModalTitle}>Thêm liên kết dự án</Text>
+                <Text style={styles.linkModalSubtitle}>
+                  Thêm tài liệu trực tuyến (Google Drive, Docs, Figma,...)
+                </Text>
+              </View>
+              <TouchableOpacity
+                style={styles.linkModalCloseBtn}
+                onPress={() => setLinkModalOpen(false)}
+                hitSlop={8}
+              >
+                <X size={18} color="#64748b" />
+              </TouchableOpacity>
+            </View>
+
+            {/* Mode Switcher Tabs */}
+            <View style={styles.linkTabsRow}>
+              <TouchableOpacity
+                style={[
+                  styles.linkTab,
+                  linkMode === "single" && styles.linkTabActive,
+                ]}
+                onPress={() => {
+                  setLinkMode("single");
+                  setLinkError(null);
+                }}
+              >
+                <Text
+                  style={[
+                    styles.linkTabText,
+                    linkMode === "single" && styles.linkTabTextActive,
+                  ]}
+                >
+                  Thêm 1 liên kết
+                </Text>
+              </TouchableOpacity>
+
+              <TouchableOpacity
+                style={[
+                  styles.linkTab,
+                  linkMode === "batch" && styles.linkTabActive,
+                ]}
+                onPress={() => {
+                  setLinkMode("batch");
+                  setLinkError(null);
+                }}
+              >
+                <Text
+                  style={[
+                    styles.linkTabText,
+                    linkMode === "batch" && styles.linkTabTextActive,
+                  ]}
+                >
+                  Điền nhiều liên kết (Hàng loạt)
+                </Text>
+              </TouchableOpacity>
+            </View>
+
+            {linkError && (
+              <View style={styles.linkErrorBanner}>
+                <AlertCircle size={14} color="#dc2626" />
+                <Text style={styles.linkErrorText}>{linkError}</Text>
+              </View>
+            )}
+
+            {linkMode === "single" ? (
+              <View style={styles.linkFormBody}>
+                <View style={styles.fieldGroup}>
+                  <Text style={styles.fieldLabel}>Tên liên kết (tùy chọn)</Text>
+                  <TextInput
+                    style={styles.textInput}
+                    placeholder="VD: Bản thiết kế Figma, File phân tích dữ liệu..."
+                    placeholderTextColor="#94a3b8"
+                    value={linkName}
+                    onChangeText={setLinkName}
+                  />
+                </View>
+
+                <View style={styles.fieldGroup}>
+                  <Text style={styles.fieldLabel}>
+                    Địa chỉ URL <Text style={styles.requiredStar}>*</Text>
+                  </Text>
+                  <TextInput
+                    style={styles.textInput}
+                    placeholder="https://example.com/..."
+                    placeholderTextColor="#94a3b8"
+                    autoCapitalize="none"
+                    autoCorrect={false}
+                    keyboardType="url"
+                    value={linkUrl}
+                    onChangeText={setLinkUrl}
+                  />
+                </View>
+
+                <TouchableOpacity
+                  style={[styles.addLinkBtn, !linkUrl.trim() && styles.btnDisabled]}
+                  disabled={!linkUrl.trim()}
+                  onPress={handleAddSingleLink}
+                >
+                  <Plus size={16} color="#ffffff" />
+                  <Text style={styles.addLinkBtnText}>Thêm vào danh sách</Text>
+                </TouchableOpacity>
+              </View>
+            ) : (
+              <View style={styles.linkFormBody}>
+                <View style={styles.fieldGroup}>
+                  <Text style={styles.fieldLabel}>
+                    Dán danh sách các liên kết (mỗi dòng 1 link)
+                  </Text>
+                  <TextInput
+                    style={[styles.textInput, { minHeight: 110, textAlignVertical: "top" }]}
+                    placeholder={`Ví dụ:\nhttps://docs.google.com/document/...\nBản vẽ | https://figma.com/file/...\nhttps://drive.google.com/...`}
+                    placeholderTextColor="#94a3b8"
+                    multiline
+                    numberOfLines={5}
+                    autoCapitalize="none"
+                    autoCorrect={false}
+                    value={batchLinks}
+                    onChangeText={setBatchLinks}
+                  />
+                  <Text style={styles.batchTip}>
+                    Mẹo: Có thể dán trực tiếp nhiều URL hoặc dùng định dạng "Tên hiển thị | URL".
+                  </Text>
+                </View>
+
+                <TouchableOpacity
+                  style={[styles.addLinkBtn, !batchLinks.trim() && styles.btnDisabled]}
+                  disabled={!batchLinks.trim()}
+                  onPress={handleAddBatchLinks}
+                >
+                  <Plus size={16} color="#ffffff" />
+                  <Text style={styles.addLinkBtnText}>Thêm tất cả các link</Text>
+                </TouchableOpacity>
+              </View>
+            )}
+          </View>
+        </View>
+      </Modal>
 
       {/* Bottom Sticky Actions */}
       <View style={styles.bottomBar}>
@@ -433,11 +868,6 @@ const styles = StyleSheet.create({
     alignItems: "center",
     justifyContent: "center",
   },
-  closeBtnText: {
-    fontSize: 16,
-    fontWeight: "700",
-    color: "#64748b",
-  },
   titleText: {
     fontSize: 17,
     fontWeight: "700",
@@ -478,9 +908,6 @@ const styles = StyleSheet.create({
     padding: 12,
     gap: 10,
   },
-  errorIcon: {
-    fontSize: 18,
-  },
   errorText: {
     flex: 1,
     color: "#dc2626",
@@ -505,6 +932,17 @@ const styles = StyleSheet.create({
     fontWeight: "800",
     color: "#64748b",
     letterSpacing: 0.6,
+  },
+  sectionSubtitle: {
+    fontSize: 12,
+    color: "#64748b",
+    lineHeight: 18,
+    marginTop: -4,
+  },
+  cardHeaderWithCount: {
+    flexDirection: "row",
+    alignItems: "center",
+    justifyContent: "space-between",
   },
   fieldGroup: {
     gap: 6,
@@ -561,6 +999,8 @@ const styles = StyleSheet.create({
     backgroundColor: "#ecfdf5",
     borderWidth: 1,
     borderColor: "#a7f3d0",
+    flexDirection: "row",
+    alignItems: "center",
   },
   quickPillText: {
     fontSize: 12,
@@ -624,9 +1064,6 @@ const styles = StyleSheet.create({
     paddingVertical: 12,
     gap: 10,
   },
-  datePickerIcon: {
-    fontSize: 16,
-  },
   datePickerValue: {
     flex: 1,
     fontSize: 14,
@@ -645,9 +1082,217 @@ const styles = StyleSheet.create({
     alignItems: "center",
     justifyContent: "center",
   },
-  dateClearText: {
+  // Attachments styling
+  attachmentBtnRow: {
+    flexDirection: "row",
+    gap: 8,
+    marginTop: 4,
+  },
+  attachActionBtn: {
+    flex: 1,
+    paddingVertical: 9,
+    paddingHorizontal: 8,
+    borderRadius: 10,
+    backgroundColor: "#f8fafc",
+    borderWidth: 1,
+    borderColor: "#cbd5e1",
+    alignItems: "center",
+    justifyContent: "center",
+  },
+  attachActionText: {
+    fontSize: 12,
+    fontWeight: "600",
+    color: "#334155",
+  },
+  uploadingBox: {
+    flexDirection: "row",
+    alignItems: "center",
+    gap: 8,
+    padding: 10,
+    borderRadius: 8,
+    backgroundColor: "#ecfdf5",
+    borderWidth: 1,
+    borderColor: "#a7f3d0",
+  },
+  uploadingText: {
+    fontSize: 12,
+    color: "#047857",
+    fontWeight: "600",
+  },
+  attachmentList: {
+    gap: 8,
+    marginTop: 4,
+  },
+  attachmentItem: {
+    flexDirection: "row",
+    alignItems: "center",
+    gap: 10,
+    backgroundColor: "#f8fafc",
+    padding: 10,
+    borderRadius: 10,
+    borderWidth: 1,
+    borderColor: "#e2e8f0",
+  },
+  attachmentIconWrap: {
+    width: 32,
+    height: 32,
+    borderRadius: 8,
+    backgroundColor: "#ffffff",
+    borderWidth: 1,
+    borderColor: "#e2e8f0",
+    alignItems: "center",
+    justifyContent: "center",
+  },
+  attachmentItemInfo: {
+    flex: 1,
+    gap: 2,
+  },
+  attachmentItemName: {
+    fontSize: 13,
+    fontWeight: "600",
+    color: "#0f172a",
+  },
+  attachmentItemSub: {
+    fontSize: 11,
+    color: "#64748b",
+  },
+  viewAttachBtn: {
+    paddingHorizontal: 10,
+    paddingVertical: 5,
+    borderRadius: 6,
+    backgroundColor: "#ecfdf5",
+    borderWidth: 1,
+    borderColor: "#a7f3d0",
+  },
+  viewAttachBtnText: {
     fontSize: 12,
     fontWeight: "700",
+    color: "#059669",
+  },
+  removeAttachBtn: {
+    padding: 4,
+  },
+  emptyTipText: {
+    fontSize: 12,
+    color: "#94a3b8",
+    fontStyle: "italic",
+  },
+  // Modal overlay & link box
+  modalOverlay: {
+    flex: 1,
+    backgroundColor: "rgba(15, 23, 42, 0.5)",
+    justifyContent: "center",
+    alignItems: "center",
+    padding: 16,
+  },
+  linkModalBox: {
+    width: "100%",
+    maxWidth: 440,
+    backgroundColor: "#ffffff",
+    borderRadius: 18,
+    padding: 18,
+    gap: 12,
+    shadowColor: "#0f172a",
+    shadowOffset: { width: 0, height: 10 },
+    shadowOpacity: 0.15,
+    shadowRadius: 20,
+    elevation: 8,
+  },
+  linkModalHeader: {
+    flexDirection: "row",
+    alignItems: "center",
+    justifyContent: "space-between",
+  },
+  linkModalTitle: {
+    fontSize: 16,
+    fontWeight: "700",
+    color: "#0f172a",
+  },
+  linkModalSubtitle: {
+    fontSize: 12,
     color: "#64748b",
+    marginTop: 2,
+  },
+  linkModalCloseBtn: {
+    width: 32,
+    height: 32,
+    borderRadius: 16,
+    backgroundColor: "#f1f5f9",
+    alignItems: "center",
+    justifyContent: "center",
+  },
+  linkTabsRow: {
+    flexDirection: "row",
+    backgroundColor: "#f1f5f9",
+    borderRadius: 10,
+    padding: 3,
+    gap: 4,
+  },
+  linkTab: {
+    flex: 1,
+    paddingVertical: 7,
+    borderRadius: 8,
+    alignItems: "center",
+    justifyContent: "center",
+  },
+  linkTabActive: {
+    backgroundColor: "#ffffff",
+    shadowColor: "#0f172a",
+    shadowOffset: { width: 0, height: 1 },
+    shadowOpacity: 0.08,
+    shadowRadius: 2,
+    elevation: 1,
+  },
+  linkTabText: {
+    fontSize: 12,
+    fontWeight: "500",
+    color: "#64748b",
+  },
+  linkTabTextActive: {
+    fontWeight: "700",
+    color: "#0f172a",
+  },
+  linkErrorBanner: {
+    flexDirection: "row",
+    alignItems: "center",
+    gap: 6,
+    backgroundColor: "#fef2f2",
+    padding: 8,
+    borderRadius: 8,
+    borderWidth: 1,
+    borderColor: "#fecaca",
+  },
+  linkErrorText: {
+    fontSize: 12,
+    color: "#dc2626",
+    flex: 1,
+  },
+  linkFormBody: {
+    gap: 12,
+    marginTop: 2,
+  },
+  batchTip: {
+    fontSize: 11,
+    color: "#64748b",
+    fontStyle: "italic",
+    marginTop: 2,
+  },
+  addLinkBtn: {
+    flexDirection: "row",
+    alignItems: "center",
+    justifyContent: "center",
+    gap: 6,
+    backgroundColor: "#059669",
+    paddingVertical: 11,
+    borderRadius: 10,
+    marginTop: 4,
+  },
+  addLinkBtnText: {
+    fontSize: 13,
+    fontWeight: "700",
+    color: "#ffffff",
+  },
+  btnDisabled: {
+    opacity: 0.5,
   },
 });

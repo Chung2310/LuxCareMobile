@@ -3,12 +3,12 @@ import { browserTransport, type ServiceTransport } from "./serviceTransport";
 import type { TrainingCourse, TrainingEnrollment } from "../types/hr";
 
 export type TrainingCourseInput = Pick<TrainingCourse, "title" | "description" | "category" | "duration" | "instructor" | "companyCode"> &
-  Partial<Pick<TrainingCourse, "tags" | "isRequired" | "icon" | "imageUrl" | "autoAssignOnboarding" | "lessons" | "quizzes">>;
+  Partial<Pick<TrainingCourse, "tags" | "isRequired" | "icon" | "imageUrl" | "autoAssignOnboarding" | "lessons" | "quizzes" | "passingScore">>;
 export type TrainingCourseUpdate = Partial<TrainingCourseInput> &
   Partial<Pick<TrainingCourse, "enrolledCount" | "companyProgress">>;
 export type TrainingEnrollmentInput = Pick<TrainingEnrollment, "courseId" | "courseTitle" | "uid" | "userName" | "companyCode"> &
-  Partial<Pick<TrainingEnrollment, "progress" | "status" | "startedAt" | "completedAt" | "completedLessons" | "quizPassed">>;
-export type TrainingEnrollmentUpdate = Partial<Pick<TrainingEnrollment, "progress" | "status" | "startedAt" | "completedAt" | "completedLessons" | "quizPassed">>;
+  Partial<Pick<TrainingEnrollment, "progress" | "status" | "startedAt" | "completedAt" | "completedLessons" | "quizPassed" | "quizScore">>;
+export type TrainingEnrollmentUpdate = Partial<Pick<TrainingEnrollment, "progress" | "status" | "startedAt" | "completedAt" | "completedLessons" | "quizPassed" | "quizScore">>;
 
 function idOf(item: { _id?: string; id?: string }) { return item._id || item.id || ""; }
 

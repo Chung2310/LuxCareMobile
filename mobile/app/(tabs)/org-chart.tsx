@@ -1,3 +1,4 @@
+import { CARD_WIDTH, CARD_MARGIN, ROOT_GAP, CANVAS_PADDING, treeWidth, fitTreeScale } from "../../src/features/org-chart/layout";
 import { useAppAlert } from "../../src/components/AppAlert";
 import React, { useCallback, useMemo, useState } from "react";
 import {
@@ -771,6 +772,7 @@ function ProfileModal({
     <Modal visible animationType="slide" transparent onRequestClose={onClose}>
       <Pressable style={s.backdrop} onPress={onClose}>
         <Pressable style={s.sheet} onPress={() => {}}>
+          <ScrollView showsVerticalScrollIndicator={false}>
           <View style={s.handle} />
           <View style={{ alignItems: "center", marginTop: 4, marginBottom: 18 }}>
             <Avatar
@@ -907,6 +909,7 @@ function ProfileModal({
               </>
             )}
           </View>
+          </ScrollView>
         </Pressable>
       </Pressable>
     </Modal>
@@ -916,8 +919,6 @@ function ProfileModal({
 /* ==========================================================================
    4. TOP-DOWN SMART CARD & RECURSIVE BRANCH (Chuẩn Luxcare Web)
    ========================================================================== */
-const CARD_WIDTH = 206;
-const CARD_MARGIN = 12;
 
 function TreeBranchView({
   node,
@@ -1310,6 +1311,10 @@ export default function OrgChart() {
   const [movingEmp, setMovingEmp] = useState<UserProfile | null>(null);
   const [viewMode, setViewMode] = useState<"tree" | "list">("tree");
   const [zoomScale, setZoomScale] = useState<number>(1.0);
+  const [viewport, setViewport] = useState({ width: 0, height: 0 });
+  const [canvasHeight, setCanvasHeight] = useState(1);
+  const verticalRef = React.useRef<ScrollView>(null);
+  const horizontalRef = React.useRef<ScrollView>(null);
   const [createModalVisible, setCreateModalVisible] = useState(false);
   const [deptList, setDeptList] = useState<DepartmentRecord[]>([]);
   const [branchList, setBranchList] = useState<BranchRecord[]>([]);
@@ -1335,7 +1340,7 @@ export default function OrgChart() {
       const [t1, t2] = e.nativeEvent.touches;
       const currentDist = Math.hypot(t1.pageX - t2.pageX, t1.pageY - t2.pageY);
       const ratio = currentDist / pinchStartDistRef.current;
-      const newScale = Math.min(2.0, Math.max(0.35, Number((pinchStartScaleRef.current * ratio).toFixed(2))));
+      const newScale = Math.min(2.0, Math.max(0.05, Number((pinchStartScaleRef.current * ratio).toFixed(2))));
       setZoomScale(newScale);
     }
   };
@@ -1381,6 +1386,7 @@ export default function OrgChart() {
   );
 
   const tree = useMemo(() => buildTree(empList), [empList]);
+  const canvasWidth = useMemo(() => treeWidth(tree, collapsed), [tree, collapsed]);
 
   const highlighted = useMemo<Set<string> | null>(() => {
     if (!search.trim()) return null;
@@ -1423,15 +1429,19 @@ export default function OrgChart() {
   }
 
   function zoomOut() {
-    setZoomScale((z) => Math.max(0.35, Number((z - 0.15).toFixed(2))));
+    setZoomScale((z) => Math.max(0.05, Number((z - 0.15).toFixed(2))));
   }
 
   function zoomReset() {
     setZoomScale(1.0);
+    verticalRef.current?.scrollTo({ y: 0, animated: false });
+    horizontalRef.current?.scrollTo({ x: 0, animated: false });
   }
 
   function zoomFit() {
-    setZoomScale(0.55);
+    setZoomScale(fitTreeScale(viewport, { width: canvasWidth, height: canvasHeight }));
+    verticalRef.current?.scrollTo({ y: 0, animated: false });
+    horizontalRef.current?.scrollTo({ x: 0, animated: false });
   }
 
   const handleConfirmMove = (target: UserProfile | null) => {
@@ -1497,18 +1507,24 @@ export default function OrgChart() {
 
   const Header = () => (
     <View style={s.header}>
-      <Pressable onPress={() => router.back()} style={s.iconBtn}>
+      <View style={s.headerMain}>
+      <Pressable accessibilityRole="button" accessibilityLabel="Quay lại" onPress={() => router.canGoBack() ? router.back() : router.replace("/(tabs)/modules")} style={s.iconBtn}>
         <Text style={{ fontSize: 18, color: "#0f172a", fontWeight: "700" }}>{"<"}</Text>
       </Pressable>
       <View style={{ flex: 1 }}>
         <Text style={s.title}>Sơ đồ tổ chức</Text>
         {!loading && !error && (
-          <Text style={s.subtitle}>
+          <Text style={s.subtitle} numberOfLines={2}>
             {empList.length} nhân sự · {selectedBranch?.name || "Tất cả chi nhánh"}
           </Text>
         )}
       </View>
 
+      <Pressable accessibilityRole="button" accessibilityLabel="Tải lại sơ đồ" style={s.iconBtn} onPress={() => setRevision((v) => v + 1)}>
+        <RefreshCw size={18} color="#475569" />
+      </Pressable>
+      </View>
+      <View style={s.headerActions}>
       {/* Segmented control: Cây vs Bảng */}
       <View style={s.viewToggleContainer}>
         <Pressable
@@ -1573,9 +1589,7 @@ export default function OrgChart() {
         </Pressable>
       )}
 
-      <Pressable style={s.iconBtn} onPress={() => setRevision((v) => v + 1)}>
-        <Text style={{ fontSize: 17 }}>↺</Text>
-      </Pressable>
+      </View>
     </View>
   );
 
@@ -1700,16 +1714,21 @@ export default function OrgChart() {
         />
       ) : (
         /* 2D Scrollable Interactive Tree Canvas with Pinch Zoom */
-        <View style={{ flex: 1 }} onTouchStart={handleTouchStart} onTouchMove={handleTouchMove} onTouchEnd={handleTouchEnd}>
+        <View style={{ flex: 1 }} onLayout={event => { const { width, height } = event.nativeEvent.layout; setViewport({ width, height }); }} onTouchStart={handleTouchStart} onTouchMove={handleTouchMove} onTouchEnd={handleTouchEnd} onTouchCancel={handleTouchEnd}>
           <ScrollView
             style={{ flex: 1 }}
+            ref={verticalRef}
+            nestedScrollEnabled
             contentContainerStyle={s.verticalScroll}
             showsVerticalScrollIndicator={true}
           >
             <ScrollView
               horizontal
+              ref={horizontalRef}
+              nestedScrollEnabled
+              style={{ flexGrow: 0 }}
               showsHorizontalScrollIndicator={true}
-              contentContainerStyle={s.horizontalScroll}
+              contentContainerStyle={[s.horizontalScroll, { minWidth: viewport.width, minHeight: viewport.height }]}
             >
               {tree.length === 0 ? (
                 <View style={s.emptyBox}>
@@ -1718,14 +1737,11 @@ export default function OrgChart() {
                   <Text style={s.emptySub}>Vui lòng kiểm tra phân quyền hoặc danh sách nhân viên</Text>
                 </View>
               ) : (
-                <View
-                  style={[
-                    s.treeCanvas,
-                    {
-                      transform: [{ scale: zoomScale }],
-                    },
-                  ]}
-                >
+                <View style={{ width: canvasWidth * zoomScale, height: canvasHeight * zoomScale, flexShrink: 0 }}>
+                  <View
+                    onLayout={event => setCanvasHeight(event.nativeEvent.layout.height)}
+                    style={[s.treeCanvas, { position: "absolute", top: 0, left: 0, width: canvasWidth, transformOrigin: "top left", transform: [{ scale: zoomScale }] }]}
+                  >
                   <View style={s.rootRow}>
                     {tree.map((rootNode) => (
                       <TreeBranchView
@@ -1743,26 +1759,12 @@ export default function OrgChart() {
                       />
                     ))}
                   </View>
+                  </View>
                 </View>
               )}
             </ScrollView>
           </ScrollView>
 
-          {/* Floating Zoom Action Controls (FAB) */}
-          <View style={s.floatingZoomBar}>
-            <Pressable style={s.floatingZoomBtn} onPress={zoomIn}>
-              <Text style={s.floatingZoomBtnTxt}>+</Text>
-            </Pressable>
-            <Pressable style={s.floatingZoomLabelBtn} onPress={zoomReset}>
-              <Text style={s.floatingZoomLabelTxt}>{Math.round(zoomScale * 100)}%</Text>
-            </Pressable>
-            <Pressable style={s.floatingZoomBtn} onPress={zoomOut}>
-              <Text style={s.floatingZoomBtnTxt}>−</Text>
-            </Pressable>
-            <Pressable style={s.floatingFitBtn} onPress={zoomFit}>
-              <Text style={s.floatingFitBtnTxt}>Fit</Text>
-            </Pressable>
-          </View>
         </View>
       )}
 
@@ -1810,9 +1812,9 @@ export default function OrgChart() {
    ========================================================================== */
 const s = StyleSheet.create({
   root: { flex: 1, backgroundColor: "#f8fafc" },
+  headerMain: { flexDirection: "row", alignItems: "center", gap: 8 },
+  headerActions: { flexDirection: "row", alignItems: "center", flexWrap: "wrap", gap: 8 },
   header: {
-    flexDirection: "row",
-    alignItems: "center",
     gap: 8,
     paddingHorizontal: 12,
     paddingVertical: 10,
@@ -1891,6 +1893,8 @@ const s = StyleSheet.create({
 
   treeToolRow: {
     flexDirection: "row",
+    flexWrap: "wrap",
+    gap: 8,
     alignItems: "center",
     justifyContent: "space-between",
   },
@@ -2049,16 +2053,16 @@ const s = StyleSheet.create({
     flexGrow: 1,
     alignItems: "center",
     justifyContent: "center",
-    paddingHorizontal: 30,
-    paddingVertical: 24,
+    padding: CANVAS_PADDING,
   },
   treeCanvas: {
     alignItems: "center",
+    paddingBottom: 12,
   },
   rootRow: {
     flexDirection: "row",
     alignItems: "flex-start",
-    gap: 32,
+    gap: ROOT_GAP,
   },
 
   /* Recursive Tree Branch Layout */
@@ -2332,6 +2336,7 @@ const s = StyleSheet.create({
     justifyContent: "flex-end",
   },
   sheet: {
+    maxHeight: "90%",
     backgroundColor: "#ffffff",
     borderTopLeftRadius: 24,
     borderTopRightRadius: 24,
@@ -2376,7 +2381,7 @@ const s = StyleSheet.create({
   iIco: { width: 22, alignItems: "center", justifyContent: "center" },
   iLbl: { fontSize: 12, color: "#64748b", width: 78, fontWeight: "600" },
   iVal: { flex: 1, fontSize: 13, color: "#0f172a", fontWeight: "600" },
-  actionRow: { flexDirection: "row", gap: 10 },
+  actionRow: { flexDirection: "row", flexWrap: "wrap", gap: 10 },
   actionBtn: {
     flex: 1,
     alignItems: "center",

@@ -13,6 +13,23 @@ import {
 import { SafeAreaView } from "react-native-safe-area-context";
 import { router, useFocusEffect } from "expo-router";
 import { Ionicons } from "@expo/vector-icons";
+import {
+  Calendar,
+  CalendarDays,
+  Clock,
+  User,
+  Users,
+  Search,
+  X,
+  Check,
+  Coffee,
+  Hourglass,
+  Moon,
+  Palmtree,
+  Building2,
+  Edit2,
+  List,
+} from "lucide-react-native";
 import { ShiftForm } from "../../src/features/shifts/ShiftForm";
 import { HolidayForm } from "../../src/features/calendar/HolidayForm";
 import type { CalendarItem, CalendarItemInput } from "../../../src/services/hrCalendarService";
@@ -727,29 +744,32 @@ export default function CalendarEvents() {
       <View style={s.scheduleViewToggleRow}>
         <View style={s.modeSegment}>
           <Pressable
-            style={[s.modeBtn, scheduleViewMode === "grid" && s.modeBtnActive]}
+            style={[s.modeBtn, scheduleViewMode === "grid" && s.modeBtnActive, { flexDirection: "row", alignItems: "center", justifyContent: "center", gap: 5 }]}
             onPress={() => setScheduleViewMode("grid")}
           >
+            <CalendarDays size={13} color={scheduleViewMode === "grid" ? "#4338ca" : "#64748b"} />
             <Text style={[s.modeBtnTxt, scheduleViewMode === "grid" ? s.modeBtnTxtActive : s.modeBtnTxtInactive]}>
-              📆 Lưới tháng
+              Lưới tháng
             </Text>
           </Pressable>
           <Pressable
-            style={[s.modeBtn, scheduleViewMode === "list" && s.modeBtnActive]}
+            style={[s.modeBtn, scheduleViewMode === "list" && s.modeBtnActive, { flexDirection: "row", alignItems: "center", justifyContent: "center", gap: 5 }]}
             onPress={() => setScheduleViewMode("list")}
           >
+            <List size={13} color={scheduleViewMode === "list" ? "#4338ca" : "#64748b"} />
             <Text style={[s.modeBtnTxt, scheduleViewMode === "list" ? s.modeBtnTxtActive : s.modeBtnTxtInactive]}>
-              📋 Danh sách
+              Danh sách
             </Text>
           </Pressable>
         </View>
 
         <Pressable
-          style={[s.filterMineBtn, onlyMine && s.filterMineBtnActive]}
+          style={[s.filterMineBtn, onlyMine && s.filterMineBtnActive, { flexDirection: "row", alignItems: "center", gap: 4 }]}
           onPress={() => setOnlyMine((v) => !v)}
         >
+          {onlyMine && <Check size={12} color="#ffffff" strokeWidth={3} />}
           <Text style={[s.filterMineTxt, onlyMine && s.filterMineTxtActive]}>
-            {onlyMine ? "✓ Của tôi" : "Toàn công ty"}
+            {onlyMine ? "Của tôi" : "Toàn công ty"}
           </Text>
         </Pressable>
       </View>
@@ -812,7 +832,7 @@ export default function CalendarEvents() {
 
       {/* Search Bar */}
       <View style={s.searchBox}>
-        <Text style={{ color: "#94a3b8", fontSize: 13, marginRight: 6 }}>🔍</Text>
+        <Search size={14} color="#94a3b8" style={{ marginRight: 6 }} />
         <TextInput
           style={s.searchInput}
           placeholder="Tìm tiêu đề, nội dung, nhân sự…"
@@ -822,7 +842,7 @@ export default function CalendarEvents() {
         />
         {!!searchQuery && (
           <Pressable onPress={() => setSearchQuery("")} hitSlop={6}>
-            <Text style={{ color: "#94a3b8", fontWeight: "700", paddingHorizontal: 4 }}>✕</Text>
+            <X size={14} color="#94a3b8" />
           </Pressable>
         )}
       </View>
@@ -937,7 +957,10 @@ export default function CalendarEvents() {
                       <Text style={s.eventCardDesc} numberOfLines={2}>{item.description}</Text>
                     )}
                     {!!item.employeeName && (
-                      <Text style={s.eventCardEmp}>👤 {item.employeeName}</Text>
+                      <View style={{ flexDirection: "row", alignItems: "center", gap: 4, marginTop: 4 }}>
+                        <User size={12} color="#64748b" />
+                        <Text style={s.eventCardEmp}>{item.employeeName}</Text>
+                      </View>
                     )}
                   </Pressable>
                 );
@@ -952,7 +975,7 @@ export default function CalendarEvents() {
         <View style={s.listViewContainer}>
           {filteredMonthItems.length === 0 ? (
             <View style={s.emptyBox}>
-              <Text style={{ fontSize: 32, marginBottom: 8 }}>📅</Text>
+              <Calendar size={36} color="#94a3b8" style={{ marginBottom: 8 }} />
               <Text style={s.emptyTitle}>Không tìm thấy lịch trình</Text>
               <Text style={s.emptySub}>Thử thay đổi bộ lọc hoặc từ khóa tìm kiếm</Text>
             </View>
@@ -986,14 +1009,20 @@ export default function CalendarEvents() {
                     </View>
                   </View>
                   <Text style={s.eventCardTitle}>{item.title}</Text>
-                  <Text style={s.listRangeTxt}>
-                    ⏰ {formatFullDateTime(item.startDate)} → {formatTimeOnly(item.endDate)}
-                  </Text>
+                  <View style={{ flexDirection: "row", alignItems: "center", gap: 4, marginTop: 4 }}>
+                    <Clock size={12} color="#64748b" />
+                    <Text style={s.listRangeTxt}>
+                      {formatFullDateTime(item.startDate)} → {formatTimeOnly(item.endDate)}
+                    </Text>
+                  </View>
                   {!!item.description && (
                     <Text style={s.eventCardDesc} numberOfLines={2}>{item.description}</Text>
                   )}
                   {!!item.employeeName && (
-                    <Text style={s.eventCardEmp}>👤 {item.employeeName}</Text>
+                    <View style={{ flexDirection: "row", alignItems: "center", gap: 4, marginTop: 4 }}>
+                      <User size={12} color="#64748b" />
+                      <Text style={s.eventCardEmp}>{item.employeeName}</Text>
+                    </View>
                   )}
                 </Pressable>
               );
@@ -1130,27 +1159,30 @@ export default function CalendarEvents() {
       {/* Sub-toggle: Shifts vs Employee Assignments vs Holidays */}
       <View style={s.shiftSubToggleRow}>
         <Pressable
-          style={[s.shiftSubBtn, shiftViewMode === "shifts" && s.shiftSubBtnActive]}
+          style={[s.shiftSubBtn, shiftViewMode === "shifts" && s.shiftSubBtnActive, { flexDirection: "row", alignItems: "center", justifyContent: "center", gap: 4 }]}
           onPress={() => setShiftViewMode("shifts")}
         >
+          <Clock size={12} color={shiftViewMode === "shifts" ? "#4338ca" : "#64748b"} />
           <Text style={[s.shiftSubTxt, shiftViewMode === "shifts" ? s.shiftSubTxtActive : s.shiftSubTxtInactive]}>
-            ⏰ Ca làm ({shifts.length})
+            Ca làm ({shifts.length})
           </Text>
         </Pressable>
         <Pressable
-          style={[s.shiftSubBtn, shiftViewMode === "employees" && s.shiftSubBtnActive]}
+          style={[s.shiftSubBtn, shiftViewMode === "employees" && s.shiftSubBtnActive, { flexDirection: "row", alignItems: "center", justifyContent: "center", gap: 4 }]}
           onPress={() => setShiftViewMode("employees")}
         >
+          <Users size={12} color={shiftViewMode === "employees" ? "#4338ca" : "#64748b"} />
           <Text style={[s.shiftSubTxt, shiftViewMode === "employees" ? s.shiftSubTxtActive : s.shiftSubTxtInactive]}>
-            👥 Phân ca & Giờ ({shiftEmployees.length})
+            Phân ca & Giờ ({shiftEmployees.length})
           </Text>
         </Pressable>
         <Pressable
-          style={[s.shiftSubBtn, shiftViewMode === "holidays" && s.shiftSubBtnActive]}
+          style={[s.shiftSubBtn, shiftViewMode === "holidays" && s.shiftSubBtnActive, { flexDirection: "row", alignItems: "center", justifyContent: "center", gap: 4 }]}
           onPress={() => setShiftViewMode("holidays")}
         >
+          <Palmtree size={12} color={shiftViewMode === "holidays" ? "#4338ca" : "#64748b"} />
           <Text style={[s.shiftSubTxt, shiftViewMode === "holidays" ? s.shiftSubTxtActive : s.shiftSubTxtInactive]}>
-            🏖️ Nghỉ lễ ({holidays.length})
+            Nghỉ lễ ({holidays.length})
           </Text>
         </Pressable>
       </View>
@@ -1176,7 +1208,7 @@ export default function CalendarEvents() {
 
           {shifts.length === 0 ? (
             <View style={s.emptyBox}>
-              <Text style={{ fontSize: 32, marginBottom: 8 }}>⏰</Text>
+              <Clock size={36} color="#94a3b8" style={{ marginBottom: 8 }} />
               <Text style={s.emptyTitle}>Chưa cấu hình ca làm việc</Text>
               <Text style={s.emptySub}>Bấm "Thêm ca" bên trên để tạo ca làm việc đầu tiên</Text>
               {isManager && (
@@ -1210,12 +1242,16 @@ export default function CalendarEvents() {
 
                   {/* Hours & Overnight */}
                   <View style={{ flexDirection: "row", alignItems: "center", gap: 8, marginTop: 4 }}>
-                    <Text style={s.shiftTime}>
-                      ⏰ Giờ làm: {sh.startTime} – {sh.endTime}
-                    </Text>
+                    <View style={{ flexDirection: "row", alignItems: "center", gap: 4 }}>
+                      <Clock size={12} color="#64748b" />
+                      <Text style={s.shiftTime}>
+                        Giờ làm: {sh.startTime} – {sh.endTime}
+                      </Text>
+                    </View>
                     {isOvernight && (
-                      <View style={s.overnightBadge}>
-                        <Text style={s.overnightText}>🌙 Qua đêm</Text>
+                      <View style={[s.overnightBadge, { flexDirection: "row", alignItems: "center", gap: 3 }]}>
+                        <Moon size={11} color="#7c3aed" />
+                        <Text style={s.overnightText}>Qua đêm</Text>
                       </View>
                     )}
                   </View>
@@ -1245,15 +1281,21 @@ export default function CalendarEvents() {
 
                   {/* Break & Tolerance info */}
                   {breakInfo && (
-                    <Text style={s.shiftBreak}>
-                      ☕ Nghỉ trưa: {breakInfo.startTime} – {breakInfo.endTime}
-                    </Text>
+                    <View style={{ flexDirection: "row", alignItems: "center", gap: 4, marginTop: 4 }}>
+                      <Coffee size={12} color="#64748b" />
+                      <Text style={s.shiftBreak}>
+                        Nghỉ trưa: {breakInfo.startTime} – {breakInfo.endTime}
+                      </Text>
+                    </View>
                   )}
 
                   <View style={{ flexDirection: "row", alignItems: "center", gap: 8, marginTop: 4 }}>
-                    <Text style={s.shiftTolerance}>
-                      ⏱️ Trễ: {sh.allowedLateMinutes}p · Sớm: {sh.allowedEarlyLeaveMinutes}p
-                    </Text>
+                    <View style={{ flexDirection: "row", alignItems: "center", gap: 4 }}>
+                      <Hourglass size={12} color="#64748b" />
+                      <Text style={s.shiftTolerance}>
+                        Trễ: {sh.allowedLateMinutes}p · Sớm: {sh.allowedEarlyLeaveMinutes}p
+                      </Text>
+                    </View>
                     <View style={[s.statusPill, { backgroundColor: sh.isActive ? "#ecfdf5" : "#f1f5f9" }]}>
                       <Text style={[s.statusPillText, { color: sh.isActive ? "#059669" : "#94a3b8" }]}>
                         {sh.isActive ? "● Hoạt động" : "○ Tạm ngừng"}
@@ -1298,7 +1340,7 @@ export default function CalendarEvents() {
 
           {/* Search Box for Employees */}
           <View style={s.searchBox}>
-            <Text style={{ color: "#94a3b8", fontSize: 13, marginRight: 6 }}>🔍</Text>
+            <Search size={14} color="#94a3b8" style={{ marginRight: 6 }} />
             <TextInput
               style={s.searchInput}
               placeholder="Tìm nhân viên theo tên, email, phòng ban…"
@@ -1308,14 +1350,14 @@ export default function CalendarEvents() {
             />
             {!!employeeSearchQuery && (
               <Pressable onPress={() => setEmployeeSearchQuery("")} hitSlop={6}>
-                <Text style={{ color: "#94a3b8", fontWeight: "700", paddingHorizontal: 4 }}>✕</Text>
+                <X size={14} color="#94a3b8" />
               </Pressable>
             )}
           </View>
 
           {filteredShiftEmployees.length === 0 ? (
             <View style={s.emptyBox}>
-              <Text style={{ fontSize: 32, marginBottom: 8 }}>👥</Text>
+              <Users size={36} color="#94a3b8" style={{ marginBottom: 8 }} />
               <Text style={s.emptyTitle}>Không tìm thấy nhân viên nào</Text>
               <Text style={s.emptySub}>Thử tìm kiếm với từ khóa khác hoặc tải lại</Text>
             </View>
@@ -1357,9 +1399,10 @@ export default function CalendarEvents() {
                             <Text style={s.empAssignedShiftName}>{currentShift.name}</Text>
                             <Text style={s.shiftCodeMini}>({currentShift.code})</Text>
                           </View>
-                          <View style={s.empHoursPill}>
+                          <View style={[s.empHoursPill, { flexDirection: "row", alignItems: "center", gap: 4 }]}>
+                            <Clock size={11} color="#4338ca" />
                             <Text style={s.empHoursPillText}>
-                              ⏰ {currentShift.startTime} – {currentShift.endTime}
+                              {currentShift.startTime} – {currentShift.endTime}
                             </Text>
                           </View>
                         </View>
@@ -1388,9 +1431,10 @@ export default function CalendarEvents() {
                         </View>
 
                         {/* Effective period */}
-                        <View style={{ flexDirection: "row", alignItems: "center", gap: 6, marginTop: 6 }}>
+                        <View style={{ flexDirection: "row", alignItems: "center", gap: 4, marginTop: 6 }}>
+                          <Calendar size={12} color="#64748b" />
                           <Text style={s.empPeriodText}>
-                            📅 Hiệu lực: {emp.assignment?.effectiveFrom || "--"}
+                            Hiệu lực: {emp.assignment?.effectiveFrom || "--"}
                             {emp.assignment?.effectiveTo ? ` → ${emp.assignment.effectiveTo}` : " (Vô thời hạn)"}
                           </Text>
                         </View>
@@ -1454,7 +1498,7 @@ export default function CalendarEvents() {
 
           {holidays.length === 0 ? (
             <View style={s.emptyBox}>
-              <Text style={{ fontSize: 32, marginBottom: 8 }}>🏖️</Text>
+              <Palmtree size={36} color="#94a3b8" style={{ marginBottom: 8 }} />
               <Text style={s.emptyTitle}>Chưa có lịch nghỉ lễ trong năm {year}</Text>
               <Text style={s.emptySub}>Bấm nút bên dưới để đồng bộ lịch nghỉ lễ quốc gia hoặc thêm ngày mới</Text>
               {isManager && (
@@ -1615,20 +1659,22 @@ export default function CalendarEvents() {
       {/* Subtab Navigator Bar */}
       <View style={s.subTabBar}>
         <Pressable
-          style={[s.subTabBtn, subTab === "schedule" && s.subTabBtnActive]}
+          style={[s.subTabBtn, subTab === "schedule" && s.subTabBtnActive, { flexDirection: "row", alignItems: "center", justifyContent: "center", gap: 5 }]}
           onPress={() => setSubTab("schedule")}
         >
+          <Calendar size={14} color={subTab === "schedule" ? "#4338ca" : "#64748b"} />
           <Text style={[s.subTabTxt, subTab === "schedule" && s.subTabTxtActive]}>
-            📅 Lịch trình
+            Lịch trình
           </Text>
         </Pressable>
 
         <Pressable
-          style={[s.subTabBtn, subTab === "shifts" && s.subTabBtnActive]}
+          style={[s.subTabBtn, subTab === "shifts" && s.subTabBtnActive, { flexDirection: "row", alignItems: "center", justifyContent: "center", gap: 5 }]}
           onPress={() => setSubTab("shifts")}
         >
+          <Building2 size={14} color={subTab === "shifts" ? "#4338ca" : "#64748b"} />
           <Text style={[s.subTabTxt, subTab === "shifts" && s.subTabTxtActive]}>
-            🏢 Ca & Lễ
+            Ca & Lễ
           </Text>
         </Pressable>
       </View>
@@ -1877,10 +1923,11 @@ export default function CalendarEvents() {
                 <View style={{ flexDirection: "row", gap: 8, marginTop: 16 }}>
                   {(isManager || viewingItem.creatorId === user?.uid || viewingItem.employeeId === user?.uid) && (
                     <Pressable
-                      style={[s.modalBtn, { backgroundColor: "#eef2ff", borderWidth: 1, borderColor: "#c7d2fe" }]}
+                      style={[s.modalBtn, { backgroundColor: "#eef2ff", borderWidth: 1, borderColor: "#c7d2fe", flexDirection: "row", alignItems: "center", justifyContent: "center", gap: 4 }]}
                       onPress={() => handleOpenEditEvent(viewingItem)}
                     >
-                      <Text style={{ fontWeight: "700", color: "#4338ca" }}>✏️ Sửa giờ</Text>
+                      <Edit2 size={13} color="#4338ca" />
+                      <Text style={{ fontWeight: "700", color: "#4338ca" }}>Sửa giờ</Text>
                     </Pressable>
                   )}
                   {(isManager || viewingItem.creatorId === user?.uid) && (
@@ -2161,9 +2208,10 @@ export default function CalendarEvents() {
                               <Text style={s.shiftPickCode}>{sh.code}</Text>
                             </View>
                           </View>
-                          <View style={[s.shiftPickHoursBadge, isSelected && { backgroundColor: "#e0e7ff" }]}>
+                          <View style={[s.shiftPickHoursBadge, isSelected && { backgroundColor: "#e0e7ff" }, { flexDirection: "row", alignItems: "center", gap: 4 }]}>
+                            <Clock size={11} color={isSelected ? "#3730a3" : "#475569"} />
                             <Text style={[s.shiftPickHoursText, isSelected && { color: "#3730a3" }]}>
-                              ⏰ {sh.startTime} – {sh.endTime}
+                              {sh.startTime} – {sh.endTime}
                             </Text>
                           </View>
                         </Pressable>

@@ -1,3 +1,4 @@
+import { UploadProgress, type FileUploadProgress } from "../../components/UploadProgress";
 import React, { useEffect, useRef, useState } from "react";
 import { ActivityIndicator, Pressable, StyleSheet, Text, View } from "react-native";
 import { Ionicons } from "@expo/vector-icons";
@@ -22,32 +23,42 @@ export function UploadFields({
   onBusy: (busy: boolean) => void;
 }) {
   const [busy, setBusy] = useState(false);
+  const [activeKind, setActiveKind] = useState<ContractUploadKind | null>(null);
+  const [progress, setProgress] = useState<FileUploadProgress | null>(null);
   const [error, setError] = useState<string | null>(null);
   const lock = useRef(false);
   const mounted = useRef(true);
+  const uploadController = useRef<AbortController | null>(null);
 
   useEffect(() => {
     mounted.current = true;
     return () => {
       mounted.current = false;
+      uploadController.current?.abort();
     };
   }, []);
 
-  const pick = async (kind: ContractUploadKind) => {
+  const pick = async (kind: ContractUploadKind, source: "file" | "camera" = "file") => {
     if (lock.current || disabled) return;
+    const controller = new AbortController();
+    uploadController.current = controller;
     lock.current = true;
     setBusy(true);
+    setActiveKind(kind);
+    setProgress(null);
     onBusy(true);
     setError(null);
     try {
-      const file = await pickContractFile(scope, kind);
-      if (mounted.current && file) onChange({ ...value, [kind]: file });
+      const file = await pickContractFile(scope, kind, source, value => { if (mounted.current && !controller.signal.aborted) setProgress(value); }, controller.signal);
+      if (mounted.current && !controller.signal.aborted && file) onChange({ ...value, [kind]: file });
     } catch (err) {
-      if (mounted.current) setError(messageOf(err));
+      if (mounted.current && !controller.signal.aborted) setError(messageOf(err));
     } finally {
       lock.current = false;
       if (mounted.current) {
         setBusy(false);
+        setActiveKind(null);
+        setProgress(null);
         onBusy(false);
       }
     }
@@ -58,13 +69,13 @@ export function UploadFields({
         {
           kind: "extension",
           title: "Tệp phụ lục gia hạn",
-          desc: "PDF hoặc tài liệu phụ lục (tối đa 10 MB)",
+          desc: "PDF, Word, Excel hoặc ảnh (tối đa 10 MB)",
           icon: "document-text-outline",
         },
         {
           kind: "extensionSigned",
-          title: "Ảnh phụ lục đã ký",
-          desc: "Ảnh chụp hợp đồng / phụ lục có chữ ký (tối đa 10 MB)",
+          title: "Tệp phụ lục đã ký",
+          desc: "PDF, Word, Excel hoặc ảnh phụ lục có chữ ký (tối đa 10 MB)",
           icon: "create-outline",
         },
       ]
@@ -107,10 +118,11 @@ export function UploadFields({
                 </View>
               </View>
 
+              {activeKind === kind && <UploadProgress progress={progress} />}
               {selected ? (
                 <View style={styles.selectedBox}>
                   <View style={{ flex: 1 }}>
-                    <Text style={styles.selectedLabel}>Đã chọn:</Text>
+                    <Text style={styles.selectedLabel}>Đã tải lên:</Text>
                     <Text style={styles.selectedName} numberOfLines={1} ellipsizeMode="middle">
                       {selected.name || "Tệp đã tải lên"}
                     </Text>
@@ -141,8 +153,18 @@ export function UploadFields({
                 onPress={() => void pick(kind)}
               >
                 <Text style={[styles.pickBtnText, selected && styles.pickBtnSecondaryText]}>
-                  {selected ? "Đổi tệp khác" : "Chọn tệp từ máy..."}
+                  {activeKind === kind && progress ? "Đang tải tệp…" : selected ? "Đổi tệp khác" : "Chọn tệp từ máy..."}
                 </Text>
+              </Pressable>
+              <Pressable
+                accessibilityRole="button"
+                accessibilityLabel={"Chụp ảnh trực tiếp: " + title}
+                accessibilityState={{ disabled: disabled || busy }}
+                style={({ pressed }) => [styles.pickBtn, styles.pickBtnSecondary, (disabled || busy) && styles.pickBtnDisabled, pressed && { opacity: 0.8 }]}
+                disabled={disabled || busy}
+                onPress={() => void pick(kind, "camera")}
+              >
+                <Text style={[styles.pickBtnText, styles.pickBtnSecondaryText]}>Chụp ảnh trực tiếp</Text>
               </Pressable>
             </View>
           );

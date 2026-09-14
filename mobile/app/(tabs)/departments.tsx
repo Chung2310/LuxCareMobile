@@ -37,7 +37,6 @@ import {
   roster,
 } from "../../src/api/services";
 import { useSession } from "../../src/auth/SessionProvider";
-import { useAppLoading } from "../../src/context/LoadingContext";
 import type { UserProfile } from "../../../src/types/common";
 import type { BranchRecord } from "../../../src/services/branchService";
 
@@ -55,7 +54,6 @@ export default function DepartmentsScreen() {
   const { showAlert, alertView } = useAppAlert();
   const { user, selectedBranch } = useSession();
   const params = useLocalSearchParams<{ from?: string }>();
-  const { navigateWithLoading } = useAppLoading();
 
   // Quyền quản lý (admin, superadmin, branch_owner, manager)
   const canManage = useMemo(() => {
@@ -254,16 +252,6 @@ export default function DepartmentsScreen() {
     await loadRooms(true);
   };
 
-  // Điều hướng sơ đồ tổ chức
-  const handleViewOrgChart = (dept?: DepartmentRecord) => {
-    navigateWithLoading("/(tabs)/org-chart", {
-      title: dept ? `Sơ đồ: ${dept.name}` : "Sơ đồ tổ chức",
-      icon: "git-network",
-      color: "#059669",
-      bgColor: "#ecfdf5",
-    });
-  };
-
   const isInitialLoading = activeTab === "departments" ? deptLoading && deptList.length === 0 : roomLoading && roomList.length === 0;
 
   return (
@@ -290,16 +278,6 @@ export default function DepartmentsScreen() {
         </View>
 
         <View style={styles.headerRightButtons}>
-          {/* Nút Sơ đồ tổ chức */}
-          <TouchableOpacity
-            style={styles.orgChartBtn}
-            onPress={() => handleViewOrgChart()}
-            activeOpacity={0.75}
-          >
-            <Ionicons name="git-network-outline" size={15} color="#059669" />
-            <Text style={styles.orgChartBtnText}>Sơ đồ</Text>
-          </TouchableOpacity>
-
           {/* Nút Thêm mới */}
           {canManage && (
             <TouchableOpacity
@@ -444,7 +422,6 @@ export default function DepartmentsScreen() {
             <DepartmentCard
               department={item}
               onPress={(dept) => setDetailDept(dept)}
-              onViewOrgChart={handleViewOrgChart}
             />
           )}
           ListEmptyComponent={
@@ -646,7 +623,6 @@ export default function DepartmentsScreen() {
         onClose={() => setDetailDept(null)}
         onSave={handleSaveDepartment}
         onDelete={handleDeleteDepartment}
-        onViewOrgChart={handleViewOrgChart}
       />
 
       {/* Modal Thêm mới phòng ban */}
@@ -726,22 +702,6 @@ const styles = StyleSheet.create({
     flexDirection: "row",
     alignItems: "center",
     gap: 8,
-  },
-  orgChartBtn: {
-    flexDirection: "row",
-    alignItems: "center",
-    gap: 4,
-    backgroundColor: "#ecfdf5",
-    paddingHorizontal: 10,
-    paddingVertical: 6,
-    borderRadius: 18,
-    borderWidth: 1,
-    borderColor: "#a7f3d0",
-  },
-  orgChartBtnText: {
-    fontSize: 12,
-    fontWeight: "600",
-    color: "#059669",
   },
   addBtn: {
     flexDirection: "row",

@@ -1,4 +1,4 @@
-import { useCallback, useMemo, useState } from "react";
+import { useCallback, useMemo, useRef, useState } from "react";
 import {
   ActivityIndicator,
   Modal,
@@ -73,6 +73,8 @@ export default function KnowledgeScreen() {
     mimeType?: string;
   } | null>(null);
   const [uploading, setUploading] = useState(false);
+  const deleteLock = useRef(false);
+  const loadSequence = useRef(0);
   const [deletingId, setDeletingId] = useState<string | null>(null);
 
   const loadData = useCallback(async () => {
@@ -80,10 +82,11 @@ export default function KnowledgeScreen() {
       setLoading(false);
       return;
     }
+    const sequence = ++loadSequence.current;
     setError(null);
     try {
       const docs = await knowledge.listDocuments();
-      setDocuments(docs);
+      if (sequence === loadSequence.current) setDocuments(docs);
     } catch (e: any) {
       setError(e.message || "Không thể tải danh sách kho tri thức.");
     } finally {
@@ -217,9 +220,13 @@ export default function KnowledgeScreen() {
   };
 
   const executeDelete = async (docId: string, title: string) => {
+    if (!canManage || deleteLock.current) return;
+    deleteLock.current = true;
     setDeletingId(docId);
     try {
       await knowledge.deleteDocument(docId);
+      ++loadSequence.current;
+      setDocuments(current => current.filter(doc => doc._id !== docId));
       if (selectedDoc?._id === docId) {
         setSelectedDoc(null);
       }
@@ -233,11 +240,13 @@ export default function KnowledgeScreen() {
     } catch (err: any) {
       showAlert("Lỗi xóa tài liệu", messageOf(err), undefined, "error");
     } finally {
+      deleteLock.current = false;
       setDeletingId(null);
     }
   };
 
   const handleConfirmDelete = (doc: KnowledgeDocument) => {
+    if (!canManage || deleteLock.current) return;
     showAlert(
       "Xác nhận xóa tài liệu",
       `Bạn có chắc chắn muốn xóa tài liệu “${doc.title}” khỏi kho tri thức? Hệ thống sẽ gỡ tài liệu này và AI sẽ không còn sử dụng để tra cứu.`,
@@ -444,7 +453,7 @@ export default function KnowledgeScreen() {
                               e.stopPropagation?.();
                               handleConfirmDelete(doc);
                             }}
-                            disabled={deletingId === doc._id}
+                            disabled={deletingId !== null}
                             style={styles.cardDeleteBtn}
                             accessibilityRole="button"
                             accessibilityLabel={`Xóa tài liệu ${doc.title}`}
@@ -453,7 +462,10 @@ export default function KnowledgeScreen() {
                             {deletingId === doc._id ? (
                               <ActivityIndicator size="small" color="#e11d48" />
                             ) : (
-                              <Ionicons name="trash-outline" size={15} color="#e11d48" />
+                              <>
+                                <Ionicons name="trash-outline" size={15} color="#e11d48" />
+                                <Text style={{ color: "#e11d48", fontSize: 12, fontWeight: "600" }}>Xóa</Text>
+                              </>
                             )}
                           </Pressable>
                         )}
@@ -562,7 +574,7 @@ export default function KnowledgeScreen() {
               {canManage && selectedDoc && (
                 <Pressable
                   onPress={() => handleConfirmDelete(selectedDoc)}
-                  disabled={deletingId === selectedDoc._id}
+                  disabled={deletingId !== null}
                   style={styles.modalDeleteBtn}
                   accessibilityRole="button"
                   accessibilityLabel="Xóa tài liệu"
@@ -1344,7 +1356,11 @@ const styles = StyleSheet.create({
     gap: 8,
   },
   cardDeleteBtn: {
-    padding: 5,
+    flexDirection: "row",
+    gap: 4,
+    minHeight: 36,
+    paddingHorizontal: 8,
+    paddingVertical: 5,
     borderRadius: 8,
     backgroundColor: "#fff1f2",
     borderWidth: 1,

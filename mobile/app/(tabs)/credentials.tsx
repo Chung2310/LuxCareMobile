@@ -2,6 +2,18 @@ import { useCallback, useRef, useState } from "react";
 import { router, useFocusEffect, useLocalSearchParams } from "expo-router";
 import { Ionicons } from "@expo/vector-icons";
 import {
+  Lock,
+  User,
+  X,
+  ChevronDown,
+  ChevronUp,
+  ChevronLeft,
+  ChevronRight,
+  RotateCcw,
+  FileText,
+  Check,
+} from "lucide-react-native";
+import {
   Modal,
   Pressable,
   RefreshControl,
@@ -119,7 +131,7 @@ export default function Credentials() {
     return (
       <SafeAreaView edges={["top"]} style={uiStyles.container}>
         <View style={uiStyles.emptyCard}>
-          <Text style={uiStyles.emptyIcon}>🔒</Text>
+          <Lock size={40} color="#94a3b8" style={{ marginBottom: 10 }} />
           <Text style={uiStyles.emptyTitle}>Không có quyền truy cập</Text>
           <Text style={uiStyles.emptyText}>
             Bạn cần phân hệ nhân sự và quyền xem chứng chỉ hoặc quyền quản lý nhân sự để truy cập mục này.
@@ -259,7 +271,7 @@ export default function Credentials() {
                 hitSlop={8}
                 style={uiStyles.clearInputBtn}
               >
-                <Text style={uiStyles.clearInputText}>✕</Text>
+                <X size={14} color="#64748b" />
               </Pressable>
             )}
             <Pressable
@@ -274,18 +286,33 @@ export default function Credentials() {
           {/* Quick Filter toggle row */}
           <View style={uiStyles.filterBarRow}>
             <Pressable
-              style={[uiStyles.filterToggleBtn, showFilters && uiStyles.filterToggleBtnActive]}
+              style={[
+                uiStyles.filterToggleBtn,
+                showFilters && uiStyles.filterToggleBtnActive,
+                { flexDirection: "row", alignItems: "center", gap: 6 },
+              ]}
               onPress={() => setShowFilters((v) => !v)}
             >
               <Text style={[uiStyles.filterToggleText, showFilters && uiStyles.filterToggleTextActive]}>
-                Bộ lọc nâng cao {activeFiltersCount > 0 ? `(${activeFiltersCount})` : ""}{" "}
-                {showFilters ? "▲ Thu gọn" : "▼ Mở bộ lọc"}
+                Bộ lọc nâng cao {activeFiltersCount > 0 ? `(${activeFiltersCount})` : ""}
               </Text>
+              {showFilters ? (
+                <View style={{ flexDirection: "row", alignItems: "center", gap: 3 }}>
+                  <ChevronUp size={13} color="#059669" />
+                  <Text style={[uiStyles.filterToggleText, uiStyles.filterToggleTextActive]}>Thu gọn</Text>
+                </View>
+              ) : (
+                <View style={{ flexDirection: "row", alignItems: "center", gap: 3 }}>
+                  <ChevronDown size={13} color="#64748b" />
+                  <Text style={uiStyles.filterToggleText}>Mở bộ lọc</Text>
+                </View>
+              )}
             </Pressable>
 
             {activeFiltersCount > 0 && (
-              <Pressable onPress={handleResetFilters} style={uiStyles.resetFiltersBtn} hitSlop={6}>
-                <Text style={uiStyles.resetFiltersText}>✕ Xóa lọc ({activeFiltersCount})</Text>
+              <Pressable onPress={handleResetFilters} style={[uiStyles.resetFiltersBtn, { flexDirection: "row", alignItems: "center", gap: 4 }]} hitSlop={6}>
+                <RotateCcw size={12} color="#dc2626" />
+                <Text style={uiStyles.resetFiltersText}>Xóa lọc ({activeFiltersCount})</Text>
               </Pressable>
             )}
           </View>
@@ -306,7 +333,7 @@ export default function Credentials() {
                   ]}
                   onPress={() => setEmployeeModalOpen(true)}
                 >
-                  <Text style={uiStyles.employeePickerIcon}>👤</Text>
+                  <User size={15} color="#059669" style={{ marginRight: 2 }} />
                   <View style={{ flex: 1 }}>
                     <Text
                       style={[
@@ -328,10 +355,10 @@ export default function Credentials() {
                       hitSlop={8}
                       style={uiStyles.clearEmployeeBtn}
                     >
-                      <Text style={uiStyles.clearEmployeeText}>✕</Text>
+                      <X size={14} color="#64748b" />
                     </Pressable>
                   ) : (
-                    <Text style={uiStyles.employeePickerChevron}>▼</Text>
+                    <ChevronDown size={14} color="#94a3b8" />
                   )}
                 </Pressable>
               </View>
@@ -361,19 +388,19 @@ export default function Credentials() {
                     return (
                       <Pressable
                         key={typeKey}
-                        style={[uiStyles.filterChip, isSelected && uiStyles.filterChipActive]}
+                        style={[uiStyles.filterChip, isSelected && uiStyles.filterChipActive, { flexDirection: "row", alignItems: "center", gap: 4 }]}
                         onPress={() => {
                           setType(isSelected ? "" : (typeKey as HRCredentialType));
                           setPage(1);
                         }}
                       >
+                        {isSelected && <Check size={12} color="#059669" strokeWidth={3} />}
                         <Text
                           style={[
                             uiStyles.filterChipText,
                             isSelected && uiStyles.filterChipTextActive,
                           ]}
                         >
-                          {isSelected ? "✓ " : ""}
                           {typeLabel}
                         </Text>
                       </Pressable>
@@ -460,7 +487,7 @@ export default function Credentials() {
 
             {data.credentials.length === 0 ? (
               <View style={uiStyles.emptyCard}>
-                <Text style={uiStyles.emptyIcon}>📋</Text>
+                <FileText size={40} color="#94a3b8" style={{ marginBottom: 10 }} />
                 <Text style={uiStyles.emptyTitle}>Không tìm thấy chứng chỉ</Text>
                 <Text style={uiStyles.emptyText}>
                   Không có hồ sơ nào phù hợp với bộ lọc hiện tại. Bạn hãy thử đổi từ khóa hoặc đặt lại bộ lọc.
@@ -535,8 +562,9 @@ export default function Credentials() {
                         </Text>
                       </View>
 
-                      <View style={uiStyles.detailLinkBadge}>
-                        <Text style={uiStyles.detailLinkText}>Chi tiết →</Text>
+                      <View style={[uiStyles.detailLinkBadge, { flexDirection: "row", alignItems: "center", gap: 3 }]}>
+                        <Text style={uiStyles.detailLinkText}>Chi tiết</Text>
+                        <ChevronRight size={13} color="#059669" />
                       </View>
                     </View>
                   </Pressable>
@@ -547,12 +575,17 @@ export default function Credentials() {
             {/* Always Visible, Prominent Pagination Bar */}
             <View style={uiStyles.paginationCard}>
               <Pressable
-                style={[uiStyles.pageBtn, page <= 1 && uiStyles.pageBtnDisabled]}
+                style={[
+                  uiStyles.pageBtn,
+                  page <= 1 && uiStyles.pageBtnDisabled,
+                  { flexDirection: "row", alignItems: "center", justifyContent: "center" },
+                ]}
                 disabled={page <= 1}
                 onPress={() => setPage((v) => Math.max(1, v - 1))}
               >
+                <ChevronLeft size={14} color={page <= 1 ? "#94a3b8" : "#059669"} style={{ marginRight: 2 }} />
                 <Text style={[uiStyles.pageBtnText, page <= 1 && uiStyles.pageBtnTextDisabled]}>
-                  ‹ Trước
+                  Trước
                 </Text>
               </Pressable>
 
@@ -571,15 +604,20 @@ export default function Credentials() {
               </View>
 
               <Pressable
-                style={[uiStyles.pageBtn, page >= totalPages && uiStyles.pageBtnDisabled]}
+                style={[
+                  uiStyles.pageBtn,
+                  page >= totalPages && uiStyles.pageBtnDisabled,
+                  { flexDirection: "row", alignItems: "center", justifyContent: "center" },
+                ]}
                 disabled={page >= totalPages}
                 onPress={() => setPage((v) => Math.min(totalPages, v + 1))}
               >
                 <Text
                   style={[uiStyles.pageBtnText, page >= totalPages && uiStyles.pageBtnTextDisabled]}
                 >
-                  Sau ›
+                  Sau
                 </Text>
+                <ChevronRight size={14} color={page >= totalPages ? "#94a3b8" : "#059669"} style={{ marginLeft: 2 }} />
               </Pressable>
             </View>
           </>

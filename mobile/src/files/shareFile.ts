@@ -136,7 +136,13 @@ async function transferApiFile(url: string, name: string, action: "share" | "dow
     clearTimeout(timer);
     // The receiving app may still be reading after the share sheet closes.
     handedOff = true;
-    await Sharing.shareAsync(file.uri, { dialogTitle: format.name, mimeType: format.mimeType });
+    try {
+      await Sharing.shareAsync(file.uri, { dialogTitle: format.name, mimeType: format.mimeType });
+    } catch (error) {
+      // Dismissing the native share sheet is not a download/share failure.
+      // Keep this check here: cancellation while downloading must still surface.
+      if (!isNativeShareCancelled(error)) throw error;
+    }
   } finally {
     clearTimeout(timer);
     signal?.removeEventListener("abort", cancel);
@@ -158,4 +164,13 @@ async function writeBinaryFile(file: File, bytes: Uint8Array) {
       throw new Error("Không thể lưu tệp vào thư mục đã chọn. Vui lòng kiểm tra quyền truy cập và dung lượng.");
     }
   }
+}
+
+function isNativeShareCancelled(error: unknown): boolean {
+  if (!error || typeof error !== "object") return false;
+  const info = error as { code?: string | number; name?: string; message?: string; domain?: string };
+  if (info.name === "AbortError") return true;
+  if (["ERR_SHARING_CANCELED", "ERR_SHARING_CANCELLED", "ERR_CANCELED", "ERR_CANCELLED"].includes(String(info.code))) return true;
+  if (info.domain === "NSCocoaErrorDomain" && Number(info.code) === 3072) return true;
+  return /\buser (?:did )?cancel(?:led|ed)\b|\bshar(?:e|ing) (?:was )?cancel(?:led|ed)\b/i.test(info.message || "");
 }

@@ -19,13 +19,11 @@ import * as Location from "expo-location";
 import { CheckInForm } from "../../src/features/attendance/CheckInForm";
 import { currentAttendancePosition, submitAttendance } from "../../src/features/attendance/checkin";
 import { ATTENDANCE_FACE_CHECK_ENABLED } from "../../../src/config/attendanceFaceCheck";
-import { attendance, workCalendar } from "../../src/api/services";
-import type { AttendanceLog, TodayAttendance, WorkShift } from "../../../src/services/attendanceService";
-import type { WorkCalendarDay } from "../../../src/services/companyWorkCalendarService";
+import { attendance } from "../../src/api/services";
+import type { AttendanceLog, TodayAttendance } from "../../../src/services/attendanceService";
 import { currentKpiPeriod } from "../../../src/services/monthlyKpiService";
 import { messageOf, useSession } from "../../src/auth/SessionProvider";
 import { canUseModule, hasPermission } from "../../src/auth/access";
-import { calendarAccess } from "../../src/features/calendar/model";
 import { EmptyState, ErrorText, Loading, Page } from "../../src/ui";
 
 const STATUS_LABELS: Record<string, { label: string; color: string; bg: string; icon: string }> = {
@@ -167,13 +165,10 @@ export default function Attendance() {
   }, []);
 
   const [period, setPeriod] = useState(() => currentKpiPeriod());
-  const [activeTab, setActiveTab] = useState<"history" | "calendar" | "shifts">("history");
   const [revision, setRevision] = useState(0);
 
   const [today, setToday] = useState<TodayAttendance | null>(null);
   const [logs, setLogs] = useState<AttendanceLog[]>([]);
-  const [days, setDays] = useState<WorkCalendarDay[]>([]);
-  const [shifts, setShifts] = useState<WorkShift[]>([]);
 
   const [loading, setLoading] = useState(false);
   const [refreshing, setRefreshing] = useState(false);
@@ -190,32 +185,24 @@ export default function Attendance() {
       const endDate = `${period}-${new Date(Date.UTC(year, month, 0)).getUTCDate()}`;
 
       try {
-        const [todayRes, logsRes, daysRes, shiftsRes] = await Promise.allSettled([
+        const [todayRes, logsRes] = await Promise.allSettled([
           attendance.today(),
           attendance.history(user.uid, user.companyCode || "", `${period}-01`, endDate),
-          calendarAccess(user).read ? workCalendar.list(year, true) : Promise.resolve([]),
-          manage ? attendance.shifts() : Promise.resolve([]),
         ]);
 
         if (todayRes.status === "fulfilled") setToday(todayRes.value);
         if (logsRes.status === "fulfilled") setLogs(logsRes.value);
-        if (daysRes.status === "fulfilled") {
-          setDays(daysRes.value.filter((day) => day.date.startsWith(period)));
-        }
-        if (shiftsRes.status === "fulfilled") setShifts(shiftsRes.value);
 
         const newErrors: string[] = [];
         if (todayRes.status === "rejected") newErrors.push(`Hôm nay: ${messageOf(todayRes.reason)}`);
         if (logsRes.status === "rejected") newErrors.push(`Lịch sử: ${messageOf(logsRes.reason)}`);
-        if (daysRes.status === "rejected") newErrors.push(`Lịch làm việc: ${messageOf(daysRes.reason)}`);
-        if (shiftsRes.status === "rejected") newErrors.push(`Ca làm việc: ${messageOf(shiftsRes.reason)}`);
         setErrors(newErrors);
       } finally {
         setLoading(false);
         setRefreshing(false);
       }
     },
-    [allowed, user?.uid, user?.companyCode, selectedBranch?._id, period, manage],
+    [allowed, user?.uid, user?.companyCode, period],
   );
 
   useFocusEffect(
@@ -223,8 +210,6 @@ export default function Attendance() {
       let active = true;
       setToday(null);
       setLogs([]);
-      setDays([]);
-      setShifts([]);
       setErrors([]);
       if (!allowed || !user) return;
       setLoading(true);
@@ -238,16 +223,6 @@ export default function Attendance() {
         attendance.history(user.uid, user.companyCode || "", `${period}-01`, endDate).then((value) => {
           if (active) setLogs(value);
         }),
-        (calendarAccess(user).read ? workCalendar.list(year, true) : Promise.resolve([])).then((value) => {
-          if (active) setDays(value.filter((day) => day.date.startsWith(period)));
-        }),
-        ...(manage
-          ? [
-              attendance.shifts().then((value) => {
-                if (active) setShifts(value);
-              }),
-            ]
-          : []),
       ];
 
       void Promise.allSettled(jobs).then((results) => {
@@ -255,7 +230,7 @@ export default function Attendance() {
           setErrors(
             results.flatMap((result, index) =>
               result.status === "rejected"
-                ? [`${["Hôm nay", "Lịch sử", "Lịch làm việc", "Ca làm"][index]}: ${messageOf(result.reason)}`]
+                ? [`${["Hôm nay", "Lịch sử"][index]}: ${messageOf(result.reason)}`]
                 : [],
             ),
           );
@@ -266,7 +241,7 @@ export default function Attendance() {
       return () => {
         active = false;
       };
-    }, [allowed, user?.uid, user?.companyCode, selectedBranch?._id, period, revision, manage]),
+    }, [allowed, user?.uid, user?.companyCode, period, revision]),
   );
 
   // Stats calculation for the current month
@@ -653,236 +628,97 @@ export default function Attendance() {
             <Ionicons name="chevron-forward" size={16} color="#0891b2" />
           </TouchableOpacity>
 
-          {/* Navigation Tabs (History, Calendar, Shifts) */}
-          <View style={styles.tabPillsRow}>
-            <TouchableOpacity
-              style={[styles.tabPill, activeTab === "history" && styles.tabPillActive]}
-              onPress={() => setActiveTab("history")}
-              activeOpacity={0.75}
-            >
-              <Ionicons
-                name="time-outline"
-                size={14}
-                color={activeTab === "history" ? "#059669" : "#64748b"}
-              />
-              <Text style={[styles.tabPillText, activeTab === "history" && styles.tabPillTextActive]}>
-                Nhật ký chấm công ({logs.length})
-              </Text>
-            </TouchableOpacity>
-
-            <TouchableOpacity
-              style={[styles.tabPill, activeTab === "calendar" && styles.tabPillActive]}
-              onPress={() => setActiveTab("calendar")}
-              activeOpacity={0.75}
-            >
-              <Ionicons
-                name="calendar-outline"
-                size={14}
-                color={activeTab === "calendar" ? "#059669" : "#64748b"}
-              />
-              <Text style={[styles.tabPillText, activeTab === "calendar" && styles.tabPillTextActive]}>
-                Lịch nghỉ & bù ({days.length})
-              </Text>
-            </TouchableOpacity>
-
-            {manage && (
-              <TouchableOpacity
-                style={[styles.tabPill, activeTab === "shifts" && styles.tabPillActive]}
-                onPress={() => setActiveTab("shifts")}
-                activeOpacity={0.75}
-              >
-                <Ionicons
-                  name="swap-horizontal-outline"
-                  size={14}
-                  color={activeTab === "shifts" ? "#059669" : "#64748b"}
-                />
-                <Text style={[styles.tabPillText, activeTab === "shifts" && styles.tabPillTextActive]}>
-                  Ca trực ({shifts.length})
-                </Text>
-              </TouchableOpacity>
-            )}
-          </View>
-
           {/* Error notifications */}
           {errors.map((err) => (
             <ErrorText key={err} message={err} />
           ))}
 
+          {/* Attendance History Section Header */}
+          <View style={styles.historySectionHeader}>
+            <View style={styles.historySectionTitleWrap}>
+              <Ionicons name="time-outline" size={16} color="#059669" />
+              <Text style={styles.historySectionTitle}>
+                Lịch sử chấm công ({logs.length})
+              </Text>
+            </View>
+            <Text style={styles.historySectionSubtitle}>Tháng {period}</Text>
+          </View>
+
           {loading && !logs.length && <Loading />}
 
-          {/* TAB 1: HISTORY LOGS */}
-          {activeTab === "history" && (
-            <View style={styles.logsListContainer}>
-              {logs.length === 0 && !loading ? (
-                <View style={styles.emptyContainer}>
-                  <Ionicons name="calendar-outline" size={44} color="#cbd5e1" />
-                  <Text style={styles.emptyTitle}>Chưa có bản ghi chấm công</Text>
-                  <Text style={styles.emptyDesc}>
-                    Không có lượt chấm công nào được ghi nhận trong tháng {period}.
-                  </Text>
-                </View>
-              ) : (
-                logs.map((log) => {
-                  const statusInfo = STATUS_LABELS[log.status || ""] || {
-                    label: log.status || "Chưa xác định",
-                    color: "#64748b",
-                    bg: "#f1f5f9",
-                    icon: "help-circle-outline",
-                  };
-                  const duration = calculateWorkHours(log.checkIn?.time, log.checkOut?.time);
+          {/* HISTORY LOGS */}
+          <View style={styles.logsListContainer}>
+            {logs.length === 0 && !loading ? (
+              <View style={styles.emptyContainer}>
+                <Ionicons name="calendar-outline" size={44} color="#cbd5e1" />
+                <Text style={styles.emptyTitle}>Chưa có bản ghi chấm công</Text>
+                <Text style={styles.emptyDesc}>
+                  Không có lượt chấm công nào được ghi nhận trong tháng {period}.
+                </Text>
+              </View>
+            ) : (
+              logs.map((log) => {
+                const statusInfo = STATUS_LABELS[log.status || ""] || {
+                  label: log.status || "Chưa xác định",
+                  color: "#64748b",
+                  bg: "#f1f5f9",
+                  icon: "help-circle-outline",
+                };
+                const duration = calculateWorkHours(log.checkIn?.time, log.checkOut?.time);
 
-                  return (
-                    <View key={log._id} style={styles.logCard}>
-                      <View style={styles.logCardTop}>
-                        <View style={styles.logDateBox}>
-                          <Text style={styles.logDateText}>{formatDisplayDate(log.date)}</Text>
-                        </View>
-                        <View
-                          style={[
-                            styles.logStatusBadge,
-                            { backgroundColor: statusInfo.bg, borderColor: `${statusInfo.color}30` },
-                          ]}
-                        >
-                          <Ionicons name={statusInfo.icon as any} size={13} color={statusInfo.color} />
-                          <Text style={[styles.logStatusText, { color: statusInfo.color }]}>
-                            {statusInfo.label}
-                          </Text>
-                        </View>
+                return (
+                  <View key={log._id} style={styles.logCard}>
+                    <View style={styles.logCardTop}>
+                      <View style={styles.logDateBox}>
+                        <Text style={styles.logDateText}>{formatDisplayDate(log.date)}</Text>
                       </View>
-
-                      <View style={styles.logTimeRow}>
-                        <View style={styles.logTimeItem}>
-                          <Text style={styles.logTimeLabel}>Giờ vào ca</Text>
-                          <Text style={styles.logTimeValue}>{formatTimeOnly(log.checkIn?.time)}</Text>
-                        </View>
-
-                        <Ionicons name="arrow-forward" size={14} color="#cbd5e1" style={{ marginTop: 10 }} />
-
-                        <View style={styles.logTimeItem}>
-                          <Text style={styles.logTimeLabel}>Giờ ra ca</Text>
-                          <Text style={styles.logTimeValue}>{formatTimeOnly(log.checkOut?.time)}</Text>
-                        </View>
-
-                        {Boolean(duration) && (
-                          <View style={styles.logDurationBox}>
-                            <Text style={styles.logDurationLabel}>Thời gian</Text>
-                            <Text style={styles.logDurationValue}>{duration}</Text>
-                          </View>
-                        )}
-                      </View>
-
-                      {Boolean(log.note) && (
-                        <View style={styles.logNoteBox}>
-                          <Ionicons name="chatbox-ellipses-outline" size={12} color="#64748b" />
-                          <Text style={styles.logNoteText} numberOfLines={2}>
-                            {log.note}
-                          </Text>
-                        </View>
-                      )}
-                    </View>
-                  );
-                })
-              )}
-            </View>
-          )}
-
-          {/* TAB 2: CALENDAR DAYS & HOLIDAYS */}
-          {activeTab === "calendar" && (
-            <View style={styles.logsListContainer}>
-              {days.length === 0 && !loading ? (
-                <View style={styles.emptyContainer}>
-                  <Ionicons name="today-outline" size={44} color="#cbd5e1" />
-                  <Text style={styles.emptyTitle}>Không có ngày làm bù / nghỉ lễ</Text>
-                  <Text style={styles.emptyDesc}>Trong tháng này mọi hoạt động diễn ra theo lịch thông thường.</Text>
-                </View>
-              ) : (
-                days.map((day) => {
-                  const isOverride = day.dayType === "working_override";
-                  const isSubstitute = day.dayType === "substitute_holiday";
-
-                  return (
-                    <View key={day._id} style={styles.calendarDayCard}>
-                      <View style={styles.calendarDayLeft}>
-                        <Ionicons
-                          name={isOverride ? "briefcase" : "ribbon"}
-                          size={18}
-                          color={isOverride ? "#2563eb" : "#059669"}
-                        />
-                        <View style={{ flex: 1, gap: 2 }}>
-                          <Text style={styles.calendarDayName}>{day.name || "Ngày lễ quy định"}</Text>
-                          <Text style={styles.calendarDayDate}>{formatDisplayDate(day.date)}</Text>
-                        </View>
-                      </View>
-
                       <View
                         style={[
-                          styles.calendarTypeBadge,
-                          {
-                            backgroundColor: isOverride ? "#eff6ff" : isSubstitute ? "#fffbeb" : "#ecfdf5",
-                          },
+                          styles.logStatusBadge,
+                          { backgroundColor: statusInfo.bg, borderColor: `${statusInfo.color}30` },
                         ]}
                       >
-                        <Text
-                          style={[
-                            styles.calendarTypeBadgeText,
-                            {
-                              color: isOverride ? "#2563eb" : isSubstitute ? "#d97706" : "#059669",
-                            },
-                          ]}
-                        >
-                          {isOverride ? "Làm bù" : isSubstitute ? "Nghỉ bù" : "Nghỉ lễ"}
+                        <Ionicons name={statusInfo.icon as any} size={13} color={statusInfo.color} />
+                        <Text style={[styles.logStatusText, { color: statusInfo.color }]}>
+                          {statusInfo.label}
                         </Text>
                       </View>
                     </View>
-                  );
-                })
-              )}
-            </View>
-          )}
 
-          {/* TAB 3: SHIFTS LIST */}
-          {activeTab === "shifts" && manage && (
-            <View style={styles.logsListContainer}>
-              {shifts.length === 0 && !loading ? (
-                <View style={styles.emptyContainer}>
-                  <Ionicons name="swap-horizontal-outline" size={44} color="#cbd5e1" />
-                  <Text style={styles.emptyTitle}>Chưa cấu hình ca làm việc</Text>
-                  <Text style={styles.emptyDesc}>Vào Quản lý công để thiết lập danh mục ca trực.</Text>
-                </View>
-              ) : (
-                shifts.map((shift) => (
-                  <View key={shift._id} style={styles.shiftCard}>
-                    <View style={styles.shiftHeaderRow}>
-                      <View style={styles.shiftCodeBadge}>
-                        <Text style={styles.shiftCodeText}>#{shift.code}</Text>
+                    <View style={styles.logTimeRow}>
+                      <View style={styles.logTimeItem}>
+                        <Text style={styles.logTimeLabel}>Giờ vào ca</Text>
+                        <Text style={styles.logTimeValue}>{formatTimeOnly(log.checkIn?.time)}</Text>
                       </View>
-                      <Text style={styles.shiftTitle}>{shift.name}</Text>
-                      {shift.isDefault && (
-                        <View style={styles.shiftDefaultBadge}>
-                          <Text style={styles.shiftDefaultBadgeText}>Mặc định</Text>
+
+                      <Ionicons name="arrow-forward" size={14} color="#cbd5e1" style={{ marginTop: 10 }} />
+
+                      <View style={styles.logTimeItem}>
+                        <Text style={styles.logTimeLabel}>Giờ ra ca</Text>
+                        <Text style={styles.logTimeValue}>{formatTimeOnly(log.checkOut?.time)}</Text>
+                      </View>
+
+                      {Boolean(duration) && (
+                        <View style={styles.logDurationBox}>
+                          <Text style={styles.logDurationLabel}>Thời gian</Text>
+                          <Text style={styles.logDurationValue}>{duration}</Text>
                         </View>
                       )}
                     </View>
 
-                    <View style={styles.shiftTimeRow}>
-                      <Ionicons name="time" size={14} color="#059669" />
-                      <Text style={styles.shiftTimeText}>
-                        {shift.startTime} – {shift.endTime}
-                        {shift.crossesMidnight ? " (qua đêm)" : ""}
-                      </Text>
-                    </View>
-
-                    <View style={styles.shiftDaysRow}>
-                      <Text style={styles.shiftDaysLabel}>Áp dụng:</Text>
-                      <Text style={styles.shiftDaysText}>
-                        {shift.workingDays.map((d) => (d === 0 ? "CN" : `T${d + 1}`)).join(", ")}
-                      </Text>
-                    </View>
+                    {Boolean(log.note) && (
+                      <View style={styles.logNoteBox}>
+                        <Ionicons name="chatbox-ellipses-outline" size={12} color="#64748b" />
+                        <Text style={styles.logNoteText} numberOfLines={2}>
+                          {log.note}
+                        </Text>
+                      </View>
+                    )}
                   </View>
-                ))
-              )}
-            </View>
-          )}
+                );
+              })
+            )}
+          </View>
         </ScrollView>
       </SafeAreaView>
 
@@ -1280,35 +1116,28 @@ const styles = StyleSheet.create({
     marginTop: 1,
   },
 
-  // Tab Pills
-  tabPillsRow: {
-    flexDirection: "row",
-    gap: 8,
-    paddingVertical: 2,
-  },
-  tabPill: {
+  // History Section Header
+  historySectionHeader: {
     flexDirection: "row",
     alignItems: "center",
-    gap: 5,
-    paddingHorizontal: 12,
-    paddingVertical: 7,
-    borderRadius: 20,
-    backgroundColor: "#ffffff",
-    borderWidth: 1,
-    borderColor: "#e2e8f0",
+    justifyContent: "space-between",
+    paddingVertical: 4,
+    marginTop: 4,
   },
-  tabPillActive: {
-    backgroundColor: "#ecfdf5",
-    borderColor: "#059669",
+  historySectionTitleWrap: {
+    flexDirection: "row",
+    alignItems: "center",
+    gap: 6,
   },
-  tabPillText: {
+  historySectionTitle: {
+    fontSize: 15,
+    fontWeight: "700",
+    color: "#0f172a",
+  },
+  historySectionSubtitle: {
     fontSize: 12,
     fontWeight: "600",
-    color: "#475569",
-  },
-  tabPillTextActive: {
-    color: "#059669",
-    fontWeight: "700",
+    color: "#64748b",
   },
 
   // Logs List

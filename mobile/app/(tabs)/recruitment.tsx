@@ -14,15 +14,15 @@ import { SafeAreaView } from "react-native-safe-area-context";
 import { router, useFocusEffect } from "expo-router";
 import type { RecruitmentJob } from "../../../src/types/recruitment";
 import { emptyPagination } from "../../../src/types/pagination";
-import { recruitment } from "../../src/api/services";
+import { branches, recruitment } from "../../src/api/services";
 import { messageOf, useSession } from "../../src/auth/SessionProvider";
+import { BranchSelector } from "../../src/features/branches/BranchSelector";
 import { RecruitmentSubnav } from "../../src/features/recruitment/RecruitmentSubnav";
 import { JOB_STATUSES, recruitmentAccess } from "../../src/features/recruitment/access";
 import { JobForm } from "../../src/features/recruitment/JobForm";
-import { AttachmentPanel } from "../../src/features/recruitment/AttachmentPanel";
-import { PublicDocumentLink } from "../../src/features/recruitment/PublicDocumentLink";
+import { JobDetail } from "../../src/features/recruitment/JobDetail";
 import { EmptyState, ErrorText, Loading, Page, styles as baseStyles } from "../../src/ui";
-import { BranchSelector } from "../../src/features/branches/BranchSelector";
+
 import {
   AlertTriangle,
   Banknote,
@@ -31,7 +31,12 @@ import {
   Calendar,
   Check,
   CheckCircle2,
+  ChevronDown,
+  ChevronLeft,
+  ChevronRight,
+  ChevronUp,
   Clock,
+  Eye,
   FileEdit,
   FileText,
   Gift,
@@ -40,10 +45,10 @@ import {
   PauseCircle,
   Pencil,
   Pin,
+  Plus,
   RotateCcw,
   Search,
   Settings,
-  Sparkles,
   Target,
   Trash2,
   Users,
@@ -59,7 +64,10 @@ const WORKPLACE_LABELS: Record<string, string> = {
 
 export default function Recruitment() {
   const { showAlert, alertView } = useAppAlert();
-  const { user, selectedBranch } = useSession();
+  const { user, selectedBranch, selectBranch } = useSession();
+  const selectBranchRef = useRef(selectBranch);
+  selectBranchRef.current = selectBranch;
+  const [branchError, setBranchError] = useState<string | null>(null);
   const isOwner = ["admin", "superadmin", "branch_owner"].includes(user?.role || "");
   const access = recruitmentAccess(user);
 
@@ -70,7 +78,7 @@ export default function Recruitment() {
   const [search, setSearch] = useState("");
   const [status, setStatus] = useState("");
   const [deleted, setDeleted] = useState(false);
-  const [expanded, setExpanded] = useState<string | null>(null);
+  const [viewingJob, setViewingJob] = useState<RecruitmentJob | null>(null);
 
   const [loading, setLoading] = useState(false);
   const [refreshing, setRefreshing] = useState(false);
@@ -86,78 +94,31 @@ export default function Recruitment() {
   const [editing, setEditing] = useState<RecruitmentJob | "new" | null>(null);
 
   const closeForm = () => {
-    if (formLock.current) return;
+    formLock.current = false;
     setEditing(null);
     setRevision((v) => v + 1);
   };
 
-  const scopeReady = Boolean(user?.companyCode || selectedBranch?._id || user?.branchId || isOwner);
+  const scopeReady = isOwner
+    ? Boolean(selectedBranch?._id)
+    : Boolean(user?.companyCode || selectedBranch?._id || user?.branchId);
 
-  const [seeding, setSeeding] = useState(false);
-  const handleSeedDemo = async () => {
-    if (seeding || !access.manage) return;
-    setSeeding(true);
-    try {
-      await recruitment.createJob({
-        code: `BS-${Date.now().toString().slice(-4)}`,
-        title: "Bác sĩ Đa khoa",
-        department: "Khám bệnh",
-        headcount: 2,
-        employmentType: "full_time",
-        workplaceType: "onsite",
-        location: selectedBranch?.name || "Cơ sở chính",
-        salaryMin: 25000000,
-        salaryMax: 40000000,
-        showSalary: true,
-        description: "Khám, chẩn đoán và điều trị bệnh nhân tại phòng khám theo đúng quy trình chuyên môn.",
-        requirements: "Tốt nghiệp Đại học Y Dược, có CCHN khám chữa bệnh, tối thiểu 2 năm kinh nghiệm.",
-        benefits: "Lương thưởng cạnh tranh, BHXH theo luật, hỗ trợ ăn trưa, đào tạo chuyên sâu.",
-        status: "open",
-        applicationDeadline: new Date(Date.now() + 30 * 86400000).toISOString(),
-      });
-      await recruitment.createJob({
-        code: `DD-${Date.now().toString().slice(-4)}`,
-        title: "Điều dưỡng viên Chăm sóc",
-        department: "Điều dưỡng",
-        headcount: 5,
-        employmentType: "full_time",
-        workplaceType: "onsite",
-        location: selectedBranch?.name || "Cơ sở chính",
-        salaryMin: 12000000,
-        salaryMax: 18000000,
-        showSalary: true,
-        description: "Thực hiện y lệnh của bác sĩ, chăm sóc bệnh nhân, tiêm truyền và xử lý vết thương.",
-        requirements: "Tốt nghiệp CĐ/ĐH Điều dưỡng, có CCHN, nhanh nhẹn, tận tâm.",
-        benefits: "Phụ cấp trực ca, thưởng KPI hàng tháng, đồng phục và bảo hiểm đầy đủ.",
-        status: "open",
-        applicationDeadline: new Date(Date.now() + 20 * 86400000).toISOString(),
-      });
-      await recruitment.createJob({
-        code: `DS-${Date.now().toString().slice(-4)}`,
-        title: "Dược sĩ Nhà thuốc",
-        department: "Dược",
-        headcount: 2,
-        employmentType: "full_time",
-        workplaceType: "onsite",
-        location: selectedBranch?.name || "Cơ sở chính",
-        salaryMin: 15000000,
-        salaryMax: 22000000,
-        showSalary: true,
-        description: "Tư vấn và bán thuốc theo đơn, quản lý tồn kho, kiểm soát hạn dùng thuốc.",
-        requirements: "Tốt nghiệp Đại học Dược, có CCHN dược, nắm vững quy chế bán lẻ.",
-        benefits: "Hoa hồng doanh số bán lẻ, du lịch hàng năm, phụ cấp trách nhiệm.",
-        status: "open",
-        applicationDeadline: new Date(Date.now() + 25 * 86400000).toISOString(),
-      });
-      setSuccess("Đã khởi tạo thành công 3 tin tuyển dụng mẫu!");
-      setTimeout(() => setSuccess(null), 4000);
-      setRevision((v) => v + 1);
-    } catch (err) {
-      setError(messageOf(err));
-    } finally {
-      setSeeding(false);
-    }
-  };
+  useFocusEffect(useCallback(() => {
+    if (!isOwner || !access.read || selectedBranch?._id) return;
+    let active = true;
+    setBranchError(null);
+    branches.list().then(items => {
+      if (!active) return;
+      const available = items.filter(item => item.isActive &&
+        item.companyCode.toUpperCase() === user?.companyCode?.toUpperCase());
+      const branch = available.find(item => item._id === user?.branchId) || available[0];
+      if (branch) selectBranchRef.current(branch);
+      else setBranchError("Chưa có chi nhánh đang hoạt động để chọn.");
+    }).catch(err => {
+      if (active) setBranchError(messageOf(err));
+    });
+    return () => { active = false; };
+  }, [isOwner, access.read, selectedBranch?._id, user?.uid, user?.companyCode, user?.branchId, revision]));
 
   const loadData = useCallback(
     async (isRefresh = false) => {
@@ -191,7 +152,7 @@ export default function Recruitment() {
     useCallback(() => {
       let active = true;
       setJobs([]);
-      setExpanded(null);
+      setViewingJob(null);
       setError(null);
       setPagination(emptyPagination);
 
@@ -227,7 +188,7 @@ export default function Recruitment() {
   );
 
   const mutate = async (job: RecruitmentJob, action: string) => {
-    if (lock.current || !access.manage) return;
+    if (lock.current || !access.manage || uncertain || loading || !scopeReady) return;
     lock.current = true;
     setBusy(true);
     setMutationError(null);
@@ -238,12 +199,26 @@ export default function Recruitment() {
       else if (action === "restore") await recruitment.restoreJob(job._id, job.version);
       else await recruitment.changeJobStatus(job._id, job.version, action as RecruitmentJob["status"]);
 
-      setSuccess("Đã cập nhật trạng thái tin tuyển dụng.");
-      setTimeout(() => setSuccess(null), 4000);
+      if (action === "delete" || action === "restore") setPage(1);
+      showAlert(
+        "Thành công",
+        action === "delete"
+          ? `Đã chuyển tin ${job.code} vào thùng rác.`
+          : action === "restore"
+          ? `Đã khôi phục tin ${job.code} thành công.`
+          : `Đã cập nhật trạng thái tin ${job.code} thành công.`,
+        [{ text: "Đóng" }],
+        "success",
+      );
       setRevision((v) => v + 1);
     } catch (err) {
       setUncertain(true);
-      setMutationError(`${messageOf(err)} Vui lòng tải lại dữ liệu trước khi thao tác.`);
+      showAlert(
+        "Thao tác không thành công",
+        `${messageOf(err)}\nVui lòng tải lại dữ liệu trước khi thao tác tiếp.`,
+        [{ text: "Đã hiểu" }],
+        "error",
+      );
     } finally {
       lock.current = false;
       setBusy(false);
@@ -251,10 +226,11 @@ export default function Recruitment() {
   };
 
   const confirm = (job: RecruitmentJob, action: string, title: string) => {
-    showAlert(title, `Mã: ${job.code} · ${job.title}`, [
+    if (lock.current || !access.manage || uncertain || loading || !scopeReady) return;
+    showAlert(title, `Mã: ${job.code} · ${job.title}${action === "delete" ? "\nTin sẽ được chuyển vào thùng rác. Bạn có thể khôi phục lại sau." : ""}`, [
       { text: "Hủy", style: "cancel" },
       {
-        text: "Xác nhận",
+        text: action === "delete" ? "Xóa tin" : "Xác nhận",
         style: action === "delete" ? "destructive" : "default",
         onPress: () => void mutate(job, action),
       },
@@ -347,11 +323,19 @@ export default function Recruitment() {
         <View style={uiStyles.emptyBox}>
           <Building2 size={40} color="#94a3b8" />
           <Text style={uiStyles.emptyTitle}>Chưa chọn chi nhánh</Text>
-          <Text style={uiStyles.emptyText}>
-            {user?.role === "admin"
-              ? "Vui lòng chọn chi nhánh làm việc trong mục Tài khoản để quản lý tin tuyển dụng."
-              : "Hồ sơ của bạn chưa được liên kết với chi nhánh làm việc."}
-          </Text>
+          {isOwner ? (
+            <>
+              <Text style={uiStyles.emptyText}>{branchError || "Đang chọn chi nhánh..."}</Text>
+              <BranchSelector allowAll={false} />
+              {!!branchError && (
+                <Pressable onPress={() => setRevision(v => v + 1)}>
+                  <Text style={uiStyles.emptyText}>Thử lại</Text>
+                </Pressable>
+              )}
+            </>
+          ) : (
+            <Text style={uiStyles.emptyText}>Hồ sơ của bạn chưa được liên kết với chi nhánh làm việc.</Text>
+          )}
         </View>
         {alertView}
       </Page>
@@ -399,42 +383,23 @@ export default function Recruitment() {
                 onPress={() => (router.canGoBack() ? router.back() : router.push("/(tabs)/modules"))}
                 style={uiStyles.backBtn}
               >
-                <Text style={{ fontSize: 18, color: "#334155", fontWeight: "700" }}>‹</Text>
+                <ChevronLeft size={20} color="#334155" />
               </Pressable>
               <View style={uiStyles.headerLeft}>
                 <Text style={uiStyles.headerTitle}>Tin tuyển dụng</Text>
                 {isOwner ? (
                   <BranchSelector
-                    renderCustomTrigger={(open) => (
-                      <Pressable
-                        onPress={open}
-                        style={[
-                          uiStyles.branchRow,
-                          {
-                            backgroundColor: "#f0fdf4",
-                            borderColor: "#bbf7d0",
-                            borderWidth: 1,
-                            paddingHorizontal: 8,
-                            paddingVertical: 2,
-                            borderRadius: 10,
-                            marginTop: 2,
-                          },
-                        ]}
-                      >
-                        <View style={[uiStyles.branchDot, { backgroundColor: "#16a34a" }]} />
-                        <Text style={[uiStyles.branchName, { color: "#15803d", fontWeight: "700" }]}>
-                          {selectedBranch?.name || "Toàn công ty"} ▾
-                        </Text>
+                    allowAll={false}
+                    renderCustomTrigger={(open, currentName) => (
+                      <Pressable onPress={open} style={uiStyles.branchRow}>
+                        <View style={uiStyles.branchDot} />
+                        <Text style={uiStyles.branchName}>{currentName}</Text>
+                        <ChevronDown size={13} color="#15803d" />
                       </Pressable>
                     )}
                   />
                 ) : (
-                  <View style={uiStyles.branchRow}>
-                    <View style={uiStyles.branchDot} />
-                    <Text style={uiStyles.branchName}>
-                      {selectedBranch?.name || user?.branchName || "Toàn công ty"}
-                    </Text>
-                  </View>
+                  <Text style={uiStyles.branchName}>{selectedBranch?.name || user?.branchName}</Text>
                 )}
               </View>
             </View>
@@ -445,7 +410,7 @@ export default function Recruitment() {
                 onPress={() => setRevision((v) => v + 1)}
                 disabled={disabled}
               >
-                <Text style={uiStyles.refreshBtnText}>↻</Text>
+                <RotateCcw size={15} color="#059669" />
               </Pressable>
 
               {access.manage && (
@@ -458,7 +423,7 @@ export default function Recruitment() {
                   onPress={() => setEditing("new")}
                   disabled={disabled || uncertain}
                 >
-                  <Text style={uiStyles.createBtnIcon}>+</Text>
+                  <Plus size={14} color="#ffffff" style={{ marginRight: 4 }} />
                   <Text style={uiStyles.createBtnText}>Tạo tin</Text>
                 </Pressable>
               )}
@@ -609,7 +574,6 @@ export default function Recruitment() {
           {/* Job Cards List */}
           {jobs.map((job) => {
             const badge = getStatusBadge(job.status, deleted);
-            const isExpanded = expanded === job._id;
             const deadline = formatDeadline(job.applicationDeadline);
             const workplace = WORKPLACE_LABELS[job.workplaceType] || job.workplaceType || "Tại chỗ";
 
@@ -749,128 +713,34 @@ export default function Recruitment() {
                     </Pressable>
                   )}
 
+                  {access.manage && !deleted && (
+                    <Pressable
+                      accessibilityRole="button"
+                      accessibilityLabel={`Xóa tin tuyển dụng ${job.title}`}
+                      style={({ pressed }) => [
+                        uiStyles.deleteActionBtn,
+                        (disabled || uncertain) && uiStyles.btnDisabled,
+                        pressed && { opacity: 0.8 },
+                      ]}
+                      disabled={disabled || uncertain}
+                      onPress={() => confirm(job, "delete", "Xóa tin tuyển dụng?")}
+                    >
+                      <Trash2 size={14} color="#b91c1c" />
+                      <Text style={uiStyles.deleteActionBtnText}>Xóa tin</Text>
+                    </Pressable>
+                  )}
+
                   <Pressable
                     style={({ pressed }) => [
-                      uiStyles.expandBtn,
-                      isExpanded && uiStyles.expandBtnActive,
+                      uiStyles.detailBtn,
                       pressed && { opacity: 0.8 },
                     ]}
-                    onPress={() => setExpanded(isExpanded ? null : job._id)}
+                    onPress={() => setViewingJob(job)}
                   >
-                    <Text
-                      style={[
-                        uiStyles.expandBtnText,
-                        isExpanded && uiStyles.expandBtnTextActive,
-                      ]}
-                    >
-                      {isExpanded ? "Thu gọn ▲" : "Chi tiết ▼"}
-                    </Text>
+                    <Eye size={13} color="#0284c7" />
+                    <Text style={uiStyles.detailBtnText}>Chi tiết</Text>
                   </Pressable>
                 </View>
-
-                {/* Collapsible Expanded Details */}
-                {isExpanded && (
-                  <View style={uiStyles.expandedSection}>
-                    {/* JD and Attachments */}
-                    <PublicDocumentLink title="Mô tả công việc (JD File)" url={job.jdFileUrl} />
-                    {!deleted && <AttachmentPanel kind="job" id={job._id} manage={access.manage} />}
-
-                    {/* Detailed Content Blocks */}
-                    {job.description ? (
-                      <View style={uiStyles.detailBlock}>
-                        <View style={{ flexDirection: "row", alignItems: "center", gap: 6 }}>
-                          <FileText size={15} color="#0284c7" />
-                          <Text style={uiStyles.detailBlockTitle}>Mô tả công việc</Text>
-                        </View>
-                        <Text style={uiStyles.detailBlockContent}>{job.description}</Text>
-                      </View>
-                    ) : null}
-
-                    {job.requirements ? (
-                      <View style={uiStyles.detailBlock}>
-                        <View style={{ flexDirection: "row", alignItems: "center", gap: 6 }}>
-                          <Target size={15} color="#0284c7" />
-                          <Text style={uiStyles.detailBlockTitle}>Yêu cầu ứng viên</Text>
-                        </View>
-                        <Text style={uiStyles.detailBlockContent}>{job.requirements}</Text>
-                      </View>
-                    ) : null}
-
-                    {job.benefits ? (
-                      <View style={uiStyles.detailBlock}>
-                        <View style={{ flexDirection: "row", alignItems: "center", gap: 6 }}>
-                          <Gift size={15} color="#0284c7" />
-                          <Text style={uiStyles.detailBlockTitle}>Quyền lợi đãi ngộ</Text>
-                        </View>
-                        <Text style={uiStyles.detailBlockContent}>{job.benefits}</Text>
-                      </View>
-                    ) : null}
-
-                    {/* Management Action Buttons */}
-                    {access.manage && (
-                      <View style={uiStyles.manageSection}>
-                        <View style={{ flexDirection: "row", alignItems: "center", gap: 6, marginBottom: 2 }}>
-                          <Settings size={14} color="#475569" />
-                          <Text style={uiStyles.manageSectionTitle}>Thao tác quản lý tin</Text>
-                        </View>
-                        {deleted ? (
-                          <Pressable
-                            style={({ pressed }) => [
-                              uiStyles.restoreActionBtn,
-                              disabled && uiStyles.btnDisabled,
-                              pressed && { opacity: 0.8 },
-                            ]}
-                            disabled={disabled || uncertain}
-                            onPress={() => confirm(job, "restore", "Khôi phục tin tuyển dụng này?")}
-                          >
-                            <RotateCcw size={14} color="#047857" />
-                            <Text style={uiStyles.restoreActionBtnText}>Khôi phục tin</Text>
-                          </Pressable>
-                        ) : (
-                          <>
-                            <View style={uiStyles.statusChangeRow}>
-                              {JOB_STATUSES.filter((item) => item.value !== job.status).map((item) => (
-                                <Pressable
-                                  key={item.value}
-                                  style={({ pressed }) => [
-                                    uiStyles.statusChangeBtn,
-                                    disabled && uiStyles.btnDisabled,
-                                    pressed && { opacity: 0.75 },
-                                  ]}
-                                  disabled={disabled || uncertain}
-                                  onPress={() =>
-                                    confirm(job, item.value, `Chuyển trạng thái sang "${item.label}"?`)
-                                  }
-                                >
-                                  {item.value === "open" && <CheckCircle2 size={12} color="#047857" />}
-                                  {item.value === "draft" && <FileEdit size={12} color="#b45309" />}
-                                  {item.value === "paused" && <PauseCircle size={12} color="#c2410c" />}
-                                  {item.value === "closed" && <Lock size={12} color="#475569" />}
-                                  <Text style={uiStyles.statusChangeBtnText}>
-                                    {item.label}
-                                  </Text>
-                                </Pressable>
-                              ))}
-                            </View>
-
-                            <Pressable
-                              style={({ pressed }) => [
-                                uiStyles.deleteActionBtn,
-                                disabled && uiStyles.btnDisabled,
-                                pressed && { opacity: 0.8 },
-                              ]}
-                              disabled={disabled || uncertain}
-                              onPress={() => confirm(job, "delete", "Chuyển tin vào thùng rác?")}
-                            >
-                              <Trash2 size={14} color="#b91c1c" />
-                              <Text style={uiStyles.deleteActionBtnText}>Xóa vào thùng rác</Text>
-                            </Pressable>
-                          </>
-                        )}
-                      </View>
-                    )}
-                  </View>
-                )}
               </View>
             );
           })}
@@ -894,25 +764,13 @@ export default function Recruitment() {
               ) : !deleted && access.manage ? (
                 <View style={{ flexDirection: "row", gap: 10, marginTop: 14 }}>
                   <Pressable
-                    style={[uiStyles.createBtn, { paddingHorizontal: 16 }]}
+                    style={[uiStyles.createBtn, { paddingHorizontal: 16, flexDirection: "row", alignItems: "center" }]}
                     onPress={() => setEditing("new")}
                   >
-                    <Text style={uiStyles.createBtnText}>+ Tạo tin mới</Text>
+                    <Plus size={14} color="#ffffff" style={{ marginRight: 4 }} />
+                    <Text style={uiStyles.createBtnText}>Tạo tin mới</Text>
                   </Pressable>
-                  <Pressable
-                    style={[
-                      uiStyles.createBtn,
-                      { backgroundColor: "#0284c7", paddingHorizontal: 16, flexDirection: "row", alignItems: "center", gap: 5 },
-                      seeding && uiStyles.btnDisabled,
-                    ]}
-                    disabled={seeding}
-                    onPress={handleSeedDemo}
-                  >
-                    <Sparkles size={14} color="#ffffff" />
-                    <Text style={uiStyles.createBtnText}>
-                      {seeding ? "Đang tạo..." : "Thêm 3 tin mẫu"}
-                    </Text>
-                  </Pressable>
+
                 </View>
               ) : null}
             </View>
@@ -930,13 +788,14 @@ export default function Recruitment() {
                 disabled={disabled || page <= 1}
                 onPress={() => setPage((v) => v - 1)}
               >
+                <ChevronLeft size={14} color={disabled || page <= 1 ? "#94a3b8" : "#0f172a"} />
                 <Text
                   style={[
                     uiStyles.pageBtnText,
                     (disabled || page <= 1) && uiStyles.pageBtnTextDisabled,
                   ]}
                 >
-                  ◀ Trang trước
+                  Trang trước
                 </Text>
               </Pressable>
 
@@ -959,52 +818,63 @@ export default function Recruitment() {
                     (disabled || page >= pagination.totalPages) && uiStyles.pageBtnTextDisabled,
                   ]}
                 >
-                  Trang sau ▶
+                  Trang sau
                 </Text>
+                <ChevronRight size={14} color={disabled || page >= pagination.totalPages ? "#94a3b8" : "#0f172a"} />
               </Pressable>
             </View>
           )}
         </ScrollView>
       </SafeAreaView>
 
-      {/* Modal for Creating / Editing Job */}
-      <Modal
-        visible={editing !== null && access.manage}
-        animationType="slide"
-        onRequestClose={closeForm}
-      >
-        <SafeAreaView style={uiStyles.modalSafeArea} edges={["top", "bottom"]}>
-          <View style={uiStyles.modalHeader}>
-            <View>
-              <Text style={uiStyles.modalTitle}>
-                {editing === "new" ? "Tạo tin tuyển dụng mới" : `Sửa tin: ${typeof editing === "object" ? editing?.code : ""}`}
-              </Text>
-              <Text style={uiStyles.modalSubtitle}>
-                Điền đầy đủ thông tin để thu hút ứng viên tài năng
-              </Text>
-            </View>
-            <Pressable
-              style={({ pressed }) => [uiStyles.modalCloseBtn, pressed && { opacity: 0.7 }]}
-              onPress={closeForm}
-            >
-              <X size={20} color="#0f172a" />
-            </Pressable>
-          </View>
+      {/* Modal for Job Details */}
+      {viewingJob && (
+        <JobDetail
+          job={viewingJob}
+          deleted={deleted}
+          canManage={access.manage}
+          disabled={disabled || uncertain}
+          onClose={() => setViewingJob(null)}
+          onEdit={(jobToEdit) => {
+            setViewingJob(null);
+            setEditing(jobToEdit);
+          }}
+          onViewApplicants={(jobToView) => {
+            setViewingJob(null);
+            router.push({
+              pathname: "/(tabs)/applicants",
+              params: { jobId: jobToView._id },
+            });
+          }}
+          onChangeStatus={(jobToUpdate, newStatus) => {
+            const item = JOB_STATUSES.find((s) => s.value === newStatus);
+            confirm(jobToUpdate, newStatus, `Chuyển trạng thái sang "${item?.label || newStatus}"?`);
+            setViewingJob((prev) =>
+              prev && prev._id === jobToUpdate._id ? { ...prev, status: newStatus } : prev,
+            );
+          }}
+          onDelete={(jobToDelete) => {
+            setViewingJob(null);
+            confirm(jobToDelete, "delete", "Xóa tin tuyển dụng?");
+          }}
+          onRestore={(jobToRestore) => {
+            setViewingJob(null);
+            confirm(jobToRestore, "restore", "Khôi phục tin tuyển dụng này?");
+          }}
+        />
+      )}
 
-          {editing && access.manage && (
-            <JobForm
-              job={editing === "new" ? undefined : editing}
-              setLocked={(val) => {
-                formLock.current = val;
-              }}
-              onClose={() => {
-                setEditing(null);
-                setRevision((v) => v + 1);
-              }}
-            />
-          )}
-        </SafeAreaView>
-      </Modal>
+      {/* Modal for Creating / Editing Job */}
+      {editing && access.manage && (
+        <JobForm
+          job={editing === "new" ? undefined : editing}
+          setLocked={(val) => {
+            formLock.current = val;
+          }}
+          onClose={closeForm}
+          onSaved={closeForm}
+        />
+      )}
       {alertView}
     </>
   );
@@ -1378,6 +1248,7 @@ const uiStyles = StyleSheet.create({
   // Card Action Row
   cardActionRow: {
     flexDirection: "row",
+    flexWrap: "wrap",
     alignItems: "center",
     gap: 8,
     paddingTop: 4,
@@ -1418,6 +1289,22 @@ const uiStyles = StyleSheet.create({
     fontSize: 12,
     fontWeight: "600",
     color: "#334155",
+  },
+  detailBtn: {
+    paddingHorizontal: 12,
+    paddingVertical: 9,
+    borderRadius: 10,
+    backgroundColor: "#f0f9ff",
+    borderWidth: 1,
+    borderColor: "#bae6fd",
+    flexDirection: "row",
+    alignItems: "center",
+    gap: 4,
+  },
+  detailBtnText: {
+    fontSize: 12,
+    fontWeight: "600",
+    color: "#0284c7",
   },
   expandBtn: {
     paddingHorizontal: 12,
@@ -1503,6 +1390,7 @@ const uiStyles = StyleSheet.create({
     color: "#334155",
   },
   deleteActionBtn: {
+    paddingHorizontal: 10,
     backgroundColor: "#fee2e2",
     borderWidth: 1,
     borderColor: "#fca5a5",
@@ -1510,7 +1398,6 @@ const uiStyles = StyleSheet.create({
     borderRadius: 8,
     alignItems: "center",
     justifyContent: "center",
-    marginTop: 4,
     flexDirection: "row",
     gap: 6,
   },
@@ -1587,10 +1474,13 @@ const uiStyles = StyleSheet.create({
     borderColor: "#e2e8f0",
   },
   pageBtn: {
-    paddingHorizontal: 14,
+    paddingHorizontal: 12,
     paddingVertical: 8,
     borderRadius: 8,
     backgroundColor: "#f1f5f9",
+    flexDirection: "row",
+    alignItems: "center",
+    gap: 4,
   },
   pageBtnDisabled: {
     opacity: 0.4,

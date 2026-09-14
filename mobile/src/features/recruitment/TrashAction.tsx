@@ -2,7 +2,7 @@ import { useAppAlert } from "../../components/AppAlert";
 import { useRef, useState } from "react";
 import { recruitment } from "../../api/services";
 import { messageOf } from "../../auth/SessionProvider";
-import { Button, ErrorText } from "../../ui";
+import { Button } from "../../ui";
 export function TrashAction({
   kind,
   id,
@@ -22,14 +22,12 @@ export function TrashAction({
 }) {
   const { showAlert, alertView } = useAppAlert();
   const [blocked, setBlocked] = useState(false);
-  const [error, setError] = useState<string | null>(null);
   const lock = useRef(false);
   const run = async () => {
     if (lock.current || blocked) return;
     lock.current = true;
     setBlocked(true);
     setBusy(true);
-    setError(null);
     try {
       const action =
         kind === "applicant"
@@ -42,7 +40,12 @@ export function TrashAction({
       await action(id, version);
       onSaved();
     } catch (error) {
-      setError(`${messageOf(error)} Tải lại danh sách trước khi thao tác tiếp.`);
+      showAlert(
+        "Không thể thực hiện",
+        `${messageOf(error)}\nVui lòng tải lại danh sách trước khi thao tác tiếp.`,
+        [{ text: "Đã hiểu" }],
+        "error",
+      );
     } finally {
       lock.current = false;
       setBusy(false);
@@ -50,7 +53,6 @@ export function TrashAction({
   };
   return (
     <>
-      <ErrorText message={error} />
       <Button
         title={deleted ? "Khôi phục" : "Chuyển vào thùng rác"}
         disabled={blocked}

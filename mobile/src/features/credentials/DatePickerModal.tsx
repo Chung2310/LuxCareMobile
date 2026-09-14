@@ -8,6 +8,7 @@ import {
   View,
 } from "react-native";
 import { SafeAreaView } from "react-native-safe-area-context";
+import { ChevronDown, ChevronLeft, ChevronRight, X } from "lucide-react-native";
 
 export interface DatePickerModalProps {
   visible: boolean;
@@ -220,23 +221,24 @@ export function DatePickerModal({
               </Text>
             </View>
             <Pressable onPress={onClose} hitSlop={10} style={styles.closeBtn}>
-              <Text style={styles.closeBtnText}>✕</Text>
+              <X size={18} color="#64748b" />
             </Pressable>
           </View>
 
           {/* Month / Year Navigator */}
           <View style={styles.navRow}>
             <Pressable onPress={handlePrevMonth} hitSlop={8} style={styles.navArrowBtn}>
-              <Text style={styles.navArrowText}>‹</Text>
+              <ChevronLeft size={18} color="#0f172a" />
             </Pressable>
 
             <View style={styles.navMonthYear}>
               <Pressable
                 onPress={() => setPickerMode((m) => (m === "month" ? "calendar" : "month"))}
-                style={[styles.navSelectBtn, pickerMode === "month" && styles.navSelectBtnActive]}
+                style={[styles.navSelectBtn, pickerMode === "month" && styles.navSelectBtnActive, { flexDirection: "row", alignItems: "center", gap: 3 }]}
                 hitSlop={6}
               >
-                <Text style={styles.navMonthText}>{MONTH_NAMES[viewMonth]} ▾</Text>
+                <Text style={styles.navMonthText}>{MONTH_NAMES[viewMonth]}</Text>
+                <ChevronDown size={13} color="#0f172a" />
               </Pressable>
               <View style={styles.yearButtonsRow}>
                 <Pressable onPress={() => setViewYear((y) => y - 10)} hitSlop={6} style={styles.yearChangeBtn}>
@@ -247,10 +249,11 @@ export function DatePickerModal({
                 </Pressable>
                 <Pressable
                   onPress={() => setPickerMode((m) => (m === "year" ? "calendar" : "year"))}
-                  style={[styles.navYearBtn, pickerMode === "year" && styles.navSelectBtnActive]}
+                  style={[styles.navYearBtn, pickerMode === "year" && styles.navSelectBtnActive, { flexDirection: "row", alignItems: "center", gap: 3 }]}
                   hitSlop={6}
                 >
-                  <Text style={styles.navYearText}>{viewYear} ▾</Text>
+                  <Text style={styles.navYearText}>{viewYear}</Text>
+                  <ChevronDown size={13} color="#0f172a" />
                 </Pressable>
                 <Pressable onPress={() => setViewYear((y) => y + 1)} hitSlop={6} style={styles.yearChangeBtn}>
                   <Text style={styles.yearChangeText}>+1</Text>
@@ -262,7 +265,7 @@ export function DatePickerModal({
             </View>
 
             <Pressable onPress={handleNextMonth} hitSlop={8} style={styles.navArrowBtn}>
-              <Text style={styles.navArrowText}>›</Text>
+              <ChevronRight size={18} color="#0f172a" />
             </Pressable>
           </View>
 

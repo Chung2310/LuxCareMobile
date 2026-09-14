@@ -6,10 +6,17 @@ export const INTERVIEW_STATUSES = [
   { value: "completed", label: "Hoàn tất" },
   { value: "cancelled", label: "Đã hủy" },
 ];
+export function interviewTimeText(value?: string | null) {
+  if (!value || !Number.isFinite(Date.parse(value))) return "";
+  const date = new Date(value);
+  const vnTime = new Date(date.getTime() + 7 * 60 * 60 * 1000);
+  return vnTime.toISOString().replace("T", " ").slice(0, 16);
+}
+
 export function interviewDraft(item?: RecruitmentInterview) {
   return {
-    start: deadlineText(item?.scheduledStart),
-    end: deadlineText(item?.scheduledEnd),
+    start: interviewTimeText(item?.scheduledStart),
+    end: interviewTimeText(item?.scheduledEnd),
     format: item?.format || "onsite",
     location: item?.location || "",
     meetingLink: item?.meetingLink || "",
@@ -24,7 +31,7 @@ export function interviewPayload(draft: ReturnType<typeof interviewDraft>, origi
     if (!/^\d{4}-\d{2}-\d{2} ([01]\d|2[0-3]):[0-5]\d$/.test(text))
       throw new Error("Nhập thời gian YYYY-MM-DD HH:mm theo giờ Việt Nam.");
     customDashboardRange(text.slice(0, 10), text.slice(0, 10));
-    return previous && text === deadlineText(previous)
+    return previous && text === interviewTimeText(previous)
       ? previous
       : new Date(`${text.replace(" ", "T")}:00+07:00`).toISOString();
   };

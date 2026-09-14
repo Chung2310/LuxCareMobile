@@ -472,12 +472,15 @@ export function LeaveForm({
                 </View>
                 <View style={s.templateBannerBtns}>
                   <Pressable
-                    style={({ pressed }) => [s.templateDownloadBtn, pressed && { opacity: 0.7 }]}
+                    style={({ pressed }) => [s.templateDownloadBtn, (pressed || busy || uncertain) && { opacity: 0.5 }]}
+                    disabled={busy || uncertain}
                     onPress={() => {
-                      void downloadLeaveFile(selectedTemplate.fileUrl, selectedTemplate.fileName).then((saved) => {
-                        if (saved) showAlert("Đã lưu tệp", saved.name + " đã được lưu vào thư mục bạn chọn.", undefined, "success");
-                      }).catch((err) => {
-                        showAlert("Lỗi tải tệp", messageOf(err), undefined, "error");
+                      void run(async () => {
+                        await downloadLeaveFile(selectedTemplate.fileUrl, selectedTemplate.fileName).then((saved) => {
+                          if (saved) showAlert("Đã lưu tệp", saved.name + " đã được lưu vào thư mục bạn chọn.", undefined, "success");
+                        }).catch((err) => {
+                          showAlert("Lỗi tải tệp", messageOf(err), undefined, "error");
+                        });
                       });
                     }}
                   >
@@ -485,25 +488,28 @@ export function LeaveForm({
                     <Text style={s.templateDownloadBtnText}>Tải về</Text>
                   </Pressable>
                   <Pressable
-                    style={({ pressed }) => [s.templateShareBtn, pressed && { opacity: 0.7 }]}
+                    style={({ pressed }) => [s.templateShareBtn, (pressed || busy || uncertain) && { opacity: 0.5 }]}
+                    disabled={busy || uncertain}
                     onPress={() => {
-                      void shareLeaveFile(selectedTemplate.fileUrl, selectedTemplate.fileName).catch((err) => {
-                        const resolved = resolveFileUrl(selectedTemplate.fileUrl);
-                        showAlert(
-                          "Không thể chia sẻ trực tiếp",
-                          `${messageOf(err)}\n\nBạn có muốn mở tệp trên trình duyệt để tải về không?`,
-                          [
-                            { text: "Đóng", style: "cancel" },
-                            {
-                              text: "Mở trình duyệt",
-                              onPress: () => {
-                                void Linking.openURL(resolved).catch(() => {
-                                  showAlert("Lỗi", "Không thể mở liên kết trình duyệt.", undefined, "error");
-                                });
+                      void run(async () => {
+                        await shareLeaveFile(selectedTemplate.fileUrl, selectedTemplate.fileName).catch((err) => {
+                          const resolved = resolveFileUrl(selectedTemplate.fileUrl);
+                          showAlert(
+                            "Không thể chia sẻ trực tiếp",
+                            `${messageOf(err)}\n\nBạn có muốn mở tệp trên trình duyệt để tải về không?`,
+                            [
+                              { text: "Đóng", style: "cancel" },
+                              {
+                                text: "Mở trình duyệt",
+                                onPress: () => {
+                                  void Linking.openURL(resolved).catch(() => {
+                                    showAlert("Lỗi", "Không thể mở liên kết trình duyệt.", undefined, "error");
+                                  });
+                                },
                               },
-                            },
-                          ]
-                        );
+                            ]
+                          );
+                        });
                       });
                     }}
                   >

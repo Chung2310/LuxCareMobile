@@ -16,7 +16,13 @@ export async function uploadPublicRecruitmentFile(): Promise<RecruitmentPublicFi
   const asset = picked.assets[0],
     file = new File(asset.uri);
   try {
-    const type = recruitmentFileType(asset.name, file.size);
+    let size = asset.size;
+    if (!Number.isFinite(size) || (size as number) <= 0) {
+      try {
+        if (Number.isFinite(file.size) && file.size > 0) size = file.size;
+      } catch {}
+    }
+    const type = recruitmentFileType(asset.name, size || 1);
     const form = new FormData();
     form.append("file", { uri: asset.uri, name: asset.name, type } as unknown as Blob);
     const response = await api.transport.fetch("/api/v1/recruitment/files/public", { method: "POST", body: form });
@@ -40,7 +46,13 @@ export async function uploadRecruitmentFile(kind: "job" | "applicant", id: strin
   const asset = picked.assets[0],
     file = new File(asset.uri);
   try {
-    const type = recruitmentFileType(asset.name, file.size);
+    let size = asset.size;
+    if (!Number.isFinite(size) || (size as number) <= 0) {
+      try {
+        if (Number.isFinite(file.size) && file.size > 0) size = file.size;
+      } catch {}
+    }
+    const type = recruitmentFileType(asset.name, size || 1);
     const form = new FormData();
     form.append("file", { uri: asset.uri, name: asset.name, type } as unknown as Blob);
     if (version !== undefined) form.append("version", String(version));

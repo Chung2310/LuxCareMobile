@@ -1,7 +1,9 @@
 import type { Contract } from "../../../../src/types/hrContract";
 import type { ExtensionInput } from "../../../../src/services/hrContractService";
 export function extensionDraft(now = new Date()) {
-  return { newEndDate: "", extensionDate: now.toISOString().slice(0, 10), reason: "" };
+  const parts = new Intl.DateTimeFormat("en", { timeZone: "Asia/Ho_Chi_Minh", year: "numeric", month: "2-digit", day: "2-digit" }).formatToParts(now);
+  const part = (type: string) => parts.find(value => value.type === type)!.value;
+  return { newEndDate: "", extensionDate: [part("year"), part("month"), part("day")].join("-"), reason: "" };
 }
 export function extensionPayload(draft: ReturnType<typeof extensionDraft>, contract: Contract): ExtensionInput {
   const parse = (value: string) => {

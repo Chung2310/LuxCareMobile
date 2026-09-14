@@ -194,3 +194,42 @@ it("still opens sharing when explicitly sharing a file", async () => {
   expect(mocks.share).toHaveBeenCalledOnce();
   expect(mocks.pickDirectory).not.toHaveBeenCalled();
 });
+
+it.each([
+  { code: "ERR_SHARING_CANCELED" },
+  { code: "ERR_SHARING_CANCELLED" },
+  { name: "AbortError", message: "The user aborted a request." },
+  { domain: "NSCocoaErrorDomain", code: 3072 },
+  { message: "The user cancelled the sharing dialog." },
+])("treats native share dismissal as cancellation: %j", async cancellation => {
+  mocks.share.mockRejectedValueOnce(cancellation);
+  await expect(shareApiFile("https://files.test/template.pdf", "template.pdf")).resolves.toBeUndefined();
+  expect(mocks.remove).not.toHaveBeenCalled();
+  // The next user-initiated share is still available.
+  mocks.fetch.mockResolvedValueOnce(new Response(new Uint8Array([1, 2, 3])));
+  await shareApiFile("https://files.test/template.pdf", "template.pdf");
+  expect(mocks.share).toHaveBeenCalledTimes(2);
+});
+
+it("still reports genuine native sharing failures", async () => {
+  mocks.share.mockRejectedValueOnce(Object.assign(new Error("Cannot open the activity"), { code: "ERR_SHARING_FAILED" }));
+  await expect(shareApiFile("https://files.test/template.pdf", "template.pdf")).rejects.toThrow("Cannot open the activity");
+});
+
+it("does not suppress AbortError while downloading", async () => {
+  mocks.fetch.mockRejectedValueOnce(Object.assign(new Error("Download aborted"), { name: "AbortError" }));
+  await expect(shareApiFile("https://files.test/template.pdf", "template.pdf")).rejects.toThrow("Download aborted");
+  expect(mocks.share).not.toHaveBeenCalled();
+});
+
+it("does not time out while the user leaves the share sheet open and then returns", async () => {
+  vi.useFakeTimers();
+  let dismiss!: () => void;
+  mocks.share.mockImplementationOnce(() => new Promise<void>(resolve => { dismiss = resolve; }));
+  const sharing = shareApiFile("https://files.test/template.pdf", "template.pdf");
+  await vi.advanceTimersByTimeAsync(0);
+  expect(mocks.share).toHaveBeenCalledOnce();
+  await vi.advanceTimersByTimeAsync(180000);
+  dismiss();
+  await expect(sharing).resolves.toBeUndefined();
+});

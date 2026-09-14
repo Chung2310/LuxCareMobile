@@ -110,6 +110,33 @@ export function draftForTask(task?: HRTask): TaskDraft {
   };
 }
 
+/** Elapsed hours from explicit timestamps, preserving timezone offsets. */
+export function taskDurationHours(start?: string, end?: string): number | null {
+  if (!start || !end) return null;
+  try {
+    const startMs = new Date(parseDateTime(start, "Bắt đầu")).getTime();
+    const endMs = new Date(parseDateTime(end, "Kết thúc")).getTime();
+    if (!Number.isFinite(startMs) || !Number.isFinite(endMs) || endMs < startMs) return null;
+    return (endMs - startMs) / 3_600_000;
+  } catch {
+    return null;
+  }
+}
+
+export function updateTaskTiming(draft: TaskDraft, patch: Partial<TaskDraft>): TaskDraft {
+  const next = { ...draft, ...patch };
+  const startChanged = next.startTime !== draft.startTime;
+  if (startChanged || next.dueDate !== draft.dueDate) {
+    const hours = taskDurationHours(next.startTime, next.dueDate);
+    next.estTime = hours === null ? "" : String(Number(hours.toFixed(1)));
+  }
+  if (startChanged || next.endTime !== draft.endTime) {
+    const hours = taskDurationHours(next.startTime, next.endTime);
+    next.actualTime = hours === null ? "" : String(Number(hours.toFixed(1)));
+  }
+  return next;
+}
+
 export function taskPayload(draft: TaskDraft, canManage: boolean, creating: boolean): TaskUpdate | TaskInput {
   const dueDate = parseDateTime(draft.dueDate, "Hạn chót");
   const startTime = parseDateTime(draft.startTime, "Bắt đầu");
@@ -129,7 +156,9 @@ export function taskPayload(draft: TaskDraft, canManage: boolean, creating: bool
   };
 
   const estTime = parseHours(draft.estTime);
-  const actualTime = parseHours(draft.actualTime);
+  const enteredActualTime = parseHours(draft.actualTime);
+  const measuredHours = taskDurationHours(startTime, endTime);
+  const actualTime = measuredHours === null ? enteredActualTime : Number(measuredHours.toFixed(1));
 
   if (!TASK_STATUSES.some((item) => item.value === draft.status)) throw new Error("Trạng thái không hợp lệ.");
   if (!canManage && draft.status === "Archived") throw new Error("Nhân viên không được lưu trữ công việc.");
@@ -194,105 +223,37 @@ export interface TaskKpiInfo {
 
 export function evaluateTaskKpi(
   estTime?: string | number,
-  actualTime?: string | number,
+  _actualTime?: string | number,
   endTime?: string,
-  dueDate?: string,
+  _dueDate?: string,
+  startTime?: string,
 ): TaskKpiInfo | null {
-  const est = estTime ? Number(String(estTime).trim().replace(",", ".")) : 0;
-  const act = actualTime ? Number(String(actualTime).trim().replace(",", ".")) : 0;
+  const est = Number(String(estTime ?? "").trim().replace(",", "."));
+  if (!Number.isFinite(est) || est <= 0) return null;
+  const actualHours = taskDurationHours(startTime, endTime);
+  if (actualHours === null) return null;
 
-  // 1. So sánh số giờ thực tế vs giờ dự tính
-  if (est > 0 && act > 0) {
-    const diff = Math.round((act - est) * 10) / 10;
-    if (diff > 0) {
-      return {
-        status: "overdue",
-        label: "KPI: Trễ hạn (Vượt giờ)",
-        detail: `Thực tế (${act}h) vượt dự tính (${est}h) là +${diff}h`,
-        color: "#b91c1c",
-        bg: "#fef2f2",
-        borderColor: "#fca5a5",
-        icon: "alert-triangle" as const,
-      };
-    }
-    if (diff < 0) {
-      return {
-        status: "ahead",
-        label: "KPI: Xuất sắc (Sớm tiến độ)",
-        detail: `Tiết kiệm được ${Math.abs(diff)}h so với dự tính (${est}h)`,
-        color: "#047857",
-        bg: "#ecfdf5",
-        borderColor: "#a7f3d0",
-        icon: "star" as const,
-      };
-    }
+  // Compare unrounded duration: even a short overrun must not become on-time.
+  if (actualHours > est) {
+    const difference = actualHours - est;
+    const delay = difference < 0.1 ? "dưới 0,1 giờ" : Number(difference.toFixed(1)) + " giờ";
     return {
-      status: "ontime",
-      label: "KPI: Đúng hạn (Chuẩn tiến độ)",
-      detail: `Hoàn thành đúng bằng số giờ dự tính (${est}h)`,
-      color: "#059669",
-      bg: "#ecfdf5",
-      borderColor: "#6ee7b7",
-      icon: "target" as const,
+      status: "overdue",
+      label: "KPI: Trễ tiến độ",
+      detail: "Thời gian thực tế vượt dự tính " + delay + " (dự tính " + est + " giờ).",
+      color: "#b91c1c",
+      bg: "#fef2f2",
+      borderColor: "#fca5a5",
+      icon: "alert-triangle",
     };
   }
-
-  // 2. So sánh theo mốc thời gian hoàn thành (endTime vs dueDate)
-  if (endTime && dueDate) {
-    const parseTime = (str: string): number => {
-      const match = str.match(/^(\d{4})-(\d{2})-(\d{2})[ T](\d{2}):(\d{2})/);
-      if (match) {
-        return new Date(
-          parseInt(match[1], 10),
-          parseInt(match[2], 10) - 1,
-          parseInt(match[3], 10),
-          parseInt(match[4], 10),
-          parseInt(match[5], 10),
-        ).getTime();
-      }
-      const t = new Date(str).getTime();
-      return Number.isFinite(t) ? t : 0;
-    };
-
-    const endT = parseTime(endTime);
-    const dueT = parseTime(dueDate);
-    if (endT > 0 && dueT > 0) {
-      if (endT > dueT) {
-        const diffH = Math.round(((endT - dueT) / (1000 * 60 * 60)) * 10) / 10;
-        return {
-          status: "overdue",
-          label: "KPI: Trễ hạn (Quá deadline)",
-          detail: `Hoàn thành sau deadline +${diffH}h`,
-          color: "#b91c1c",
-          bg: "#fef2f2",
-          borderColor: "#fca5a5",
-          icon: "alert-triangle" as const,
-        };
-      }
-      return {
-        status: "ontime",
-        label: "KPI: Đúng hạn",
-        detail: "Hoàn thành trước hoặc đúng thời hạn deadline",
-        color: "#059669",
-        bg: "#ecfdf5",
-        borderColor: "#a7f3d0",
-        icon: "target" as const,
-      };
-    }
-  }
-
-  // 3. Nếu mới có giờ dự tính (chưa có giờ thực tế)
-  if (est > 0) {
-    return {
-      status: "pending",
-      label: "KPI: Kế hoạch chuẩn",
-      detail: `Kế hoạch ${est}h để đạt KPI hoàn thành đúng hạn`,
-      color: "#1d4ed8",
-      bg: "#eff6ff",
-      borderColor: "#bfdbfe",
-      icon: "clock" as const,
-    };
-  }
-
-  return null;
+  return {
+    status: "ontime",
+    label: "KPI: Đúng tiến độ (Đạt KPI)",
+    detail: "Thực tế " + Number(actualHours.toFixed(1)) + " giờ / dự tính " + est + " giờ.",
+    color: "#059669",
+    bg: "#ecfdf5",
+    borderColor: "#a7f3d0",
+    icon: "target",
+  };
 }

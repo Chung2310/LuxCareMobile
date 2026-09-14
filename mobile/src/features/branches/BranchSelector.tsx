@@ -17,9 +17,11 @@ import { useSession, messageOf } from "../../auth/SessionProvider";
 import { Ionicons } from "@expo/vector-icons";
 
 export function BranchSelector({
+  allowAll = true,
   triggerStyle,
   renderCustomTrigger,
 }: {
+  allowAll?: boolean;
   triggerStyle?: any;
   renderCustomTrigger?: (open: () => void, currentName: string) => React.ReactNode;
 } = {}) {
@@ -63,7 +65,7 @@ export function BranchSelector({
   };
 
   const currentBranchName =
-    selectedBranch?.name || "Toàn hệ thống (Tất cả chi nhánh)";
+    selectedBranch?.name || (allowAll ? "Toàn hệ thống (Tất cả chi nhánh)" : "Chọn chi nhánh");
 
   return (
     <>
@@ -166,7 +168,7 @@ export function BranchSelector({
               keyboardShouldPersistTaps="handled"
               showsVerticalScrollIndicator={false}
             >
-              {/* Option: Toàn hệ thống (Tất cả chi nhánh) */}
+              {allowAll && (
               <Pressable
                 style={({ pressed }) => [
                   styles.branchCard,
@@ -215,6 +217,8 @@ export function BranchSelector({
                   {!selectedBranch && <View style={styles.radioDot} />}
                 </View>
               </Pressable>
+
+              )}
 
               {loading && (
                 <View style={styles.loadingBox}>

@@ -1,5 +1,5 @@
 import { useAppAlert } from "../../components/AppAlert";
-import React, { useRef, useState } from "react";
+import React, { useMemo, useRef, useState } from "react";
 import {
   ActivityIndicator,
   KeyboardAvoidingView,
@@ -21,12 +21,16 @@ import { DAYS, shiftDraft, shiftPayload } from "./model";
 
 const COLOR_PRESETS = [
   "#059669", // Emerald
+  "#0d9488", // Teal
   "#0284c7", // Sky
+  "#2563eb", // Blue
   "#4f46e5", // Indigo
   "#7c3aed", // Purple
-  "#d97706", // Amber
+  "#db2777", // Pink
   "#e11d48", // Rose
-  "#0f172a", // Slate
+  "#ea580c", // Orange
+  "#d97706", // Amber
+  "#475569", // Slate
 ];
 
 const TIME_PRESETS_START = ["07:30", "08:00", "08:30", "09:00", "13:00", "22:00"];
@@ -60,6 +64,14 @@ export function ShiftForm({
   const [breakEnd, setBreakEnd] = useState("13:00");
   const [breakPaid, setBreakPaid] = useState(false);
   const [showAddBreak, setShowAddBreak] = useState(false);
+
+  const paletteColors = useMemo(() => {
+    const list = [...COLOR_PRESETS];
+    if (draft.color && !list.some((c) => c.toLowerCase() === draft.color.toLowerCase())) {
+      list.push(draft.color);
+    }
+    return list;
+  }, [draft.color]);
 
   const save = async () => {
     if (lock.current) return;
@@ -221,30 +233,27 @@ export function ShiftForm({
           <View style={{ gap: 6, marginTop: 4 }}>
             <Text style={s.label}>Màu sắc nhận diện trên lịch</Text>
             <View style={s.paletteRow}>
-              {COLOR_PRESETS.map((hex) => (
-                <Pressable
-                  key={hex}
-                  style={[
-                    s.colorDot,
-                    { backgroundColor: hex },
-                    draft.color === hex && s.colorDotSelected,
-                  ]}
-                  onPress={() => setDraft((cur) => ({ ...cur, color: hex }))}
-                >
-                  {draft.color === hex && (
-                    <Ionicons name="checkmark" size={14} color="#ffffff" />
-                  )}
-                </Pressable>
-              ))}
-              <TextInput
-                style={s.hexInput}
-                value={draft.color}
-                onChangeText={(val) => setDraft((cur) => ({ ...cur, color: val }))}
-                maxLength={7}
-                placeholder="#059669"
-                placeholderTextColor="#94a3b8"
-                editable={!busy && !uncertain}
-              />
+              {paletteColors.map((hex) => {
+                const isSelected = draft.color.toLowerCase() === hex.toLowerCase();
+                return (
+                  <Pressable
+                    key={hex}
+                    style={[
+                      s.colorDot,
+                      { backgroundColor: hex },
+                      isSelected && s.colorDotSelected,
+                    ]}
+                    onPress={() => setDraft((cur) => ({ ...cur, color: hex }))}
+                    disabled={busy || uncertain}
+                    accessibilityLabel={`Màu ${hex}`}
+                    accessibilityRole="button"
+                  >
+                    {isSelected && (
+                      <Ionicons name="checkmark" size={16} color="#ffffff" />
+                    )}
+                  </Pressable>
+                );
+              })}
             </View>
           </View>
         </View>
@@ -672,29 +681,20 @@ const s = StyleSheet.create({
   paletteRow: {
     flexDirection: "row",
     alignItems: "center",
-    gap: 8,
+    flexWrap: "wrap",
+    gap: 10,
+    paddingVertical: 4,
   },
   colorDot: {
-    width: 28,
-    height: 28,
-    borderRadius: 14,
+    width: 32,
+    height: 32,
+    borderRadius: 16,
     alignItems: "center",
     justifyContent: "center",
   },
   colorDotSelected: {
-    borderWidth: 2,
+    borderWidth: 2.5,
     borderColor: "#0f172a",
-  },
-  hexInput: {
-    width: 80,
-    height: 36,
-    backgroundColor: "#f8fafc",
-    borderWidth: 1,
-    borderColor: "#cbd5e1",
-    borderRadius: 8,
-    textAlign: "center",
-    fontSize: 12,
-    color: "#0f172a",
   },
   overnightBadge: {
     flexDirection: "row",

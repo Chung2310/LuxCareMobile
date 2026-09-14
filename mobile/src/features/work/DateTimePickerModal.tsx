@@ -17,6 +17,7 @@ export interface DateTimePickerModalProps {
   onChange: (val: string) => void;
   title?: string;
   allowClear?: boolean;
+  minuteStep?: 1 | 5 | 15;
 }
 
 const WEEK_DAYS = ["T2", "T3", "T4", "T5", "T6", "T7", "CN"];
@@ -76,6 +77,7 @@ export function DateTimePickerModal({
   onChange,
   title = "Chọn thời gian",
   allowClear = true,
+  minuteStep = 15,
 }: DateTimePickerModalProps) {
   const initial = useMemo(() => parseDateTimeStr(value), [value]);
   const [viewYear, setViewYear] = useState(initial.year);
@@ -98,6 +100,10 @@ export function DateTimePickerModal({
   const daysInMonth = useMemo(() => {
     return new Date(viewYear, viewMonth + 1, 0).getDate();
   }, [viewYear, viewMonth]);
+
+  useEffect(() => {
+    setSelectedDay((day) => Math.min(day, daysInMonth));
+  }, [daysInMonth]);
 
   const startDayOfWeek = useMemo(() => {
     const d = new Date(viewYear, viewMonth, 1).getDay();
@@ -364,14 +370,14 @@ export function DateTimePickerModal({
                   <View style={styles.stepperControls}>
                     <Pressable
                       style={styles.stepperBtn}
-                      onPress={() => setSelectedMinute((m) => (m <= 0 ? 45 : m - 15))}
+                      onPress={() => setSelectedMinute((m) => (m - minuteStep + 60) % 60)}
                     >
                       <Text style={styles.stepperBtnText}>-</Text>
                     </Pressable>
                     <Text style={styles.stepperValue}>{pad(selectedMinute)}</Text>
                     <Pressable
                       style={styles.stepperBtn}
-                      onPress={() => setSelectedMinute((m) => (m >= 45 ? 0 : m + 15))}
+                      onPress={() => setSelectedMinute((m) => (m + minuteStep) % 60)}
                     >
                       <Text style={styles.stepperBtnText}>+</Text>
                     </Pressable>
