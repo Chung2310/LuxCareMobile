@@ -2,6 +2,7 @@ import React from "react";
 import { StyleSheet, Text, View } from "react-native";
 import { useSafeAreaInsets } from "react-native-safe-area-context";
 import { AppButton } from "../common";
+import { formatNumber } from "../../utils/numberFormat";
 
 export interface BatchStockFooterProps {
   totalItemsCount: number;
@@ -29,10 +30,10 @@ export const BatchStockFooter: React.FC<BatchStockFooterProps> = ({
     <View style={[styles.footer, { paddingBottom: bottomPadding }]}>
       <View style={styles.footerSummary}>
         <Text style={styles.footerSummaryText}>
-          Tổng cộng: <Text style={styles.footerSummaryBold}>{totalItemsCount} mặt hàng</Text>
+          Tổng cộng: <Text style={styles.footerSummaryBold}>{formatNumber(totalItemsCount)} mặt hàng</Text>
         </Text>
         <Text style={styles.footerSummarySub}>
-          Tổng số lượng: {totalQuantity} đơn vị
+          Tổng số lượng: {formatNumber(totalQuantity)} đơn vị
         </Text>
       </View>
 

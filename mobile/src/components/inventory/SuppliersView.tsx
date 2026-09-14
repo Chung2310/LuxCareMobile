@@ -14,6 +14,7 @@ import {
 import { Ionicons } from "@expo/vector-icons";
 import type { InventorySupplier } from "./types";
 import { SupplierFormModal } from "./SupplierFormModal";
+import { formatNumber } from "../../utils/numberFormat";
 
 interface SuppliersViewProps {
   suppliers: InventorySupplier[];
@@ -138,7 +139,7 @@ export function SuppliersView({
           </View>
 
           <View style={styles.countBadge}>
-            <Text style={styles.countNum}>{item.suppliedItemsCount}</Text>
+            <Text style={styles.countNum}>{formatNumber(item.suppliedItemsCount)}</Text>
             <Text style={styles.countLabel}>Mặt hàng</Text>
           </View>
         </View>

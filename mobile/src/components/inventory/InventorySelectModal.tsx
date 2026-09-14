@@ -9,6 +9,7 @@ import {
 } from "react-native";
 import { Ionicons } from "@expo/vector-icons";
 import { SearchInput } from "../common";
+import { formatNumber } from "../../utils/numberFormat";
 
 export interface SelectOption {
   id: string;
@@ -76,7 +77,7 @@ export const InventorySelectModal: React.FC<InventorySelectModalProps> = ({
           <View style={styles.header}>
             <View style={styles.headerTitleBox}>
               <Text style={styles.headerTitle}>{title}</Text>
-              <Text style={styles.headerSubtitle}>{options.length} lựa chọn khả dụng</Text>
+              <Text style={styles.headerSubtitle}>{formatNumber(options.length)} lựa chọn khả dụng</Text>
             </View>
 
             <View style={styles.headerRight}>
@@ -116,7 +117,7 @@ export const InventorySelectModal: React.FC<InventorySelectModalProps> = ({
                     activeOpacity={0.7}
                   >
                     <Text style={[styles.tabChipText, isActive && styles.tabChipTextActive]}>
-                      {tab.label} {tab.count !== undefined ? `(${tab.count})` : ""}
+                      {tab.label} {tab.count !== undefined ? `(${formatNumber(tab.count)})` : ""}
                     </Text>
                   </TouchableOpacity>
                 );
