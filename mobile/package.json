@@ -34,15 +34,24 @@
     "react-native-screens": "~4.26.0",
     "react-native-svg": "15.15.4",
     "react-native-web": "^0.21.2",
+    "react-native-webview": "13.16.1",
     "react-native-worklets": "0.10.1",
-    "socket.io-client": "^4.8.3"
+    "socket.io-client": "^4.8.3",
+    "xlsx": "https://cdn.sheetjs.com/xlsx-0.20.3/xlsx-0.20.3.tgz"
   },
   "devDependencies": {
     "@types/react": "~19.2.2",
+    "dompurify": "3.4.15",
+    "esbuild": "0.28.2",
+    "mammoth": "1.12.3",
+    "pdfjs-dist": "6.3.289",
+    "playwright": "1.63.0",
     "typescript": "~6.0.3"
   },
   "scripts": {
     "typecheck": "tsc --noEmit",
+    "build:document-viewer": "node scripts/build-document-viewer.mjs",
+    "test:document-viewer": "node scripts/test-document-viewer.mjs",
     "export:native": "expo export --platform android --platform ios",
     "start": "expo start --port 8088",
     "android": "expo start --port 8088 --android",

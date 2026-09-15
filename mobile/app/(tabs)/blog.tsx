@@ -1,3 +1,4 @@
+import { BlogDocumentPreview } from "../../src/features/blog/BlogDocumentPreview";
 import { BlogImage } from "../../src/features/blog/BlogImage";
 import { blogShareMessage } from "../../../src/services/blogShareMessage";
 import { historicalUserLabel } from "../../../src/utils/historicalUser";
@@ -116,6 +117,7 @@ export default function BlogScreen() {
   const jumpRetry = useRef<ReturnType<typeof setTimeout> | null>(null);
   const jumpAttempts = useRef(0);
   const isSharingRef = useRef(false);
+  const [previewDocument, setPreviewDocument] = useState<BlogAttachment | null>(null);
   const [viewImage, setViewImage] = useState<{ postId: string; attachment: BlogAttachment } | null>(null);
   const viewImageUrl = viewImage?.attachment.url;
   const viewedPost = postsScope === feedScope ? posts.find(post => post.id === viewImage?.postId) : undefined;
@@ -1077,16 +1079,20 @@ export default function BlogScreen() {
                       void exportAttachment(post.id, att, "share");
                     };
                     return (
-                      <View key={att.id} style={styles.webFileCard}>
+                      <View key={att.id} style={[styles.webFileCard, { flexWrap: "wrap" }]}>
                         <View style={styles.webFileIconWrap}>
                           <Ionicons name="document-text" size={20} color="#000000" />
                         </View>
-                        <View style={styles.webFileMeta}>
+                        <Pressable style={styles.webFileMeta} onPress={() => setPreviewDocument(att)} accessibilityLabel={"Xem trước " + att.name}>
                           <Text style={styles.webFileName} numberOfLines={1}>
                             {att.name}
                           </Text>
                           <Text style={styles.webFileSize}>{att.size || ""}</Text>
-                        </View>
+                        </Pressable>
+                        <View style={{ width: "100%", flexDirection: "row", justifyContent: "flex-end", alignItems: "center", flexWrap: "wrap", gap: 6 }}>
+                          <Pressable style={styles.webDownloadBtn} onPress={() => setPreviewDocument(att)} accessibilityLabel={"Xem trước " + att.name}>
+                            <Ionicons name="eye-outline" size={14} color="#000000" /><Text style={styles.webDownloadText}>Xem trước</Text>
+                          </Pressable>
                         <View style={[styles.webFileActions, !post.attachmentsPublic && { display: "none" }]}>
                           {/* Download button */}
                           {att.url ? (
@@ -1106,6 +1112,7 @@ export default function BlogScreen() {
                             <Ionicons name="share-social-outline" size={14} color="#000000" />
                             <Text style={styles.webDownloadText}>Chia sẻ</Text>
                           </Pressable>
+                        </View>
                         </View>
                       </View>
                     );
@@ -1469,6 +1476,7 @@ export default function BlogScreen() {
           busy={logoutBusy}
         />
 
+        {previewDocument && <BlogDocumentPreview attachment={previewDocument} onClose={() => setPreviewDocument(null)} />}
         {/* Fullscreen Image Viewer Modal */}
         <Modal
           visible={!!viewImageUrl}
