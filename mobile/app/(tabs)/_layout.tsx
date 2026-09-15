@@ -15,10 +15,9 @@ interface MomoTabIconProps {
   name: keyof typeof Ionicons.glyphMap;
   outlineName: keyof typeof Ionicons.glyphMap;
   focused: boolean;
-  badge?: string | number;
 }
 
-function MomoTabIcon({ name, outlineName, focused, badge }: MomoTabIconProps) {
+function MomoTabIcon({ name, outlineName, focused }: MomoTabIconProps) {
   const scale = useRef(new Animated.Value(1)).current;
   const translateY = useRef(new Animated.Value(0)).current;
   const dotScale = useRef(new Animated.Value(focused ? 1 : 0)).current;
@@ -100,13 +99,6 @@ function MomoTabIcon({ name, outlineName, focused, badge }: MomoTabIconProps) {
         />
       </Animated.View>
 
-      {/* Huy hiệu số tin nhắn chưa đọc đỏ nổi bật (chuẩn Zalo/MoMo) */}
-      {Boolean(badge) && (
-        <View style={momoStyles.badge}>
-          <Text style={momoStyles.badgeText}>{badge}</Text>
-        </View>
-      )}
-
       {/* Chấm chỉ báo nhỏ tinh tế bên dưới */}
       <Animated.View
         style={[
@@ -174,6 +166,7 @@ export default function TabLayout() {
   const { unreadCount, workUnread } = useNotifications();
   const { user, selectedBranch } = useSession();
   const { totalUnread } = useChatUnread();
+  const effectiveChatUnread = totalUnread > 0 ? totalUnread : chatUnread;
   const insets = useSafeAreaInsets();
   if (!user) return <Redirect href="/login" />;
 
@@ -246,7 +239,7 @@ export default function TabLayout() {
         name="chat"
         options={{
           title: "Trò chuyện",
-          tabBarBadge: chatUnread > 0 ? (chatUnread > 99 ? "99+" : chatUnread) : undefined,
+          tabBarBadge: effectiveChatUnread > 0 ? (effectiveChatUnread > 99 ? "99+" : effectiveChatUnread) : undefined,
           headerShown: false,
           href: isEditor ? null : undefined,
           tabBarIcon: ({ focused }) => (
@@ -254,7 +247,6 @@ export default function TabLayout() {
               name="chatbubble-ellipses"
               outlineName="chatbubble-ellipses-outline"
               focused={focused}
-              badge={totalUnread > 0 ? (totalUnread > 99 ? "99+" : totalUnread) : undefined}
             />
           ),
         }}
@@ -330,28 +322,6 @@ const momoStyles = StyleSheet.create({
     height: 30,
     alignItems: "center",
     justifyContent: "center",
-  },
-  badge: {
-    position: "absolute",
-    top: -4,
-    right: 0,
-    backgroundColor: "#ef4444",
-    borderRadius: 9,
-    minWidth: 17,
-    height: 17,
-    paddingHorizontal: 4,
-    alignItems: "center",
-    justifyContent: "center",
-    borderWidth: 1.5,
-    borderColor: "#ffffff",
-    zIndex: 10,
-  },
-  badgeText: {
-    color: "#ffffff",
-    fontSize: 9.5,
-    fontWeight: "800",
-    textAlign: "center",
-    lineHeight: 12,
   },
   accentDot: {
     position: "absolute",
