@@ -2,10 +2,6 @@ const fs = require("node:fs");
 const path = require("node:path");
 
 function validate(env) {
-  const projectId = env.EXPO_PUBLIC_EAS_PROJECT_ID?.trim();
-  if (!/^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i.test(projectId || "")) {
-    throw new Error("Set repository variable EXPO_PUBLIC_EAS_PROJECT_ID to the existing Expo project UUID for Android push.");
-  }
   const packageName = env.LUXCARE_ANDROID_PACKAGE?.trim();
   if (!/^[A-Za-z][A-Za-z0-9_]*(\.[A-Za-z][A-Za-z0-9_]*)+$/.test(packageName || "")) {
     throw new Error("Set LUXCARE_ANDROID_PACKAGE to the Android app registered in Firebase.");
@@ -17,7 +13,7 @@ function validate(env) {
   try { config = JSON.parse(env.GOOGLE_SERVICES_JSON_CONTENT); }
   catch { throw new Error("GOOGLE_SERVICES_JSON must contain valid JSON from Firebase Android app settings."); }
   if (config?.type === "service_account" || config?.private_key) {
-    throw new Error("Do not bundle a service account key. GOOGLE_SERVICES_JSON must be the Android client configuration; upload FCM V1 service credentials to EAS.");
+    throw new Error("Do not bundle a service account key. GOOGLE_SERVICES_JSON must be the Android client configuration; configure FCM V1 service credentials on the backend only.");
   }
   if (!config?.project_info?.project_id || !/^\d+$/.test(String(config?.project_info?.project_number || ""))) {
     throw new Error("google-services.json is missing Firebase project information.");

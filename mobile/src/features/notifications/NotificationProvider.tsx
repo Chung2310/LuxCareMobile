@@ -1,3 +1,4 @@
+import { getPushRegistration } from "./pushToken";
 import React, { createContext, useCallback, useContext, useEffect, useRef, useState } from "react";
 import { AppState, Linking, Platform, Pressable, Text, View } from "react-native";
 import { Ionicons } from "@expo/vector-icons";
@@ -131,12 +132,12 @@ export function NotificationProvider({ children }: React.PropsWithChildren) {
           return;
         }
         const projectId = Constants.easConfig?.projectId || Constants.expoConfig?.extra?.eas?.projectId;
-        if (!projectId) { setPushError("Thông báo nền chưa được cấu hình cho bản ứng dụng này."); return; }
-        const token = (await Notifications.getExpoPushTokenAsync({ projectId })).data;
+        const registration = await getPushRegistration(Platform.OS, Notifications, projectId);
+        const { token } = registration;
         if (!active) return;
         stage = "server";
         const response = await api.transport.fetch("/api/v1/push/devices", { method: "POST",
-          headers: { "Content-Type": "application/json" }, body: JSON.stringify({ token, platform: Platform.OS }) });
+          headers: { "Content-Type": "application/json" }, body: JSON.stringify(registration) });
         if (!response.ok) throw Object.assign(new Error("registration failed"), { status: response.status });
         const previousToken = registeredToken;
         registeredToken = token;

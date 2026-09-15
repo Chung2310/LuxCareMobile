@@ -9,11 +9,10 @@ const config = {
   client: [{ client_info: { mobilesdk_app_id: "1:123456789:android:abc", android_client_info: { package_name: "com.example.luxcare" } }, api_key: [{ current_key: "test-only-key" }] }],
 };
 const env = {
-  EXPO_PUBLIC_EAS_PROJECT_ID: "11111111-2222-3333-4444-555555555555",
   LUXCARE_ANDROID_PACKAGE: "com.example.luxcare",
   GOOGLE_SERVICES_JSON_CONTENT: JSON.stringify(config),
 };
-test("validates the matching Firebase app", () => assert.deepEqual(validate(env), config));
+test("validates the matching Firebase app without an Expo project ID", () => assert.deepEqual(validate(env), config));
 for (const name of Object.keys(env)) {
   test("rejects missing " + name, () => assert.throws(() => validate({ ...env, [name]: "" })));
 }

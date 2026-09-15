@@ -8,7 +8,7 @@ Chat hiển thị banner khi nhận tin của người khác ngoài phòng đang
 
 Blog hiển thị banner bài mới và số bài chưa xem trên icon ở trang chủ, danh sách chức năng và mục ghim. Đánh dấu đã xem khi kênh được tải thành công trong màn hình đang mở. Chỉ tính 50 bài API đang trả về, không tính bài tự đăng. Lần đồng bộ đầu tiên trên thiết bị lấy các bài hiện tại làm mốc; các bài mới sau đó được đếm. Trạng thái xem lưu riêng theo API server/công ty/tài khoản trên thiết bị, chưa đồng bộ đã xem giữa nhiều thiết bị. Khi reconnect/foreground, tải lại API để cập nhật nội dung và badge.
 
-Phần Chat/Blog này là realtime trong app, chạy được trên Expo Go; chưa bổ sung push nền cho hai loại nội dung này.
+Blog dùng realtime trong app. Chat có push nền qua worker như mô tả bên dưới.
 
 Expo Go: không nạp `expo-notifications` hoặc gọi API native push. Vẫn dùng socket, banner và badge trong ứng dụng; màn hình Thông báo giải thích giới hạn này. Luồng xin quyền và push native chạy trong development/release build của LuxCare.
 
@@ -17,37 +17,42 @@ Backend: `E:/Igen/LuxCare`. Mobile: `mobile/`.
 ## Luồng hoạt động
 
 - Khi mở app, tạo Android channel `default` và xin quyền nếu người dùng chưa quyết định. Không chờ đăng nhập. Từ chối quyền không chặn ứng dụng; màn hình Thông báo có nút mở Cài đặt.
-- Sau đăng nhập, lấy Expo push token và POST `/api/v1/push/devices` với `{ token, platform: "android" | "ios" }`. JWT quyết định người nhận, công ty và phiên. DELETE cùng endpoint với `{ token }` để hủy.
+- Sau đăng nhập, Android lấy token FCM và POST `/api/v1/push/devices` với `{ token, platform: "android", provider: "fcm" }`. iOS tiếp tục đăng ký token Expo với `provider: "expo"`. JWT quyết định người nhận, công ty và phiên. DELETE cùng endpoint với `{ token }` để hủy.
 - Socket dùng API origin, path `/socket.io/`, namespace `/`, `auth.token`. Server tự join room cá nhân. Mobile nghe `new_notification` và `notifications:changed`, đồng bộ lại qua API sau reconnect/foreground.
 - Foreground hiển thị banner chung cho socket và push, chống trùng theo notification ID trong phiên (giới hạn 200 ID). Tab thông báo hiển thị số chưa đọc. Push foreground không tạo thêm banner hệ điều hành.
 - Background dùng push có title/body để hệ điều hành hiển thị. Không chạy socket bằng background task. Chạm thông báo chờ khôi phục phiên và navigation, kiểm tra người nhận/công ty rồi dùng `notificationTarget`; nội dung chưa hỗ trợ mở danh sách thông báo.
 - Backend đánh dấu thông báo mới bằng `mobilePushQueued: false`. Worker mỗi 5 giây chuyển tối đa 20 thông báo sang các job MongoDB có khóa duy nhất notification/token/session, rồi xử lý tối đa 20 job. Thông báo cũ không có cờ này không được gửi lại.
-- Worker kiểm tra thiết bị và phiên trước gửi; logout/đổi phiên thu hồi đăng ký. Job retry tối đa 8 lần với backoff; ticket được kiểm tra receipt sau 15 phút. `DeviceNotRegistered` loại đăng ký đúng chủ sở hữu. Job lưu 7 ngày qua TTL để chẩn đoán.
+- Worker kiểm tra thiết bị và phiên trước gửi; logout/đổi phiên thu hồi đăng ký. Job retry tối đa 8 lần với backoff; FCM thành công chuyển sang `accepted`; chỉ Expo kiểm tra receipt sau 15 phút. `DeviceNotRegistered` loại đăng ký đúng chủ sở hữu. Job lưu 7 ngày qua TTL để chẩn đoán.
 - Thông báo kho được ghi qua inventory outbox cũng có event realtime và đi qua worker push. Web Push hiện có vẫn độc lập.
 
 ## Cấu hình trước khi phát hành
 
-Điền biến build trong `mobile/.env` hoặc EAS environment theo `mobile/.env.example`:
+### Android: Firebase trực tiếp, cài APK trên máy khách
 
-| Biến | Giá trị cần có |
-| --- | --- |
-| `EXPO_PUBLIC_API_URL` | Backend đã triển khai API thiết bị |
-| `EXPO_PUBLIC_EAS_PROJECT_ID` | UUID project EAS thực tế |
-| `LUXCARE_ANDROID_PACKAGE` | Android application ID đã đăng ký |
-| `LUXCARE_IOS_BUNDLE_IDENTIFIER` | iOS bundle identifier đã đăng ký |
-| `GOOGLE_SERVICES_JSON` | Đường dẫn google-services.json đúng ứng dụng, có thể dùng EAS file variable |
+Không cần Expo account, EAS Project ID hay upload keystore lên EAS để dùng luồng Android này. App vẫn dùng thư viện Expo trong mã nguồn; thông báo đi từ backend → Firebase FCM → Android.
 
-Cấu hình FCM v1 service account và APNs credentials trong EAS cho project tương ứng. Không đưa khóa dịch vụ vào biến `EXPO_PUBLIC_*` hoặc git. Backend hỗ trợ biến `EXPO_ACCESS_TOKEN` nếu bật enhanced push security của Expo.
+1. Firebase Console → Project settings → Android app: package phải là `com.igen.luxcare` nếu GitHub đang dùng `LUXCARE_IOS_BUNDLE_IDENTIFIER=com.igen.luxcare`. Tải `google-services.json`.
+2. GitHub → Settings → Secrets and variables → Actions: giữ `EXPO_PUBLIC_API_URL`, giữ biến package hiện có (workflow dùng `LUXCARE_ANDROID_PACKAGE` nếu có, nếu không dùng `LUXCARE_IOS_BUNDLE_IDENTIFIER`). Secret `GOOGLE_SERVICES_JSON` chứa toàn bộ cấu hình client vừa tải.
+3. Trên **máy chủ backend LuxCare**: dùng tài khoản dịch vụ có quyền gửi FCM cho cùng Firebase project. Có thể dùng Application Default Credentials của môi trường Google; nếu dùng máy chủ riêng, Firebase Console → Project settings → Service accounts → Generate new private key, lưu JSON ngoài repository, rồi đặt:
+   ```dotenv
+   GOOGLE_APPLICATION_CREDENTIALS=/duong-dan-bi-mat/firebase-service-account.json
+   FIREBASE_PROJECT_ID=project-id-trong-google-services-json
+   ```
+   Đây là biến môi trường **backend**, không phải GitHub mobile hay `EXPO_PUBLIC_*`. Không đưa khóa này vào APK. Bật Firebase Cloud Messaging API (HTTP v1); backend cần truy cập Google OAuth và `fcm.googleapis.com`.
+4. Triển khai backend đã sửa và khởi động lại. Bảo đảm index unique/TTL của `MobilePushDevice` và `MobilePushJob` được tạo theo schema nếu tắt autoIndex.
+5. Chạy workflow APK trên GitHub, tải artifact và cài APK lên máy khách. Mở app, đăng nhập, cho phép thông báo rồi thử nhận khi app ở nền và khi đóng bình thường.
 
-Triển khai backend trước, bảo đảm MongoDB tạo index unique của `MobilePushDevice` và `MobilePushJob` cùng TTL/index hàng đợi theo schema. Nếu môi trường tắt autoIndex, tạo các index theo schema trong quy trình migration trước khi bật worker. Cho phép backend kết nối HTTPS tới `exp.host`.
+`google-services.json` chỉ cấu hình app nhận thông báo; backend cần quyền gửi ở bước 3. Khách hàng không cần tài khoản Expo hoặc Firebase.
 
-Build lại native sau khi thêm plugin; cập nhật JavaScript đơn thuần không bổ sung native module. Dùng development/release build để kiểm thử push, không dùng Expo Go Android.
+### iOS và bản Android cũ
+
+iOS và thiết bị cũ chưa nâng cấp APK tiếp tục dùng luồng Expo có sẵn: cần EAS Project ID và credentials tương ứng. Bản Android mới gửi `provider: "fcm"` và không gọi Expo Push Service. Không đổi token APNs của iOS thành token FCM.
 
 ## Thông báo chat và tắt thông báo
 
 - Mobile: mở cuộc trò chuyện → Thông tin cuộc trò chuyện → Tắt/Bật thông báo tin nhắn. Áp dụng riêng cho mỗi người trong chat cá nhân hoặc nhóm, lưu trên backend và đồng bộ qua socket. Không chặn gửi tin, không ẩn nội dung và không giảm badge chưa đọc.
 - API mới: `PATCH /api/v1/chat/rooms/:roomId/notifications`, body `{"muted":true}`. Cần quyền chat và là thành viên đúng công ty; chỉ cập nhật cài đặt của người đang đăng nhập.
-- Tin nhắn mới có hàng đợi Expo Push bền vững; kiểm tra lại thành viên, công ty, đã đọc, tắt thông báo và phiên thiết bị trước gửi. Không gửi lại tin cũ khi bật thông báo. Web Push hiện có cũng kiểm tra mute.
+- Tin nhắn mới có hàng đợi push bền vững; kiểm tra lại thành viên, công ty, đã đọc, tắt thông báo và phiên thiết bị trước gửi. Không gửi lại tin cũ khi bật thông báo. Web Push hiện có cũng kiểm tra mute.
 - Foreground dùng chung khóa messageId để tránh banner trùng socket/push. Chạm push mở phòng sau khi xác minh tài khoản và quyền truy cập, kể cả khi khởi động ứng dụng từ trạng thái đóng.
 - Triển khai backend LuxCare cùng thay đổi mobile; tạo index `ChatMessage { mobilePushQueued: 1, createdAt: 1 }` nếu autoIndex bị tắt. Không backfill cờ cho tin nhắn lịch sử. Push chat hết hạn sau một giờ.
 - Push đã chuyển sang nhà cung cấp trước thời điểm tắt có thể vẫn xuất hiện; không thể thu hồi bằng cài đặt này. Tắt thông báo cần kết nối mạng để lưu thành công.
@@ -76,17 +81,12 @@ Tài liệu: [Expo Notifications SDK 57](https://docs.expo.dev/versions/v57.0.0/
 
 ## APK GitHub Actions và push khi đóng app
 
-Job Android của **Build IPA & APK** yêu cầu:
+Workflow kiểm tra cấu hình Firebase client khớp package, ghi vào thư mục tạm rồi truyền `GOOGLE_SERVICES_JSON` cho prebuild. Android không còn yêu cầu `EXPO_PUBLIC_EAS_PROJECT_ID`.
 
-1. Repository variable `EXPO_PUBLIC_EAS_PROJECT_ID`: UUID project Expo thực tế.
-2. Repository variable `LUXCARE_ANDROID_PACKAGE`: phải trùng Android app trong Firebase.
-3. Repository secret `GOOGLE_SERVICES_JSON`: toàn bộ nội dung tệp **google-services.json** tải từ Firebase → Project settings → Android app. Đây là cấu hình client, không phải service account.
-4. Cấu hình **FCM V1 service account** trong EAS Credentials cho cùng Firebase project và application ID. Không đưa private key vào APK hoặc biến EXPO_PUBLIC.
+App đăng ký lại khi mở, reconnect hoặc token thay đổi; lỗi tạm thời thử lại sau 30 giây, tăng tối đa 5 phút trong foreground. Khi chuyển nền, đăng ký vẫn được giữ.
 
-Workflow kiểm tra các giá trị, ghi cấu hình Firebase vào thư mục tạm và truyền đường dẫn `GOOGLE_SERVICES_JSON` cho Expo trước prebuild. Nếu thiếu hoặc sai cấu hình, job dừng với thông báo cụ thể để tránh tạo APK không thể đăng ký push. Các bản APK đã cài cần build/cài lại, sau đó mở app, đăng nhập và cấp quyền thông báo.
+Kiểm tra bằng hai tài khoản trên máy thật: gửi thông báo/chat → kiểm tra khay thông báo khi app ở nền/đóng → chạm để mở đúng nội dung. Thử cả logout, đổi tài khoản, chat đã đọc và tắt thông báo chat. Android **Buộc dừng** chặn nhận push cho đến khi mở app lại.
 
-App đăng ký lại push khi mở/reconnect/token thay đổi; nếu lỗi tạm thời, thử lại sau 30 giây với khoảng chờ tăng dần tối đa 5 phút khi app đang mở. Không xóa đăng ký khi chuyển nền. Màn hình Thông báo phân biệt bản cài thiếu Firebase/quyền APNs với lỗi máy chủ.
+Backend: `MobilePushJob.state = accepted` nghĩa là FCM đã nhận yêu cầu, chưa xác nhận thiết bị hiển thị. `FCM UNREGISTERED` xóa token đúng chủ sở hữu; `FCM SENDER_ID_MISMATCH` cần đối chiếu Firebase project của APK và backend. Lỗi xác thực/mạng được ghi mã lỗi không kèm khóa bí mật, thử lại tối đa 8 lần. Sau khi sửa credentials, gửi thông báo mới để kiểm tra.
 
-Kiểm tra trên máy thật: đăng nhập → bảo đảm màn hình Thông báo không báo lỗi → cho app về nền/đóng bình thường → gửi thông báo từ tài khoản khác → kiểm tra khay thông báo và chạm để mở đúng màn hình. Android **Buộc dừng** là trường hợp hệ điều hành chặn app; cần mở lại trước khi thử push. iOS cần chữ ký/provisioning có quyền Push Notifications; bản IPA ký lại bằng tài khoản cá nhân không bảo đảm quyền này.
-
-Nếu đăng ký thiết bị đã thành công nhưng vẫn không nhận, kiểm tra backend `MobilePushDevice`, worker `MobilePushJob` và Expo receipts. `InvalidCredentials`/`MismatchSenderId` cần sửa credentials EAS/Firebase; thêm mã chạy nền vào mobile không khắc phục được các lỗi đó.
+Tài liệu: [Gửi FCM HTTP v1](https://firebase.google.com/docs/cloud-messaging/send/v1-api), [Dùng FCM trực tiếp với expo-notifications](https://docs.expo.dev/push-notifications/sending-notifications-custom/).

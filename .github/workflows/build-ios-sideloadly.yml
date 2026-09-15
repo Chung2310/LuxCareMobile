@@ -119,7 +119,6 @@ jobs:
       EXPO_NO_TELEMETRY: "1"
       EXPO_PUBLIC_API_URL: ${{ vars.EXPO_PUBLIC_API_URL }}
       LUXCARE_ANDROID_PACKAGE: ${{ vars.LUXCARE_ANDROID_PACKAGE || vars.LUXCARE_IOS_BUNDLE_IDENTIFIER }}
-      EXPO_PUBLIC_EAS_PROJECT_ID: ${{ vars.EXPO_PUBLIC_EAS_PROJECT_ID }}
 
     steps:
       - uses: actions/checkout@v4
