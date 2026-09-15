@@ -119,7 +119,6 @@ jobs:
       EXPO_NO_TELEMETRY: "1"
       EXPO_PUBLIC_API_URL: ${{ vars.EXPO_PUBLIC_API_URL }}
       LUXCARE_ANDROID_PACKAGE: ${{ vars.LUXCARE_ANDROID_PACKAGE || vars.LUXCARE_IOS_BUNDLE_IDENTIFIER }}
-      EXPO_PUBLIC_EAS_PROJECT_ID: ${{ vars.EXPO_PUBLIC_EAS_PROJECT_ID }}
 
     steps:
       - uses: actions/checkout@v4
@@ -160,6 +159,14 @@ jobs:
             throw Error("Set repository variable LUXCARE_ANDROID_PACKAGE, e.g. com.yourcompany.luxcare (defaults to the iOS bundle identifier)");
           }
           NODE
+
+      - name: Test Android push configuration
+        run: node --test scripts/prepare-android-push.check.cjs
+
+      - name: Configure Android push notifications
+        env:
+          GOOGLE_SERVICES_JSON_CONTENT: ${{ secrets.GOOGLE_SERVICES_JSON }}
+        run: node scripts/prepare-android-push.cjs
 
       - name: Install root dependencies
         working-directory: .

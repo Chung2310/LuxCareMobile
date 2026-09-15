@@ -3,6 +3,9 @@
     "name": "LuxCare",
     "slug": "luxcare-mobile",
     "scheme": "luxcare",
+    "extra": {
+      "eas": { "projectId": "170cf082-c6fd-4619-8175-3a8e1db30b67" }
+    },
     "version": "1.0.0",
     "orientation": "portrait",
     "icon": "./assets/icon.png",
