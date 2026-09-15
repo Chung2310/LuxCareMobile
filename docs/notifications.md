@@ -73,3 +73,20 @@ Không thể thu hồi push đã được nhà cung cấp nhận trước thời
 Chưa thể xác minh push end-to-end nếu thiếu project ID/credentials và bản native cài trên thiết bị. Không có khóa hoặc ID giả được thêm vào cấu hình.
 
 Tài liệu: [Expo Notifications SDK 57](https://docs.expo.dev/versions/v57.0.0/sdk/notifications/), [gửi push và xử lý receipts](https://docs.expo.dev/push-notifications/sending-notifications/).
+
+## APK GitHub Actions và push khi đóng app
+
+Job Android của **Build IPA & APK** yêu cầu:
+
+1. Repository variable `EXPO_PUBLIC_EAS_PROJECT_ID`: UUID project Expo thực tế.
+2. Repository variable `LUXCARE_ANDROID_PACKAGE`: phải trùng Android app trong Firebase.
+3. Repository secret `GOOGLE_SERVICES_JSON`: toàn bộ nội dung tệp **google-services.json** tải từ Firebase → Project settings → Android app. Đây là cấu hình client, không phải service account.
+4. Cấu hình **FCM V1 service account** trong EAS Credentials cho cùng Firebase project và application ID. Không đưa private key vào APK hoặc biến EXPO_PUBLIC.
+
+Workflow kiểm tra các giá trị, ghi cấu hình Firebase vào thư mục tạm và truyền đường dẫn `GOOGLE_SERVICES_JSON` cho Expo trước prebuild. Nếu thiếu hoặc sai cấu hình, job dừng với thông báo cụ thể để tránh tạo APK không thể đăng ký push. Các bản APK đã cài cần build/cài lại, sau đó mở app, đăng nhập và cấp quyền thông báo.
+
+App đăng ký lại push khi mở/reconnect/token thay đổi; nếu lỗi tạm thời, thử lại sau 30 giây với khoảng chờ tăng dần tối đa 5 phút khi app đang mở. Không xóa đăng ký khi chuyển nền. Màn hình Thông báo phân biệt bản cài thiếu Firebase/quyền APNs với lỗi máy chủ.
+
+Kiểm tra trên máy thật: đăng nhập → bảo đảm màn hình Thông báo không báo lỗi → cho app về nền/đóng bình thường → gửi thông báo từ tài khoản khác → kiểm tra khay thông báo và chạm để mở đúng màn hình. Android **Buộc dừng** là trường hợp hệ điều hành chặn app; cần mở lại trước khi thử push. iOS cần chữ ký/provisioning có quyền Push Notifications; bản IPA ký lại bằng tài khoản cá nhân không bảo đảm quyền này.
+
+Nếu đăng ký thiết bị đã thành công nhưng vẫn không nhận, kiểm tra backend `MobilePushDevice`, worker `MobilePushJob` và Expo receipts. `InvalidCredentials`/`MismatchSenderId` cần sửa credentials EAS/Firebase; thêm mã chạy nền vào mobile không khắc phục được các lỗi đó.

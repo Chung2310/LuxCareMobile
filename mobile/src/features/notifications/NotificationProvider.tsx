@@ -4,6 +4,7 @@ import { Ionicons } from "@expo/vector-icons";
 import type { NotificationPermissionsStatus } from "expo-notifications";
 import { nativeNotifications as Notifications, nativeNotificationsUnavailableReason } from "./nativeNotifications";
 import Constants from "expo-constants";
+import { pushRegistrationError } from "./pushRegistrationError";
 import { router, useRootNavigationState } from "expo-router";
 import { useSafeAreaInsets } from "react-native-safe-area-context";
 import { api, kanban, notifications } from "../../api/services";
@@ -106,13 +107,17 @@ export function NotificationProvider({ children }: React.PropsWithChildren) {
     setPushError(nativeNotificationsUnavailableReason);
     let active = true;
     let registering = false;
+    let retryTimer: ReturnType<typeof setTimeout> | undefined;
+    let retryCount = 0;
     let registeredToken: string | null = null;
     if (!user && !loading && Notifications) {
       void Notifications.dismissAllNotificationsAsync().catch(() => {});
     }
     async function register() {
-      if (!Notifications || !user || registering) return;
+      if (!Notifications || !user || !active || registering || AppState.currentState === "background") return;
       registering = true;
+      if (retryTimer) clearTimeout(retryTimer);
+      let stage: "token" | "server" = "token";
       try {
         await initialPermission();
         const permission = await Notifications.getPermissionsAsync();
@@ -129,16 +134,25 @@ export function NotificationProvider({ children }: React.PropsWithChildren) {
         if (!projectId) { setPushError("Thông báo nền chưa được cấu hình cho bản ứng dụng này."); return; }
         const token = (await Notifications.getExpoPushTokenAsync({ projectId })).data;
         if (!active) return;
+        stage = "server";
         const response = await api.transport.fetch("/api/v1/push/devices", { method: "POST",
           headers: { "Content-Type": "application/json" }, body: JSON.stringify({ token, platform: Platform.OS }) });
-        if (!response.ok) throw new Error("registration failed");
+        if (!response.ok) throw Object.assign(new Error("registration failed"), { status: response.status });
         const previousToken = registeredToken;
         registeredToken = token;
         if (active && previousToken && previousToken !== token) {
           await api.transport.fetch("/api/v1/push/devices", { method: "DELETE", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ token: previousToken }) });
         }
+        retryCount = 0;
         if (active) setPushError(null);
-      } catch { if (active) setPushError("Chưa đăng ký được thông báo nền. Ứng dụng sẽ thử lại khi kết nối lại."); }
+      } catch (error) {
+        if (active) {
+          setPushError(pushRegistrationError(error, stage, Platform.OS));
+          if (AppState.currentState === "active") {
+            retryTimer = setTimeout(() => void register(), Math.min(300000, 30000 * 2 ** Math.min(retryCount++, 4)));
+          }
+        }
+      }
       finally { registering = false; }
     }
     void register();
@@ -149,11 +163,12 @@ export function NotificationProvider({ children }: React.PropsWithChildren) {
         if (token && user) socketService.connect(token);
         refresh(); void register();
       } else if (state === "background") {
+        if (retryTimer) clearTimeout(retryTimer);
         socketService.disconnect();
       }
     });
     const tokenListener = Notifications ? Notifications.addPushTokenListener(() => void register()) : null;
-    return () => { active = false; removeConnect(); stateListener.remove(); tokenListener?.remove(); };
+    return () => { active = false; if (retryTimer) clearTimeout(retryTimer); removeConnect(); stateListener.remove(); tokenListener?.remove(); };
   }, [user?.uid, user?.companyCode, refresh]);
 
   useEffect(() => {

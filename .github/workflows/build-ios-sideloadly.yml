@@ -161,6 +161,14 @@ jobs:
           }
           NODE
 
+      - name: Test Android push configuration
+        run: node --test scripts/prepare-android-push.check.cjs
+
+      - name: Configure Android push notifications
+        env:
+          GOOGLE_SERVICES_JSON_CONTENT: ${{ secrets.GOOGLE_SERVICES_JSON }}
+        run: node scripts/prepare-android-push.cjs
+
       - name: Install root dependencies
         working-directory: .
         run: npm ci

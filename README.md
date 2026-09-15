@@ -46,7 +46,8 @@ Workflow **Build IPA & APK** (`.github/workflows/build-ios-sideloadly.yml`) ch�
 
 - Biến repository `EXPO_PUBLIC_API_URL`: địa chỉ HTTPS của backend.
 - `LUXCARE_ANDROID_PACKAGE`: mã ứng dụng Android, ví dụ `com.yourcompany.luxcare`. Nếu không đặt, job dùng `LUXCARE_IOS_BUNDLE_IDENTIFIER`; mã này phải hợp lệ với Android (các phần ngăn bằng dấu chấm, không có dấu gạch ngang).
-- `EXPO_PUBLIC_EAS_PROJECT_ID`: dùng chung cấu hình EAS hiện có nếu được đặt.
+- `EXPO_PUBLIC_EAS_PROJECT_ID`: UUID project Expo thực tế, bắt buộc cho push Android.
+- Secret `GOOGLE_SERVICES_JSON`: nội dung google-services.json của Firebase Android app, khớp package ở trên. Cấu hình FCM V1 service account trong EAS Credentials; xem [hướng dẫn push](docs/notifications.md).
 
 Khi job Android thành công, tải artifact `LuxCare-android-apk-<run_number>`, giải nén và cài `LuxCare.apk` trên điện thoại. APK là bản Release có sẵn JavaScript, không cần Metro. Artifact và log build được giữ 7 ngày; log Android nằm trong `LuxCare-android-build-log-<run_number>`.
 
