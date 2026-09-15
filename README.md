@@ -51,4 +51,4 @@ Workflow **Build IPA & APK** (`.github/workflows/build-ios-sideloadly.yml`) ch�
 
 Khi job Android thành công, tải artifact `LuxCare-android-apk-<run_number>`, giải nén và cài `LuxCare.apk` trên điện thoại. APK là bản Release có sẵn JavaScript, không cần Metro. Artifact và log build được giữ 7 ngày; log Android nằm trong `LuxCare-android-build-log-<run_number>`.
 
-APK dùng khóa debug có sẵn trong template Expo để cài thử nội bộ, chưa phải bản ký bằng khóa phát hành Google Play. Workflow IPA đã ký qua EAS (`build-ios.yml`) vẫn chạy thủ công riêng.
+APK dùng khóa ký riêng từ secrets ANDROID_KEYSTORE_BASE64 và ANDROID_KEYSTORE_PASSWORD. Mã phiên bản tự tăng theo lần chạy workflow. Xem [thiết lập và cập nhật APK cho khách](docs/android-releases.md). Workflow IPA đã ký qua EAS (`build-ios.yml`) vẫn chạy thủ công riêng.
