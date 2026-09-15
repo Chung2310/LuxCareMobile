@@ -24,8 +24,7 @@ export const PinnedServicesSection: React.FC<PinnedServicesSectionProps> = ({
     <View style={styles.pinnedSection}>
       <View style={styles.pinnedHeaderRow}>
         <View>
-          <Text style={styles.pinnedTitle}>Dịch vụ được ghim</Text>
-          <Text style={styles.pinnedSubtitle}>Cố định dịch vụ thường dùng</Text>
+          <Text style={styles.pinnedTitle}>Tính năng thường dùng</Text>
         </View>
 
         <TouchableOpacity
