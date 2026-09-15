@@ -140,6 +140,9 @@ jobs:
           java-version: "17"
 
       - uses: android-actions/setup-android@v3
+        with:
+          # Override the default "tools platform-tools"; the legacy tools package is unavailable.
+          packages: platform-tools
 
       - uses: gradle/actions/setup-gradle@v4
 
