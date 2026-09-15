@@ -31,7 +31,8 @@ import * as DocumentPicker from "expo-document-picker";
 import * as ImagePicker from "expo-image-picker";
 import * as Sharing from "expo-sharing";
 import * as FileSystem from "expo-file-system/legacy";
-import { File } from "expo-file-system";
+import { readPickedFileAsBase64 } from "../../src/files/readBase64";
+import { uploadBlogAttachment, type PendingBlogAttachment } from "../../src/features/blog/uploadBlogAttachment";
 import { SafeAreaView } from "react-native-safe-area-context";
 import { useRouter, useFocusEffect } from "expo-router";
 import { useCommunication } from "../../src/features/notifications/CommunicationProvider";
@@ -105,7 +106,7 @@ export default function BlogScreen() {
   const [newTitle, setNewTitle] = useState("");
   const [newContent, setNewContent] = useState("");
   const [selectedTag, setSelectedTag] = useState("Thông báo");
-  const [attachments, setAttachments] = useState<{ id: string; name: string; type: "file" | "image"; sizeBytes?: number; sizeLabel?: string; localUri?: string }[]>([]);
+  const [attachments, setAttachments] = useState<PendingBlogAttachment[]>([]);
   const [attachmentsPublic, setAttachmentsPublic] = useState(false);
   const [visibilityPost, setVisibilityPost] = useState<BlogPost | null>(null);
   const [visibilityBusy, setVisibilityBusy] = useState(false);
@@ -290,6 +291,7 @@ export default function BlogScreen() {
                   sizeBytes: file.size ?? 0,
                   sizeLabel: file.size ? `${(file.size / 1024).toFixed(1)} KB` : "Không rõ",
                   localUri: file.uri,
+                  mimeType: file.mimeType,
                 },
               ]);
             }
@@ -330,6 +332,7 @@ export default function BlogScreen() {
                 sizeBytes: asset.fileSize ?? 0,
                 sizeLabel: asset.fileSize ? `${(asset.fileSize / 1024).toFixed(1)} KB` : "Không rõ",
                 localUri: asset.uri,
+                  mimeType: asset.mimeType,
               },
             ]);
           }
@@ -356,6 +359,7 @@ export default function BlogScreen() {
                   sizeBytes: asset.fileSize ?? 0,
                   sizeLabel: asset.fileSize ? `${(asset.fileSize / 1024).toFixed(1)} KB` : "Không rõ",
                   localUri: asset.uri,
+                  mimeType: asset.mimeType,
                 },
               ]);
             }
@@ -372,44 +376,8 @@ export default function BlogScreen() {
     setAttachments((prev) => prev.filter((a) => a.id !== id));
   };
 
-  const uploadBlogAttachment = async (att: {
-    name: string;
-    type: "file" | "image";
-    sizeBytes?: number;
-    localUri?: string;
-  }) => {
-    if (!att.localUri) return null;
-    const uri = att.localUri;
-    const fileName = att.name || (att.type === "image" ? `image_${Date.now()}.jpg` : `file_${Date.now()}`);
-    const mimeType = att.type === "image" ? "image/jpeg" : "application/octet-stream";
-
-    let base64 = "";
-    try {
-      const file = new File(uri);
-      base64 = await file.base64();
-    } catch {
-      base64 = await FileSystem.readAsStringAsync(uri, { encoding: "base64" });
-    }
-
-    if (base64) {
-      const dataUri = base64.startsWith("data:") ? base64 : `data:${mimeType};base64,${base64}`;
-      const uploadRes = await blog.uploadFile({
-        file: dataUri,
-        fileName,
-      });
-      if (uploadRes.url) {
-        return {
-          name: fileName,
-          type: att.type,
-          url: uploadRes.url,
-          size: uploadRes.size,
-        };
-      }
-    }
-    return null;
-  };
-
   const handleCreatePost = async () => {
+    if (posting) return;
     if (!newContent.trim() && attachments.length === 0) {
       showAlert("Thông báo", "Vui lòng nhập nội dung bài viết hoặc chọn tệp đính kèm.");
       return;
@@ -418,27 +386,8 @@ export default function BlogScreen() {
     try {
       const uploadedAttachments: { name: string; type: string; url: string; size: number }[] = [];
 
-      // Upload through protected Blog storage.
-      if (attachments.length > 0) {
-        for (const att of attachments) {
-          try {
-            const uploaded = await uploadBlogAttachment(att);
-            if (uploaded) {
-              uploadedAttachments.push(uploaded);
-            } else if (attachmentsPublic && att.localUri && (att.localUri.startsWith("http://") || att.localUri.startsWith("https://"))) {
-              uploadedAttachments.push({
-                name: att.name,
-                type: att.type,
-                url: att.localUri,
-                size: att.sizeBytes ?? 0,
-              });
-            } else {
-              throw new Error("Tệp chưa được tải lên máy chủ.");
-            }
-          } catch (uploadErr) {
-            throw new Error(`Không thể tải lên tệp "${att.name}". Vui lòng chọn lại tệp hoặc thử lại. Bài viết chưa được đăng.`);
-          }
-        }
+      for (const attachment of attachments) {
+        uploadedAttachments.push(await uploadBlogAttachment(attachment, readPickedFileAsBase64, blog.uploadFile));
       }
 
       // Save permissions together with the post.
