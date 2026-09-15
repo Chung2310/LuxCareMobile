@@ -160,6 +160,15 @@ jobs:
           }
           NODE
 
+      - name: Prepare release signing and version
+        env:
+          ANDROID_KEYSTORE_BASE64: ${{ secrets.ANDROID_KEYSTORE_BASE64 }}
+          ANDROID_KEYSTORE_PASSWORD: ${{ secrets.ANDROID_KEYSTORE_PASSWORD }}
+        run: |
+          node --test scripts/prepare-android-release.check.cjs
+          node scripts/prepare-android-release.cjs
+          keytool -list -keystore "$RUNNER_TEMP/luxcare-release.p12" -storetype PKCS12 -storepass:env ANDROID_KEYSTORE_PASSWORD >/dev/null
+
       - name: Test Android push configuration
         run: node --test scripts/prepare-android-push.check.cjs
 
@@ -192,6 +201,17 @@ jobs:
           bash ./gradlew :app:assembleRelease --no-daemon --max-workers=2 --stacktrace \
             -PreactNativeArchitectures=arm64-v8a,armeabi-v7a,x86_64 \
             2>&1 | tee "$RUNNER_TEMP/luxcare-gradle.log"
+
+      - name: Sign customer APK
+        env:
+          ANDROID_KEYSTORE_PASSWORD: ${{ secrets.ANDROID_KEYSTORE_PASSWORD }}
+        run: |
+          APKSIGNER="$(find "$ANDROID_HOME/build-tools" -name apksigner -type f | sort -V | tail -n 1)"
+          test -n "$APKSIGNER"
+          "$APKSIGNER" sign --ks "$LUXCARE_ANDROID_KEYSTORE" --ks-type PKCS12 \
+            --ks-pass env:ANDROID_KEYSTORE_PASSWORD --key-pass env:ANDROID_KEYSTORE_PASSWORD \
+            android/app/build/outputs/apk/release/app-release.apk
+          "$APKSIGNER" verify --verbose --print-certs android/app/build/outputs/apk/release/app-release.apk
 
       - name: Validate and package APK
         run: |
@@ -227,6 +247,7 @@ jobs:
 
       - name: Installation note
         run: |
+          echo "Android versionCode: $LUXCARE_ANDROID_VERSION_CODE" >> "$GITHUB_STEP_SUMMARY"
           echo '### Android APK' >> "$GITHUB_STEP_SUMMARY"
           echo 'Download LuxCare.apk from Artifacts and install it directly on Android. This Release build includes its JavaScript bundle and does not need Metro.' >> "$GITHUB_STEP_SUMMARY"
-          echo 'Internal testing APK, signed with the Expo template debug keystore. Store distribution requires a dedicated release signing key.' >> "$GITHUB_STEP_SUMMARY"
+          echo 'Customer APK signed with the repository release key. Keep the package and signing key unchanged for future updates.' >> "$GITHUB_STEP_SUMMARY"
