@@ -36,10 +36,7 @@ export const EditPinnedModal: React.FC<EditPinnedModalProps> = ({
         <View style={styles.modalCard}>
           <View style={styles.modalHeader}>
             <View>
-              <Text style={styles.modalTitle}>Tùy chỉnh Dịch vụ ghim</Text>
-              <Text style={styles.modalSubtitle}>
-                Chọn tối đa 8 dịch vụ bạn thường xuyên sử dụng ({pinnedIds.length}/8)
-              </Text>
+              <Text style={styles.modalTitle}>Tùy chỉnh Tính năng ghim</Text>
             </View>
             <TouchableOpacity onPress={onClose} style={styles.modalCloseBtn}>
               <Ionicons name="close" size={20} color="#64748b" />
