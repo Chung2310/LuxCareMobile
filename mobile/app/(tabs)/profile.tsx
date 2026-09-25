@@ -11,11 +11,12 @@ import {
 } from "react-native";
 import { SafeAreaView, useSafeAreaInsets } from "react-native-safe-area-context";
 import { Ionicons } from "@expo/vector-icons";
+import { router } from "expo-router";
 import { AccountForm } from "../../src/features/account/AccountForm";
 import { getRoleDisplayName } from "../../../src/utils/permissionUtils";
 import { messageOf, useSession } from "../../src/auth/SessionProvider";
 import { BranchSelector } from "../../src/features/branches/BranchSelector";
-import { LogoutConfirmModal } from "../../src/components/common";
+import { DeleteAccountConfirmModal, LogoutConfirmModal } from "../../src/components/common";
 
 const bannerSource = require("../../public/pfp-banner.png");
 
@@ -23,12 +24,33 @@ export default function Profile() {
   const insets = useSafeAreaInsets();
   const [editing, setEditing] = useState<"profile" | "password" | null>(null);
   const formLock = useRef(false);
-  const { user, selectedBranch, logout } = useSession();
+  const { user, selectedBranch, logout, deleteAccount } = useSession();
   const [busy, setBusy] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [showLogoutModal, setShowLogoutModal] = useState(false);
+  const [showDeleteAccountModal, setShowDeleteAccountModal] = useState(false);
+  const [deleteAccountBusy, setDeleteAccountBusy] = useState(false);
+  const [deleteAccountError, setDeleteAccountError] = useState<string | null>(null);
 
   const handleLogoutPress = () => setShowLogoutModal(true);
+
+  const handleDeleteAccountPress = () => {
+    setDeleteAccountError(null);
+    setShowDeleteAccountModal(true);
+  };
+
+  const handleConfirmDeleteAccount = async (password: string) => {
+    setDeleteAccountBusy(true);
+    setDeleteAccountError(null);
+    try {
+      await deleteAccount(password);
+      setShowDeleteAccountModal(false);
+    } catch (err) {
+      setDeleteAccountError(messageOf(err));
+    } finally {
+      setDeleteAccountBusy(false);
+    }
+  };
 
   const handleConfirmLogout = async () => {
     setBusy(true);
@@ -230,7 +252,7 @@ export default function Profile() {
             <Pressable
               style={({ pressed }) => [styles.actionRow, pressed && styles.actionRowPressed]}
               onPress={() => setEditing("password")}
-              disabled={busy}
+              disabled={busy || deleteAccountBusy}
             >
               <View style={[styles.actionIconBox, { backgroundColor: "#fef3c7" }]}>
                 <Ionicons name="key-outline" size={18} color="#d97706" />
@@ -241,6 +263,66 @@ export default function Profile() {
               </View>
               <Ionicons name="chevron-forward" size={18} color="#94a3b8" />
             </Pressable>
+
+            {/* Delete Account */}
+            <Pressable
+              style={({ pressed }) => [styles.actionRow, pressed && styles.actionRowPressed]}
+              onPress={handleDeleteAccountPress}
+              disabled={busy || deleteAccountBusy}
+            >
+              <View style={[styles.actionIconBox, { backgroundColor: "#fee2e2" }]}>
+                <Ionicons name="trash-outline" size={18} color="#dc2626" />
+              </View>
+              <View style={{ flex: 1 }}>
+                <Text style={[styles.actionTitle, { color: "#dc2626" }]}>Xóa tài khoản</Text>
+                <Text style={styles.actionSub}>Yêu cầu xóa tài khoản và toàn bộ dữ liệu</Text>
+              </View>
+              <Ionicons name="chevron-forward" size={18} color="#94a3b8" />
+            </Pressable>
+          </View>
+        </View>
+
+        {/* Legal & Policies Section */}
+        <View style={styles.sectionCard}>
+          <View style={styles.sectionTitleRow}>
+            <View style={styles.sectionIconBox}>
+              <Ionicons name="document-text-outline" size={16} color="#059669" />
+            </View>
+            <Text style={styles.sectionTitle}>Pháp lý & Điều khoản</Text>
+          </View>
+
+          <View style={styles.actionList}>
+            {/* Privacy Policy */}
+            <Pressable
+              style={({ pressed }) => [styles.actionRow, pressed && styles.actionRowPressed]}
+              onPress={() => router.push("/privacy-policy")}
+              disabled={busy || deleteAccountBusy}
+            >
+              <View style={[styles.actionIconBox, { backgroundColor: "#ecfdf5" }]}>
+                <Ionicons name="shield-checkmark-outline" size={18} color="#059669" />
+              </View>
+              <View style={{ flex: 1 }}>
+                <Text style={styles.actionTitle}>Chính sách bảo mật</Text>
+                <Text style={styles.actionSub}>Thu thập, xử lý và bảo vệ dữ liệu cá nhân</Text>
+              </View>
+              <Ionicons name="chevron-forward" size={18} color="#94a3b8" />
+            </Pressable>
+
+            {/* Terms of Service */}
+            <Pressable
+              style={({ pressed }) => [styles.actionRow, pressed && styles.actionRowPressed]}
+              onPress={() => router.push("/terms-of-service")}
+              disabled={busy || deleteAccountBusy}
+            >
+              <View style={[styles.actionIconBox, { backgroundColor: "#f0f9ff" }]}>
+                <Ionicons name="scale-outline" size={18} color="#0284c7" />
+              </View>
+              <View style={{ flex: 1 }}>
+                <Text style={styles.actionTitle}>Điều khoản dịch vụ</Text>
+                <Text style={styles.actionSub}>Quy định sử dụng và trách nhiệm tài khoản</Text>
+              </View>
+              <Ionicons name="chevron-forward" size={18} color="#94a3b8" />
+            </Pressable>
           </View>
         </View>
 
@@ -248,10 +330,10 @@ export default function Profile() {
         <Pressable
           style={({ pressed }) => [
             styles.logoutBtn,
-            busy && styles.logoutBtnDisabled,
+            (busy || deleteAccountBusy) && styles.logoutBtnDisabled,
             pressed && { opacity: 0.88 },
           ]}
-          disabled={busy}
+          disabled={busy || deleteAccountBusy}
           onPress={handleLogoutPress}
         >
           {busy ? (
@@ -272,6 +354,21 @@ export default function Profile() {
         onConfirm={handleConfirmLogout}
         user={user}
         busy={busy}
+      />
+
+      {/* Delete Account Confirmation Modal */}
+      <DeleteAccountConfirmModal
+        visible={showDeleteAccountModal}
+        onClose={() => {
+          if (!deleteAccountBusy) {
+            setShowDeleteAccountModal(false);
+            setDeleteAccountError(null);
+          }
+        }}
+        onConfirm={handleConfirmDeleteAccount}
+        user={user}
+        busy={deleteAccountBusy}
+        errorMessage={deleteAccountError}
       />
 
       {/* Account Form Modal */}

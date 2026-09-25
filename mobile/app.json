@@ -9,15 +9,23 @@
     "version": "1.0.0",
     "orientation": "portrait",
     "icon": "./assets/icon.png",
+    "splash": {
+      "image": "./assets/splash-icon.png",
+      "resizeMode": "contain",
+      "backgroundColor": "#ffffff"
+    },
     "userInterfaceStyle": "light",
     "ios": {
-      "supportsTablet": true,
+      "supportsTablet": false,
+      "bundleIdentifier": "com.luxcare.mobile",
       "infoPlist": {
+        "ITSAppUsesNonExemptEncryption": false,
         "NSPhotoLibraryUsageDescription": "LuxCare cần quyền truy cập thư viện ảnh để đính kèm tệp và tải lên ảnh đại diện.",
         "NSPhotoLibraryAddUsageDescription": "LuxCare cần quyền lưu ảnh và video vào Thư viện thiết bị.",
         "UIFileSharingEnabled": true,
         "LSSupportsOpeningDocumentsInPlace": true,
-        "NSCameraUsageDescription": "LuxCare cần quyền truy cập máy ảnh để chấm công, chụp ảnh đại diện, hồ sơ và hợp đồng."
+        "NSCameraUsageDescription": "LuxCare cần quyền truy cập máy ảnh để chấm công, chụp ảnh đại diện, hồ sơ và hợp đồng.",
+        "NSMicrophoneUsageDescription": "LuxCare cần quyền truy cập microphone để ghi âm và gửi tin nhắn thoại trong phần trò chuyện."
       }
     },
     "android": {
