@@ -1,7 +1,7 @@
 {
   "expo": {
     "name": "LuxCare",
-    "slug": "luxcare-mobile",
+    "slug": "luxcare",
     "scheme": "luxcare",
     "extra": {
       "eas": { "projectId": "0ec1cf95-301c-44f9-8317-23b44d0f5234" }
