@@ -63,44 +63,27 @@ export function BlockedUsersModal({
     }
   }, [visible, loadBlockedUsers]);
 
-  const handleUnblockPress = (item: BlockedUserItem) => {
+  const handleUnblockPress = async (item: BlockedUserItem) => {
     const targetId = String(
       item.blockedUser?._id || item.blockedUser?.uid || item.blockedUser || item.blockId
     );
-    const targetName =
-      typeof item.blockedUser === "object" && item.blockedUser !== null
-        ? item.blockedUser.displayName || item.blockedUser.fullName || item.blockedUser.email || "người dùng này"
-        : "người dùng này";
+    if (!targetId || unblockingId === targetId) return;
 
-    Alert.alert(
-      "Bỏ chặn người dùng",
-      `Bạn có chắc chắn muốn bỏ chặn ${targetName}?\n\nSau khi bỏ chặn, hai bên sẽ có thể gửi tin nhắn và thấy hoạt động của nhau.`,
-      [
-        { text: "Hủy", style: "cancel" },
-        {
-          text: "Bỏ chặn",
-          style: "default",
-          onPress: async () => {
-            try {
-              setUnblockingId(targetId);
-              await chat.unblockUser(targetId);
-              setBlockedList((prev) =>
-                prev.filter(
-                  (i) =>
-                    String(i.blockedUser?._id || i.blockedUser?.uid || i.blockedUser || i.blockId) !== targetId
-                )
-              );
-              onUnblocked?.(targetId);
-              Alert.alert("Thành công", `Đã bỏ chặn ${targetName}.`);
-            } catch (err: any) {
-              Alert.alert("Lỗi", err?.message || "Không thể bỏ chặn người dùng.");
-            } finally {
-              setUnblockingId(null);
-            }
-          },
-        },
-      ]
-    );
+    try {
+      setUnblockingId(targetId);
+      await chat.unblockUser(targetId);
+      setBlockedList((prev) =>
+        prev.filter(
+          (i) =>
+            String(i.blockedUser?._id || i.blockedUser?.uid || i.blockedUser || i.blockId) !== targetId
+        )
+      );
+      onUnblocked?.(targetId);
+    } catch (err: any) {
+      Alert.alert("Lỗi", err?.message || "Không thể bỏ chặn người dùng.");
+    } finally {
+      setUnblockingId(null);
+    }
   };
 
   const formatDate = (dateStr: string) => {
