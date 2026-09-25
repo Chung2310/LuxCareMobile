@@ -75,10 +75,14 @@ jobs:
           token: ${{ secrets.EXPO_TOKEN }}
 
       - name: Build signed IPA on EAS
-        run: eas build --platform ios --profile "$BUILD_PROFILE" --non-interactive --wait --json > "$RUNNER_TEMP/ios-build.json"
+        run: |
+          set -euo pipefail
+          echo "Building signed iOS IPA on EAS for profile: $BUILD_PROFILE..."
+          eas build --platform ios --profile "$BUILD_PROFILE" --non-interactive --wait --json > "$RUNNER_TEMP/ios-build.json"
 
       - name: Download and validate IPA
         run: |
+          set -euo pipefail
           BUILD_URL="$(jq -er '.[0] | select(.status == "FINISHED") | .artifacts.buildUrl | select(type == "string" and startswith("https://"))' "$RUNNER_TEMP/ios-build.json")"
           echo "::add-mask::$BUILD_URL"
           mkdir -p "$RUNNER_TEMP/ios-artifacts"
@@ -95,8 +99,37 @@ jobs:
           if-no-files-found: error
           retention-days: 7
 
-      - name: Installation note
+      - name: Submit production build to App Store Connect / TestFlight
+        if: inputs.profile == 'production'
         run: |
-          echo '### Signed iOS IPA' >> "$GITHUB_STEP_SUMMARY"
-          echo "Profile: $BUILD_PROFILE. Download the IPA from this run's Artifacts." >> "$GITHUB_STEP_SUMMARY"
-          echo 'Preview installs only on devices included in the provisioning profile. Production requires TestFlight/App Store distribution. No automatic submission was performed.' >> "$GITHUB_STEP_SUMMARY"
+          set -euo pipefail
+          BUILD_ID="$(jq -er '.[0] | select(.status == "FINISHED") | .id' "$RUNNER_TEMP/ios-build.json")"
+          echo "Submitting EAS production build $BUILD_ID to App Store Connect / TestFlight..."
+          eas submit --platform ios --profile production --id "$BUILD_ID" --non-interactive --wait
+
+      - name: Build summary
+        if: always()
+        run: |
+          set -euo pipefail
+          if [[ "${{ job.status }}" != "success" ]]; then
+            echo "### LuxCare iOS Build Failed" >> "$GITHUB_STEP_SUMMARY"
+            echo "The build or submission did not complete successfully. Check workflow logs above for details." >> "$GITHUB_STEP_SUMMARY"
+            exit 0
+          fi
+
+          if [[ "$BUILD_PROFILE" == "production" ]]; then
+            echo '### LuxCare iOS Production Build' >> "$GITHUB_STEP_SUMMARY"
+            echo '- **Production IPA generated**: success' >> "$GITHUB_STEP_SUMMARY"
+            echo '- **Submitted to App Store Connect**: success' >> "$GITHUB_STEP_SUMMARY"
+            echo '- **Destination**: TestFlight' >> "$GITHUB_STEP_SUMMARY"
+            echo '- **GitHub Artifact**: available' >> "$GITHUB_STEP_SUMMARY"
+            echo '' >> "$GITHUB_STEP_SUMMARY"
+            echo 'Binary submitted to App Store Connect for TestFlight. Check App Store Connect -> TestFlight for processing status.' >> "$GITHUB_STEP_SUMMARY"
+          else
+            echo '### LuxCare iOS Preview Build' >> "$GITHUB_STEP_SUMMARY"
+            echo '- **Signed preview IPA generated**: success' >> "$GITHUB_STEP_SUMMARY"
+            echo '- **GitHub Artifact**: available' >> "$GITHUB_STEP_SUMMARY"
+            echo '- **Status**: Not submitted to App Store Connect' >> "$GITHUB_STEP_SUMMARY"
+            echo '' >> "$GITHUB_STEP_SUMMARY"
+            echo 'Preview build only. Installs on registered devices included in the provisioning profile.' >> "$GITHUB_STEP_SUMMARY"
+          fi
