@@ -53,6 +53,7 @@ import { chatNotificationsMuted } from "../../src/features/notifications/chatNot
 import { useSession } from "../../src/auth/SessionProvider";
 import { useChatUnread } from "../../src/context/ChatUnreadContext";
 import { api, chat, kanbanMedia } from "../../src/api/services";
+import { BlockedUsersModal } from "../../src/components/chat/BlockedUsersModal";
 import { socketService } from "../../src/api/socketService";
 import { userManagementApi } from "../../src/api/userManagementApi";
 import type {
@@ -1094,6 +1095,7 @@ export default function ChatScreen() {
   const [reportDetails, setReportDetails] = useState("");
   const [submittingReport, setSubmittingReport] = useState(false);
   const [blockedUserIds, setBlockedUserIds] = useState<string[]>([]);
+  const [blockedUsersModalVisible, setBlockedUsersModalVisible] = useState(false);
 
   useEffect(() => {
     void (async () => {
@@ -4696,6 +4698,34 @@ export default function ChatScreen() {
                 />
               </View>
 
+              {/* Quản lý danh sách chặn */}
+              <TouchableOpacity
+                style={{
+                  padding: 14,
+                  marginTop: 12,
+                  borderRadius: 12,
+                  backgroundColor: "#ffffff",
+                  flexDirection: "row",
+                  alignItems: "center",
+                  borderWidth: 1,
+                  borderColor: "#e2e8f0",
+                }}
+                onPress={() => {
+                  setRoomInfoModalVisible(false);
+                  setBlockedUsersModalVisible(true);
+                }}
+                activeOpacity={0.7}
+              >
+                <View style={{ width: 36, height: 36, borderRadius: 18, backgroundColor: "#fee2e2", alignItems: "center", justifyContent: "center", marginRight: 12 }}>
+                  <Ionicons name="ban-outline" size={18} color="#dc2626" />
+                </View>
+                <View style={{ flex: 1 }}>
+                  <Text style={{ fontSize: 14, fontWeight: "600", color: "#0f172a" }}>Danh sách người dùng đã chặn</Text>
+                  <Text style={{ fontSize: 12, color: "#64748b", marginTop: 2 }}>Xem và bỏ chặn người dùng</Text>
+                </View>
+                <Ionicons name="chevron-forward" size={18} color="#94a3b8" />
+              </TouchableOpacity>
+
               {activeRoom.isGroup && (
                 <View style={{ marginTop: 24 }}>
                   <View style={styles.sectionHeaderRow}>
@@ -4898,6 +4928,16 @@ export default function ChatScreen() {
         {/* FLOATING ROUNDED TOAST FEEDBACK */}
         {renderToast()}
 
+        {/* MODAL: DANH SÁCH CHẶN & BỎ CHẶN */}
+        <BlockedUsersModal
+          visible={blockedUsersModalVisible}
+          onClose={() => setBlockedUsersModalVisible(false)}
+          onUnblocked={(unblockedUserId) => {
+            setBlockedUserIds((prev) => prev.filter((id) => id !== unblockedUserId));
+            void loadRooms(true);
+          }}
+        />
+
         {/* CUSTOM ROUNDED ALERT MODAL */}
         {renderCustomAlert()}
       </View>
@@ -4926,6 +4966,17 @@ export default function ChatScreen() {
             </TouchableOpacity>
           )}
         </View>
+
+        {/* Nút Xem danh sách đã chặn */}
+        <TouchableOpacity
+          style={styles.headerActionBtn}
+          onPress={() => setBlockedUsersModalVisible(true)}
+          activeOpacity={0.8}
+          accessibilityRole="button"
+          accessibilityLabel="Danh sách người dùng đã chặn"
+        >
+          <Ionicons name="shield-outline" size={20} color="#059669" />
+        </TouchableOpacity>
 
         {/* Nút Tạo cuộc trò chuyện / Nhóm mới */}
         <TouchableOpacity style={styles.headerActionBtn} onPress={handleOpenCreateModal} activeOpacity={0.8}>
@@ -5283,6 +5334,16 @@ export default function ChatScreen() {
 
       {/* FLOATING ROUNDED TOAST FEEDBACK */}
       {renderToast()}
+
+      {/* MODAL: DANH SÁCH CHẶN & BỎ CHẶN */}
+      <BlockedUsersModal
+        visible={blockedUsersModalVisible}
+        onClose={() => setBlockedUsersModalVisible(false)}
+        onUnblocked={(unblockedUserId) => {
+          setBlockedUserIds((prev) => prev.filter((id) => id !== unblockedUserId));
+          void loadRooms(true);
+        }}
+      />
 
       {/* CUSTOM ROUNDED ALERT MODAL */}
       {renderCustomAlert()}

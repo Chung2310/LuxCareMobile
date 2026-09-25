@@ -16,7 +16,7 @@ import { AccountForm } from "../../src/features/account/AccountForm";
 import { getRoleDisplayName } from "../../../src/utils/permissionUtils";
 import { messageOf, useSession } from "../../src/auth/SessionProvider";
 import { BranchSelector } from "../../src/features/branches/BranchSelector";
-import { DeleteAccountConfirmModal, LogoutConfirmModal } from "../../src/components/common";
+import { DeleteAccountConfirmModal, LogoutConfirmModal, BlockedUsersModal } from "../../src/components";
 
 const bannerSource = require("../../public/pfp-banner.png");
 
@@ -31,6 +31,7 @@ export default function Profile() {
   const [showDeleteAccountModal, setShowDeleteAccountModal] = useState(false);
   const [deleteAccountBusy, setDeleteAccountBusy] = useState(false);
   const [deleteAccountError, setDeleteAccountError] = useState<string | null>(null);
+  const [showBlockedModal, setShowBlockedModal] = useState(false);
 
   const handleLogoutPress = () => setShowLogoutModal(true);
 
@@ -264,6 +265,22 @@ export default function Profile() {
               <Ionicons name="chevron-forward" size={18} color="#94a3b8" />
             </Pressable>
 
+            {/* Blocked Users */}
+            <Pressable
+              style={({ pressed }) => [styles.actionRow, pressed && styles.actionRowPressed]}
+              onPress={() => setShowBlockedModal(true)}
+              disabled={busy || deleteAccountBusy}
+            >
+              <View style={[styles.actionIconBox, { backgroundColor: "#fef2f2" }]}>
+                <Ionicons name="ban-outline" size={18} color="#e11d48" />
+              </View>
+              <View style={{ flex: 1 }}>
+                <Text style={styles.actionTitle}>Danh sách người dùng đã chặn</Text>
+                <Text style={styles.actionSub}>Xem và bỏ chặn người dùng</Text>
+              </View>
+              <Ionicons name="chevron-forward" size={18} color="#94a3b8" />
+            </Pressable>
+
             {/* Delete Account */}
             <Pressable
               style={({ pressed }) => [styles.actionRow, pressed && styles.actionRowPressed]}
@@ -369,6 +386,12 @@ export default function Profile() {
         user={user}
         busy={deleteAccountBusy}
         errorMessage={deleteAccountError}
+      />
+
+      {/* Blocked Users Modal */}
+      <BlockedUsersModal
+        visible={showBlockedModal}
+        onClose={() => setShowBlockedModal(false)}
       />
 
       {/* Account Form Modal */}
