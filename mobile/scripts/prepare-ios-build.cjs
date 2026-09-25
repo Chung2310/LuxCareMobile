@@ -2,7 +2,8 @@ const fs = require("node:fs");
 const path = require("node:path");
 
 function prepare(config, env) {
-  if (!env.EXPO_TOKEN?.trim()) throw new Error("Missing GitHub secret: EXPO_TOKEN");
+  const token = env.EXPO_TOKEN || env.EAS_TOKEN || env.EXPO_ACCESS_TOKEN;
+  if (!token?.trim()) throw new Error("Missing GitHub secret: EXPO_TOKEN");
   if (!["preview", "production"].includes(env.BUILD_PROFILE)) throw new Error("Invalid BUILD_PROFILE");
   const keys = ["EXPO_PUBLIC_API_URL", "EXPO_PUBLIC_EAS_PROJECT_ID", "LUXCARE_IOS_BUNDLE_IDENTIFIER"];
   for (const key of keys) if (!env[key]?.trim()) throw new Error("Missing GitHub variable: " + key);
