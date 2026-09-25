@@ -29,9 +29,9 @@ jobs:
         shell: bash
     env:
       BUILD_PROFILE: ${{ inputs.profile }}
-      EXPO_PUBLIC_API_URL: ${{ vars.EXPO_PUBLIC_API_URL }}
-      EXPO_PUBLIC_EAS_PROJECT_ID: ${{ vars.EXPO_PUBLIC_EAS_PROJECT_ID }}
-      LUXCARE_IOS_BUNDLE_IDENTIFIER: ${{ vars.LUXCARE_IOS_BUNDLE_IDENTIFIER }}
+      EXPO_PUBLIC_API_URL: ${{ vars.EXPO_PUBLIC_API_URL || secrets.EXPO_PUBLIC_API_URL }}
+      EXPO_PUBLIC_EAS_PROJECT_ID: ${{ vars.EXPO_PUBLIC_EAS_PROJECT_ID || secrets.EXPO_PUBLIC_EAS_PROJECT_ID || '170cf082-c6fd-4619-8175-3a8e1db30b67' }}
+      LUXCARE_IOS_BUNDLE_IDENTIFIER: ${{ vars.LUXCARE_IOS_BUNDLE_IDENTIFIER || secrets.LUXCARE_IOS_BUNDLE_IDENTIFIER || 'com.luxcare.mobile' }}
 
     steps:
       - uses: actions/checkout@v4
