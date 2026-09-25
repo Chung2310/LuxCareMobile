@@ -1,6 +1,6 @@
 import React, { createContext, useContext, useEffect, useRef, useState } from "react";
 import { AppState } from "react-native";
-import { api, configurationError, getMe } from "../api/services";
+import { account, api, configurationError, getMe } from "../api/services";
 import { socketService } from "../api/socketService";
 import type { UserProfile } from "../../../src/types/common";
 import type { BranchRecord } from "../../../src/services/branchService";
@@ -14,6 +14,7 @@ type Session = {
   retry: () => Promise<void>;
   login: (email: string, password: string) => Promise<void>;
   logout: () => Promise<void>;
+  deleteAccount: (password: string) => Promise<void>;
   updateDisplayName: (uid: string, name: string) => void;
   updateUserProfile: (uid: string, data: Partial<UserProfile>) => void;
   selectedBranch: BranchRecord | null;
@@ -240,6 +241,15 @@ export function SessionProvider({ children }: React.PropsWithChildren) {
           operation.current++;
           try {
             await api.logout();
+          } finally {
+            endSession();
+          }
+        },
+        deleteAccount: async (password: string) => {
+          operation.current++;
+          try {
+            await account.deleteAccount(password);
+            await api.clear();
           } finally {
             endSession();
           }

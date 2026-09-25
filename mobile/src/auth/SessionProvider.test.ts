@@ -39,7 +39,7 @@ function mount(restore: (api: any) => Promise<boolean>, getMe = vi.fn().mockReso
   vm.runInNewContext(source, { exports: module.exports, module, Error, require: (name: string) => {
     if (name === "react") return react;
     if (name === "react-native") return { AppState: { addEventListener: () => ({ remove() {} }) } };
-    if (name === "../api/services") return { api, getMe, configurationError: null };
+    if (name === "../api/services") return { api, getMe, account: { deleteAccount: vi.fn() }, configurationError: null };
     if (name === "../api/socketService") return { socketService: socket };
     throw new Error(name);
   } });

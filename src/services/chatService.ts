@@ -358,5 +358,69 @@ export function createChatService(transport: ServiceTransport = browserTransport
       const json = await res.json();
       return json.data as LinkPreview;
     },
+    /**
+     * Báo cáo nội dung hoặc người dùng vi phạm (UGC Guideline 1.2)
+     */
+    async reportContent(data: {
+      reportedUserId: string;
+      roomId: string;
+      messageId?: string;
+      reason: "spam" | "harassment" | "inappropriate" | "fraud" | "other";
+      details?: string;
+    }): Promise<{ message: string }> {
+      const res = await transport.fetch("/api/v1/chat/reports", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify(data),
+      });
+      if (!res.ok) {
+        const err = await res.json().catch(() => ({}));
+        throw new Error(err.message || "Không thể gửi báo cáo vi phạm.");
+      }
+      return await res.json();
+    },
+
+    /**
+     * Chặn người dùng (UGC Guideline 1.2)
+     */
+    async blockUser(blockedUserId: string, reason?: string): Promise<{ message: string }> {
+      const res = await transport.fetch("/api/v1/chat/blocks", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ blockedUserId, reason }),
+      });
+      if (!res.ok) {
+        const err = await res.json().catch(() => ({}));
+        throw new Error(err.message || "Không thể chặn người dùng.");
+      }
+      return await res.json();
+    },
+
+    /**
+     * Bỏ chặn người dùng
+     */
+    async unblockUser(targetUserId: string): Promise<{ message: string }> {
+      const res = await transport.fetch(`/api/v1/chat/blocks/${encodeURIComponent(targetUserId)}`, {
+        method: "DELETE",
+      });
+      if (!res.ok) {
+        const err = await res.json().catch(() => ({}));
+        throw new Error(err.message || "Không thể bỏ chặn người dùng.");
+      }
+      return await res.json();
+    },
+
+    /**
+     * Lấy danh sách người dùng đã chặn
+     */
+    async getBlockedUsers(): Promise<{ blockId: string; blockedUser: any; reason: string; createdAt: string }[]> {
+      const res = await transport.fetch("/api/v1/chat/blocks");
+      if (!res.ok) {
+        const err = await res.json().catch(() => ({}));
+        throw new Error(err.message || "Không thể lấy danh sách chặn.");
+      }
+      const json = await res.json();
+      return json.data || [];
+    },
   };
 }

@@ -24,3 +24,5 @@ export * from "./dashboard";
 // Department & Room Components
 export * from "./departments";
 
+// Chat Components
+export * from "./chat/BlockedUsersModal";

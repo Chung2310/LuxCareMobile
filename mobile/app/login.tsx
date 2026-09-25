@@ -14,7 +14,8 @@ import {
 } from "react-native";
 import { StatusBar } from "expo-status-bar";
 import { SafeAreaView } from "react-native-safe-area-context";
-import { Redirect } from "expo-router";
+import { Redirect, router } from "expo-router";
+import { Ionicons } from "@expo/vector-icons";
 import { messageOf, useSession } from "../src/auth/SessionProvider";
 import { colors } from "../src/ui";
 import { useAppAlert } from "../src/components/AppAlert";
@@ -98,6 +99,23 @@ export default function Login() {
       />
 
       <SafeAreaView style={localStyles.safeArea} edges={["top", "bottom"]}>
+        {/* Top bar with quick Legal & Policy button */}
+        <View style={localStyles.topBar}>
+          <Pressable
+            style={({ pressed }) => [
+              localStyles.topLegalBtn,
+              pressed && { opacity: 0.75 },
+            ]}
+            onPress={() => router.push("/privacy-policy")}
+            hitSlop={8}
+            accessibilityRole="button"
+            accessibilityLabel="Xem Chính sách bảo mật"
+          >
+            <Ionicons name="shield-checkmark-outline" size={15} color="#059669" />
+            <Text style={localStyles.topLegalBtnText}>Chính sách & Điều khoản</Text>
+          </Pressable>
+        </View>
+
         <KeyboardAvoidingView
           style={localStyles.keyboardView}
           behavior={Platform.OS === "ios" ? "padding" : undefined}
@@ -189,6 +207,46 @@ export default function Login() {
                   {busy ? "Đang đăng nhập…" : "Đăng nhập"}
                 </Text>
               </Pressable>
+
+              {/* Legal Action Buttons */}
+              <View style={localStyles.legalButtonsContainer}>
+                <Pressable
+                  style={({ pressed }) => [
+                    localStyles.legalActionBtn,
+                    pressed && localStyles.legalActionBtnPressed,
+                  ]}
+                  onPress={() => router.push("/privacy-policy")}
+                  accessibilityRole="button"
+                  accessibilityLabel="Xem Chính sách bảo mật"
+                >
+                  <View style={[localStyles.legalIconBox, { backgroundColor: "#ecfdf5" }]}>
+                    <Ionicons name="shield-checkmark-outline" size={16} color="#059669" />
+                  </View>
+                  <Text style={localStyles.legalActionBtnText}>Xem Chính sách bảo mật</Text>
+                  <Ionicons name="chevron-forward" size={15} color="#94a3b8" />
+                </Pressable>
+
+                <Pressable
+                  style={({ pressed }) => [
+                    localStyles.legalActionBtn,
+                    pressed && localStyles.legalActionBtnPressed,
+                  ]}
+                  onPress={() => router.push("/terms-of-service")}
+                  accessibilityRole="button"
+                  accessibilityLabel="Xem Điều khoản sử dụng"
+                >
+                  <View style={[localStyles.legalIconBox, { backgroundColor: "#f0f9ff" }]}>
+                    <Ionicons name="document-text-outline" size={16} color="#0284c7" />
+                  </View>
+                  <Text style={localStyles.legalActionBtnText}>Xem Điều khoản sử dụng</Text>
+                  <Ionicons name="chevron-forward" size={15} color="#94a3b8" />
+                </Pressable>
+              </View>
+
+              {/* Legal Disclaimer Sub-text */}
+              <Text style={localStyles.legalDisclaimerText}>
+                Bằng việc đăng nhập, bạn đồng ý tuân thủ các điều khoản dịch vụ và chính sách bảo vệ dữ liệu của LuxCare.
+              </Text>
             </View>
           </ScrollView>
         </KeyboardAvoidingView>
@@ -221,6 +279,74 @@ const localStyles = StyleSheet.create({
     borderRadius: 26, // Bo góc mượt mà
     padding: 20,
     gap: 14,
+  },
+  topBar: {
+    flexDirection: "row",
+    justifyContent: "flex-end",
+    paddingHorizontal: 20,
+    paddingTop: 6,
+    zIndex: 10,
+  },
+  topLegalBtn: {
+    flexDirection: "row",
+    alignItems: "center",
+    gap: 6,
+    backgroundColor: "rgba(255, 255, 255, 0.85)",
+    paddingHorizontal: 12,
+    paddingVertical: 6,
+    borderRadius: 20,
+    borderWidth: 1,
+    borderColor: "rgba(167, 243, 208, 0.9)",
+    shadowColor: "#059669",
+    shadowOffset: { width: 0, height: 2 },
+    shadowOpacity: 0.1,
+    shadowRadius: 4,
+    elevation: 2,
+  },
+  topLegalBtnText: {
+    fontSize: 12,
+    fontWeight: "700",
+    color: "#059669",
+  },
+  legalButtonsContainer: {
+    gap: 8,
+    marginTop: 2,
+  },
+  legalActionBtn: {
+    flexDirection: "row",
+    alignItems: "center",
+    backgroundColor: "rgba(255, 255, 255, 0.75)",
+    borderWidth: 1,
+    borderColor: "rgba(203, 213, 225, 0.8)",
+    borderRadius: 14,
+    paddingHorizontal: 12,
+    paddingVertical: 10,
+    gap: 10,
+  },
+  legalActionBtnPressed: {
+    opacity: 0.8,
+    backgroundColor: "rgba(255, 255, 255, 0.95)",
+  },
+  legalIconBox: {
+    width: 28,
+    height: 28,
+    borderRadius: 14,
+    justifyContent: "center",
+    alignItems: "center",
+  },
+  legalActionBtnText: {
+    flex: 1,
+    fontSize: 13,
+    fontWeight: "600",
+    color: "#1e293b",
+  },
+  legalDisclaimerText: {
+    fontSize: 11.5,
+    lineHeight: 16,
+    color: "#64748b",
+    textAlign: "center",
+    marginTop: 2,
+    paddingHorizontal: 4,
   },
   heading: {
     fontSize: 22,

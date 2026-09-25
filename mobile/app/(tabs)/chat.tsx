@@ -53,6 +53,7 @@ import { chatNotificationsMuted } from "../../src/features/notifications/chatNot
 import { useSession } from "../../src/auth/SessionProvider";
 import { useChatUnread } from "../../src/context/ChatUnreadContext";
 import { api, chat, kanbanMedia } from "../../src/api/services";
+import { BlockedUsersModal } from "../../src/components/chat/BlockedUsersModal";
 import { socketService } from "../../src/api/socketService";
 import { userManagementApi } from "../../src/api/userManagementApi";
 import type {
@@ -1086,6 +1087,28 @@ export default function ChatScreen() {
   }, [requestedRoom, requestedPeer, rooms, focused, router]);
 
   const [messages, setMessages] = useState<ChatMessage[]>([]);
+
+  // UGC Moderation (Guideline 1.2)
+  const [reportModalVisible, setReportModalVisible] = useState(false);
+  const [reportingMessage, setReportingMessage] = useState<ChatMessage | null>(null);
+  const [reportReason, setReportReason] = useState<"spam" | "harassment" | "inappropriate" | "fraud" | "other">("harassment");
+  const [reportDetails, setReportDetails] = useState("");
+  const [submittingReport, setSubmittingReport] = useState(false);
+  const [blockedUserIds, setBlockedUserIds] = useState<string[]>([]);
+  const [blockedUsersModalVisible, setBlockedUsersModalVisible] = useState(false);
+
+  useEffect(() => {
+    void (async () => {
+      try {
+        const list = await chat.getBlockedUsers();
+        const ids = list.map((item: any) => String(item.blockedUser?._id || item.blockedUser?.uid || item.blockId));
+        setBlockedUserIds(ids);
+      } catch {
+        // ignore
+      }
+    })();
+  }, [chat]);
+
   const [loadingMessages, setLoadingMessages] = useState(false);
   const [inputText, setInputText] = useState("");
   const [sending, setSending] = useState(false);
@@ -3148,13 +3171,15 @@ export default function ChatScreen() {
     const deduped: ChatMessage[] = [];
     for (const m of messages) {
       if (m._id && seen.has(m._id)) continue;
+      const sId = getSenderIdString(m.senderId);
+      if (blockedUserIds.includes(sId)) continue;
       if (m._id) seen.add(m._id);
       deduped.push(m);
     }
     if (!chatSearchQuery.trim()) return deduped;
     const q = chatSearchQuery.toLowerCase().trim();
     return deduped.filter((m) => (m.content || "").toLowerCase().includes(q));
-  }, [messages, chatSearchQuery]);
+  }, [messages, chatSearchQuery, blockedUserIds]);
 
   // Pinned messages list in active room
   const pinnedMessages = useMemo(() => {
@@ -4164,6 +4189,11 @@ export default function ChatScreen() {
                 const isVoiceMessage = Boolean(hasAudioAtt || isPureAudioContent) && !hasVideoAtt;
                 const downloadableFiles = extractDownloadableAttachments(selectedMessage);
                 const hasDownloadableMedia = downloadableFiles.length > 0;
+                const actionSenderIdStr = getSenderIdString(selectedMessage.senderId);
+                const isSelectedFromMe =
+                  actionSenderIdStr === currentUserId ||
+                  selectedMessage.senderId === "me" ||
+                  selectedMessage.senderId === currentUserId;
 
                 return (
                   <View style={styles.actionGridCard}>
@@ -4288,6 +4318,65 @@ export default function ChatScreen() {
                       <Text style={styles.actionGridLabel}>Chi tiết</Text>
                     </TouchableOpacity>
 
+
+                    {/* Báo cáo vi phạm (UGC Guideline 1.2) */}
+                    {!isSelectedFromMe && (
+                      <TouchableOpacity
+                        style={styles.actionGridItem}
+                        onPress={() => {
+                          setMessageActionModalVisible(false);
+                          setReportingMessage(selectedMessage);
+                          setReportReason("harassment");
+                          setReportDetails("");
+                          setReportModalVisible(true);
+                        }}
+                        activeOpacity={0.7}
+                      >
+                        <View style={[styles.actionIconBadge, { backgroundColor: "#fff1f2", borderColor: "#ffe4e6" }]}>
+                          <Ionicons name="flag-outline" size={22} color="#e11d48" />
+                        </View>
+                        <Text style={[styles.actionGridLabel, { color: "#e11d48" }]}>Báo cáo</Text>
+                      </TouchableOpacity>
+                    )}
+
+                    {/* Chặn người dùng (UGC Guideline 1.2) */}
+                    {!isSelectedFromMe && (
+                      <TouchableOpacity
+                        style={styles.actionGridItem}
+                        onPress={() => {
+                          setMessageActionModalVisible(false);
+                          const targetId = getSenderIdString(selectedMessage.senderId);
+                          const targetName = selectedMessage.senderName || "người dùng này";
+                          showCustomAlert(
+                            "Chặn người dùng",
+                            `Bạn có chắc chắn muốn chặn ${targetName}?\n\nToàn bộ tin nhắn từ người này sẽ bị ẩn và hai bên không thể nhắn tin trực tiếp cho nhau.`,
+                            [
+                              { text: "Hủy", style: "cancel" },
+                              {
+                                text: "Chặn",
+                                style: "destructive",
+                                onPress: async () => {
+                                  try {
+                                    await chat.blockUser(targetId);
+                                    setBlockedUserIds((prev) => [...prev, targetId]);
+                                    setMessages((prev) => prev.filter((m) => getSenderIdString(m.senderId) !== targetId));
+                                    showCustomAlert("Thành công", `Đã chặn ${targetName}.`);
+                                  } catch (err: any) {
+                                    showCustomAlert("Lỗi", err?.message || "Không thể chặn người dùng.");
+                                  }
+                                },
+                              },
+                            ]
+                          );
+                        }}
+                        activeOpacity={0.7}
+                      >
+                        <View style={[styles.actionIconBadge, { backgroundColor: "#fff1f2", borderColor: "#ffe4e6" }]}>
+                          <Ionicons name="ban-outline" size={22} color="#e11d48" />
+                        </View>
+                        <Text style={[styles.actionGridLabel, { color: "#e11d48" }]}>Chặn</Text>
+                      </TouchableOpacity>
+                    )}
                     {/* Xóa / Thu hồi (Delete / Revoke) */}
                     <TouchableOpacity
                       style={styles.actionGridItem}
@@ -4317,6 +4406,122 @@ export default function ChatScreen() {
                 );
               })()}
             </View>
+          </Pressable>
+        </Modal>
+
+
+        {/* MODAL: BÁO CÁO VI PHẠM (UGC GUIDELINE 1.2) */}
+        <Modal
+          visible={reportModalVisible}
+          animationType="fade"
+          transparent
+          onRequestClose={() => setReportModalVisible(false)}
+        >
+          <Pressable style={styles.customAlertOverlay} onPress={() => setReportModalVisible(false)}>
+            <Pressable style={[styles.customAlertCard, { maxWidth: 360 }]} onPress={(e) => e.stopPropagation()}>
+              <Text style={styles.customAlertTitle}>Báo cáo vi phạm</Text>
+              <Text style={[styles.customAlertMessage, { marginBottom: 12 }]}>
+                Báo cáo tin nhắn của {reportingMessage?.senderName || "người dùng"} vi phạm tiêu chuẩn cộng đồng.
+              </Text>
+
+              <View style={{ width: "100%", gap: 6, marginBottom: 12 }}>
+                {[
+                  { value: "harassment", label: "Quấy rối / Xúc phạm / Đe dọa" },
+                  { value: "inappropriate", label: "Nội dung phản cảm / Nhạy cảm" },
+                  { value: "spam", label: "Tin nhắn rác / Quảng cáo" },
+                  { value: "fraud", label: "Lừa đảo / Giả mạo" },
+                  { value: "other", label: "Lý do khác" },
+                ].map((item) => (
+                  <TouchableOpacity
+                    key={item.value}
+                    style={{
+                      flexDirection: "row",
+                      alignItems: "center",
+                      gap: 8,
+                      paddingVertical: 8,
+                      paddingHorizontal: 10,
+                      borderRadius: 10,
+                      backgroundColor: reportReason === item.value ? "#fff1f2" : "#f8fafc",
+                      borderWidth: 1,
+                      borderColor: reportReason === item.value ? "#fecdd3" : "#e2e8f0",
+                    }}
+                    onPress={() => setReportReason(item.value as any)}
+                  >
+                    <Ionicons
+                      name={reportReason === item.value ? "radio-button-on" : "radio-button-off"}
+                      size={18}
+                      color={reportReason === item.value ? "#e11d48" : "#94a3b8"}
+                    />
+                    <Text style={{ fontSize: 12, fontWeight: "600", color: reportReason === item.value ? "#be123c" : "#334155" }}>
+                      {item.label}
+                    </Text>
+                  </TouchableOpacity>
+                ))}
+              </View>
+
+              <TextInput
+                style={{
+                  width: "100%",
+                  borderWidth: 1,
+                  borderColor: "#e2e8f0",
+                  borderRadius: 10,
+                  padding: 8,
+                  fontSize: 12,
+                  minHeight: 50,
+                  marginBottom: 12,
+                  textAlignVertical: "top",
+                }}
+                placeholder="Mô tả chi tiết thêm (không bắt buộc)..."
+                value={reportDetails}
+                onChangeText={setReportDetails}
+                multiline
+                maxLength={500}
+              />
+
+              <Text style={{ fontSize: 10, color: "#64748b", marginBottom: 12, textAlign: "center" }}>
+                Cam kết kiểm duyệt và xử lý vi phạm trong vòng 24 giờ.
+              </Text>
+
+              <View style={styles.customAlertBtnRow}>
+                <TouchableOpacity
+                  style={[styles.customAlertBtn, styles.customAlertBtnCancel]}
+                  onPress={() => setReportModalVisible(false)}
+                >
+                  <Text style={[styles.customAlertBtnText, styles.customAlertBtnTextCancel]}>Hủy</Text>
+                </TouchableOpacity>
+
+                <TouchableOpacity
+                  style={[styles.customAlertBtn, styles.customAlertBtnDestructive]}
+                  disabled={submittingReport}
+                  onPress={async () => {
+                    if (!reportingMessage || !activeRoom) return;
+                    try {
+                      setSubmittingReport(true);
+                      await chat.reportContent({
+                        reportedUserId: getSenderIdString(reportingMessage.senderId),
+                        roomId: activeRoom._id,
+                        messageId: reportingMessage._id,
+                        reason: reportReason,
+                        details: reportDetails,
+                      });
+                      setReportModalVisible(false);
+                      showCustomAlert(
+                        "Báo cáo thành công",
+                        "Báo cáo của bạn đã được ghi nhận. Ban quản trị sẽ kiểm duyệt và xử lý trong vòng 24 giờ."
+                      );
+                    } catch (err: any) {
+                      showCustomAlert("Lỗi", err?.message || "Không thể gửi báo cáo.");
+                    } finally {
+                      setSubmittingReport(false);
+                    }
+                  }}
+                >
+                  <Text style={[styles.customAlertBtnText, styles.customAlertBtnTextDestructive]}>
+                    {submittingReport ? "Đang gửi..." : "Gửi báo cáo"}
+                  </Text>
+                </TouchableOpacity>
+              </View>
+            </Pressable>
           </Pressable>
         </Modal>
 
@@ -4492,6 +4697,34 @@ export default function ChatScreen() {
                   }}
                 />
               </View>
+
+              {/* Quản lý danh sách chặn */}
+              <TouchableOpacity
+                style={{
+                  padding: 14,
+                  marginTop: 12,
+                  borderRadius: 12,
+                  backgroundColor: "#ffffff",
+                  flexDirection: "row",
+                  alignItems: "center",
+                  borderWidth: 1,
+                  borderColor: "#e2e8f0",
+                }}
+                onPress={() => {
+                  setRoomInfoModalVisible(false);
+                  setBlockedUsersModalVisible(true);
+                }}
+                activeOpacity={0.7}
+              >
+                <View style={{ width: 36, height: 36, borderRadius: 18, backgroundColor: "#fee2e2", alignItems: "center", justifyContent: "center", marginRight: 12 }}>
+                  <Ionicons name="ban-outline" size={18} color="#dc2626" />
+                </View>
+                <View style={{ flex: 1 }}>
+                  <Text style={{ fontSize: 14, fontWeight: "600", color: "#0f172a" }}>Danh sách người dùng đã chặn</Text>
+                  <Text style={{ fontSize: 12, color: "#64748b", marginTop: 2 }}>Xem và bỏ chặn người dùng</Text>
+                </View>
+                <Ionicons name="chevron-forward" size={18} color="#94a3b8" />
+              </TouchableOpacity>
 
               {activeRoom.isGroup && (
                 <View style={{ marginTop: 24 }}>
@@ -4695,6 +4928,16 @@ export default function ChatScreen() {
         {/* FLOATING ROUNDED TOAST FEEDBACK */}
         {renderToast()}
 
+        {/* MODAL: DANH SÁCH CHẶN & BỎ CHẶN */}
+        <BlockedUsersModal
+          visible={blockedUsersModalVisible}
+          onClose={() => setBlockedUsersModalVisible(false)}
+          onUnblocked={(unblockedUserId) => {
+            setBlockedUserIds((prev) => prev.filter((id) => id !== unblockedUserId));
+            void loadRooms(true);
+          }}
+        />
+
         {/* CUSTOM ROUNDED ALERT MODAL */}
         {renderCustomAlert()}
       </View>
@@ -4723,6 +4966,17 @@ export default function ChatScreen() {
             </TouchableOpacity>
           )}
         </View>
+
+        {/* Nút Xem danh sách đã chặn */}
+        <TouchableOpacity
+          style={styles.headerActionBtn}
+          onPress={() => setBlockedUsersModalVisible(true)}
+          activeOpacity={0.8}
+          accessibilityRole="button"
+          accessibilityLabel="Danh sách người dùng đã chặn"
+        >
+          <Ionicons name="shield-outline" size={20} color="#059669" />
+        </TouchableOpacity>
 
         {/* Nút Tạo cuộc trò chuyện / Nhóm mới */}
         <TouchableOpacity style={styles.headerActionBtn} onPress={handleOpenCreateModal} activeOpacity={0.8}>
@@ -5080,6 +5334,16 @@ export default function ChatScreen() {
 
       {/* FLOATING ROUNDED TOAST FEEDBACK */}
       {renderToast()}
+
+      {/* MODAL: DANH SÁCH CHẶN & BỎ CHẶN */}
+      <BlockedUsersModal
+        visible={blockedUsersModalVisible}
+        onClose={() => setBlockedUsersModalVisible(false)}
+        onUnblocked={(unblockedUserId) => {
+          setBlockedUserIds((prev) => prev.filter((id) => id !== unblockedUserId));
+          void loadRooms(true);
+        }}
+      />
 
       {/* CUSTOM ROUNDED ALERT MODAL */}
       {renderCustomAlert()}
