@@ -80,13 +80,26 @@ jobs:
           eas-version: latest
           token: ${{ secrets.EXPO_TOKEN || secrets.EAS_TOKEN || secrets.EXPO_ACCESS_TOKEN }}
 
-      - name: Write ASC API Key
+      - name: Set up iOS credentials for local signing
         run: |
-          echo "${{ secrets.APP_STORE_CONNECT_API_KEY_BASE64 }}" | base64 -d > "$RUNNER_TEMP/asc-api-key.p8"
+          set -euo pipefail
+          mkdir -p ios-certs
+          echo "${{ secrets.APPLE_CERTIFICATE_BASE64 }}" | base64 -d > ios-certs/dist-cert.p12
+          echo "${{ secrets.PROVISIONING_PROFILE_BASE64 }}" | base64 -d > ios-certs/profile.mobileprovision
+          cat > credentials.json <<EOF
+          {
+            "ios": {
+              "distributionCertificate": {
+                "path": "ios-certs/dist-cert.p12",
+                "password": "${{ secrets.APPLE_CERTIFICATE_PASSWORD }}"
+              },
+              "provisioningProfilePath": "ios-certs/profile.mobileprovision"
+            }
+          }
+          EOF
+          echo "✅ Local iOS credentials configured"
 
       - name: Build signed IPA on EAS
-        env:
-          EXPO_ASC_API_KEY_PATH: ${{ runner.temp }}/asc-api-key.p8
         run: |
           set -euo pipefail
           echo "Building signed iOS IPA on EAS for profile: $BUILD_PROFILE..."
