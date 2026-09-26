@@ -34,8 +34,6 @@ jobs:
       EXPO_PUBLIC_EAS_PROJECT_ID: ${{ vars.EXPO_PUBLIC_EAS_PROJECT_ID || secrets.EXPO_PUBLIC_EAS_PROJECT_ID || '0ec1cf95-301c-44f9-8317-23b44d0f5234' }}
       LUXCARE_IOS_BUNDLE_IDENTIFIER: ${{ vars.LUXCARE_IOS_BUNDLE_IDENTIFIER || secrets.LUXCARE_IOS_BUNDLE_IDENTIFIER || 'com.luxcare.mobile' }}
       EAS_BUILD_NO_EXPO_GO_WARNING: "true"
-      EXPO_APPLE_ID: ${{ secrets.EXPO_APPLE_ID }}
-      EXPO_APPLE_PASSWORD: ${{ secrets.EXPO_APPLE_APP_SPECIFIC_PASSWORD }}
       EXPO_ASC_KEY_ID: ${{ secrets.APP_STORE_CONNECT_API_KEY_ID }}
       EXPO_ASC_ISSUER_ID: ${{ secrets.APP_STORE_CONNECT_ISSUER_ID }}
       EXPO_APPLE_TEAM_ID: "VP77TD9A77"
@@ -115,7 +113,7 @@ jobs:
         run: |
           set -euo pipefail
           echo "Building signed iOS IPA on EAS for profile: $BUILD_PROFILE..."
-          eas build --platform ios --profile "$BUILD_PROFILE" --non-interactive --wait --json > "$RUNNER_TEMP/ios-build.json"
+          eas build --platform ios --profile "$BUILD_PROFILE" --freeze-credentials --non-interactive --wait --json > "$RUNNER_TEMP/ios-build.json"
 
       - name: Download and validate IPA
         run: |
