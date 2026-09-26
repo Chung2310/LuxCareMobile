@@ -16,7 +16,7 @@
     "production": {
       "distribution": "store",
       "environment": "production",
-      "credentialsSource": "local",
+      "credentialsSource": "remote",
       "autoIncrement": true,
       "ios": {
         "simulator": false,
