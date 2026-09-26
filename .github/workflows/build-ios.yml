@@ -35,7 +35,7 @@ jobs:
       LUXCARE_IOS_BUNDLE_IDENTIFIER: ${{ vars.LUXCARE_IOS_BUNDLE_IDENTIFIER || secrets.LUXCARE_IOS_BUNDLE_IDENTIFIER || 'com.luxcare.mobile' }}
       EAS_BUILD_NO_EXPO_GO_WARNING: "true"
       EXPO_APPLE_ID: ${{ secrets.EXPO_APPLE_ID }}
-      EXPO_APPLE_APP_SPECIFIC_PASSWORD: ${{ secrets.EXPO_APPLE_APP_SPECIFIC_PASSWORD }}
+      EXPO_APPLE_PASSWORD: ${{ secrets.EXPO_APPLE_APP_SPECIFIC_PASSWORD }}
 
     steps:
       - uses: actions/checkout@v4
