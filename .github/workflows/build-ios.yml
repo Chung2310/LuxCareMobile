@@ -80,34 +80,66 @@ jobs:
           eas-version: latest
           token: ${{ secrets.EXPO_TOKEN || secrets.EAS_TOKEN || secrets.EXPO_ACCESS_TOKEN }}
 
-      - name: Set up App Store Connect API Key for EAS non-interactive signing
+      - name: Configure App Store Connect API key for remote signing and submission
         env:
           APP_STORE_CONNECT_API_KEY_BASE64: ${{ secrets.APP_STORE_CONNECT_API_KEY_BASE64 }}
           APP_STORE_CONNECT_API_KEY_ID: ${{ secrets.APP_STORE_CONNECT_API_KEY_ID }}
           APP_STORE_CONNECT_ISSUER_ID: ${{ secrets.APP_STORE_CONNECT_ISSUER_ID }}
         run: |
           set -euo pipefail
-          if [[ -n "${APP_STORE_CONNECT_API_KEY_BASE64:-}" && -n "${APP_STORE_CONNECT_API_KEY_ID:-}" ]]; then
-            KEY_DIR="$RUNNER_TEMP/asc-keys"
-            mkdir -p "$KEY_DIR"
-            KEY_PATH="$KEY_DIR/AuthKey_${APP_STORE_CONNECT_API_KEY_ID}.p8"
-
-            if echo "$APP_STORE_CONNECT_API_KEY_BASE64" | base64 -d > "$KEY_PATH" 2>/dev/null && grep -q "PRIVATE KEY" "$KEY_PATH"; then
-              echo "Decoded base64 App Store Connect API Key"
-            else
-              echo "$APP_STORE_CONNECT_API_KEY_BASE64" > "$KEY_PATH"
-            fi
-            chmod 600 "$KEY_PATH"
-
-            echo "EXPO_ASC_API_KEY_PATH=$KEY_PATH" >> "$GITHUB_ENV"
-            echo "EXPO_ASC_KEY_ID=$APP_STORE_CONNECT_API_KEY_ID" >> "$GITHUB_ENV"
-            echo "EXPO_ASC_ISSUER_ID=$APP_STORE_CONNECT_ISSUER_ID" >> "$GITHUB_ENV"
-            echo "EXPO_APPLE_TEAM_ID=VP77TD9A77" >> "$GITHUB_ENV"
-            echo "EXPO_APPLE_TEAM_TYPE=COMPANY_OR_ORGANIZATION" >> "$GITHUB_ENV"
-            echo "✅ Configured App Store Connect API Key for non-interactive EAS signing"
-          else
-            echo "::warning::Missing App Store Connect API Key secret, EAS non-interactive may fail to validate credentials"
-          fi
+          umask 077
+          node <<'NODE'
+          const fs = require('node:fs');
+          const path = require('node:path');
+          const crypto = require('node:crypto');
+          const required = name => {
+            const value = process.env[name]?.trim();
+            if (!value) throw new Error('Missing GitHub secret: ' + name);
+            return value;
+          };
+          const keyId = required('APP_STORE_CONNECT_API_KEY_ID');
+          const issuerId = required('APP_STORE_CONNECT_ISSUER_ID');
+          if (!/^[A-Z0-9]{10}$/.test(keyId)) throw new Error('Invalid App Store Connect Key ID');
+          if (!/^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i.test(issuerId)) {
+            throw new Error('Invalid App Store Connect Issuer ID');
+          }
+          const rawKey = required('APP_STORE_CONNECT_API_KEY_BASE64');
+          let key;
+          if (rawKey.includes('-----BEGIN PRIVATE KEY-----')) {
+            key = Buffer.from(rawKey + '\n');
+          } else {
+            const encoded = rawKey.replace(/\s/g, '');
+            key = Buffer.from(encoded, 'base64');
+            if (!/^[A-Za-z0-9+/]+={0,2}$/.test(encoded) ||
+                key.toString('base64').replace(/=+$/, '') !== encoded.replace(/=+$/, '')) {
+              throw new Error('Invalid base64 App Store Connect API key');
+            }
+          }
+          try {
+            const parsed = crypto.createPrivateKey(key);
+            if (parsed.asymmetricKeyType !== 'ec' || parsed.asymmetricKeyDetails?.namedCurve !== 'prime256v1') {
+              throw new Error('Expected EC P-256 key');
+            }
+          } catch {
+            throw new Error('Invalid App Store Connect .p8 private key (expected EC P-256)');
+          }
+          const dir = path.join(process.env.RUNNER_TEMP, 'luxcare-asc');
+          fs.mkdirSync(dir, { recursive: true, mode: 0o700 });
+          const keyPath = path.join(dir, 'AuthKey.p8');
+          fs.writeFileSync(keyPath, key, { mode: 0o600 });
+          fs.appendFileSync(process.env.GITHUB_ENV, 'EXPO_ASC_API_KEY_PATH=' + keyPath + '\n');
+          const config = JSON.parse(fs.readFileSync('eas.json', 'utf8'));
+          const profile = config.build[process.env.BUILD_PROFILE];
+          const source = profile.ios?.credentialsSource ?? profile.credentialsSource ?? 'remote';
+          if (source !== 'remote') throw new Error('This workflow requires Expo remote signing credentials');
+          if (process.env.BUILD_PROFILE === 'production') {
+            Object.assign(config.submit.production.ios, {
+              ascApiKeyPath: keyPath, ascApiKeyId: keyId, ascApiKeyIssuerId: issuerId,
+            });
+            fs.writeFileSync('eas.json', JSON.stringify(config, null, 2) + '\n');
+          }
+          console.log('Remote signing retained; App Store Connect API key configured.');
+          NODE
 
       - name: Build signed IPA on EAS
         run: |
@@ -141,6 +173,10 @@ jobs:
           BUILD_ID="$(jq -er '.[0] | select(.status == "FINISHED") | .id' "$RUNNER_TEMP/ios-build.json")"
           echo "Submitting EAS production build $BUILD_ID to App Store Connect / TestFlight..."
           eas submit --platform ios --profile production --id "$BUILD_ID" --non-interactive --wait
+
+      - name: Clean up App Store Connect API key
+        if: always()
+        run: rm -f "$RUNNER_TEMP/luxcare-asc/AuthKey.p8"
 
       - name: Build summary
         if: always()

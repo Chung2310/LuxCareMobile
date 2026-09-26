@@ -44,3 +44,4 @@ yarn-error.*
 /android
 # Keep the independent native dependency graph reproducible.
 !package-lock.json
+credentials.json
