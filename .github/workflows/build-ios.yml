@@ -36,6 +36,8 @@ jobs:
       EAS_BUILD_NO_EXPO_GO_WARNING: "true"
       EXPO_APPLE_ID: ${{ secrets.EXPO_APPLE_ID }}
       EXPO_APPLE_PASSWORD: ${{ secrets.EXPO_APPLE_APP_SPECIFIC_PASSWORD }}
+      EXPO_ASC_KEY_ID: ${{ secrets.APP_STORE_CONNECT_API_KEY_ID }}
+      EXPO_ASC_ISSUER_ID: ${{ secrets.APP_STORE_CONNECT_ISSUER_ID }}
 
     steps:
       - uses: actions/checkout@v4
@@ -78,7 +80,13 @@ jobs:
           eas-version: latest
           token: ${{ secrets.EXPO_TOKEN || secrets.EAS_TOKEN || secrets.EXPO_ACCESS_TOKEN }}
 
+      - name: Write ASC API Key
+        run: |
+          echo "${{ secrets.APP_STORE_CONNECT_API_KEY_BASE64 }}" | base64 -d > "$RUNNER_TEMP/asc-api-key.p8"
+
       - name: Build signed IPA on EAS
+        env:
+          EXPO_ASC_API_KEY_PATH: ${{ runner.temp }}/asc-api-key.p8
         run: |
           set -euo pipefail
           echo "Building signed iOS IPA on EAS for profile: $BUILD_PROFILE..."
