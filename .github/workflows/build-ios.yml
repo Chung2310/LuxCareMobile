@@ -38,6 +38,8 @@ jobs:
       EXPO_APPLE_PASSWORD: ${{ secrets.EXPO_APPLE_APP_SPECIFIC_PASSWORD }}
       EXPO_ASC_KEY_ID: ${{ secrets.APP_STORE_CONNECT_API_KEY_ID }}
       EXPO_ASC_ISSUER_ID: ${{ secrets.APP_STORE_CONNECT_ISSUER_ID }}
+      EXPO_APPLE_TEAM_ID: "VP77TD9A77"
+      EXPO_APPLE_TEAM_TYPE: "COMPANY_OR_ORGANIZATION"
 
     steps:
       - uses: actions/checkout@v4
@@ -79,6 +81,35 @@ jobs:
         with:
           eas-version: latest
           token: ${{ secrets.EXPO_TOKEN || secrets.EAS_TOKEN || secrets.EXPO_ACCESS_TOKEN }}
+
+      - name: Set up App Store Connect API Key for EAS non-interactive signing
+        env:
+          APP_STORE_CONNECT_API_KEY_BASE64: ${{ secrets.APP_STORE_CONNECT_API_KEY_BASE64 }}
+          APP_STORE_CONNECT_API_KEY_ID: ${{ secrets.APP_STORE_CONNECT_API_KEY_ID }}
+          APP_STORE_CONNECT_ISSUER_ID: ${{ secrets.APP_STORE_CONNECT_ISSUER_ID }}
+        run: |
+          set -euo pipefail
+          if [[ -n "${APP_STORE_CONNECT_API_KEY_BASE64:-}" && -n "${APP_STORE_CONNECT_API_KEY_ID:-}" ]]; then
+            KEY_DIR="$RUNNER_TEMP/asc-keys"
+            mkdir -p "$KEY_DIR"
+            KEY_PATH="$KEY_DIR/AuthKey_${APP_STORE_CONNECT_API_KEY_ID}.p8"
+
+            if echo "$APP_STORE_CONNECT_API_KEY_BASE64" | base64 -d > "$KEY_PATH" 2>/dev/null && grep -q "PRIVATE KEY" "$KEY_PATH"; then
+              echo "Decoded base64 App Store Connect API Key"
+            else
+              echo "$APP_STORE_CONNECT_API_KEY_BASE64" > "$KEY_PATH"
+            fi
+            chmod 600 "$KEY_PATH"
+
+            echo "EXPO_ASC_API_KEY_PATH=$KEY_PATH" >> "$GITHUB_ENV"
+            echo "EXPO_ASC_KEY_ID=$APP_STORE_CONNECT_API_KEY_ID" >> "$GITHUB_ENV"
+            echo "EXPO_ASC_ISSUER_ID=$APP_STORE_CONNECT_ISSUER_ID" >> "$GITHUB_ENV"
+            echo "EXPO_APPLE_TEAM_ID=VP77TD9A77" >> "$GITHUB_ENV"
+            echo "EXPO_APPLE_TEAM_TYPE=COMPANY_OR_ORGANIZATION" >> "$GITHUB_ENV"
+            echo "✅ Configured App Store Connect API Key for non-interactive EAS signing"
+          else
+            echo "::warning::Missing App Store Connect API Key secret, EAS non-interactive may fail to validate credentials"
+          fi
 
       - name: Build signed IPA on EAS
         run: |
