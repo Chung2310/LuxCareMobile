@@ -81,17 +81,29 @@ jobs:
           token: ${{ secrets.EXPO_TOKEN || secrets.EAS_TOKEN || secrets.EXPO_ACCESS_TOKEN }}
 
       - name: Set up iOS credentials for local signing
+        env:
+          CERT_PASSWORD: ${{ secrets.APPLE_CERTIFICATE_PASSWORD }}
         run: |
           set -euo pipefail
           mkdir -p ios-certs
-          echo "${{ secrets.APPLE_CERTIFICATE_BASE64 }}" | base64 -d > ios-certs/dist-cert.p12
+
+          # Decode certificate from base64
+          echo "${{ secrets.APPLE_CERTIFICATE_BASE64 }}" | base64 -d > /tmp/cert-original.p12
+
+          # Re-package .p12 with legacy format for macOS Keychain compatibility
+          openssl pkcs12 -in /tmp/cert-original.p12 -nodes -passin pass:"$CERT_PASSWORD" 2>/dev/null | \
+            openssl pkcs12 -export -legacy -passout pass:"$CERT_PASSWORD" -out ios-certs/dist-cert.p12 2>/dev/null
+
+          # Decode provisioning profile
           echo "${{ secrets.PROVISIONING_PROFILE_BASE64 }}" | base64 -d > ios-certs/profile.mobileprovision
+
+          # Create credentials.json for EAS local credentials
           cat > credentials.json <<EOF
           {
             "ios": {
               "distributionCertificate": {
                 "path": "ios-certs/dist-cert.p12",
-                "password": "${{ secrets.APPLE_CERTIFICATE_PASSWORD }}"
+                "password": "$CERT_PASSWORD"
               },
               "provisioningProfilePath": "ios-certs/profile.mobileprovision"
             }
