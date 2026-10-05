@@ -1,5 +1,7 @@
+import { needsOnboarding } from "../../shared/onboarding";
 import { Redirect } from "expo-router";
 import { useSession } from "../src/auth/SessionProvider";
 export default function Index() {
-  return <Redirect href={useSession().user ? "/(tabs)" : "/login"} />;
+  const { user } = useSession();
+  return <Redirect href={user ? needsOnboarding(user) ? "/onboarding" : "/(tabs)" : "/login"} />;
 }

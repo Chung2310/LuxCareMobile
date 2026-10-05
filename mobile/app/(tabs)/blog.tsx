@@ -1,3 +1,4 @@
+import { BlogSafetyPanel } from "../../src/features/blog/BlogSafetyPanel";
 import { BlogDocumentPreview } from "../../src/features/blog/BlogDocumentPreview";
 import { BlogImage } from "../../src/features/blog/BlogImage";
 import { blogShareMessage } from "../../../src/services/blogShareMessage";
@@ -43,7 +44,7 @@ import { Ionicons } from "@expo/vector-icons";
 import Svg, { Path } from "react-native-svg";
 import { useSession } from "../../src/auth/SessionProvider";
 import { LogoutConfirmModal } from "../../src/components/common";
-import { blog } from "../../src/api/services";
+import { blog, blogModeration } from "../../src/api/services";
 import { isBlogEditorUser } from "../../../src/utils/permissionUtils";
 import {
   DEFAULT_BLOG_CHANNELS,
@@ -89,6 +90,7 @@ export default function BlogScreen() {
   const [selectedChannel, setSelectedChannel] = useState<BlogChannel>(DEFAULT_BLOG_CHANNELS[0]);
   const [channelModalVisible, setChannelModalVisible] = useState(false);
 
+  const [safety, setSafety] = useState<{ mode: "report" | "block" | "blocks"; post?: BlogPost } | null>(null);
   const [posts, setPosts] = useState<BlogPost[]>([]);
   const [postsScope, setPostsScope] = useState("");
   const [loadedChannel, setLoadedChannel] = useState("");
@@ -142,7 +144,7 @@ export default function BlogScreen() {
   };
 
   const handleLongPressPost = (post: BlogPost) => {
-    if (!isEditor) return;
+    if (!isEditor || (!["superadmin", "blog_editor"].includes(user?.role || "") && String(post.authorId) !== String(user?.uid))) return;
     const isAlreadyPinned = Boolean(post.isPinned);
     showAlert(
       isAlreadyPinned ? "Bỏ ghim bài viết" : "Ghim bài viết",
@@ -217,9 +219,10 @@ export default function BlogScreen() {
     const version = ++requestVersion.current;
     setLoading(loadedChannel !== selectedChannel.id || postsScope !== feedScope);
     try {
-      const fetchedPosts = await blog.getPosts(selectedChannel.id, true);
+      const [fetchedPosts, blocks] = await Promise.all([blog.getPosts(selectedChannel.id, true), blogModeration.blocks()]);
       if (version !== requestVersion.current) return;
-      setPosts(fetchedPosts);
+      const blockedIds = new Set(blocks.map(block => block.authorId));
+      setPosts(fetchedPosts.filter(post => !blockedIds.has(String(post.authorId))));
       setLoadedChannel(selectedChannel.id);
       setPostsScope(`${user?.companyCode}|${user?.uid}`);
     } catch {
@@ -704,6 +707,9 @@ export default function BlogScreen() {
         behavior={Platform.OS === "ios" ? "padding" : "height"}
         keyboardVerticalOffset={Platform.OS === "ios" ? 0 : 0}
       >
+        {safety && <BlogSafetyPanel key={`${feedScope}:${safety.mode}:${safety.post?.id || "list"}`} {...safety} onClose={() => setSafety(null)}
+          onBlocked={authorId => { requestVersion.current++; setPosts(items => items.filter(post => String(post.authorId) !== authorId)); setViewImage(null); setPreviewDocument(null); setLoading(false); setRefreshing(false); void loadBlogData(); }}
+          onUnblocked={() => void loadBlogData()} />}
         {/* Header Bar */}
         <View style={styles.header}>
           {/* Channel Selector Trigger */}
@@ -724,6 +730,9 @@ export default function BlogScreen() {
 
           {/* Right Action Controls: Search icon & Logout button to return to login screen */}
           <View style={styles.headerRightActions}>
+            <Pressable accessibilityRole="button" accessibilityLabel="Người đã chặn" style={styles.headerIconBtn} onPress={() => setSafety({ mode: "blocks" })}>
+              <Ionicons name="person-remove-outline" size={20} color="#334155" />
+            </Pressable>
             <Pressable
               style={styles.headerIconBtn}
               onPress={() => setSearchBarVisible(!searchBarVisible)}
@@ -874,8 +883,16 @@ export default function BlogScreen() {
                       <Text style={styles.postTime}>{post.createdAt}</Text>
                     </View>
 
+                    {String(post.authorId) !== String(user?.uid) && <Pressable accessibilityRole="button" accessibilityLabel="Báo cáo hoặc chặn tác giả" style={{ minWidth: 44, minHeight: 44, alignItems: "center", justifyContent: "center" }}
+                      onPress={() => Alert.alert("Bài viết", post.authorName, [
+                        { text: "Báo cáo bài viết", onPress: () => setSafety({ mode: "report", post }) },
+                        { text: "Chặn tác giả", style: "destructive", onPress: () => setSafety({ mode: "block", post }) },
+                        { text: "Hủy", style: "cancel" },
+                      ])}>
+                      <Ionicons name="ellipsis-horizontal" size={20} color="#64748b" />
+                    </Pressable>}
                     {/* Editor Extra Controls: Pin & Delete */}
-                    {isEditor && (
+                    {isEditor && (["superadmin", "blog_editor"].includes(user?.role || "") || String(post.authorId) === String(user?.uid)) && (
                       <View style={styles.editorPostActions}>
                         <Pressable
                           style={styles.editorActionBtn}

@@ -249,6 +249,12 @@ export default function Profile() {
               <Ionicons name="chevron-forward" size={18} color="#94a3b8" />
             </Pressable>
 
+            {user?.role === "admin" && <Pressable style={styles.actionRow} onPress={() => router.push("/company-invitations")}>
+              <Text style={styles.actionTitle}>Mời nhân viên qua email</Text>
+            </Pressable>}
+            <Pressable style={styles.actionRow} onPress={() => router.push("/onboarding")}>
+              <Text style={styles.actionTitle}>Trạng thái yêu cầu xóa tài khoản</Text>
+            </Pressable>
             {/* Change Password */}
             <Pressable
               style={({ pressed }) => [styles.actionRow, pressed && styles.actionRowPressed]}

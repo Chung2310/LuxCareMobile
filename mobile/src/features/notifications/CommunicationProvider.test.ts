@@ -1,3 +1,4 @@
+import { needsOnboarding } from "../../../../shared/onboarding";
 import { readFileSync } from "node:fs";
 import { createRequire } from "node:module";
 import vm from "node:vm";
@@ -47,6 +48,7 @@ function mount() {
   vm.runInNewContext(source, { module, exports: module.exports, setTimeout, clearTimeout,
     require: (name: string) => {
       if (name === "react") return react;
+      if (name === "../../../../shared/onboarding") return { needsOnboarding };
       if (name === "react-native") return { Platform: { OS: "android" }, AppState: { currentState: "active", addEventListener: () => ({ remove() {} }) } };
       if (name === "expo-router") return { router: { push() {} }, usePathname: () => "/chat", useRootNavigationState: () => ({ key: "ready" }) };
       if (name === "./nativeNotifications") return { nativeNotifications: null };

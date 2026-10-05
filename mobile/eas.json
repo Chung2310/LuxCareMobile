@@ -21,6 +21,9 @@
       "ios": {
         "simulator": false,
         "buildConfiguration": "Release"
+      },
+      "env": {
+        "EXPO_PUBLIC_API_URL": "https://luxcare.igentechnology.net"
       }
     }
   },

@@ -1,5 +1,7 @@
 import { useEffect, useRef, useState } from "react";
 import { Animated, Image, StyleSheet, Text, TouchableOpacity, View } from "react-native";
+import { Redirect, usePathname } from "expo-router";
+import { needsOnboarding } from "../../shared/onboarding";
 import { router, Stack } from "expo-router";
 import { StatusBar } from "expo-status-bar";
 import { useFonts } from "expo-font";
@@ -28,7 +30,8 @@ function isSessionExpiredError(msg?: string | null): boolean {
 }
 
 function Routes() {
-  const { loading, error, retry, sessionReplaced, resetSessionReplaced } = useSession();
+  const { user, loading, error, retry, sessionReplaced, resetSessionReplaced } = useSession();
+  const path = usePathname();
   const [minTimeElapsed, setMinTimeElapsed] = useState(false);
   const [splashFinished, setSplashFinished] = useState(false);
   const fadeAnim = useRef(new Animated.Value(1)).current;
@@ -72,6 +75,8 @@ function Routes() {
       </View>
     );
   }
+
+  if (user && needsOnboarding(user) && !["/onboarding", "/account-security", "/privacy-policy", "/terms-of-service", "/user-data-deletion"].includes(path)) return <Redirect href="/onboarding" />;
 
   const isExpired = Boolean(sessionReplaced || (error && isSessionExpiredError(error)));
 

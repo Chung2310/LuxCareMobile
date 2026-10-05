@@ -1,3 +1,4 @@
+import { needsOnboarding } from "../../../shared/onboarding";
 import { readFileSync } from "node:fs";
 import { createRequire } from "node:module";
 import vm from "node:vm";
@@ -10,7 +11,7 @@ const source = ts.transpileModule(readFileSync(new URL("./SessionProvider.tsx", 
 }).outputText;
 
 // Execute the actual provider with a small hook host; no native runtime or copied auth logic.
-function mount(restore: (api: any) => Promise<boolean>, getMe = vi.fn().mockResolvedValue({ uid: "user" })) {
+function mount(restore: (api: any) => Promise<boolean>, getMe = vi.fn().mockResolvedValue({ uid: "user", role: "user", companyCode: "ACME" })) {
   const values: any[] = [];
   const refs: any[] = [];
   const effects: (() => void)[] = [];
@@ -22,6 +23,8 @@ function mount(restore: (api: any) => Promise<boolean>, getMe = vi.fn().mockReso
     restore: () => restore(api), getOrigin: () => "https://example.com", getAccessToken: () => "access",
     clear: vi.fn().mockResolvedValue(undefined), setBranchId: vi.fn(), logout: vi.fn().mockResolvedValue(undefined),
   };
+  const account = { deleteAccount: vi.fn().mockResolvedValue({ deletionStatus: "deleted" }) };
+  const router = { push: vi.fn() };
   const socket = { configure: vi.fn(), connect: vi.fn(), disconnect: vi.fn(), subscribe: vi.fn((_event: string, _listener: (data: any) => void) => unsubscribe) };
   const react = {
     createContext: () => ({ Provider: "provider" }),
@@ -38,8 +41,10 @@ function mount(restore: (api: any) => Promise<boolean>, getMe = vi.fn().mockReso
   const module = { exports: {} as any };
   vm.runInNewContext(source, { exports: module.exports, module, Error, require: (name: string) => {
     if (name === "react") return react;
+    if (name === "expo-router") return { router };
+    if (name === "../../../shared/onboarding") return { needsOnboarding };
     if (name === "react-native") return { AppState: { addEventListener: () => ({ remove() {} }) } };
-    if (name === "../api/services") return { api, getMe, account: { deleteAccount: vi.fn() }, configurationError: null };
+    if (name === "../api/services") return { api, getMe, account, configurationError: null };
     if (name === "../api/socketService") return { socketService: socket };
     throw new Error(name);
   } });
@@ -51,7 +56,7 @@ function mount(restore: (api: any) => Promise<boolean>, getMe = vi.fn().mockReso
   };
   render();
   effects.forEach(effect => effect());
-  return { api, render, getMe, socket, unsubscribe, runProfileEffect: () => currentEffects[currentEffects.length - 1]() };
+  return { api, account, router, render, getMe, socket, unsubscribe, runSocketEffect: () => currentEffects[1](), runProfileEffect: () => currentEffects[currentEffects.length - 1]() };
 }
 
 describe("autologin state and login fallback", () => {
@@ -117,4 +122,28 @@ it("refreshes the active user permissions on socket notification and unsubscribe
   await vi.waitFor(() => expect(host.render().user?.permissions).toEqual([]));
   cleanup();
   expect(host.unsubscribe).toHaveBeenCalledOnce();
+});
+
+it("does not connect business sockets for an unassigned account", async () => {
+  const host = mount(async () => true, vi.fn().mockResolvedValue({ uid: "new", role: "user", onboardingRequired: true }));
+  await vi.waitFor(() => expect(host.render().user?.uid).toBe("new"));
+  host.runSocketEffect(); host.api.onAccessTokenChanged("rotated");
+  expect(host.socket.connect).not.toHaveBeenCalled();
+});
+it("keeps the current session when account deletion fails", async () => {
+  const host = mount(async () => true);
+  await vi.waitFor(() => expect(host.render().user?.uid).toBe("user"));
+  host.account.deleteAccount.mockRejectedValue(Error("Invalid password"));
+  await expect(host.render().deleteAccount("wrong")).rejects.toThrow("Invalid password");
+  expect(host.render().user?.uid).toBe("user");
+  expect(host.api.clear).not.toHaveBeenCalled();
+});
+it("shows a pending deletion request without claiming the account is gone", async () => {
+  const host = mount(async () => true);
+  await vi.waitFor(() => expect(host.render().user?.uid).toBe("user"));
+  host.account.deleteAccount.mockResolvedValue({ deletionStatus: "requested" });
+  await host.render().deleteAccount("password");
+  expect(host.router.push).toHaveBeenCalledWith("/onboarding");
+  expect(host.render().user?.uid).toBe("user");
+  expect(host.api.clear).not.toHaveBeenCalled();
 });

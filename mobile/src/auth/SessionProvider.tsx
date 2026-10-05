@@ -1,4 +1,6 @@
 import React, { createContext, useContext, useEffect, useRef, useState } from "react";
+import { router } from "expo-router";
+import { needsOnboarding } from "../../../shared/onboarding";
 import { AppState } from "react-native";
 import { account, api, configurationError, getMe } from "../api/services";
 import { socketService } from "../api/socketService";
@@ -12,6 +14,7 @@ type Session = {
   sessionReplaced?: boolean;
   resetSessionReplaced?: () => void;
   retry: () => Promise<void>;
+  refreshProfile: () => Promise<void>;
   login: (email: string, password: string) => Promise<void>;
   logout: () => Promise<void>;
   deleteAccount: (password: string) => Promise<void>;
@@ -104,6 +107,7 @@ export function SessionProvider({ children }: React.PropsWithChildren) {
   const [sessionReplaced, setSessionReplaced] = useState(false);
   const resetSessionReplaced = () => setSessionReplaced(false);
   const operation = useRef(0);
+  const currentUser = useRef(user); currentUser.current = user;
   const endSession = () => {
     operation.current++;
     socketService.disconnect();
@@ -146,7 +150,7 @@ export function SessionProvider({ children }: React.PropsWithChildren) {
     }
     api.onSessionExpired = endSession;
     void retry();
-    api.onAccessTokenChanged = (token) => socketService.connect(token);
+    api.onAccessTokenChanged = (token) => { if (currentUser.current && !needsOnboarding(currentUser.current)) socketService.connect(token); };
     return () => {
       operation.current++;
       api.onSessionExpired = () => {};
@@ -157,13 +161,13 @@ export function SessionProvider({ children }: React.PropsWithChildren) {
   // Connect socket once we have an authenticated user.
   // The token may rotate after a refresh, so we re-read it on each user change.
   useEffect(() => {
-    if (!user) {
+    if (!user || needsOnboarding(user)) {
       socketService.disconnect();
       return;
     }
     const token = api.getAccessToken();
     if (token) socketService.connect(token);
-  }, [user?.uid]);
+  }, [user?.uid, user?.companyCode, user?.role]);
 
   useEffect(() => {
     if (!user) return;
@@ -204,6 +208,15 @@ export function SessionProvider({ children }: React.PropsWithChildren) {
         sessionReplaced,
         resetSessionReplaced,
         retry,
+        refreshProfile: async () => {
+          const attempt = operation.current;
+          const profile = await getMe();
+          if (attempt !== operation.current) return;
+          if (profile.companyCode !== currentUser.current?.companyCode || profile.role !== currentUser.current?.role) {
+            api.setBranchId(null); setSelectedBranch(null);
+          }
+          setUser(profile);
+        },
         selectedBranch,
         updateDisplayName: (uid, name) =>
           setUser((current) => (current?.uid === uid ? { ...current, displayName: name } : current)),
@@ -231,7 +244,7 @@ export function SessionProvider({ children }: React.PropsWithChildren) {
             setLoading(false);
             // Connect socket with the new access token.
             const token = api.getAccessToken();
-            if (token) socketService.connect(token);
+            if (token && !needsOnboarding(profile)) socketService.connect(token);
           } catch (error) {
             if (attempt === operation.current) await api.clear();
             throw error;
@@ -246,13 +259,11 @@ export function SessionProvider({ children }: React.PropsWithChildren) {
           }
         },
         deleteAccount: async (password: string) => {
+          const result = await account.deleteAccount(password);
+          if (result.deletionStatus === "requested") { router.push("/onboarding"); return; }
           operation.current++;
-          try {
-            await account.deleteAccount(password);
-            await api.clear();
-          } finally {
-            endSession();
-          }
+          await api.clear();
+          endSession();
         },
       }}
     >

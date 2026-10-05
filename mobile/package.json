@@ -56,7 +56,8 @@
     "start": "expo start --port 8088",
     "android": "expo start --port 8088 --android",
     "ios": "expo start --ios",
-    "web": "expo start --web"
+    "web": "expo start --web",
+    "review:preflight": "node scripts/review-preflight.mjs"
   },
   "private": true
 }

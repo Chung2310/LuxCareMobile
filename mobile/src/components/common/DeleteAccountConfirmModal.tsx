@@ -129,6 +129,7 @@ export function DeleteAccountConfirmModal({
             </View>
           )}
 
+          {user?.role === "admin" && <Text style={styles.userSub}>Nếu bạn là quản trị viên duy nhất, yêu cầu được xử lý trong 7 ngày. Xem trạng thái hoặc hủy trong mục Tài khoản; dữ liệu đồng nghiệp được giữ lại.</Text>}
           {/* Password Confirmation Input */}
           <View style={styles.inputContainer}>
             <Text style={styles.inputLabel}>Nhập mật khẩu để xác nhận</Text>

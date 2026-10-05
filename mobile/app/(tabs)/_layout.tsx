@@ -1,5 +1,6 @@
 import React, { useEffect, useRef } from "react";
 import { Animated, Platform, Pressable, StyleSheet, Text, View } from "react-native";
+import { needsOnboarding } from "../../../shared/onboarding";
 import { Redirect, Tabs } from "expo-router";
 import { useSafeAreaInsets } from "react-native-safe-area-context";
 import { Ionicons } from "@expo/vector-icons";
@@ -169,6 +170,7 @@ export default function TabLayout() {
   const effectiveChatUnread = totalUnread > 0 ? totalUnread : chatUnread;
   const insets = useSafeAreaInsets();
   if (!user) return <Redirect href="/login" />;
+  if (needsOnboarding(user)) return <Redirect href="/onboarding" />;
 
   const isEditor = isBlogEditorUser(user);
   const bottomPadding = insets.bottom > 0 ? insets.bottom : (Platform.OS === "android" ? 12 : 10);

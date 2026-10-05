@@ -1,3 +1,5 @@
+import { AiSharingNotice } from "../../src/features/ai/AiSharingNotice";
+import { useAiSharing } from "../../src/features/ai/useAiSharing";
 import { useCallback, useMemo, useRef, useState } from "react";
 import {
   ActivityIndicator,
@@ -58,6 +60,7 @@ export default function KnowledgeScreen() {
 
   // Create Modal State
   const [createModalOpen, setCreateModalOpen] = useState(false);
+  const sharing = useAiSharing("company", `${user?.uid}:${user?.companyCode}`, createModalOpen);
   const [createTab, setCreateTab] = useState<"file" | "text">("file");
   const [newTitle, setNewTitle] = useState("");
   const [newType, setNewType] = useState("medical");
@@ -168,6 +171,7 @@ export default function KnowledgeScreen() {
   };
 
   const handleUploadFile = async () => {
+    if (!sharing.accepted) { showAlert("Chia sẻ dữ liệu với AI", "Hãy đồng ý chia sẻ trước khi nạp tài liệu vào AI.", undefined, "error"); return; }
     if (!pickedFile) return;
     setUploading(true);
     try {
@@ -195,6 +199,7 @@ export default function KnowledgeScreen() {
   };
 
   const handleCreateText = async () => {
+    if (!sharing.accepted) { showAlert("Chia sẻ dữ liệu với AI", "Hãy đồng ý chia sẻ trước khi nạp tài liệu vào AI.", undefined, "error"); return; }
     if (!newTitle.trim() || !newContent.trim()) {
       return;
     }
@@ -618,6 +623,7 @@ export default function KnowledgeScreen() {
                 <Ionicons name="close" size={20} color="#64748b" />
               </Pressable>
             </View>
+            <AiSharingNotice sharing={sharing} compact />
 
             {/* Mode Switcher: Tải tệp lên vs Nhập văn bản */}
             <View style={styles.modalSubTabBar}>
@@ -803,7 +809,7 @@ export default function KnowledgeScreen() {
               {createTab === "file" ? (
                 <Pressable
                   onPress={handleUploadFile}
-                  disabled={uploading || !pickedFile}
+                  disabled={!sharing.accepted || uploading || !pickedFile}
                   style={[
                     styles.modalPrimaryBtn,
                     (!pickedFile || uploading) && { backgroundColor: "#94a3b8" },

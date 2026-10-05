@@ -20,8 +20,9 @@ export function createAccountService({ fetch, getAccessToken }: ServiceTransport
     changePassword: async (password: string): Promise<void> => {
       await request("/api/v1/auth/change-password", "POST", { password });
     },
-    deleteAccount: async (password: string): Promise<void> => {
-      await request("/api/v1/auth/delete-account", "DELETE", { password });
+    deleteAccount: async (password: string): Promise<{ deletionStatus: "deleted" | "requested"; dueAt?: string }> => {
+      const response = await request("/api/v1/auth/delete-account", "POST", { password });
+      return response.json();
     },
   };
 }

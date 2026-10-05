@@ -1,3 +1,8 @@
+if (process.env.EAS_BUILD_PROFILE === "production") {
+  const apiUrl = new URL(process.env.EXPO_PUBLIC_API_URL || "https://unconfigured.invalid");
+  if (apiUrl.protocol !== "https:" || /^(localhost|unconfigured\.invalid|127\.|192\.168\.|10\.|172\.(1[6-9]|2\d|3[01])\.)/.test(apiUrl.hostname))
+    throw new Error("Production builds require a public HTTPS EXPO_PUBLIC_API_URL.");
+}
 const releaseVersionCode = process.env.LUXCARE_ANDROID_VERSION_CODE;
 if (releaseVersionCode && (!/^[1-9]\d*$/.test(releaseVersionCode) || Number(releaseVersionCode) > 2100000000)) throw new Error("Invalid Android versionCode");
 

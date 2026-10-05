@@ -70,7 +70,7 @@ export default function TermsOfServiceScreen() {
           <View style={styles.highlightNotice}>
             <Ionicons name="alert-circle" size={18} color="#0284c7" />
             <Text style={styles.highlightNoticeText}>
-              Bằng việc đăng nhập hoặc sử dụng ứng dụng, bạn đồng ý tuân thủ các quy tắc ứng xử, bảo mật tài khoản và quy định nội bộ của tổ chức.
+              Bằng việc đăng ký hoặc sử dụng ứng dụng, bạn đồng ý với điều khoản sử dụng và bảo mật tài khoản. Quy định của tổ chức áp dụng khi bạn tham gia doanh nghiệp đó.
             </Text>
           </View>
         </View>

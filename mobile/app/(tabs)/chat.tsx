@@ -1,3 +1,5 @@
+import { AiSharingNotice } from "../../src/features/ai/AiSharingNotice";
+import { useAiSharing } from "../../src/features/ai/useAiSharing";
 import { historicalUserLabel } from "../../../src/utils/historicalUser";
 import { createDirectChatOpener } from "../../src/features/chat/openDirectChat";
 import { downloadRemoteFile } from "../../src/files/downloadRemoteFile";
@@ -1112,6 +1114,16 @@ export default function ChatScreen() {
   const [loadingMessages, setLoadingMessages] = useState(false);
   const [inputText, setInputText] = useState("");
   const [sending, setSending] = useState(false);
+  const sharing = useAiSharing("company", `${user?.uid}:${user?.companyCode}`, Boolean(activeRoom?.isChatbot));
+  const [aiReply, setAiReply] = useState<{ roomId: string; busy: boolean; error: string } | null>(null);
+  useEffect(() => {
+    if (!aiReply?.busy) return;
+    const roomId = aiReply.roomId;
+    const timer = setTimeout(() => setAiReply(previous => previous?.roomId === roomId && previous.busy
+      ? { roomId, busy: false, error: "AI đang phản hồi chậm. Hãy tải lại cuộc trò chuyện để kiểm tra kết quả." } : previous), 90_000);
+    return () => clearTimeout(timer);
+  }, [aiReply?.roomId, aiReply?.busy]);
+  useEffect(() => { setAiReply(null); }, [user?.uid, user?.companyCode]);
   const [showEmojiPicker, setShowEmojiPicker] = useState(false);
   const [activeEmojiCategory, setActiveEmojiCategory] = useState("smileys");
   const [previewImageUri, setPreviewImageUri] = useState<string | null>(null);
@@ -1686,6 +1698,19 @@ export default function ChatScreen() {
       }
     };
 
+    const handleAiTyping = (payload: { roomId: string; isTyping: boolean; userId?: string }) => {
+      if (!payload?.roomId || payload.roomId !== activeRoomRef.current?._id || !activeRoomRef.current?.isChatbot ||
+          (payload.userId && payload.userId !== "6582a82d6b38c201a4e21bc5")) return;
+      setAiReply(previous => ({ roomId: payload.roomId, busy: Boolean(payload.isTyping),
+        error: payload.isTyping ? "" : previous?.roomId === payload.roomId ? previous.error : "" }));
+    };
+    const handleAiError = (payload: { roomId: string; message: string; code?: string }) => {
+      if (!payload?.roomId) return;
+      setAiReply({ roomId: payload.roomId, busy: false, error: payload.message || "Không thể hoàn tất yêu cầu AI." });
+      if (payload.code === "AI_CONSENT_REQUIRED") sharing.refresh();
+    };
+    socketService.on("internal_typing_status", handleAiTyping);
+    socketService.on("internal_ai_error", handleAiError);
     socketService.on("internal_new_message", handleNewMessage);
     socketService.on("internal_room_updated", handleRoomUpdated);
     socketService.on("internal_message_deleted", handleMessageDeleted);
@@ -1693,6 +1718,8 @@ export default function ChatScreen() {
     socketService.on("internal_message_edited", handleMessageEdited);
 
     return () => {
+      socketService.off("internal_typing_status", handleAiTyping);
+      socketService.off("internal_ai_error", handleAiError);
       socketService.off("internal_new_message", handleNewMessage);
       socketService.off("internal_room_updated", handleRoomUpdated);
       socketService.off("internal_message_deleted", handleMessageDeleted);
@@ -2061,6 +2088,9 @@ export default function ChatScreen() {
   // 4. Send Message
   const handleSendMessage = async (attachments?: ChatAttachment[]) => {
     if (!activeRoom?._id) return;
+    if (activeRoom.isChatbot && !sharing.accepted) {
+      showCustomAlert("Chia sẻ dữ liệu với AI", "Hãy đọc và đồng ý chia sẻ dữ liệu với AI trước khi gửi."); return;
+    }
     const rawInput = inputText.trim();
     if (!rawInput && (!attachments || attachments.length === 0)) return;
 
@@ -2148,7 +2178,8 @@ export default function ChatScreen() {
       void loadRooms(true);
     } catch (err: any) {
       setMessages((prev) => prev.map((m) => (m._id === tempId ? { ...m, status: "failed" } : m)));
-      showToast("Không thể gửi tin nhắn");
+      showCustomAlert("Không thể gửi tin nhắn", err?.message || "Vui lòng thử lại sau.");
+      if (activeRoom.isChatbot && String(err?.message).includes("đồng ý")) sharing.refresh();
     } finally {
       setSending(false);
     }
@@ -3963,6 +3994,12 @@ export default function ChatScreen() {
             </View>
           )}
 
+          {activeRoom.isChatbot && <AiSharingNotice sharing={sharing} compact />}
+          {activeRoom.isChatbot && aiReply?.roomId === activeRoom._id && (aiReply.busy || aiReply.error) &&
+            <View style={{ paddingHorizontal: 14, paddingVertical: 10, backgroundColor: "#f8fafc", flexDirection: "row", gap: 8 }}>
+              {aiReply.busy && <ActivityIndicator size="small" color="#047857" />}
+              <Text accessibilityRole={aiReply.error ? "alert" : undefined} style={{ flex: 1, fontSize: 13, color: aiReply.error ? "#b45309" : "#475569" }}>{aiReply.busy ? "Trợ lý AI đang trả lời…" : aiReply.error}</Text>
+            </View>}
           {/* 4. Bottom Input Bar */}
           <View
             style={[

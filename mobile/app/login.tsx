@@ -14,6 +14,7 @@ import {
 } from "react-native";
 import { StatusBar } from "expo-status-bar";
 import { SafeAreaView } from "react-native-safe-area-context";
+import { needsOnboarding } from "../../shared/onboarding";
 import { Redirect, router } from "expo-router";
 import { Ionicons } from "@expo/vector-icons";
 import { messageOf, useSession } from "../src/auth/SessionProvider";
@@ -57,7 +58,7 @@ export default function Login() {
     }, 120);
   };
 
-  if (session.user) return <Redirect href="/(tabs)" />;
+  if (session.user) return <Redirect href={needsOnboarding(session.user) ? "/onboarding" : "/(tabs)"} />;
 
   const submit = async () => {
     if (busy || !email.trim() || !password) return;
@@ -208,6 +209,9 @@ export default function Login() {
                 </Text>
               </Pressable>
 
+              <Pressable accessibilityRole="button" onPress={() => router.push("/register")} style={{ paddingVertical: 14, alignItems: "center" }}>
+                <Text style={{ color: "#047857", fontWeight: "600", fontSize: 16 }}>Đăng ký tài khoản</Text>
+              </Pressable>
               {/* Legal Action Buttons */}
               <View style={localStyles.legalButtonsContainer}>
                 <Pressable

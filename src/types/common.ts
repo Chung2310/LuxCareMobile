@@ -40,6 +40,8 @@ export interface UserProfile {
   parentId?: string;
   status?: "online" | "offline";
   division?: string;
+  onboardingRequired?: boolean;
+  emailVerifiedAt?: string;
   companyCode?: string;
   companyName?: string;
   branchId?: string;

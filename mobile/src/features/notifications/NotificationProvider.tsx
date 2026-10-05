@@ -1,3 +1,4 @@
+import { needsOnboarding } from "../../../../shared/onboarding";
 import { getPushRegistration } from "./pushToken";
 import React, { createContext, useCallback, useContext, useEffect, useRef, useState } from "react";
 import { AppState, Linking, Platform, Pressable, Text, View } from "react-native";
@@ -66,7 +67,7 @@ export function NotificationProvider({ children }: React.PropsWithChildren) {
 
   useEffect(() => {
     let active = true;
-    if (!user) { setUnreadCount(0); return; }
+    if (!user || needsOnboarding(user)) { setUnreadCount(0); return; }
     const timer = setTimeout(() => void notifications.getNotifications({ limit: 1 }).then(result => {
       if (active) setUnreadCount(result.unreadCount);
     }).catch(() => {}), 150);
@@ -79,7 +80,7 @@ export function NotificationProvider({ children }: React.PropsWithChildren) {
 
   useEffect(() => {
     let active = true;
-    if (!user || !canUseModule(user, "hr")) {
+    if (!user || needsOnboarding(user) || !canUseModule(user, "hr")) {
       setWorkUnread(0);
       return;
     }
@@ -115,7 +116,7 @@ export function NotificationProvider({ children }: React.PropsWithChildren) {
       void Notifications.dismissAllNotificationsAsync().catch(() => {});
     }
     async function register() {
-      if (!Notifications || !user || !active || registering || AppState.currentState === "background") return;
+      if (!Notifications || !user || needsOnboarding(user) || !active || registering || AppState.currentState === "background") return;
       registering = true;
       if (retryTimer) clearTimeout(retryTimer);
       let stage: "token" | "server" = "token";
@@ -161,7 +162,7 @@ export function NotificationProvider({ children }: React.PropsWithChildren) {
     const stateListener = AppState.addEventListener("change", state => {
       if (state === "active") {
         const token = api.getAccessToken();
-        if (token && user) socketService.connect(token);
+        if (token && user && !needsOnboarding(user)) socketService.connect(token);
         refresh(); void register();
       } else if (state === "background") {
         if (retryTimer) clearTimeout(retryTimer);
