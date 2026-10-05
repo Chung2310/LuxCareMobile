@@ -7,10 +7,13 @@ function prepare(config, env) {
   if (!["preview", "production"].includes(env.BUILD_PROFILE)) throw new Error("Invalid BUILD_PROFILE");
   const keys = ["EXPO_PUBLIC_API_URL", "EXPO_PUBLIC_EAS_PROJECT_ID", "LUXCARE_IOS_BUNDLE_IDENTIFIER"];
   for (const key of keys) if (!env[key]?.trim()) throw new Error("Missing GitHub variable: " + key);
-  const api = new URL(env.EXPO_PUBLIC_API_URL);
+  const api = new URL(env.EXPO_PUBLIC_API_URL.trim());
   if (api.protocol !== "https:" || api.username || api.password ||
       ["localhost", "127.0.0.1", "[::1]"].includes(api.hostname)) {
     throw new Error("EXPO_PUBLIC_API_URL must be an HTTPS backend reachable from the iPhone, without credentials");
+  }
+  if (api.pathname !== "/" || api.search || api.hash) {
+    throw new Error("EXPO_PUBLIC_API_URL must be the backend origin without a path, query or fragment");
   }
   if (!/^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i.test(env.EXPO_PUBLIC_EAS_PROJECT_ID)) {
     throw new Error("EXPO_PUBLIC_EAS_PROJECT_ID must be the UUID of an existing EAS project");
@@ -23,7 +26,11 @@ function prepare(config, env) {
   if (!profile) throw new Error("Build profile missing from eas.json");
   // GitHub environment variables are not automatically forwarded to the remote builder.
   // Only public app settings go into the uploaded eas.json, never EXPO_TOKEN.
-  profile.env = { ...profile.env, ...Object.fromEntries(keys.map(key => [key, env[key]])) };
+  profile.env = {
+    ...profile.env,
+    ...Object.fromEntries(keys.map(key => [key, env[key]])),
+    EXPO_PUBLIC_API_URL: api.origin,
+  };
   return next;
 }
 

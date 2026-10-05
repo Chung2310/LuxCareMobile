@@ -23,7 +23,13 @@ describe("native AI sharing wiring", () => {
   });
   it("stores public HTTPS production settings and avoids developer LAN legal links", () => {
     const eas = JSON.parse(readFileSync("mobile/eas.json", "utf8"));
-    expect(eas.build.production.env.EXPO_PUBLIC_API_URL).toBe("https://luxcare.igentechnology.net");
+    const api = new URL(eas.build.production.env.EXPO_PUBLIC_API_URL);
+    expect(api.origin).toBe("https://luxcare.igentechnology.net");
+    expect(api.pathname).toBe("/");
+    expect(api.search).toBe("");
+    expect(api.hash).toBe("");
+    expect(api.username).toBe("");
+    expect(api.password).toBe("");
     const legal = readFileSync("mobile/src/features/legal/legalContent.ts", "utf8");
     expect(legal).not.toContain("6 lượt trong 60 phút");
     expect(legal).toContain("OpenRouter");

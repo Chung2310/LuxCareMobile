@@ -23,10 +23,21 @@ test("production retains store distribution and automatic build numbers", () => 
   assert.equal(result.build.production.autoIncrement, true);
   assert.equal(result.build.preview.env, undefined);
 });
+for (const profile of ["preview", "production"]) {
+  test("normalizes trailing slashes and surrounding whitespace for " + profile, () => {
+    const buildEnv = { ...env, BUILD_PROFILE: profile, EXPO_PUBLIC_API_URL: " https://api.example.com/ " };
+    const result = prepare(config, buildEnv);
+    assert.equal(result.build[profile].env.EXPO_PUBLIC_API_URL, "https://api.example.com");
+    assert.equal(buildEnv.EXPO_PUBLIC_API_URL, " https://api.example.com/ ");
+  });
+}
 for (const key of Object.keys(env)) {
   test("rejects missing " + key, () => assert.throws(() => prepare(config, { ...env, [key]: "" })));
 }
-for (const url of ["http://api.example.com", "https://localhost", "https://user:password@example.com"]) {
+for (const url of [
+  "http://api.example.com", "https://localhost", "https://user:password@example.com",
+  "https://api.example.com/api/v1", "https://api.example.com/?source=ci", "https://api.example.com/#fragment",
+]) {
   test("rejects invalid backend " + url, () => assert.throws(() => prepare(config, { ...env, EXPO_PUBLIC_API_URL: url })));
 }
 test("rejects invalid project, bundle ID and profile", () => {
