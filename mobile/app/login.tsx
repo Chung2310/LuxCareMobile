@@ -143,7 +143,7 @@ export default function Login() {
                   accessibilityLabel="Email"
                   placeholder="Nhập email của bạn"
                   placeholderTextColor={colors.muted}
-                  style={localStyles.input}
+                  style={[localStyles.input, localStyles.inputText]}
                   value={email}
                   onChangeText={setEmail}
                   onFocus={() => scrollToInput(170)}
@@ -163,7 +163,7 @@ export default function Login() {
                     accessibilityLabel="Mật khẩu"
                     placeholder="Nhập mật khẩu"
                     placeholderTextColor={colors.muted}
-                    style={localStyles.passwordInput}
+                    style={[localStyles.passwordInput, localStyles.inputText]}
                     value={password}
                     onChangeText={setPassword}
                     onFocus={() => scrollToInput(250)}
@@ -374,6 +374,13 @@ const localStyles = StyleSheet.create({
     color: colors.ink,
     marginLeft: 4,
   },
+  inputText: {
+    fontFamily: "Inter-Regular",
+    fontSize: 15,
+    letterSpacing: 0,
+    textAlign: "left",
+    color: colors.ink,
+  },
   input: {
     backgroundColor: "#ecfdf5", // Xanh lá nhạt tươi mát
     borderWidth: 1.2,
@@ -381,8 +388,6 @@ const localStyles = StyleSheet.create({
     borderRadius: 24, // Bo tròn mềm mại
     paddingHorizontal: 18,
     paddingVertical: 12,
-    fontSize: 15,
-    color: colors.ink,
   },
   passwordBox: {
     flexDirection: "row",
@@ -397,8 +402,6 @@ const localStyles = StyleSheet.create({
   passwordInput: {
     flex: 1,
     paddingVertical: 12,
-    fontSize: 15,
-    color: colors.ink,
   },
   eyeButton: {
     padding: 8,
