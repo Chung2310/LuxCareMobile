@@ -124,8 +124,11 @@ describe("unverified account management", () => {
     expect(session.logout).toHaveBeenCalledOnce();
   });
   it("allows the security route through the onboarding redirect and keeps verification actions separate", () => {
-    const layout = readSource("../../app/_layout.tsx");
-    expect(layout).toContain('["/onboarding", "/account-security"');
+    const tabsLayout = readSource("../../app/(tabs)/_layout.tsx");
+    expect(tabsLayout).toContain('if (needsEmailVerification(user)) return <Redirect href="/onboarding" />;');
+    const security = readSource("../../app/account-security.tsx");
+    expect(security).toContain('if (!user) return <Redirect href="/login" />;');
+    expect(security).not.toContain("needsEmailVerification");
     const onboarding = readSource("../../app/onboarding.tsx");
     const verification = onboarding.slice(
       onboarding.indexOf("// Keep verification separate"),

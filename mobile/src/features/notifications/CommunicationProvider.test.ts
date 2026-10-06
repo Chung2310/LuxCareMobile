@@ -48,7 +48,10 @@ function mount() {
   vm.runInNewContext(source, { module, exports: module.exports, setTimeout, clearTimeout,
     require: (name: string) => {
       if (name === "react") return react;
-      if (name === "../../../../shared/onboarding") return { needsOnboarding };
+      if (name === "../../../../shared/onboarding") return {
+        needsOnboarding,
+        isTrialUser: (value: any) => value?.role === "trial_user",
+      };
       if (name === "react-native") return { Platform: { OS: "android" }, AppState: { currentState: "active", addEventListener: () => ({ remove() {} }) } };
       if (name === "expo-router") return { router: { push() {} }, usePathname: () => "/chat", useRootNavigationState: () => ({ key: "ready" }) };
       if (name === "./nativeNotifications") return { nativeNotifications: null };
