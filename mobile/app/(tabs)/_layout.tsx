@@ -1,6 +1,6 @@
 import React, { useEffect, useRef } from "react";
 import { Animated, Platform, Pressable, StyleSheet, Text, View } from "react-native";
-import { needsOnboarding } from "../../../shared/onboarding";
+import { needsOnboarding, needsEmailVerification } from "../../../shared/onboarding";
 import { Redirect, Tabs } from "expo-router";
 import { useSafeAreaInsets } from "react-native-safe-area-context";
 import { Ionicons } from "@expo/vector-icons";
@@ -170,9 +170,10 @@ export default function TabLayout() {
   const effectiveChatUnread = totalUnread > 0 ? totalUnread : chatUnread;
   const insets = useSafeAreaInsets();
   if (!user) return <Redirect href="/login" />;
-  if (needsOnboarding(user)) return <Redirect href="/onboarding" />;
+  if (needsEmailVerification(user)) return <Redirect href="/onboarding" />;
 
   const isEditor = isBlogEditorUser(user);
+  const isTrialUser = user.role === "trial_user";
   const bottomPadding = insets.bottom > 0 ? insets.bottom : (Platform.OS === "android" ? 12 : 10);
   const tabHeight = 56 + bottomPadding;
 
@@ -231,7 +232,7 @@ export default function TabLayout() {
           title: "Công việc",
           tabBarBadge: workUnread > 0 ? (workUnread > 99 ? "99+" : workUnread) : undefined,
           headerShown: false,
-          href: isEditor ? null : canUseModule(user, "hr") ? undefined : null,
+          href: isEditor || needsOnboarding(user) ? null : canUseModule(user, "hr") ? undefined : null,
           tabBarIcon: ({ focused }) => (
             <MomoTabIcon name="briefcase" outlineName="briefcase-outline" focused={focused} />
           ),
@@ -243,7 +244,7 @@ export default function TabLayout() {
           title: "Trò chuyện",
           tabBarBadge: effectiveChatUnread > 0 ? (effectiveChatUnread > 99 ? "99+" : effectiveChatUnread) : undefined,
           headerShown: false,
-          href: isEditor ? null : undefined,
+          href: isEditor || isTrialUser || needsOnboarding(user) ? null : undefined,
           tabBarIcon: ({ focused }) => (
             <MomoTabIcon
               name="chatbubble-ellipses"
@@ -259,7 +260,7 @@ export default function TabLayout() {
           title: "Thông báo",
           tabBarBadge: unreadCount > 0 ? (unreadCount > 99 ? "99+" : unreadCount) : undefined,
           headerShown: false,
-          href: isEditor ? null : undefined,
+          href: isEditor || isTrialUser || needsOnboarding(user) ? null : undefined,
           tabBarIcon: ({ focused }) => (
             <MomoTabIcon name="notifications" outlineName="notifications-outline" focused={focused} />
           ),

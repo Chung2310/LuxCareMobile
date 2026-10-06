@@ -7,6 +7,7 @@ export type UserRole =
   | "branch_owner"
   | "manager"
   | "user"
+  | "trial_user"
   | "superadmin"
   | (string & {});
 

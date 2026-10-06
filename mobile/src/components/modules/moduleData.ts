@@ -488,6 +488,18 @@ export const LUXCARE_MODULES: ServiceModule[] = [
 export function isServiceAccessible(item: ServiceItem, user: UserProfile | null): boolean {
   if (!user) return false;
 
+  if (user.role === "trial_user") {
+    return new Set([
+      "/(tabs)/work",
+      "/(tabs)/projects",
+      "/(tabs)/customers",
+      "/(tabs)/calendar-events",
+      "/(tabs)/training",
+      "/(tabs)/resources",
+      "/(tabs)/inventory",
+    ]).has(item.route.split("?")[0]);
+  }
+
   const isManager = ["admin", "superadmin", "branch_owner", "manager"].includes(user.role || "");
 
   // Route-based permission checks
@@ -589,4 +601,3 @@ export function getAllServicesFlat(modulesList = LUXCARE_MODULES, user?: UserPro
   }
   return list;
 }
-

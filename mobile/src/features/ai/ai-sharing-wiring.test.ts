@@ -8,13 +8,15 @@ describe("native AI sharing wiring", () => {
     expect(isOnboardingRoute("DELETE", "/api/v1/ai/consent/personal")).toBe(false);
     expect(isOnboardingRoute("GET", "/api/v1/ai/consent/other")).toBe(false);
   });
-  it("gates both assistants and displays decline/withdraw options", () => {
-    const personal = readFileSync("mobile/src/features/ai/PersonalAiPanel.tsx", "utf8");
+  it("keeps the personal assistant out of mobile and gates company AI", () => {
+    const home = readFileSync("mobile/app/(tabs)/index.tsx", "utf8");
+    const register = readFileSync("mobile/app/register.tsx", "utf8");
     const chat = readFileSync("mobile/app/(tabs)/chat.tsx", "utf8");
     const knowledge = readFileSync("mobile/app/(tabs)/knowledge.tsx", "utf8");
+    expect(home).not.toContain("PersonalAiPanel");
+    expect(register).not.toContain("personalAiDisclosure");
     expect(knowledge).toContain("!sharing.accepted");
     const notice = readFileSync("mobile/src/features/ai/AiSharingNotice.tsx", "utf8");
-    expect(personal).toContain("!sharing.accepted");
     expect(chat).toContain("activeRoom.isChatbot && !sharing.accepted");
     expect(notice).toContain("Không đồng ý");
     expect(notice).toContain("Thu hồi đồng ý");

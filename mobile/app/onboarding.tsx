@@ -6,7 +6,6 @@ import { SafeAreaView } from "react-native-safe-area-context";
 import { useSession, messageOf } from "../src/auth/SessionProvider";
 import { onboarding } from "../src/api/services";
 import { Page, Field, Button, ErrorText, Card, styles } from "../src/ui";
-import { PersonalAiPanel } from "../src/features/ai/PersonalAiPanel";
 import { AuthLayout, AuthField, AuthButton, AuthFeedback, authStyles } from "../src/features/auth/AuthForm";
 import type { CompanyApplication, CompanyApplicationInput, OnboardingState } from "../../shared/onboarding";
 const empty: CompanyApplicationInput = {
@@ -25,7 +24,7 @@ const labels: Record<string, string> = {
   cancelled: "Đã hủy",
 };
 export default function Onboarding() {
-  const { user, refreshProfile, logout, deleteAccount } = useSession();
+  const { user, refreshProfile, updateUserProfile, logout, deleteAccount } = useSession();
   const [state, setState] = useState<OnboardingState | null>(null);
   const [error, setError] = useState<string | null>(null);
   const [message, setMessage] = useState("");
@@ -64,8 +63,8 @@ export default function Onboarding() {
     }, [user?.uid]),
   );
   if (!user) return <Redirect href="/login" />;
-  async function act(task: () => Promise<unknown>, success = "Đã cập nhật.") {
-    if (busy) return;
+  async function act(task: () => Promise<unknown>, success = "Đã cập nhật."): Promise<boolean> {
+    if (busy) return false;
     setBusy(true);
     setError(null);
     setMessage("");
@@ -74,11 +73,33 @@ export default function Onboarding() {
       setMessage(success);
       setState(await onboarding.state());
       await refreshProfile();
+      return true;
     } catch (e) {
       if ((e as { code?: string })?.code === "EMAIL_COOLDOWN") setResendSeconds(60);
       setError(messageOf(e));
+      return false;
     } finally {
       setBusy(false);
+    }
+  }
+  async function verifyEmail() {
+    if (busy || !user) return;
+    setBusy(true);
+    setError(null);
+    setMessage("");
+    setEmailAction("verify");
+    try {
+      await onboarding.verifyEmail(code);
+      setCode("");
+      updateUserProfile(user.uid, { emailVerifiedAt: new Date().toISOString() });
+      setMessage("Email đã được xác minh.");
+      await refreshProfile().catch(() => {});
+      router.replace("/(tabs)");
+    } catch (e) {
+      setError(messageOf(e));
+    } finally {
+      setBusy(false);
+      setEmailAction(null);
     }
   }
   const update = (key: keyof CompanyApplicationInput, value: string) => setInput((v) => ({ ...v, [key]: value }));
@@ -101,7 +122,7 @@ export default function Onboarding() {
     }, "Đã gửi đơn xét duyệt.");
   }
   // Keep verification separate so account/company controls cannot crowd the code form.
-  if (!user.companyCode && !(state?.emailVerified ?? Boolean(user.emailVerifiedAt))) {
+  if (user.role !== "trial_user" && !user.companyCode && !(state?.emailVerified ?? Boolean(user.emailVerifiedAt))) {
     const loading = !state && !error;
     return (
       <AuthLayout title="Xác minh email" icon="mail-open-outline" headerAction={
@@ -134,13 +155,7 @@ export default function Onboarding() {
           title={emailAction === "verify" ? "Đang xác minh…" : "Xác minh"}
           loading={emailAction === "verify"}
           disabled={busy || loading || code.length !== 6}
-          onPress={() => {
-            if (busy) return;
-            Keyboard.dismiss();
-            setEmailAction("verify");
-            void act(async () => { await onboarding.verifyEmail(code); setCode(""); }, "Email đã được xác minh.")
-              .finally(() => setEmailAction(null));
-          }}
+          onPress={() => { Keyboard.dismiss(); void verifyEmail(); }}
         />
         <AuthButton
           title={emailAction === "resend" ? "Đang gửi…" : resendSeconds > 0 ? `Gửi lại mã (${resendSeconds}s)` : "Gửi lại mã"}
@@ -159,7 +174,7 @@ export default function Onboarding() {
   }
   return (
     <SafeAreaView style={{ flex: 1, backgroundColor: "#f8fafc" }}>
-      <Page title="Tài khoản LuxCare" showBack={Boolean(user.companyCode)} onBack={() => router.replace("/(tabs)")}>
+      <Page title={user.companyCode ? "Tài khoản LuxCare" : "Doanh nghiệp & lời mời"} showBack onBack={() => router.replace("/(tabs)")}>
         <Text style={styles.text}>{user.email}</Text>
         <ErrorText message={error} />
         {message ? (
@@ -171,9 +186,8 @@ export default function Onboarding() {
           <Button title="Tải lại" onPress={() => void act(async () => {})} disabled={busy} />
         ) : (
           <>
-            {state.emailVerified && !user.companyCode && (
+            {state.emailVerified && (!user.companyCode || user.role === "trial_user") && (
               <>
-                {state.personalAiEnabled && <PersonalAiPanel />}
                 {state.invitations.length > 0 && <Card>
                   <Text style={styles.title}>Lời mời vào doanh nghiệp</Text>
                   <Text style={styles.text}>
@@ -337,7 +351,7 @@ export default function Onboarding() {
               </>
             )}
             {user.companyCode && (
-              <Button title="Vào doanh nghiệp" onPress={() => router.replace("/(tabs)")} disabled={busy} />
+              <Button title={user.role === "trial_user" ? "Tiếp tục trải nghiệm" : "Vào doanh nghiệp"} onPress={() => router.replace("/(tabs)")} disabled={busy} />
             )}
             {state.deletionRequest && (
               <Card>

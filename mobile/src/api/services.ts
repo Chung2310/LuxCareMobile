@@ -1,7 +1,6 @@
 import { createBlogModerationService } from "../../../src/services/blogModerationService";
 import { createAiSharingService } from "../../../src/services/aiSharingService";
 import { createOnboardingService } from "../../../src/services/onboardingService";
-import { createAiAccessService } from "../../../src/services/aiAccessService";
 import * as SecureStore from "expo-secure-store";
 import { MobileApi } from "./client";
 import { createPayrollService } from "../../../src/services/payrollService";
@@ -53,7 +52,6 @@ function createApi() {
 }
 export const api = createApi();
 export const onboarding = createOnboardingService(api.transport);
-export const aiAccess = createAiAccessService(api.transport);
 export const aiSharing = createAiSharingService(api.transport);
 export const blogModeration = createBlogModerationService(api.transport);
 export const blog = createBlogService(api.transport);

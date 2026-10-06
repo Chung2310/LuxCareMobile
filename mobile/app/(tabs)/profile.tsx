@@ -17,6 +17,7 @@ import { getRoleDisplayName } from "../../../src/utils/permissionUtils";
 import { messageOf, useSession } from "../../src/auth/SessionProvider";
 import { BranchSelector } from "../../src/features/branches/BranchSelector";
 import { DeleteAccountConfirmModal, LogoutConfirmModal, BlockedUsersModal } from "../../src/components";
+import { needsOnboarding } from "../../../shared/onboarding";
 
 const bannerSource = require("../../public/pfp-banner.png");
 
@@ -132,7 +133,7 @@ export default function Profile() {
 
             {user?.companyCode && (
               <View style={styles.companyBadge}>
-                <Text style={styles.companyBadgeText}>Mã DN: {user.companyCode}</Text>
+                <Text style={styles.companyBadgeText}>{user.role === "trial_user" ? "Không gian trải nghiệm" : `Mã DN: ${user.companyCode}`}</Text>
               </View>
             )}
           </View>
@@ -143,6 +144,21 @@ export default function Profile() {
             <Ionicons name="alert-circle-outline" size={18} color="#e11d48" />
             <Text style={styles.errorBannerText}>{error}</Text>
           </View>
+        )}
+
+        {(needsOnboarding(user) || user?.role === "trial_user") && (
+          <Pressable
+            accessibilityRole="button"
+            onPress={() => router.push("/onboarding")}
+            style={({ pressed }) => [styles.actionRow, { marginHorizontal: 16, marginBottom: 12, borderRadius: 14, backgroundColor: "#ecfdf5", borderWidth: 1, borderColor: "#a7f3d0", paddingHorizontal: 16 }, pressed && styles.actionRowPressed]}
+          >
+            <Ionicons name="business-outline" size={21} color="#047857" />
+            <View style={{ flex: 1 }}>
+              <Text style={styles.actionTitle}>Đăng ký doanh nghiệp / lời mời</Text>
+              <Text style={styles.actionSub}>Tạo hồ sơ doanh nghiệp hoặc tham gia doanh nghiệp đã mời bạn</Text>
+            </View>
+            <Ionicons name="chevron-forward" size={18} color="#047857" />
+          </Pressable>
         )}
 
         {/* Work Information Card */}
@@ -195,7 +211,7 @@ export default function Profile() {
             </View>
 
             {/* Branch Switcher */}
-            <BranchSelector
+            {!needsOnboarding(user) && user?.role !== "trial_user" && <BranchSelector
               renderCustomTrigger={(open, currentName) => (
                 <Pressable
                   style={({ pressed }) => [
@@ -219,7 +235,7 @@ export default function Profile() {
                   </View>
                 </Pressable>
               )}
-            />
+            />}
           </View>
         </View>
 
@@ -253,7 +269,7 @@ export default function Profile() {
               <Text style={styles.actionTitle}>Mời nhân viên qua email</Text>
             </Pressable>}
             <Pressable style={styles.actionRow} onPress={() => router.push("/onboarding")}>
-              <Text style={styles.actionTitle}>Trạng thái yêu cầu xóa tài khoản</Text>
+              <Text style={styles.actionTitle}>{needsOnboarding(user) || user?.role === "trial_user" ? "Doanh nghiệp & lời mời" : "Trạng thái yêu cầu xóa tài khoản"}</Text>
             </Pressable>
             {/* Change Password */}
             <Pressable

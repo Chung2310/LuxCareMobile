@@ -1,4 +1,4 @@
-import { needsOnboarding } from "../../../../shared/onboarding";
+import { isTrialUser, needsOnboarding } from "../../../../shared/onboarding";
 import React, { createContext, useCallback, useContext, useEffect, useMemo, useRef, useState } from "react";
 import { AppState, Platform, Pressable, Text, View } from "react-native";
 import { router, usePathname, useRootNavigationState } from "expo-router";
@@ -79,7 +79,7 @@ export function CommunicationProvider({ children }: React.PropsWithChildren) {
   }, [scope, key]);
 
   useEffect(() => {
-    if (!user || needsOnboarding(user)) return;
+    if (!user || needsOnboarding(user) || isTrialUser(user)) return;
     let active = true;
     const timer = setTimeout(() => void blog.getPosts("all", true).then(posts => {
       if (active) setSnapshot({ scope, posts });
@@ -102,7 +102,7 @@ export function CommunicationProvider({ children }: React.PropsWithChildren) {
   }, [scope, chatRefresh, user?.enabledModules]);
 
   useEffect(() => {
-    if (!user || needsOnboarding(user)) return;
+    if (!user || needsOnboarding(user) || isTrialUser(user)) return;
     let active = true;
     const showChat = async (messageId: string, roomId: string, title: string, body: string) => {
       try {

@@ -14,7 +14,7 @@ import {
 } from "react-native";
 import { StatusBar } from "expo-status-bar";
 import { SafeAreaView } from "react-native-safe-area-context";
-import { needsOnboarding } from "../../shared/onboarding";
+import { needsEmailVerification } from "../../shared/onboarding";
 import { Redirect, router } from "expo-router";
 import { Ionicons } from "@expo/vector-icons";
 import { messageOf, useSession } from "../src/auth/SessionProvider";
@@ -58,7 +58,7 @@ export default function Login() {
     }, 120);
   };
 
-  if (session.user) return <Redirect href={needsOnboarding(session.user) ? "/onboarding" : "/(tabs)"} />;
+  if (session.user) return <Redirect href={needsEmailVerification(session.user) ? "/onboarding" : "/(tabs)"} />;
 
   const submit = async () => {
     if (busy || !email.trim() || !password) return;

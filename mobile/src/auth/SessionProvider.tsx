@@ -1,6 +1,6 @@
 import React, { createContext, useContext, useEffect, useRef, useState } from "react";
 import { router } from "expo-router";
-import { needsOnboarding } from "../../../shared/onboarding";
+import { isTrialUser, needsOnboarding } from "../../../shared/onboarding";
 import { AppState } from "react-native";
 import { account, api, configurationError, getMe } from "../api/services";
 import { socketService } from "../api/socketService";
@@ -150,7 +150,7 @@ export function SessionProvider({ children }: React.PropsWithChildren) {
     }
     api.onSessionExpired = endSession;
     void retry();
-    api.onAccessTokenChanged = (token) => { if (currentUser.current && !needsOnboarding(currentUser.current)) socketService.connect(token); };
+    api.onAccessTokenChanged = (token) => { if (currentUser.current && !needsOnboarding(currentUser.current) && !isTrialUser(currentUser.current)) socketService.connect(token); };
     return () => {
       operation.current++;
       api.onSessionExpired = () => {};
@@ -161,7 +161,7 @@ export function SessionProvider({ children }: React.PropsWithChildren) {
   // Connect socket once we have an authenticated user.
   // The token may rotate after a refresh, so we re-read it on each user change.
   useEffect(() => {
-    if (!user || needsOnboarding(user)) {
+    if (!user || needsOnboarding(user) || isTrialUser(user)) {
       socketService.disconnect();
       return;
     }
@@ -244,7 +244,7 @@ export function SessionProvider({ children }: React.PropsWithChildren) {
             setLoading(false);
             // Connect socket with the new access token.
             const token = api.getAccessToken();
-            if (token && !needsOnboarding(profile)) socketService.connect(token);
+            if (token && !needsOnboarding(profile) && !isTrialUser(profile)) socketService.connect(token);
           } catch (error) {
             if (attempt === operation.current) await api.clear();
             throw error;

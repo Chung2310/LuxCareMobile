@@ -12,3 +12,7 @@ export interface AiSharingDisclosure {
   accepted: boolean;
   acceptedAt: string | null;
 }
+export type AiSharingDisclosurePreview = Pick<
+  AiSharingDisclosure,
+  "model" | "recipients" | "dataTypes" | "purpose" | "privacyUrl"
+> & { fingerprint: string };

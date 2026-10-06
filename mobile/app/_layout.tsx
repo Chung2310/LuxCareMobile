@@ -1,7 +1,5 @@
 import { useEffect, useRef, useState } from "react";
 import { Animated, Image, StyleSheet, Text, TouchableOpacity, View } from "react-native";
-import { Redirect, usePathname } from "expo-router";
-import { needsOnboarding } from "../../shared/onboarding";
 import { router, Stack } from "expo-router";
 import { StatusBar } from "expo-status-bar";
 import { useFonts } from "expo-font";
@@ -31,7 +29,6 @@ function isSessionExpiredError(msg?: string | null): boolean {
 
 function Routes() {
   const { user, loading, error, retry, sessionReplaced, resetSessionReplaced } = useSession();
-  const path = usePathname();
   const [minTimeElapsed, setMinTimeElapsed] = useState(false);
   const [splashFinished, setSplashFinished] = useState(false);
   const fadeAnim = useRef(new Animated.Value(1)).current;
@@ -63,27 +60,15 @@ function Routes() {
     });
   }, [minTimeElapsed, loading, fontsLoaded, fadeAnim]);
 
-  if (loading || !fontsLoaded) {
-    return (
-      <View style={splashStyles.container}>
-        <StatusBar style="dark" />
-        <Image
-          source={require("../public/brand-icon.png")}
-          style={splashStyles.logo}
-          resizeMode="contain"
-        />
-      </View>
-    );
-  }
-
-  if (user && needsOnboarding(user) && !["/onboarding", "/account-security", "/privacy-policy", "/terms-of-service", "/user-data-deletion"].includes(path)) return <Redirect href="/onboarding" />;
-
   const isExpired = Boolean(sessionReplaced || (error && isSessionExpiredError(error)));
+  const showError = Boolean((error || sessionReplaced) && splashFinished);
+  const showSplash = loading || !fontsLoaded || !splashFinished;
 
-  if ((error || sessionReplaced) && splashFinished) {
-    if (isExpired) {
-      return (
-        <SafeAreaView style={sessionExpiredStyles.container}>
+  return (
+    <View style={{ flex: 1 }}>
+      <Stack screenOptions={{ headerShown: false }} />
+      {showError && (isExpired ? (
+        <SafeAreaView style={[StyleSheet.absoluteFill, sessionExpiredStyles.container]}>
           <StatusBar style="dark" />
           <View style={sessionExpiredStyles.content}>
             <Image
@@ -105,21 +90,15 @@ function Routes() {
             </TouchableOpacity>
           </View>
         </SafeAreaView>
-      );
-    }
-
-    return (
-      <Page title="Kết nối LuxCare">
-        <ErrorText message={error} />
-        <Button title="Thử lại" onPress={() => void retry()} />
-      </Page>
-    );
-  }
-
-  return (
-    <View style={{ flex: 1 }}>
-      <Stack screenOptions={{ headerShown: false }} />
-      {!splashFinished && (
+      ) : (
+        <View style={[StyleSheet.absoluteFill, { backgroundColor: "#ffffff", zIndex: 1000 }]}>
+          <Page title="Kết nối LuxCare">
+            <ErrorText message={error} />
+            <Button title="Thử lại" onPress={() => void retry()} />
+          </Page>
+        </View>
+      ))}
+      {showSplash && !showError && (
         <Animated.View
           style={[splashStyles.container, { opacity: fadeAnim }]}
           pointerEvents="none"

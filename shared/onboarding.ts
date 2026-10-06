@@ -16,6 +16,7 @@ export interface CompanyApplication extends CompanyApplicationInput {
   revision: number;
   reviewerNote?: string;
   companyCode?: string;
+  workspaceCode?: string;
   createdAt: string;
   history: Array<{ status: string; actorId: string; note?: string; at: string }>;
 }
@@ -44,6 +45,16 @@ export function needsOnboarding(user?: { role?: string; companyCode?: string } |
     !user.companyCode &&
     !["blog_editor", "blog_author"].includes(user.role || ""),
   );
+}
+export function isTrialUser(user?: { role?: string } | null): boolean {
+  return user?.role === "trial_user";
+}
+export function needsEmailVerification(user?: {
+  onboardingRequired?: boolean;
+  emailVerifiedAt?: string | null;
+  companyCode?: string;
+} | null): boolean {
+  return Boolean(user?.onboardingRequired && !user.emailVerifiedAt && !user.companyCode);
 }
 export function isOnboardingRoute(method: string, originalUrl: string): boolean {
   const path = originalUrl.split("?")[0].replace(/\/$/, "");

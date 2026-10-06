@@ -6,6 +6,7 @@ import type {
   CompanyInvitation,
   OnboardingState,
 } from "../../shared/onboarding";
+import type { AiSharingDisclosurePreview } from "../../shared/ai-sharing";
 export function createOnboardingService(transport: ServiceTransport) {
   async function request<T>(path: string, method = "GET", body?: unknown): Promise<T> {
     const send = () => {
@@ -37,9 +38,30 @@ export function createOnboardingService(transport: ServiceTransport) {
     return envelope.data ?? envelope;
   }
   return {
-    capabilities: () => request<{ registrationEnabled: boolean; personalAiEnabled: boolean; companyWalletEnabled: boolean }>("/onboarding/capabilities"),
-    register: (email: string, password: string, displayName: string) =>
-      request("/auth/register", "POST", { email, password, displayName, termsAccepted: true }),
+    capabilities: () => request<{
+      registrationEnabled: boolean;
+      personalAiEnabled: boolean;
+      companyWalletEnabled: boolean;
+      personalAiDisclosure?: AiSharingDisclosurePreview | null;
+    }>("/onboarding/capabilities"),
+    register: (
+      email: string,
+      password: string,
+      displayName: string,
+      personalAiConsent = false,
+      personalAiDisclosureFingerprint?: string,
+    ) =>
+      request("/auth/register", "POST", {
+        email,
+        password,
+        displayName,
+        termsAccepted: true,
+        ...(personalAiConsent && personalAiDisclosureFingerprint
+          ? { personalAiConsent: true, personalAiDisclosureFingerprint }
+          : {}),
+      }),
+    verifyRegistration: (email: string, code: string) =>
+      request("/auth/register/verify", "POST", { email, code }),
     state: () => request<OnboardingState>("/onboarding/state"),
     resendCode: () => request("/onboarding/email/resend", "POST"),
     verifyEmail: (code: string) => request("/onboarding/email/verify", "POST", { code }),

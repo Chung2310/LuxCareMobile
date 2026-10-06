@@ -3,6 +3,7 @@ import { AppState, type AppStateStatus } from "react-native";
 import { useSession } from "../auth/SessionProvider";
 import { chat } from "../api/services";
 import { socketService } from "../api/socketService";
+import { isTrialUser, needsOnboarding } from "../../../shared/onboarding";
 
 interface ChatUnreadContextValue {
   totalUnread: number;
@@ -34,17 +35,24 @@ const getSenderIdString = (senderId: any): string => {
 export function ChatUnreadProvider({ children }: { children: React.ReactNode }) {
   const { user } = useSession();
   const currentUserId = (user as any)?._id || user?.uid || "";
+  const hasCompanyAccess = Boolean(user && !needsOnboarding(user) && !isTrialUser(user));
   const currentUserIdRef = useRef(currentUserId);
+  const hasCompanyAccessRef = useRef(hasCompanyAccess);
+  const [unreadByRoom, setUnreadByRoom] = useState<Record<string, number>>({});
   useEffect(() => {
     currentUserIdRef.current = currentUserId;
-  }, [currentUserId]);
-
-  const [unreadByRoom, setUnreadByRoom] = useState<Record<string, number>>({});
+    hasCompanyAccessRef.current = hasCompanyAccess;
+    if (!hasCompanyAccess) setUnreadByRoom((previous) => Object.keys(previous).length ? {} : previous);
+  }, [currentUserId, hasCompanyAccess]);
 
   const refreshUnread = useCallback(async () => {
-    if (!currentUserIdRef.current) return;
+    if (!currentUserIdRef.current || !hasCompanyAccessRef.current) {
+      setUnreadByRoom({});
+      return;
+    }
     try {
       const rooms = await chat.getRooms();
+      if (!hasCompanyAccessRef.current) return;
       const initial: Record<string, number> = {};
       rooms.forEach((room) => {
         if (room._id && room.unreadCount && room.unreadCount > 0) {
@@ -69,16 +77,16 @@ export function ChatUnreadProvider({ children }: { children: React.ReactNode }) 
 
   // Tải ban đầu khi đăng nhập
   useEffect(() => {
-    if (!user || !currentUserId) {
+    if (!hasCompanyAccess || !currentUserId) {
       setUnreadByRoom({});
       return;
     }
     void refreshUnread();
-  }, [user?.uid, currentUserId, refreshUnread]);
+  }, [user?.uid, currentUserId, hasCompanyAccess, refreshUnread]);
 
   // Lắng nghe WebSocket thời gian thực (real-time)
   useEffect(() => {
-    if (!user || !currentUserId) return;
+    if (!hasCompanyAccess || !currentUserId) return;
 
     const handleNewMessage = (payload: any) => {
       const roomId = payload?.roomId as string | undefined;
@@ -136,7 +144,7 @@ export function ChatUnreadProvider({ children }: { children: React.ReactNode }) 
       socketService.off("internal_room_deleted", handleRoomDeleted);
       socketService.off("internal_room_updated", handleRoomUpdated);
     };
-  }, [user, currentUserId, refreshUnread]);
+  }, [hasCompanyAccess, currentUserId, refreshUnread]);
 
   // Làm mới khi mở lại app từ background
   useEffect(() => {
@@ -150,12 +158,12 @@ export function ChatUnreadProvider({ children }: { children: React.ReactNode }) 
 
   // Polling dự phòng mỗi 12 giây nếu đang mở app
   useEffect(() => {
-    if (!user || !currentUserId) return;
+    if (!hasCompanyAccess || !currentUserId) return;
     const interval = setInterval(() => {
       void refreshUnread();
     }, 12000);
     return () => clearInterval(interval);
-  }, [user, currentUserId, refreshUnread]);
+  }, [hasCompanyAccess, currentUserId, refreshUnread]);
 
   const totalUnread = useMemo(() => {
     return Object.values(unreadByRoom).reduce((acc, count) => acc + (count || 0), 0);

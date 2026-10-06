@@ -18,8 +18,6 @@ export async function runReviewPreflight({ base, fetchImpl = fetch, log = consol
     ["/user-data-deletion", 200],
     // Read-only anonymous probes: registered protected routes must reject authentication.
     // A 404 or the SPA HTML fallback means the API/proxy is not ready.
-    ["/api/v1/ai/personal/status", 401],
-    ["/api/v1/ai/consent/personal", 401],
     ["/api/v1/ai/consent/company", 401],
     ["/api/v1/blogs/blocks", 401],
   ];
@@ -37,8 +35,6 @@ export async function runReviewPreflight({ base, fetchImpl = fetch, log = consol
         if (!data || typeof data !== "object" || Array.isArray(data)) throw new Error("Invalid API JSON response.");
         if (path.endsWith("/capabilities")) {
           if (data.registrationEnabled !== true) throw new Error("Public registration is disabled.");
-          if (data.personalAiEnabled !== true)
-            throw new Error("Personal AI is disabled or the deployed capabilities endpoint is outdated.");
         }
       }
       log(`PASS ${path}`);

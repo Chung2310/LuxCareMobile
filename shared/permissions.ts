@@ -285,4 +285,17 @@ export const DEFAULT_ROLE_PERMISSIONS: Record<string, string[]> = {
     "equipment:read",
     "supply:read",
   ],
+  trial_user: [
+    "dashboard:read",
+    "kanban:read",
+    "kanban:manage",
+    "project:read",
+    "project:manage",
+    "work:read",
+    "work:manage",
+    "hr:read",
+    "resource:read",
+    "supply:read",
+    "supply:manage",
+  ],
 };

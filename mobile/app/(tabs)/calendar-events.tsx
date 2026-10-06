@@ -215,8 +215,9 @@ function parseIsoTimePart(isoString?: string): string {
 export default function CalendarEvents() {
   const { showAlert, alertView } = useAppAlert();
   const { user, selectedBranch } = useSession();
+  const isTrialUser = user?.role === "trial_user";
   const allowed = canUseModule(user, "hr") && !!user?.companyCode;
-  const isManager = hasPermission(user, "timekeeping:manage") || user?.role === "admin" || user?.role === "superadmin";
+  const isManager = isTrialUser || hasPermission(user, "timekeeping:manage") || user?.role === "admin" || user?.role === "superadmin";
 
   // Subtab Navigation
   const [subTab, setSubTab] = useState<SubTabType>("schedule");
@@ -320,19 +321,13 @@ export default function CalendarEvents() {
         hrCalendar.list(user.companyCode).then((data) => {
           if (active) setItems(data);
         }),
-        attendance.shifts().then((res) => {
-          if (active) setShifts(res || []);
-        }).catch(() => {}),
-        attendance.assignments().then((res) => {
-          if (active) setShiftEmployees(res || []);
-        }).catch(() => {}),
-        workCalendar.list(year).then((res) => {
-          if (active) setHolidays(res || []);
-        }).catch(() => {}),
-        roster.list(user.companyCode, selectedBranch?._id).then((res) => {
-          if (active) setEmployees(res || []);
-        }).catch(() => {}),
       ];
+      if (!isTrialUser) tasks.push(
+        attendance.shifts().then((res) => { if (active) setShifts(res || []); }).catch(() => {}),
+        attendance.assignments().then((res) => { if (active) setShiftEmployees(res || []); }).catch(() => {}),
+        workCalendar.list(year).then((res) => { if (active) setHolidays(res || []); }).catch(() => {}),
+        roster.list(user.companyCode, selectedBranch?._id).then((res) => { if (active) setEmployees(res || []); }).catch(() => {}),
+      );
 
       Promise.allSettled(tasks)
         .catch((e) => {
@@ -345,7 +340,7 @@ export default function CalendarEvents() {
       return () => {
         active = false;
       };
-    }, [allowed, user?.companyCode, user?.uid, selectedBranch?._id, year, month, revision])
+    }, [allowed, isTrialUser, user?.companyCode, user?.uid, selectedBranch?._id, year, month, revision])
   );
 
   /* ==========================================================================
@@ -1668,7 +1663,7 @@ export default function CalendarEvents() {
           </Text>
         </Pressable>
 
-        <Pressable
+        {!isTrialUser && <Pressable
           style={[s.subTabBtn, subTab === "shifts" && s.subTabBtnActive, { flexDirection: "row", alignItems: "center", justifyContent: "center", gap: 5 }]}
           onPress={() => setSubTab("shifts")}
         >
@@ -1676,7 +1671,7 @@ export default function CalendarEvents() {
           <Text style={[s.subTabTxt, subTab === "shifts" && s.subTabTxtActive]}>
             Ca & Lễ
           </Text>
-        </Pressable>
+        </Pressable>}
       </View>
 
       {/* Content Area */}

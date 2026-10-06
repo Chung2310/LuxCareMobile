@@ -64,9 +64,9 @@ export const PRIVACY_POLICY_SECTIONS: LegalSection[] = [
     content: [
       "Khi người dùng sử dụng tính năng hỗ trợ tạo nội dung bằng AI, hệ thống chỉ xử lý các tài liệu và văn bản do người dùng trực tiếp cung cấp.",
       "Người dùng giữ toàn quyền sở hữu và chịu trách nhiệm kiểm duyệt nội dung trước khi xuất bản hoặc sử dụng trong công việc.",
-      "Trợ lý AI cá nhân cho tài khoản cơ bản đã xác minh email xử lý câu hỏi để tạo câu trả lời. Câu hỏi, câu trả lời và lượt sử dụng được lưu tối đa 45 ngày hoặc xóa sớm hơn khi tài khoản đủ điều kiện được xóa. Không nhập thông tin y tế, dữ liệu cá nhân nhạy cảm hoặc dữ liệu kinh doanh bí mật vào trợ lý kiến thức chung.",
-      "Trợ lý cá nhân và doanh nghiệp sử dụng OpenRouter (https://openrouter.ai/privacy) để định tuyến tới bên phục vụ model đang cấu hình. Với model Gemini mặc định, bên xử lý bao gồm Google / Google AI Studio (https://cloud.google.com/terms/cloud-privacy-notice). Trước khi chia sẻ, app hiển thị danh sách bên xử lý thực tế cùng liên kết chính sách, loại dữ liệu và mục đích; bạn cần đồng ý rõ ràng. Khi model, bên xử lý hoặc công ty thay đổi, app yêu cầu xác nhận lại.",
-      "AI cá nhân gửi câu hỏi bạn nhập. AI doanh nghiệp có thể gửi câu hỏi, tin nhắn gần đây với trợ lý và các đoạn tài liệu hoặc dữ liệu công việc mà bạn có quyền tra cứu để trả lời câu hỏi. Khi tạo hoặc tải tài liệu vào Kho tri thức, nội dung tài liệu và ảnh/trang cần OCR có thể được gửi để đọc, lập chỉ mục và tìm kiếm; model và bên xử lý thực tế được hiển thị trước khi bạn xác nhận. Chỉ gửi dữ liệu bạn có quyền chia sẻ. Bạn có thể từ chối hoặc thu hồi đồng ý ngay trong trợ lý; các tính năng khác của tài khoản vẫn sử dụng được.",
+      "Trợ lý AI doanh nghiệp xử lý câu hỏi, tin nhắn gần đây với trợ lý và tài liệu hoặc dữ liệu công việc mà người dùng có quyền tra cứu. Không nhập thông tin y tế, dữ liệu cá nhân nhạy cảm hoặc dữ liệu kinh doanh bí mật nếu bạn không có quyền chia sẻ.",
+      "AI doanh nghiệp sử dụng OpenRouter (https://openrouter.ai/privacy) để định tuyến tới bên phục vụ model đang cấu hình. Với model Gemini mặc định, bên xử lý bao gồm Google / Google AI Studio (https://cloud.google.com/terms/cloud-privacy-notice). Trước khi chia sẻ, app hiển thị danh sách bên xử lý thực tế cùng liên kết chính sách, loại dữ liệu và mục đích; bạn cần đồng ý rõ ràng. Khi model, bên xử lý hoặc công ty thay đổi, app yêu cầu xác nhận lại.",
+      "Khi tạo hoặc tải tài liệu vào Kho tri thức, nội dung tài liệu và ảnh/trang cần OCR có thể được gửi để đọc, lập chỉ mục và tìm kiếm; model và bên xử lý thực tế được hiển thị trước khi bạn xác nhận. Chỉ gửi dữ liệu bạn có quyền chia sẻ. Bạn có thể từ chối hoặc thu hồi đồng ý ngay trong trợ lý; các tính năng khác của tài khoản vẫn sử dụng được.",
     ],
   },
   {
@@ -75,7 +75,7 @@ export const PRIVACY_POLICY_SECTIONS: LegalSection[] = [
     content: [
       "Chúng tôi tuyệt đối không bán dữ liệu người dùng, thông tin cá nhân hoặc thông tin xác thực cho bất kỳ bên thứ ba nào.",
       "Chúng tôi không sử dụng dữ liệu người dùng cho mục đích quảng cáo thương mại ngoài phạm vi dịch vụ.",
-      "Dữ liệu được chia sẻ với các nhà cung cấp hạ tầng, lưu trữ và thông báo ở mức cần thiết để vận hành ứng dụng. Trợ lý cá nhân và doanh nghiệp chỉ gửi dữ liệu sang OpenRouter và các bên xử lý AI đã được hiển thị sau khi bạn đồng ý. Nội dung chat bị báo cáo và tệp liên quan có thể được quản trị viên doanh nghiệp có thẩm quyền xem để xử lý vi phạm.",
+      "Dữ liệu được chia sẻ với các nhà cung cấp hạ tầng, lưu trữ và thông báo ở mức cần thiết để vận hành ứng dụng. Trợ lý doanh nghiệp chỉ gửi dữ liệu sang OpenRouter và các bên xử lý AI đã được hiển thị sau khi bạn đồng ý. Nội dung chat bị báo cáo và tệp liên quan có thể được quản trị viên doanh nghiệp có thẩm quyền xem để xử lý vi phạm.",
     ],
   },
   {
@@ -92,7 +92,7 @@ export const PRIVACY_POLICY_SECTIONS: LegalSection[] = [
     content: [
       "Người dùng có quyền xem, chỉnh sửa thông tin cá nhân hoặc đổi mật khẩu trong mục Cài đặt tài khoản.",
       "Bạn có thể yêu cầu XÓA TÀI KHOẢN trong ứng dụng: tài khoản chưa thuộc doanh nghiệp vào Tài khoản → Bảo mật tài khoản; thành viên doanh nghiệp vào Hồ sơ → Xóa tài khoản. Trang web xóa dữ liệu và email hỗ trợ cung cấp hướng dẫn bổ sung.",
-      "Khi tài khoản đủ điều kiện được xóa, quyền truy cập, hồ sơ tài khoản và lịch sử AI cá nhân được xóa khỏi hệ thống đang hoạt động. Hồ sơ nghiệp vụ và một số thông tin lịch sử cần lưu của doanh nghiệp có thể được giữ lại theo nghĩa vụ lưu trữ. Quản trị viên duy nhất có thể gửi yêu cầu trong app, theo dõi thời hạn xử lý 7 ngày và hủy yêu cầu.",
+      "Khi tài khoản đủ điều kiện được xóa, quyền truy cập và hồ sơ tài khoản được xóa khỏi hệ thống đang hoạt động. Hồ sơ nghiệp vụ và một số thông tin lịch sử cần lưu của doanh nghiệp có thể được giữ lại theo nghĩa vụ lưu trữ. Quản trị viên duy nhất có thể gửi yêu cầu trong app, theo dõi thời hạn xử lý 7 ngày và hủy yêu cầu.",
     ],
   },
 ];
@@ -139,8 +139,8 @@ export const TERMS_OF_SERVICE_SECTIONS: LegalSection[] = [
     content: [
       "Dịch vụ có thể cung cấp các công cụ hỗ trợ soạn thảo, tóm tắt và phân tích bằng trí tuệ nhân tạo.",
       "Kết quả từ AI mang tính tham khảo và người dùng cần xem xét, kiểm tra lại trước khi áp dụng vào công việc chính thức.",
-      "Tài khoản cơ bản đã xác minh email được dùng trợ lý kiến thức chung miễn phí theo hạn mức giờ/ngày/tháng hiển thị trong app và ngân sách vận hành chung. App hiển thị lượt còn lại và thời điểm được dùng lại. Doanh nghiệp đã duyệt tự nạp ví AI trên web; chi phí AI của nhân viên trừ vào ví doanh nghiệp. Ứng dụng di động không bán Credit cho cá nhân.",
-      "Trợ lý kiến thức chung không dùng để chẩn đoán, kê đơn hoặc hướng dẫn điều trị. AI cá nhân và doanh nghiệp yêu cầu đồng ý chia sẻ trước khi gọi bên xử lý; bạn có thể từ chối hoặc thu hồi tại giao diện trợ lý.",
+      "Doanh nghiệp đã duyệt tự nạp ví AI trên web; chi phí AI của nhân viên trừ vào ví doanh nghiệp. Ứng dụng di động không bán Credit cho cá nhân.",
+      "AI doanh nghiệp không dùng để chẩn đoán, kê đơn hoặc hướng dẫn điều trị. Tính năng AI doanh nghiệp yêu cầu đồng ý chia sẻ trước khi gọi bên xử lý; bạn có thể từ chối hoặc thu hồi tại giao diện trợ lý.",
     ],
   },
   {

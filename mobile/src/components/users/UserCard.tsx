@@ -48,6 +48,13 @@ export const ROLE_MAP: Record<
     border: "#bae6fd",
     icon: "person",
   },
+  trial_user: {
+    label: "Người dùng trải nghiệm",
+    color: "#047857",
+    bg: "#ecfdf5",
+    border: "#6ee7b7",
+    icon: "sparkles",
+  },
 };
 
 interface UserCardProps {

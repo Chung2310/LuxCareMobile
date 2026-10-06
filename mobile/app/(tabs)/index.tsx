@@ -36,6 +36,7 @@ import { isBlogEditorUser } from "../../../src/utils/permissionUtils";
 import { BranchSelector } from "../../src/features/branches/BranchSelector";
 import { useChatUnread } from "../../src/context/ChatUnreadContext";
 import { useNotifications } from "../../src/features/notifications/NotificationProvider";
+import { needsOnboarding } from "../../../shared/onboarding";
 
 const { width: SCREEN_WIDTH } = Dimensions.get("window");
 
@@ -59,6 +60,7 @@ export default function Home() {
   const { navigateWithLoading } = useAppLoading();
   const isOwner = ["admin", "superadmin", "branch_owner"].includes(user?.role || "");
   const isEditor = isBlogEditorUser(user);
+  const requiresCompanyWorkspace = needsOnboarding(user);
 
   const [avatarError, setAvatarError] = useState(false);
 
@@ -140,7 +142,7 @@ export default function Home() {
     setAttendanceSummary(null);
     setMyAttendance(null);
     setLoadingDashboard(false);
-    if (isEditor) return;
+    if (isEditor || requiresCompanyWorkspace) return;
     setLoadingDashboard(true);
     try {
       if (allowed) {
@@ -168,10 +170,11 @@ export default function Home() {
     } finally {
       if (request === dashboardRequest.current) setLoadingDashboard(false);
     }
-  }, [allowed, isEditor, params, user?.uid, user?.companyCode, selectedBranch?._id]);
+  }, [allowed, isEditor, params, user?.companyCode, user?.role, requiresCompanyWorkspace, selectedBranch?._id]);
 
   useFocusEffect(
     useCallback(() => {
+      if (requiresCompanyWorkspace) return;
       void loadDashboardData();
       refreshNotifications();
       let day = attendanceDay();
@@ -190,7 +193,7 @@ export default function Home() {
         appState.remove();
         clearInterval(timer);
       };
-    }, [loadDashboardData, refreshNotifications]),
+    }, [loadDashboardData, refreshNotifications, requiresCompanyWorkspace]),
   );
 
   // 8 Chức năng cốt lõi (2 hàng x 4 cột) - Phong cách Super App tinh gọn, đầy đủ các mảng thiết yếu
@@ -332,7 +335,6 @@ export default function Home() {
   const pendingCount = (actions?.overdueTasks.length || 0) + (actions?.pendingApprovals.length || 0);
 
   if (isEditor) return <Redirect href="/(tabs)/blog" />;
-
   return (
     <View style={uiStyles.screen}>
       <ScrollView
@@ -542,7 +544,7 @@ export default function Home() {
         {/* ============================================================ */}
         {/* KHỐI 2: THẺ NỔI VÍ NHÂN SỰ LUXCARE (NẰM ĐÈ NỬA XANH NỬA TRẮNG) */}
         {/* ============================================================ */}
-        <View style={uiStyles.floatingCardWrapper}>
+        <View style={[uiStyles.floatingCardWrapper, requiresCompanyWorkspace && { display: "none" }]}>
           <View style={uiStyles.floatingCard}>
             <View style={uiStyles.floatingCardTop}>
               {/* Cột 1: Công hôm nay */}

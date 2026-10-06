@@ -6,7 +6,7 @@ const setup = (change?: (path: string, response: Response) => Response) => {
     const path = new URL(String(input)).pathname;
     const protectedRoute = path.includes("/ai/") || path.endsWith("/blocks");
     const body = path.endsWith("/capabilities")
-      ? { registrationEnabled: true, personalAiEnabled: true }
+      ? { registrationEnabled: true }
       : { message: protectedRoute ? "Unauthorized" : "ok" };
     const response = new Response(JSON.stringify(body), {
       status: protectedRoute ? 401 : 200,
@@ -20,14 +20,14 @@ describe("App Review preflight", () => {
   it("checks AI and Blog routes using GET without authentication or paid requests", async () => {
     const options = setup();
     expect(await runReviewPreflight({ base, fetchImpl: options.send, ...options })).toBe(true);
-    expect(options.send.mock.calls).toHaveLength(9);
+    expect(options.send.mock.calls).toHaveLength(7);
     expect(options.send.mock.calls.map(([url]) => new URL(String(url)).pathname)).toContain(
-      "/api/v1/ai/consent/personal",
+      "/api/v1/ai/consent/company",
     );
   });
   it("fails a missing AI route even while the website is available", async () => {
     const options = setup((path, response) =>
-      path === "/api/v1/ai/personal/status" ? new Response("Missing", { status: 404 }) : response,
+      path === "/api/v1/ai/consent/company" ? new Response("Missing", { status: 404 }) : response,
     );
     expect(await runReviewPreflight({ base, fetchImpl: options.send, ...options })).toBe(false);
     expect(options.errorLog).toHaveBeenCalledWith(expect.stringContaining("expected 401"));
@@ -40,10 +40,11 @@ describe("App Review preflight", () => {
     );
     expect(await runReviewPreflight({ base, fetchImpl: options.send, ...options })).toBe(false);
   });
-  it.each(["registrationEnabled", "personalAiEnabled"])("requires %s enabled", async (key) => {
+  it("requires public registration enabled", async () => {
+    const key = "registrationEnabled";
     const options = setup((path, response) =>
       path.endsWith("/capabilities")
-        ? new Response(JSON.stringify({ registrationEnabled: true, personalAiEnabled: true, [key]: false }), {
+        ? new Response(JSON.stringify({ registrationEnabled: true, [key]: false }), {
             headers: { "content-type": "application/json" },
           })
         : response,
