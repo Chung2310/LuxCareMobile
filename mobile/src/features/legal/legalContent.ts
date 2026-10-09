@@ -139,7 +139,7 @@ export const TERMS_OF_SERVICE_SECTIONS: LegalSection[] = [
     content: [
       "Dịch vụ có thể cung cấp các công cụ hỗ trợ soạn thảo, tóm tắt và phân tích bằng trí tuệ nhân tạo.",
       "Kết quả từ AI mang tính tham khảo và người dùng cần xem xét, kiểm tra lại trước khi áp dụng vào công việc chính thức.",
-      "Doanh nghiệp đã duyệt tự nạp ví AI trên web; chi phí AI của nhân viên trừ vào ví doanh nghiệp. Ứng dụng di động không bán Credit cho cá nhân.",
+      "LuxCare chịu toàn bộ chi phí nhà cung cấp AI. Người dùng và doanh nghiệp không phải trả phí, nạp tiền hay mua thêm lượt sử dụng. AI miễn phí trong hạn mức được cấu hình; khi hết hạn mức, tính năng tạm ngừng đến khi hạn mức được đặt lại.",
       "AI doanh nghiệp không dùng để chẩn đoán, kê đơn hoặc hướng dẫn điều trị. Tính năng AI doanh nghiệp yêu cầu đồng ý chia sẻ trước khi gọi bên xử lý; bạn có thể từ chối hoặc thu hồi tại giao diện trợ lý.",
     ],
   },

@@ -2,19 +2,18 @@
 
 ## Luồng đã triển khai
 
-1. Người dùng đăng ký bằng email, tên và mật khẩu (8–72 ký tự, tối đa 72 byte UTF-8), đồng ý điều khoản. Backend luôn tạo role `user`, chưa có `companyCode`.
-2. Hệ thống gửi mã 6 chữ số bằng SMTP riêng của nền tảng. Mã hết hạn sau 15 phút, tối đa 5 lần thử; gửi lại cách nhau 60 giây.
-3. Người dùng đã xác minh email có thể:
-   - Gửi đơn mở doanh nghiệp, xem trạng thái, bổ sung khi được yêu cầu hoặc hủy.
-   - Nhận lời mời gửi tới đúng email đó, xác nhận hoặc từ chối.
-4. Superadmin đăng nhập qua quy trình 2FA hiện có → **Xét duyệt doanh nghiệp**. Duyệt đơn tạo Company và chi nhánh MAIN trong cùng transaction; tài khoản gửi đơn được nâng lên `admin`. Có thể chọn module được cấp.
-5. Admin doanh nghiệp → **Mời nhân viên qua email** trên web hoặc hồ sơ mobile. Lời mời hết hạn sau 7 ngày; có gửi lại, thu hồi và mời lại. Nhân viên tự xác nhận rồi được gán role `user`.
-6. Một tài khoản thuộc một doanh nghiệp. Không chuyển dữ liệu hoặc tự đổi công ty qua lời mời.
+1. Người dùng đăng ký bằng email, tên và mật khẩu (8–72 ký tự, tối đa 72 byte UTF-8), đồng ý điều khoản. Backend lưu PendingRegistration, chưa tạo User hoàn chỉnh trước khi xác minh.
+2. Hệ thống gửi mã 6 chữ số bằng SMTP nền tảng. Mã hết hạn sau 15 phút, tối đa 5 lần thử; gửi lại cách nhau 60 giây.
+3. Xác minh thành công tạo User role **trial_user**, Company workspace riêng có lifecycleStatus=trial và chi nhánh MAIN. Người dùng có companyCode của workspace riêng và được vào các module thử nghiệm theo quyền/module policy (hr/resource/supply), không tự thành admin một doanh nghiệp đã duyệt.
+4. Người dùng có thể gửi/bổ sung/hủy đơn doanh nghiệp hoặc xác nhận/từ chối lời mời gửi tới email đó. Không phải tạo tài khoản mới để gửi đơn.
+5. Superadmin → **Xét duyệt doanh nghiệp**: duyệt nâng workspace riêng lên active, giữ mã và dữ liệu; chủ tài khoản thành admin. Với tài khoản cũ chưa có workspace, dịch vụ tạo Company/MAIN khi duyệt. Các ghi thay đổi chạy trong transaction; có thể chọn module được cấp.
+6. Admin → **Mời nhân viên qua email** trên web hoặc hồ sơ mobile. Lời mời hết hạn sau 7 ngày; có gửi lại, thu hồi và mời lại. Người nhận xác nhận rồi được gán role user và companyCode đích.
+7. Khi trial_user tham gia tổ chức khác, workspace riêng được archive, không tự chuyển dữ liệu vào tổ chức đích. Một tài khoản chỉ có một companyCode đang hoạt động.
 
 ## Tài khoản và dữ liệu hiện có
 
 - Không backfill companyCode, không đổi role hoặc mật khẩu của các tài khoản cũ.
-- `onboardingRequired` chỉ được bật cho người tự đăng ký mới. Thành viên công ty cũ không phải xác minh lại email.
+- Tài khoản tự đăng ký sau xác minh có onboardingRequired=false và role trial_user; thành viên công ty cũ không phải xác minh lại email. Luồng xác minh còn được giữ cho tài khoản cũ có yêu cầu onboarding.
 - Tài khoản cũ chưa có công ty chỉ được dùng màn tiếp nhận; tài khoản blog độc lập tiếp tục luồng blog.
 - Quyền và công ty trong request được đọc từ User hiện tại, thay vì tin quyền cũ trong JWT.
 - Mọi endpoint nghiệp vụ dùng requireAuth chặn tài khoản chưa có công ty. Bộ lọc tenant từ chối user thiếu companyCode.
@@ -74,11 +73,11 @@ PLATFORM_PUBLIC_URL=https://your-luxcare-domain.example/onboarding
 
 1. Admin/user/manager/branch_owner cũ đăng nhập web và mobile; dữ liệu/chi nhánh/module cũ đúng.
 2. Đăng ký mới, nhận email, nhập sai mã 5 lần, hết hạn, gửi lại, SMTP lỗi rồi retry. Thử request role=superadmin/companyCode phải không cấp quyền.
-3. Token user chưa có công ty không truy cập được users/crud/dashboard/chat/media/AI; socket không kết nối nghiệp vụ.
+3. Xác minh xong vào workspace riêng với đúng role trial_user và module policy. API/socket chỉ truy cập dữ liệu workspace đó, không xem được công ty khác hoặc tự cấp role admin. Tài khoản legacy không có companyCode vẫn bị chặn nghiệp vụ.
 4. Gửi trùng đơn, bổ sung đơn với revision cũ, hủy trong lúc đang duyệt, từ chối rồi gửi lại.
-5. Duyệt hai lần cùng idempotency-key, mất response sau commit, mã công ty trùng. Không có công ty mồ côi hay tài khoản admin thứ hai.
+5. Duyệt hai lần cùng idempotency-key, mất response sau commit, mã công ty trùng: workspace riêng giữ mã/dữ liệu khi nâng active; không có công ty mồ côi hay admin thứ hai.
 6. Admin công ty A không xem/thu hồi lời mời công ty B. Sai email, chưa xác minh, hết hạn, thu hồi, chi nhánh inactive phải bị từ chối.
-7. Hai lời mời và duyệt đơn chạy đồng thời: đúng một companyCode, không mất dữ liệu. Cần chạy với MongoDB thật hỗ trợ transaction.
+7. Hai lời mời và duyệt đơn chạy đồng thời: đúng một companyCode. Tham gia tổ chức khác archive workspace riêng và không tự chuyển dữ liệu. Cần chạy với MongoDB thật hỗ trợ transaction.
 8. Sau xác nhận/duyệt: profile được làm mới, vào workspace đúng công ty; app không còn gọi API doanh nghiệp trước khi có quyền.
 9. Xóa tài khoản mới; admin duy nhất gửi đơn và hủy; superadmin hoàn tất; tài khoản đã xóa không đăng nhập/refresh được.
 10. Web build, backend build, mobile typecheck/unit tests/export iOS+Android. Kiểm tra giao diện và bàn phím trên iPhone thật.
@@ -93,3 +92,7 @@ PLATFORM_PUBLIC_URL=https://your-luxcare-domain.example/onboarding
 - Privileged platform: GET /super-admin/company-applications; POST /:id/review.
 - Deletion: GET /super-admin/account-deletion-requests; POST /:id/complete; POST /onboarding/deletion/cancel.
 - Tất cả đường dẫn rút gọn ở trên đều nằm dưới /api/v1. Mutation privileged cần idempotency-key.
+
+## AI miễn phí và Credit tạm ngừng
+
+Xem tài liệu AI-ACCESS-ROLLOUT.md trong repository backend LuxCare để cấu hình hạn mức AI dùng chung trên web/mobile và ngân sách vận hành do LuxCare chịu. Credit/nạp tiền đang tạm ngừng; code và dữ liệu cũ được giữ. Trước App Review, kiểm tra tài khoản reviewer dùng được AI và hạn mức trên backend đã triển khai.

@@ -1,6 +1,8 @@
 # Hướng dẫn chi tiết Build & Đẩy App lên Apple App Store (iOS)
 
-Tài liệu này tổng hợp toàn bộ quy trình, danh sách kiểm tra (checklist) và các bước kỹ thuật cần thiết để đưa ứng dụng **LuxCare** lên Apple App Store thành công, tránh bị Apple từ chối (reject).
+Tài liệu này tổng hợp toàn bộ quy trình, danh sách kiểm tra (checklist) và các bước kỹ thuật cần thiết để đưa ứng dụng **LuxCare** lên Apple App Store và chuẩn bị thông tin để Apple review. Các kết quả kiểm tra local không bảo đảm được duyệt.
+
+**Cập nhật review 09/10/2026:** xem [APP-REVIEW-RELEASE.md](APP-REVIEW-RELEASE.md) và [bản nháp phản hồi Apple](APP-REVIEW-RESPONSE-2026-10-09.md) trước khi dùng hướng dẫn build bên dưới. Build đã review là 1.0 (23); bản sửa cần build mới.
 
 ---
 
@@ -20,7 +22,7 @@ Tài liệu này tổng hợp toàn bộ quy trình, danh sách kiểm tra (chec
 | Đường link Chính sách bảo mật (Privacy Policy URL) | ✅ Đã tích hợp | Có màn hình in-app trực tiếp `/privacy-policy` & link theo URL dự án |
 | Điều khoản sử dụng (Terms of Service / EULA) | ✅ Đã tích hợp | Có màn hình in-app trực tiếp `/terms-of-service` & link theo URL dự án |
 | Cơ chế Báo cáo / Chặn vi phạm trong Chat (UGC) | ✅ Đã triển khai | Có nút Báo cáo vi phạm & Chặn người dùng trực tiếp trong Chat (Guideline 1.2) |
-| Tài khoản Demo cho Apple Reviewer | ⚠️ Cần chuẩn bị | Cung cấp tài khoản test có sẵn dữ liệu, không chặn SMS OTP |
+| Tài khoản Demo cho Apple Reviewer | ⚠️ Cần chuẩn bị | Cung cấp tài khoản đã xác minh email, có dữ liệu và còn quota AI; kiểm tra cả luồng tự đăng ký |
 | **Tài nguyên Đồ họa & Metadata** | | |
 | App Icon 1024x1024 (No Alpha / Flat) | ⚠️ Cần chuẩn bị | File PNG 1024x1024 không có kênh trong suốt (transparency) |
 | Screenshots iPhone 6.7" / 6.9" | ⚠️ Cần chụp | Kích thước 1290 x 2796 px (iPhone 15/16 Pro Max), 3 - 5 ảnh |
@@ -44,17 +46,16 @@ Apple kiểm tra rất nghiêm ngặt chuỗi mô tả lý do yêu cầu quyền
 - `NSMicrophoneUsageDescription`: Ghi âm tin nhắn thoại trong phần Chat.
 
 ### 2.2. Xóa tài khoản (Apple Guideline 5.1.1(v) - Data Collection and Storage)
-> *"If your app doesn't include account creation, you must provide a way to initiate account deletion within the app."*
-
-Nếu app cho phép đăng nhập hoặc tạo tài khoản, người dùng **phải có quyền tự xóa hoặc gửi yêu cầu xóa tài khoản của mình ngay trong app** (thường đặt ở màn hình Profile hoặc Cài đặt tài khoản).
+Theo [Guideline 5.1.1(v)](https://developer.apple.com/app-store/review/guidelines/#data-collection-and-storage), app hỗ trợ tạo tài khoản phải có chức năng xóa tài khoản trong app. Kiểm tra luồng thực tế tại Hồ sơ/Bảo mật tài khoản, cả tiếp nhận yêu cầu của admin duy nhất và hoàn tất xóa theo hạn công bố.
 - Cần có hộp thoại xác nhận cảnh báo dữ liệu sẽ bị xóa hoặc vô hiệu hóa.
-- Gọi API backend xóa/vô hiệu hóa tài khoản và xóa token khỏi thiết bị (`SecureStore`).
+- Gọi API backend xóa tài khoản và thu hồi session/token; chỉ thông báo đã xóa sau khi hoàn tất. Tạm vô hiệu hóa hoặc chỉ đăng xuất không thay thế việc xóa.
 
 ### 2.3. Quy định về tính năng Chat / Mạng xã hội (UGC - Guideline 1.2)
 Vì LuxCare có tính năng gửi tin nhắn văn bản, ảnh, âm thanh giữa người dùng:
 - Apple yêu cầu phải có Điều khoản sử dụng cam kết không dung thứ cho nội dung độc hại.
-- Nếu ứng dụng chỉ dùng trong nội bộ doanh nghiệp (Internal Employee App), trong phần **Review Notes** gửi Apple, bạn hãy ghi rõ:
-  > *"LuxCare is an internal workforce and operational management application for authorized employees of LuxCare. All user accounts are provisioned and managed directly by company administration under enterprise employment agreements."*
+- Review Notes hiện tại phải phản ánh nền tảng công khai nhiều tổ chức và đăng ký cá nhân miễn phí; không ghi chỉ dành cho nhân viên LuxCare. Ví dụ:
+  > LuxCare supports users from independent organizations. Users may create a free account, verify their email and enter a private workspace without an invitation. Organization applications control workspace administration and do not initiate a purchase or subscription.
+- Các cơ chế lọc, báo cáo/chặn và xử lý vi phạm vẫn cần nghiệm thu; phân phối public không thay thế các yêu cầu này.
 
 ---
 
@@ -99,7 +100,7 @@ Vì LuxCare có tính năng gửi tin nhắn văn bản, ảnh, âm thanh giữa
    - **iPhone 6.7" / 6.9"**: 1290 x 2796 px (chụp từ iPhone 15 Pro Max hoặc 16 Pro Max trong Simulator).
    - Tối thiểu 3 ảnh cho các màn hình chính: Trang chủ/Dashboard, Chấm công/Ca làm việc, Bảng lương/Công việc, Trò chuyện/Thông báo.
 3. **Thông tin mô tả**:
-   - **Description**: Giới thiệu ứng dụng quản trị nhân sự, chấm công và điều hành dịch vụ chăm sóc LuxCare.
+   - **Description**: Giới thiệu nền tảng quản trị công việc/vận hành cho nhiều tổ chức độc lập, đăng ký cá nhân miễn phí và workspace riêng. Chỉ mô tả các module thực tế của build; không ghi app dành riêng cho một công ty.
    - **Keywords**: `luxcare, cham cong, bang luong, quan ly nhan su, dieu hanh`
    - **Support URL**: Trang liên hệ hỗ trợ hoặc email cskh.
    - **Privacy Policy URL**: Link HTTPS chính sách bảo mật bắt buộc.

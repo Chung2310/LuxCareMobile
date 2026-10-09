@@ -20,10 +20,15 @@ export async function runReviewPreflight({ base, fetchImpl = fetch, log = consol
     // A 404 or the SPA HTML fallback means the API/proxy is not ready.
     ["/api/v1/ai/consent/company", 401],
     ["/api/v1/blogs/blocks", 401],
+    ["/api/v1/ai/status", 401],
+    // Disabled Credit routes must reject old clients before authentication.
+    ["/api/v1/wallet/balance", 410],
+    ["/api/v1/company-wallet/status", 410],
   ];
   for (const [path, status] of endpoints) {
     try {
       const response = await fetchImpl(new URL(path, origin), {
+        method: "GET",
         signal: AbortSignal.timeout(15000),
         redirect: "manual",
       });
@@ -35,7 +40,11 @@ export async function runReviewPreflight({ base, fetchImpl = fetch, log = consol
         if (!data || typeof data !== "object" || Array.isArray(data)) throw new Error("Invalid API JSON response.");
         if (path.endsWith("/capabilities")) {
           if (data.registrationEnabled !== true) throw new Error("Public registration is disabled.");
+          if (data.companyWalletEnabled !== false) throw new Error("Credit access is enabled or not explicitly disabled.");
+          if (data.aiQuotaEnabled !== true) throw new Error("Shared free AI quota is disabled or not deployed.");
         }
+        if (status === 410 && data.code !== "FEATURE_DISABLED")
+          throw new Error("Credit endpoint did not confirm FEATURE_DISABLED.");
       }
       log(`PASS ${path}`);
     } catch (error) {
@@ -45,7 +54,7 @@ export async function runReviewPreflight({ base, fetchImpl = fetch, log = consol
   }
   if (passed)
     log(
-      "Public endpoints and protected AI/Blog routes are reachable. Verify rendered legal pages, email delivery, AI permission and account deletion on TestFlight before submission.",
+      "Public endpoints, free AI capability and disabled Credit routes passed. Verify rendered legal pages, email delivery, authenticated AI quota, permissions and account deletion on TestFlight before submission.",
     );
   return passed;
 }

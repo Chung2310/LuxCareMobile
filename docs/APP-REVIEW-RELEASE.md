@@ -1,31 +1,34 @@
 # LuxCare: nghiệm thu và gửi lại App Review
 
+Cập nhật 09/10/2026 cho phản hồi Apple về bản **1.0 (23)**. Thay đổi đang ở source local; chưa deploy backend/web, build EAS mới hoặc gửi phản hồi vào App Store Connect.
+
 ## Thứ tự triển khai
 
-1. Deploy backend/web mới trước. Không đưa build mới vào review khi endpoint `/api/v1/onboarding/capabilities` công khai vẫn trả 404.
-2. Cấu hình backend mở đăng ký, SMTP Gmail hoạt động, AI cá nhân và ngân sách được bật theo nhu cầu. Giữ model AI đang dùng; consent tự lấy danh sách bên xử lý từ metadata công khai của OpenRouter.
-3. Tại `mobile`, chạy `npm run review:preflight`. Script chỉ GET các endpoint health/capabilities/chính sách, không tạo tài khoản, gửi email hay gọi AI. Kết quả 200 chưa thay thế kiểm tra nội dung trang được render.
-4. Profile EAS production đã đặt `EXPO_PUBLIC_API_URL=https://luxcare.igentechnology.net`; số build tăng tự động bằng remote versioning. Kiểm tra build mới lớn hơn 21 trong App Store Connect.
-5. Build/TestFlight trên thiết bị thật. Chọn đúng build mới để gửi Apple.
+1. Deploy backend/web có Credit tạm ngừng và quota AI dùng chung trước. Mã nguồn Credit/model/dữ liệu được giữ; không xóa số dư hoặc lịch sử.
+2. Backend mở PUBLIC_REGISTRATION_ENABLED với SMTP hoạt động. Bật AI_FREE_ENABLED=true, hoặc dùng AI_PERSONAL_FREE_ENABLED=true nếu chưa khai báo AI_FREE_ENABLED. Giữ cấu hình hạn mức giờ/ngày/tháng hiện tại và ngân sách vận hành do LuxCare chịu; không có phí/ngân sách người dùng. Secrets chỉ đặt ở backend.
+3. Tại mobile chạy npm run review:preflight. Có thể dùng LUXCARE_REVIEW_API_URL để kiểm tra staging HTTPS. Script chỉ gửi GET không xác thực, không tạo tài khoản/email, không gọi provider AI hay mua/nạp.
+4. Preflight kiểm tra 10 đường dẫn: health/capabilities/legal pages 200; AI consent, AI status và Blog blocks 401; wallet/balance và company-wallet/status 410 FEATURE_DISABLED. Capabilities phải có registrationEnabled=true, companyWalletEnabled=false, aiQuotaEnabled=true. Bản server cũ không có flag mới sẽ FAIL, kể cả health vẫn 200.
+5. Profile EAS production dùng HTTPS https://luxcare.igentechnology.net và remote versioning/autoIncrement. Build iOS mới phải lớn hơn **23**; kiểm tra số thực tế trong App Store Connect, không đoán dựa vào source.
+6. Nghiệm thu TestFlight trên iPhone thật; chọn đúng build mới để gửi review. Preflight không thay thế kiểm tra nội dung trang và luồng đã đăng nhập.
 
 ## Nghiệm thu TestFlight
 
-- Đăng nhập → Đăng ký tài khoản; tạo tài khoản không thuộc công ty; nhận và xác minh mã email.
-- AI cá nhân: đọc dữ liệu chia sẻ/tên bên xử lý/chính sách; Không đồng ý phải chặn gửi, Đồng ý mới gửi; thu hồi phải chặn các request tiếp theo. Đăng xuất/đổi tài khoản không dùng nhầm sự đồng ý của tài khoản trước.
-- Kiểm tra quota/lượt còn lại và thời điểm thử lại; không có màn mua/nạp Credit cá nhân.
-- AI doanh nghiệp/Kho tri thức: xác nhận riêng cho workspace trước khi gửi câu hỏi hoặc nạp tài liệu; thấy trạng thái đang trả lời và lỗi nếu provider thất bại.
-- Chat: nội dung/tệp bị bộ lọc chặn phải hiện lý do; báo cáo/chặn/bỏ chặn hoạt động. Admin kiểm tra và xử lý hàng đợi báo cáo trên web.
-- Tài khoản cơ bản: Tài khoản → Bảo mật tài khoản → Xóa; tài khoản doanh nghiệp: Hồ sơ → Xóa. Admin duy nhất thấy deadline 7 ngày và tùy chọn hủy.
-- Link chính sách/điều khoản/hỗ trợ hoạt động trước và sau đăng nhập.
+- Đăng nhập → **Đăng ký tài khoản** → mã email → workspace riêng. Tài khoản mới role trial_user, không tự thành admin doanh nghiệp được duyệt; không yêu cầu trả phí.
+- Hồ sơ → **Doanh nghiệp & lời mời** → **Đăng ký doanh nghiệp**: gửi/theo dõi/bổ sung/hủy đơn miễn phí. Duyệt giữ mã/dữ liệu workspace và cấp quyền admin. Nhận lời mời sang tổ chức khác archive workspace riêng, không tự chuyển dữ liệu.
+- AI trong Chat: đọc dữ liệu chia sẻ/tên bên xử lý/chính sách, từ chối phải chặn gửi, đồng ý mới gửi; thu hồi chặn request tiếp theo. Đổi tài khoản không dùng nhầm consent.
+- AI không cần số dư Credit. Cùng tài khoản web/mobile phải cộng chung hạn mức. Dùng hết hạn mức thì có thông báo và thời điểm dùng lại; không có nút nạp/mua thêm. Không mô tả màn trợ lý cá nhân hay bảng số lượt còn lại nếu mobile không có màn đó.
+- Mobile không có màn Credit/nạp; điều khoản ghi LuxCare chịu toàn bộ chi phí AI. API server vẫn phải chặn client/link/callback cũ. Các màn bảng lương là ghi nhận nghiệp vụ lương, không phải mua quyền sử dụng app.
+- AI doanh nghiệp/Kho tri thức: consent riêng theo workspace; kiểm tra typing và lỗi provider. Quota không thay thế kiểm tra quyền hoặc consent.
+- Chat/Blog: báo cáo, chặn/bỏ chặn và bộ lọc hiện lý do. Bố trí người xử lý hàng đợi báo cáo trên web; lọc cục bộ không đọc pixels/âm thanh bên trong file.
+- Hồ sơ/Bảo mật tài khoản → Xóa; admin duy nhất thấy yêu cầu, hạn xử lý 7 ngày và tùy chọn hủy. Người vận hành phải hoàn tất trong hạn, không coi tiếp nhận là đã xóa.
+- Link chính sách/điều khoản/hỗ trợ hoạt động trước và sau đăng nhập; trang render đúng nội dung miễn phí.
 
 ## App Store Connect
 
-- Dùng Privacy URL `https://luxcare.igentechnology.net/privacy-policy` và Support URL hoạt động; email hỗ trợ thống nhất `support@luxdefa.vn`, cần xác nhận được theo dõi.
-- Mô tả/ảnh chụp phản ánh AI cá nhân miễn phí và doanh nghiệp xét duyệt; không mô tả toàn app là dành riêng cho nhân viên một công ty.
-- Khai báo App Privacy theo dữ liệu thực tế và các tính năng đang bật, gồm thông tin tài khoản, nội dung người dùng, usage/security và vị trí chấm công nếu dùng. Sự đồng ý AI không thay thế khai báo này.
-- Chuẩn bị tài khoản reviewer cơ bản đã xác minh, còn quota; tài khoản công ty nếu cần kiểm tra nghiệp vụ. Điền credentials ở Sign-In Information, không commit mật khẩu.
-- Trả lời đủ năm câu hỏi 3.2 theo bản nháp `D:/cty/LuxCare/docs/APP-REVIEW-ONBOARDING.md`; xác nhận mô hình khách hàng/thu phí đúng thực tế trước khi gửi.
+- [Bản nháp trả lời Apple 09/10](APP-REVIEW-RESPONSE-2026-10-09.md) trả lời năm câu **2.1(b)** và hỏi phạm vi yêu cầu **3.1.1**. Chưa gửi; không khẳng định đã bỏ đăng ký. Không tự suy ra 3.2 đã được duyệt.
+- Giữ phân phối public theo mục tiêu sản phẩm. Metadata mô tả nhiều tổ chức độc lập, tự đăng ký và workspace riêng; không mô tả chỉ dành cho nhân viên LuxCare hay gói trả phí.
+- Review Notes: Login → “Đăng ký tài khoản” → verify email → private workspace; Profile → “Doanh nghiệp & lời mời”; AI in Chat free within usage limits.
+- Chuẩn bị reviewer account đã xác minh email, còn quota, có dữ liệu phù hợp; thêm account tổ chức đã duyệt nếu cần. Chỉ điền credentials trong Sign-In Information, không commit mật khẩu.
+- Privacy URL https://luxcare.igentechnology.net/privacy-policy; support mailbox support@luxdefa.vn cần được theo dõi. App Privacy phản ánh dữ liệu thực tế: account/contact, nội dung người dùng/AI/tệp, usage/security, vị trí chấm công nếu bật. Consent AI không thay thế khai báo này.
 
-## Giới hạn
-
-Bộ lọc cục bộ kiểm tra văn bản, link và metadata tệp, không phân tích nội dung hình ảnh/âm thanh bên trong. Cần người phụ trách xử lý báo cáo và hành động kịp thời. Chưa deploy, build EAS, gửi email, gọi AI thật hoặc gửi trả lời Apple bằng tác vụ sửa code này.
+Các lệnh build/submit xem [APP_STORE_RELEASE_GUIDE.md](APP_STORE_RELEASE_GUIDE.md). Chỉ thực hiện sau nghiệm thu và quyết định phát hành; cập nhật docs không tự phát hành hoặc sửa metadata online.
