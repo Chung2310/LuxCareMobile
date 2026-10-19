@@ -18,6 +18,8 @@ Trên GitHub repository **LuxCareMobile** → Settings → Secrets and variables
 | `APP_STORE_CONNECT_API_KEY_ID` | Key ID của App Store Connect API key |
 | `APP_STORE_CONNECT_ISSUER_ID` | Issuer ID của App Store Connect API team key |
 
+Các tên Secrets cũ hiện có cũng được hỗ trợ, không cần tạo lại: `APPLE_CERTIFICATE_BASE64` thay cho `IOS_DISTRIBUTION_P12_BASE64`, `APPLE_CERTIFICATE_PASSWORD` thay cho `IOS_DISTRIBUTION_P12_PASSWORD`, và `PROVISIONING_PROFILE_BASE64` thay cho profile riêng theo môi trường. Tên mới được ưu tiên; nếu dùng tên mới hãy cấu hình cả certificate/password thành một cặp. Profile chung vẫn được kiểm tra đúng loại: production yêu cầu App Store Connect, preview yêu cầu Ad Hoc. Các tên này chỉ ánh xạ cùng nội dung signing, không chuyển đổi certificate hoặc loại profile.
+
 API key App Store Connect dùng quyền phù hợp để upload build (ví dụ App Manager). Đây là key khác với APNs push key. Workflow cũng nhận PEM nguyên văn trong secret API key nhưng base64 dễ sao chép hơn.
 
 Nếu signing credentials hiện nằm trên EAS, dùng `eas credentials -p ios` tại `mobile/` trên máy quản trị để tải **credentials hiện có** về, lấy `.p12`, password và provisioning profile; thao tác này chỉ chuyển credentials, không build trên EAS. Không revoke certificate đang dùng. Nếu không còn credentials, tạo/export Apple Distribution certificate gồm private key bằng Keychain Access trên Mac và tạo profile tương ứng trên Apple Developer. API key `.p8` lấy từ App Store Connect → Users and Access → Integrations → App Store Connect API, thường chỉ tải được lúc tạo.
