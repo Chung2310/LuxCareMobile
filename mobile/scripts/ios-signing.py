@@ -109,19 +109,27 @@ def append_env(values):
             out.write(f"{key}={value}\n")
 
 
-def validate_p12(p12):
-    # Verify the password and private-key presence before touching the keychain.
-    # OpenSSL output is captured in memory and is never logged or saved.
-    args = ["openssl", "pkcs12", "-in", str(p12), "-passin", "env:IOS_DISTRIBUTION_P12_PASSWORD", "-nocerts", "-nodes"]
+def read_p12(p12, *options):
+    args = ["openssl", "pkcs12", "-in", str(p12), "-passin", "env:IOS_DISTRIBUTION_P12_PASSWORD", *options]
     try:
-        material = run(*args)
+        return run(*args)
     except SigningCommandError as error:
         if "unsupported encryption" not in str(error):
             raise
-        material = run(*args, "-legacy")
+        return run(*args, "-legacy")
+
+
+def validate_p12(p12, profile=None):
+    # OpenSSL output is captured in memory, never logged or saved.
+    material = read_p12(p12, "-nocerts", "-nodes")
     if not re.search(rb"-----BEGIN (?:RSA |EC |ENCRYPTED )?PRIVATE KEY-----", material):
         raise ValueError("The P12 contains no private key. Export the Apple Distribution identity (certificate AND private key) from EAS credentials or Keychain Access; a certificate-only export cannot sign iOS apps.")
-    print("P12 password and private-key presence verified.", flush=True)
+    if profile is not None:
+        certificates = read_p12(p12, "-clcerts", "-nokeys")
+        expected = {hashlib.sha1(cert).hexdigest().upper() for cert in profile.get("DeveloperCertificates", [])}
+        if not certificate_fingerprints(certificates) & expected:
+            raise ValueError("Certificate/profile mismatch: the P12 certificate is not included in the provisioning profile. Download/export a matching P12 and profile pair, then update both GitHub Secrets.")
+    print("P12 password, private key and certificate/profile pairing verified.", flush=True)
 
 
 def certificate_fingerprints(pem):
@@ -147,8 +155,18 @@ def select_identity(keychain, profile):
     raise ValueError("P12 certificate matches profile, but no valid private-key signing identity was imported. Check the key pair and Apple intermediate certificate chain.")
 
 
+def resolve_p12(env):
+    if env.get("IOS_DISTRIBUTION_P12_BASE64"):
+        return env["IOS_DISTRIBUTION_P12_BASE64"], env.get("IOS_DISTRIBUTION_P12_PASSWORD", "")
+    return env.get("APPLE_CERTIFICATE_BASE64", ""), env.get("APPLE_CERTIFICATE_PASSWORD", "")
+
+
 def install(folder):
     env = os.environ
+    # Select the password from the same credential family as the P12, including an empty password.
+    certificate, password = resolve_p12(env)
+    env["IOS_DISTRIBUTION_P12_BASE64"] = certificate
+    env["IOS_DISTRIBUTION_P12_PASSWORD"] = password
     for key in ["IOS_DISTRIBUTION_P12_BASE64", "IOS_PROVISIONING_PROFILE_BASE64"]:
         if not env.get(key):
             raise ValueError(f"Missing signing secret {key}")
@@ -157,11 +175,11 @@ def install(folder):
     folder.mkdir(mode=0o700)
     p12 = folder / "distribution.p12"
     p12.write_bytes(decode(env["IOS_DISTRIBUTION_P12_BASE64"]))
-    validate_p12(p12)
     profile_path = folder / "profile.mobileprovision"
     profile_path.write_bytes(decode(env["IOS_PROVISIONING_PROFILE_BASE64"]))
     profile = plistlib.loads(run("security", "cms", "-D", "-i", str(profile_path)))
     validate_profile(profile, env)
+    validate_p12(p12, profile)
     (folder / "profile.plist").write_bytes(plistlib.dumps(profile))
     keychain = folder / "build.keychain-db"
     original = shlex.split(run("security", "list-keychains", "-d", "user").decode())
@@ -188,7 +206,7 @@ def install(folder):
         shutil.copyfile(profile_path, destination)
     (folder / "ExportOptions.plist").write_bytes(plistlib.dumps(export_options(env, profile["UUID"], identity)))
     values = {"IOS_PROFILE_UUID": profile["UUID"], "IOS_SIGNING_IDENTITY": identity, "IOS_KEYCHAIN_PATH": str(keychain)}
-    if env.get("UPLOAD_TESTFLIGHT") == "true":
+    if env.get("UPLOAD_TESTFLIGHT") == "true" or (env.get("BUILD_PROFILE") == "production" and env.get("APP_STORE_CONNECT_API_KEY_BASE64")):
         key_id = env.get("APP_STORE_CONNECT_API_KEY_ID", "").strip()
         issuer = env.get("APP_STORE_CONNECT_ISSUER_ID", "").strip()
         if not re.fullmatch(r"[A-Z0-9]{10}", key_id) or not re.fullmatch(r"[a-fA-F0-9-]{36}", issuer):
@@ -224,23 +242,37 @@ def verify_app(folder):
 def cleanup(folder):
     if not folder.exists():
         return
+    expected = Path(os.environ["RUNNER_TEMP"]).resolve() / "luxcare-ios-signing"
+    if folder.resolve() != expected:
+        raise ValueError("Unexpected signing cleanup directory")
+    errors = []
     original = folder / "original-keychains.json"
     if original.exists():
-        run("security", "list-keychains", "-d", "user", "-s", *json.loads(original.read_text()))
+        try:
+            run("security", "list-keychains", "-d", "user", "-s", *json.loads(original.read_text()))
+        except SigningCommandError as error:
+            errors.append(str(error))
     keychain = folder / "build.keychain-db"
     if keychain.exists():
-        run("security", "delete-keychain", str(keychain))
-    installed = folder / "installed-profiles.json"
-    if installed.exists():
-        allowed = [(Path.home() / "Library/Developer/Xcode/UserData/Provisioning Profiles").resolve(),
-                   (Path.home() / "Library/MobileDevice/Provisioning Profiles").resolve()]
-        for name in json.loads(installed.read_text()):
-            profile = Path(name).resolve()
-            if profile.parent not in allowed or not re.fullmatch(r"[a-fA-F0-9-]{36}\.mobileprovision", profile.name):
-                raise ValueError("Unexpected provisioning profile cleanup path")
-            profile.unlink(missing_ok=True)
-    # folder is a fixed child of RUNNER_TEMP, never a user-supplied deletion target.
-    shutil.rmtree(folder)
+        try:
+            run("security", "delete-keychain", str(keychain))
+        except SigningCommandError as error:
+            errors.append(str(error))
+    try:
+        installed = folder / "installed-profiles.json"
+        if installed.exists():
+            allowed = [(Path.home() / "Library/Developer/Xcode/UserData/Provisioning Profiles").resolve(),
+                       (Path.home() / "Library/MobileDevice/Provisioning Profiles").resolve()]
+            for name in json.loads(installed.read_text()):
+                profile = Path(name).resolve()
+                if profile.parent not in allowed or not re.fullmatch(r"[a-fA-F0-9-]{36}\.mobileprovision", profile.name):
+                    raise ValueError("Unexpected provisioning profile cleanup path")
+                profile.unlink(missing_ok=True)
+    finally:
+        # Fixed and verified child of RUNNER_TEMP; remove private files even if keychain restore failed.
+        shutil.rmtree(folder)
+    if errors:
+        raise SigningCommandError("Temporary files removed; keychain cleanup reported: " + "; ".join(errors))
     print("Temporary signing credentials removed.")
 
 

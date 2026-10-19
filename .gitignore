@@ -27,3 +27,6 @@ mobile/ios/
 *.xcarchive/
 *.ipa
 __pycache__/
+
+# EAS credential exports contain the P12 password
+credentials.json

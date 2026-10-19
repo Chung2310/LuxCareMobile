@@ -58,13 +58,14 @@ Số build mặc định = `IOS_BUILD_NUMBER_BASE + github.run_number`. Trước
 
 ## Chạy production / TestFlight
 
-1. Deploy backend B2B trước. Workflow production chạy `review:preflight`; sẽ dừng trước signing nếu public API chưa đáp ứng cấu hình B2B, legal URLs hoặc Credit chưa tắt.
-2. Đưa workflow và toàn bộ source mới lên nhánh cần build trong repository LuxCareMobile. Workflow phải có trên nhánh mặc định để nút Run workflow hiện ra.
-3. Actions → **Build iOS IPA (GitHub macOS)** → Run workflow → chọn nhánh → profile `production`.
-4. Chọn `upload_testflight=true` để upload sau khi IPA kiểm tra thành công; chọn false nếu chỉ cần tải IPA để dùng Transporter.
-5. Tải artifact `LuxCare-ios-production-<run>-<attempt>`: `LuxCare.ipa`, debug symbols. Log native nằm trong artifact riêng, giữ 7 ngày.
-6. Chờ Apple xử lý build trong App Store Connect → TestFlight. Upload thành công chưa đồng nghĩa build được xử lý xong hoặc được duyệt. Nghiệm thu lời mời, OTP, quyền tổ chức, AI/push và xóa tài khoản trên iPhone.
-7. Chọn build mới khi resubmit. Giữ App Store Connect distribution **Public** theo [APP-REVIEW-B2B.md](../docs/APP-REVIEW-B2B.md).
+1. Kiểm tra signing trước: Run workflow với `signing_check_only=true`. Chế độ này đọc profile, kiểm tra mật khẩu/private key/P12 có khớp certificate trong profile, thử import/keychain và kiểm tra API key nếu đã cấu hình; không compile hoặc upload. Khi pass, chạy lượt mới với `signing_check_only=false`.
+2. Deploy backend B2B trước. Workflow production chạy `review:preflight`; sẽ dừng trước signing nếu public API chưa đáp ứng cấu hình B2B, legal URLs hoặc Credit chưa tắt.
+3. Đưa workflow và toàn bộ source mới lên nhánh cần build trong repository LuxCareMobile. Workflow phải có trên nhánh mặc định để nút Run workflow hiện ra.
+4. Actions → **Build iOS IPA (GitHub macOS)** → Run workflow → chọn nhánh → profile `production`.
+5. Chọn `upload_testflight=true` để upload sau khi IPA kiểm tra thành công; chọn false nếu chỉ cần tải IPA để dùng Transporter.
+6. Tải artifact `LuxCare-ios-production-<run>-<attempt>`: `LuxCare.ipa`, debug symbols. Log native nằm trong artifact riêng, giữ 7 ngày.
+7. Chờ Apple xử lý build trong App Store Connect → TestFlight. Upload thành công chưa đồng nghĩa build được xử lý xong hoặc được duyệt. Nghiệm thu lời mời, OTP, quyền tổ chức, AI/push và xóa tài khoản trên iPhone.
+8. Chọn build mới khi resubmit. Giữ App Store Connect distribution **Public** theo [APP-REVIEW-B2B.md](../docs/APP-REVIEW-B2B.md).
 
 Workflow chỉ upload binary, không tự gửi App Review hoặc phát hành App Store. Không cần Apple ID/password hay token Expo để chạy workflow này.
 
@@ -86,3 +87,19 @@ bash -n scripts/build-signed-ios.sh
 CI thường cũng chạy các kiểm tra helper này. Windows kiểm tra được cấu hình, profile validation và serialization Xcode project; archive/codesign/upload cần runner macOS cùng credentials thật. Build này dùng phút macOS GitHub; cần bảo đảm Actions được bật và billing/quota phù hợp. Nếu runner bỏ Xcode 26.4.1, cập nhật `DEVELOPER_DIR` sang bản đáp ứng Expo SDK 57 (Xcode 26.4 trở lên) sau khi kiểm tra.
 
 Nguồn: [Expo native production builds](https://docs.expo.dev/guides/local-app-production/), [Expo SDK 57](https://docs.expo.dev/versions/v57.0.0/), [GitHub Apple signing](https://docs.github.com/en/actions/how-tos/deploy/deploy-to-third-party-platforms/sign-xcode-applications), [macOS runner image](https://github.com/actions/runner-images/blob/main/images/macos/macos-26-Readme.md), [Apple upload builds](https://developer.apple.com/help/app-store-connect/manage-builds/upload-builds/).
+
+## Xử lý lỗi certificate/profile không khớp
+
+Đã xác minh trên runner macOS ngày 19/10: P12 hiện tại mở được bằng password và có private key, nhưng certificate import từ P12 không nằm trong provisioning profile đang cấu hình. Đây là lỗi cặp credentials, không thể chữa bằng cách bỏ kiểm tra signing.
+
+Để lấy lại đúng cặp credentials từng được EAS quản lý, tại thư mục `mobile/` chạy:
+
+```bash
+npx eas-cli credentials --platform ios
+```
+
+Chọn profile production, mục **Credentials.json: Upload/Download credentials between EAS servers and your local json**, rồi **Download credentials from EAS to credentials.json**. Lấy đường dẫn P12/profile và password từ file xuất. Cập nhật đồng thời `APPLE_CERTIFICATE_BASE64`, `APPLE_CERTIFICATE_PASSWORD`, `PROVISIONING_PROFILE_BASE64` trong GitHub bằng các file trong cùng bộ xuất. Không trộn P12 của bộ cũ với profile mới. Nếu đã tạo tên Secrets `IOS_*`, chúng được ưu tiên nên phải cập nhật chính các tên đó hoặc bỏ bản cũ tránh che Secrets `APPLE_*`.
+
+Nếu tự quản lý Apple Developer, tạo lại profile App Store Connect cho đúng Bundle ID và chọn đúng distribution certificate tương ứng P12/private key hiện có. Không cần revoke certificate hợp lệ chỉ để tạo profile mới.
+
+Đây là thao tác tải credentials theo [hướng dẫn Expo](https://docs.expo.dev/app-signing/syncing-credentials/); việc compile vẫn chạy trên GitHub macOS. `credentials.json` và các file signing đã được gitignore, không gửi private key/password qua chat hoặc commit vào Git.
