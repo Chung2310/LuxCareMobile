@@ -124,6 +124,29 @@ def validate_p12(p12):
     print("P12 password and private-key presence verified.", flush=True)
 
 
+def certificate_fingerprints(pem):
+    return {hashlib.sha1(base64.b64decode(match)).hexdigest().upper()
+            for match in re.findall(rb"-----BEGIN CERTIFICATE-----\s*(.*?)\s*-----END CERTIFICATE-----", pem, re.DOTALL)}
+
+
+def select_identity(keychain, profile):
+    imported = certificate_fingerprints(run("security", "find-certificate", "-a", "-p", str(keychain)))
+    expected = {hashlib.sha1(cert).hexdigest().upper() for cert in profile.get("DeveloperCertificates", [])}
+    common = imported & expected
+    if not common:
+        raise ValueError("Certificate/profile mismatch: the P12 certificate is not included in the provisioning profile. Update the profile and P12 as a matching pair.")
+    identities = run("security", "find-identity", "-v", "-p", "codesigning", str(keychain)).decode()
+    available = set(re.findall(r"\b[0-9A-F]{40}\b", identities))
+    matching = sorted(common & available)
+    if matching:
+        return matching[0]
+    all_identities = run("security", "find-identity", "-p", "codesigning", str(keychain)).decode()
+    reasons = [reason for reason in ["CSSMERR_TP_CERT_EXPIRED", "CSSMERR_TP_NOT_TRUSTED", "CSSMERR_TP_CERT_REVOKED", "CSSMERR_TP_CERT_NOT_VALID_YET"] if reason in all_identities]
+    if reasons:
+        raise ValueError("P12 certificate matches profile but macOS rejects the signing identity: " + ", ".join(reasons))
+    raise ValueError("P12 certificate matches profile, but no valid private-key signing identity was imported. Check the key pair and Apple intermediate certificate chain.")
+
+
 def install(folder):
     env = os.environ
     for key in ["IOS_DISTRIBUTION_P12_BASE64", "IOS_PROVISIONING_PROFILE_BASE64"]:
@@ -150,13 +173,7 @@ def install(folder):
     run("security", "import", str(p12), "-P", env["IOS_DISTRIBUTION_P12_PASSWORD"],
         "-f", "pkcs12", "-k", str(keychain), "-T", "/usr/bin/codesign", "-T", "/usr/bin/security")
     run("security", "list-keychains", "-d", "user", "-s", str(keychain), *original)
-    identities = run("security", "find-identity", "-v", "-p", "codesigning", str(keychain)).decode()
-    available = set(re.findall(r"\b[0-9A-F]{40}\b", identities))
-    matching = [hashlib.sha1(cert).hexdigest().upper() for cert in profile.get("DeveloperCertificates", [])
-                if hashlib.sha1(cert).hexdigest().upper() in available]
-    if not matching:
-        raise ValueError("P12 private key/certificate does not match a valid signing identity in this profile")
-    identity = matching[0]
+    identity = select_identity(keychain, profile)
     run("security", "set-key-partition-list", "-S", "apple-tool:,apple:,codesign:", "-s", "-k", password, str(keychain))
     # Current Xcode location, plus the legacy location supported by older toolchains.
     installed = []
