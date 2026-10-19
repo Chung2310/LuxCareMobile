@@ -1,28 +1,47 @@
-if (process.env.EAS_BUILD_PROFILE === "production") {
+if ((process.env.BUILD_PROFILE || process.env.EAS_BUILD_PROFILE) === "production") {
   const apiUrl = new URL(process.env.EXPO_PUBLIC_API_URL || "https://unconfigured.invalid");
-  if (apiUrl.protocol !== "https:" || /^(localhost|unconfigured\.invalid|127\.|192\.168\.|10\.|172\.(1[6-9]|2\d|3[01])\.)/.test(apiUrl.hostname))
+  if (
+    apiUrl.protocol !== "https:" ||
+    /^(localhost|unconfigured\.invalid|127\.|192\.168\.|10\.|172\.(1[6-9]|2\d|3[01])\.)/.test(apiUrl.hostname)
+  )
     throw new Error("Production builds require a public HTTPS EXPO_PUBLIC_API_URL.");
 }
 const releaseVersionCode = process.env.LUXCARE_ANDROID_VERSION_CODE;
-if (releaseVersionCode && (!/^[1-9]\d*$/.test(releaseVersionCode) || Number(releaseVersionCode) > 2100000000)) throw new Error("Invalid Android versionCode");
+if (releaseVersionCode && (!/^[1-9]\d*$/.test(releaseVersionCode) || Number(releaseVersionCode) > 2100000000))
+  throw new Error("Invalid Android versionCode");
 
 const iosBuildNumber = process.env.IOS_BUILD_NUMBER || process.env.LUXCARE_IOS_BUILD_NUMBER;
-if (iosBuildNumber && (!/^[1-9]\d*$/.test(iosBuildNumber) || Number(iosBuildNumber) > 2100000000)) throw new Error("Invalid iOS buildNumber");
+if (iosBuildNumber && (!/^[1-9]\d*$/.test(iosBuildNumber) || Number(iosBuildNumber) > 2100000000))
+  throw new Error("Invalid iOS buildNumber");
 
 // Supply the actual registered application IDs and EAS project ID at build time.
 module.exports = ({ config }) => ({
   ...config,
   ...(process.env.APP_VERSION ? { version: process.env.APP_VERSION } : {}),
-  extra: { ...config.extra, ...(process.env.EXPO_PUBLIC_EAS_PROJECT_ID ? {
-    eas: { ...config.extra?.eas, projectId: process.env.EXPO_PUBLIC_EAS_PROJECT_ID },
-  } : {}) },
-  android: { ...config.android,
+  extra: {
+    ...config.extra,
+    ...(process.env.EXPO_PUBLIC_EAS_PROJECT_ID
+      ? {
+          eas: { ...config.extra?.eas, projectId: process.env.EXPO_PUBLIC_EAS_PROJECT_ID },
+        }
+      : {}),
+  },
+  android: {
+    ...config.android,
     ...(releaseVersionCode ? { versionCode: Number(releaseVersionCode) } : {}),
     ...(process.env.LUXCARE_ANDROID_PACKAGE ? { package: process.env.LUXCARE_ANDROID_PACKAGE } : {}),
     ...(process.env.GOOGLE_SERVICES_JSON ? { googleServicesFile: process.env.GOOGLE_SERVICES_JSON } : {}),
   },
-  ios: { ...config.ios,
+  ios: {
+    ...config.ios,
+    ...(["production", "preview"].includes(process.env.BUILD_PROFILE)
+      ? {
+          entitlements: { ...config.ios?.entitlements, "aps-environment": "production" },
+        }
+      : {}),
     ...(iosBuildNumber ? { buildNumber: String(iosBuildNumber) } : {}),
-    ...(process.env.LUXCARE_IOS_BUNDLE_IDENTIFIER ? { bundleIdentifier: process.env.LUXCARE_IOS_BUNDLE_IDENTIFIER } : {}),
+    ...(process.env.LUXCARE_IOS_BUNDLE_IDENTIFIER
+      ? { bundleIdentifier: process.env.LUXCARE_IOS_BUNDLE_IDENTIFIER }
+      : {}),
   },
 });

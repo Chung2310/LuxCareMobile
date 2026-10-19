@@ -42,24 +42,25 @@ export function needsOnboarding(user?: { role?: string; companyCode?: string } |
   return Boolean(
     user &&
     user.role !== "superadmin" &&
-    !user.companyCode &&
+    (!user.companyCode || user.role === "trial_user") &&
     !["blog_editor", "blog_author"].includes(user.role || ""),
   );
 }
 export function isTrialUser(user?: { role?: string } | null): boolean {
   return user?.role === "trial_user";
 }
-export function needsEmailVerification(user?: {
-  onboardingRequired?: boolean;
-  emailVerifiedAt?: string | null;
-  companyCode?: string;
-} | null): boolean {
+export function needsEmailVerification(
+  user?: {
+    onboardingRequired?: boolean;
+    emailVerifiedAt?: string | null;
+    companyCode?: string;
+  } | null,
+): boolean {
   return Boolean(user?.onboardingRequired && !user.emailVerifiedAt && !user.companyCode);
 }
 export function isOnboardingRoute(method: string, originalUrl: string): boolean {
   const path = originalUrl.split("?")[0].replace(/\/$/, "");
   if (/^\/api\/v1\/onboarding(?:\/|$)/.test(path)) return true;
-  if (/^\/api\/v1\/ai\/consent\/(?:personal|company)$/.test(path) && ["GET", "POST"].includes(method.toUpperCase())) return true;
   const allowed: Record<string, string[]> = {
     "/api/v1/auth/me": ["GET"],
     "/api/v1/auth/logout": ["POST"],

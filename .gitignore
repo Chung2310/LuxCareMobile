@@ -21,3 +21,9 @@ LuxCare-develop/
 
 # Local Android signing backup (never commit)
 .android-signing/
+
+# Generated iOS projects and local native build output
+mobile/ios/
+*.xcarchive/
+*.ipa
+__pycache__/

@@ -1,92 +1,86 @@
-# Build IPA bằng GitHub Actions
+# Build iOS trực tiếp trên GitHub macOS
 
-## Cài qua USB bằng Sideloadly (không cần ký trên EAS)
+Workflow chính: `.github/workflows/build-ios.yml`, tên **Build iOS IPA (GitHub macOS)**.
+Chạy thủ công trên `macos-26`, Xcode 26.4.1, Node 22. Expo CLI chỉ tạo native project bằng prebuild ngay trên runner; Xcode archive/export và Apple upload cũng chạy trên runner. Không gọi EAS Build/Submit, không cần EXPO_TOKEN hoặc quota EAS Build.
+Expo project ID vẫn được giữ để đăng ký Expo Push Token. Dịch vụ gửi push hiện có là phần riêng với dịch vụ build.
 
-Dùng workflow **Build iOS IPA for Sideloadly** trong `.github/workflows/build-ios-sideloadly.yml`.
-Workflow tự chạy khi `develop` nhận commit mới (merge PR hoặc push trực tiếp); không chạy khi PR chỉ được mở/cập nhật. Vẫn hỗ trợ chạy thủ công qua Run workflow.
-Workflow này chạy Xcode trên GitHub macOS 26, build Release cho iPhone thật, tắt code signing rồi đóng gói `Payload/*.app` thành `LuxCare-unsigned.ipa`.
-Không cần EXPO_TOKEN, chứng chỉ .p12, provisioning profile, Apple Developer trả phí hoặc đăng ký UDID cho bước build này.
-Không gửi Apple ID/mật khẩu lên GitHub. Sideloadly ký và cài bằng tài khoản của bạn trên máy tính.
+## Thiết lập signing một lần
 
-### Cấu hình và chạy
+Trên GitHub repository **LuxCareMobile** → Settings → Secrets and variables → Actions.
 
-1. GitHub → Settings → Secrets and variables → Actions → Variables:
-   - `EXPO_PUBLIC_API_URL`: backend HTTPS mà iPhone truy cập được, không dùng localhost.
-   - `LUXCARE_IOS_BUNDLE_IDENTIFIER`: ví dụ `com.yourcompany.luxcare`, giữ ổn định qua các lần cài.
-   - `EXPO_PUBLIC_EAS_PROJECT_ID`: không bắt buộc cho build unsigned; chỉ dùng nếu đã có dự án Expo phù hợp.
-2. Đưa workflow lên nhánh mặc định để hiện nút Run workflow.
-3. Merge PR vào `develop` để tự build, hoặc Actions → **Build iOS IPA for Sideloadly** → Run workflow → chọn nhánh.
-4. Tải artifact `LuxCare-ios-sideloadly-<run number>`, giải nén ZIP ngoài để lấy IPA. Không giải nén file IPA.
-5. Cài Sideloadly từ trang chính thức. Trên Windows, làm theo yêu cầu iTunes/iCloud bản web của Sideloadly.
-6. Kết nối iPhone qua USB, mở khóa và chọn Trust/Tin cậy máy tính.
-7. Trong Sideloadly chọn iPhone, kéo IPA vào, nhập Apple ID và chạy cài đặt.
-8. Nếu iOS yêu cầu, tin cậy tài khoản nhà phát triển trong Settings → General → VPN & Device Management và bật Developer Mode trong Privacy & Security.
+| Secret | Nội dung |
+| --- | --- |
+| `IOS_DISTRIBUTION_P12_BASE64` | Base64 file Apple Distribution `.p12`, gồm certificate **và private key** |
+| `IOS_DISTRIBUTION_P12_PASSWORD` | Mật khẩu xuất file `.p12`; có thể rỗng nếu file không đặt mật khẩu |
+| `IOS_APP_STORE_PROFILE_BASE64` | Base64 provisioning profile **App Store Connect** cho Bundle ID hiện tại |
+| `IOS_ADHOC_PROFILE_BASE64` | Chỉ cần cho preview: base64 profile **Ad Hoc** có UDID iPhone cần cài |
+| `APP_STORE_CONNECT_API_KEY_BASE64` | Base64 file API key `.p8`; chỉ cần khi chọn upload TestFlight |
+| `APP_STORE_CONNECT_API_KEY_ID` | Key ID của App Store Connect API key |
+| `APP_STORE_CONNECT_ISSUER_ID` | Issuer ID của App Store Connect API team key |
 
-### Giới hạn cần biết
+API key App Store Connect dùng quyền phù hợp để upload build (ví dụ App Manager). Đây là key khác với APNs push key. Workflow cũng nhận PEM nguyên văn trong secret API key nhưng base64 dễ sao chép hơn.
 
-- Tài khoản Apple miễn phí: app thường có hiệu lực 7 ngày; cần ký lại hoặc dùng auto-refresh của Sideloadly.
-- App hiện dùng Expo SDK 57, yêu cầu iOS 16.4 trở lên. Không hạ minimum iOS bằng công cụ sideload để vượt yêu cầu native SDK.
-- IPA unsigned không thể tự cài bằng cách mở file trên iPhone; phải được Sideloadly ký trước.
-- Không phải bản TestFlight/App Store. Workflow EAS có ký vẫn được giữ riêng phía dưới.
-- Bản này phù hợp thử độ mượt, login, Blog, chat. Socket realtime khi app đang hoạt động khác với push nền.
-- Push nền/APNs cần quyền ký và credentials phù hợp; không dùng bản ký bằng Apple ID miễn phí để kết luận push hoạt động. App có thể báo thông báo nền chưa cấu hình/đăng ký thất bại.
-- Đổi Bundle ID/nhóm ký có thể ảnh hưởng phiên đăng nhập, Keychain và push token; hãy kiểm tra lại login sau khi cài.
-- Workflow kiểm tra arm64, nền tảng iphoneos và bundle JS trước khi xuất IPA. Chưa xác minh cài/chạy trên iPhone cho tới khi có build thực tế.
-- Build dùng phút chạy macOS của GitHub Actions; không dùng quota EAS. Lỗi native build được lưu trong artifact log.
-- Xcode được chọn là 26.4.1 (đáp ứng SDK 57); cần cập nhật đường dẫn nếu GitHub runner bỏ phiên bản này trong tương lai.
+Nếu signing credentials hiện nằm trên EAS, dùng `eas credentials -p ios` tại `mobile/` trên máy quản trị để tải **credentials hiện có** về, lấy `.p12`, password và provisioning profile; thao tác này chỉ chuyển credentials, không build trên EAS. Không revoke certificate đang dùng. Nếu không còn credentials, tạo/export Apple Distribution certificate gồm private key bằng Keychain Access trên Mac và tạo profile tương ứng trên Apple Developer. API key `.p8` lấy từ App Store Connect → Users and Access → Integrations → App Store Connect API, thường chỉ tải được lúc tạo.
 
-Nguồn: [Sideloadly chính thức](https://sideloadly.io/), [Expo SDK 57](https://docs.expo.dev/versions/v57.0.0/).
+Profile phải khớp chính xác `com.luxcare.mobile`, team `VP77TD9A77`, còn hạn và chứa certificate trong `.p12`. Bật Push Notifications trên App ID và tạo lại profile nếu capability thiếu. Profile App Store/Ad Hoc phải có quyền push production khi ứng dụng sử dụng push nền. Luồng hiện hỗ trợ một app target; khi thêm extension phải bổ sung profile riêng trước khi build.
 
-## Luồng EAS có ký (tùy chọn thay thế)
+Base64 file trên Mac (kết quả chỉ dán vào GitHub Secret tương ứng):
 
-Workflow: `.github/workflows/build-ios.yml`. Chỉ chạy thủ công, không chạy trên push/PR và không tự submit lên App Store.
-GitHub dùng EAS Build cloud để ký/biên dịch iOS, sau đó tải IPA về Artifacts (giữ 7 ngày).
-Có thể phát sinh phí/quota EAS và phút chạy GitHub. Bản build là Release, không cần Metro/Expo Go.
+```bash
+base64 -i distribution.p12 | pbcopy
+base64 -i LuxCare_AppStore.mobileprovision | pbcopy
+base64 -i AuthKey_YOURKEYID.p8 | pbcopy
+```
 
-## Thiết lập một lần
+Trên PowerShell, đưa trực tiếp vào clipboard, không in nội dung lên log:
 
-Cần tài khoản Expo, dự án EAS và Apple Developer Program còn hiệu lực.
-Trong GitHub → Settings → Secrets and variables → Actions, khai báo:
+```powershell
+[Convert]::ToBase64String([IO.File]::ReadAllBytes('C:\signing\distribution.p12')) | Set-Clipboard
+```
 
-| Loại | Tên | Giá trị |
-| --- | --- | --- |
-| Secret | `EXPO_TOKEN` | Expo access token có quyền build dự án |
-| Variable | `EXPO_PUBLIC_API_URL` | URL HTTPS backend mà iPhone truy cập được |
-| Variable | `EXPO_PUBLIC_EAS_PROJECT_ID` | UUID dự án EAS |
-| Variable | `LUXCARE_IOS_BUNDLE_IDENTIFIER` | Bundle ID đã đăng ký, ví dụ `com.yourcompany.luxcare` |
+Giữ các file signing ngoài repository. Runner tạo keychain tạm, chỉ cấp signing app target, kiểm tra certificate/profile, sau đó xóa keychain/profile/API key kể cả khi build lỗi. Artifacts chỉ gồm IPA, dSYMs và log Xcode; không upload thư mục credentials.
 
-Không đặt mật khẩu, token API hoặc khóa bí mật trong các biến EXPO_PUBLIC.
-Script CI chuyển ba giá trị cấu hình công khai vào profile EAS trước khi upload mã nguồn; không ghi EXPO_TOKEN vào file.
-Tránh đặt giá trị khác cho cùng các biến trong EAS Environment.
-Workflow upload cả repository để giữ các import nguồn chung `src/` và `shared/` ngoài mobile.
+## Variables và số build
 
-Trên máy phát triển, từ `mobile/`, đăng nhập Expo và liên kết đúng dự án bằng `npx eas-cli@latest init`.
-Cấu hình các biến môi trường phía trên với cùng giá trị trong terminal.
-Nếu init thay đổi app config, kiểm tra và lưu project ID đúng; app.config.js hiện cũng hỗ trợ project ID qua biến môi trường.
+| Variable | Mặc định |
+| --- | --- |
+| `EXPO_PUBLIC_API_URL` | `https://luxcare.igentechnology.net` |
+| `LUXCARE_IOS_BUNDLE_IDENTIFIER` | `com.luxcare.mobile` |
+| `APPLE_TEAM_ID` | `VP77TD9A77` |
+| `EXPO_PUBLIC_EAS_PROJECT_ID` | `0ec1cf95-301c-44f9-8317-23b44d0f5234` (push registration) |
+| `IOS_BUILD_NUMBER_BASE` | `1000` |
 
-Đối với preview:
-1. Chạy `npx eas-cli@latest device:create`, mở link trên từng iPhone và đăng ký thiết bị.
-2. Chạy `npx eas-cli@latest build --platform ios --profile preview` tương tác một lần.
-3. Đăng nhập Apple theo hướng dẫn để EAS tạo/lưu distribution certificate và provisioning profile, chọn đúng thiết bị.
-4. Chờ build đầu tiên thành công rồi mới dùng CI.
+Số build mặc định = `IOS_BUILD_NUMBER_BASE + github.run_number`. Trước lần đầu, xem số build cao nhất trong App Store Connect và đặt base để kết quả lớn hơn số đó. Có thể nhập `build_number` thủ công. Bộ đếm version remote trong EAS không còn được dùng bởi workflow này. Nếu rerun một workflow đã upload thành công, số build không tự đổi: tạo Run workflow mới hoặc nhập số mới để tránh duplicate build. Khi dùng override lớn, tăng base cho các lần sau.
 
-Đối với production: thiết lập credentials bằng một lần build tương tác với `--profile production`.
-CI dùng credentials đã lưu trên EAS, không cần đặt Apple ID/password hay file .p12 vào GitHub.
-Thông báo đẩy còn cần APNs credentials tương ứng; chỉ build IPA thành công chưa đảm bảo push hoạt động.
+`app_version` có thể đặt `1.0.1`; để trống dùng `app.json`. Giữ marketing version phù hợp với phiên bản đang chuẩn bị gửi Apple.
 
-## Chạy và tải IPA
+## Chạy production / TestFlight
 
-1. Đưa workflow lên nhánh mặc định để nút Run workflow xuất hiện trong GitHub Actions.
-2. Actions → **Build iOS IPA** → **Run workflow** → chọn nhánh và profile.
-3. Sau khi thành công, tải artifact `LuxCare-ios-<profile>-<run number>`; giải nén để lấy `LuxCare.ipa`.
+1. Deploy backend B2B trước. Workflow production chạy `review:preflight`; sẽ dừng trước signing nếu public API chưa đáp ứng cấu hình B2B, legal URLs hoặc Credit chưa tắt.
+2. Đưa workflow và toàn bộ source mới lên nhánh cần build trong repository LuxCareMobile. Workflow phải có trên nhánh mặc định để nút Run workflow hiện ra.
+3. Actions → **Build iOS IPA (GitHub macOS)** → Run workflow → chọn nhánh → profile `production`.
+4. Chọn `upload_testflight=true` để upload sau khi IPA kiểm tra thành công; chọn false nếu chỉ cần tải IPA để dùng Transporter.
+5. Tải artifact `LuxCare-ios-production-<run>-<attempt>`: `LuxCare.ipa`, debug symbols. Log native nằm trong artifact riêng, giữ 7 ngày.
+6. Chờ Apple xử lý build trong App Store Connect → TestFlight. Upload thành công chưa đồng nghĩa build được xử lý xong hoặc được duyệt. Nghiệm thu lời mời, OTP, quyền tổ chức, AI/push và xóa tài khoản trên iPhone.
+7. Chọn build mới khi resubmit. Giữ App Store Connect distribution **Public** theo [APP-REVIEW-B2B.md](../docs/APP-REVIEW-B2B.md).
 
-- `preview`: chỉ cài trên iPhone có UDID trong provisioning profile. Link cài trực tiếp nằm trên trang build EAS.
-- `production`: IPA dành cho TestFlight/App Store; không cài trực tiếp như APK. Workflow không tự submit.
-- Thêm iPhone mới: đăng ký rồi build tương tác lại/re-sign để cập nhật provisioning profile. CI non-interactive không tự thêm thiết bị mới.
-- Khi hủy/timeout GitHub job, kiểm tra EAS: build cloud có thể vẫn chạy; hủy trên EAS nếu không cần.
-- Nếu build báo thiếu signing credentials, quay lại bước thiết lập tương tác, không commit certificate hoặc khóa vào repo.
+Workflow chỉ upload binary, không tự gửi App Review hoặc phát hành App Store. Không cần Apple ID/password hay token Expo để chạy workflow này.
 
-Kiểm tra script cấu hình: `node --test mobile/scripts/prepare-ios-build.check.cjs` từ thư mục gốc.
-Chưa chạy build ký thật nếu chưa có tài khoản/credentials.
+## Preview và thử cài qua USB
 
-Tham khảo: [Expo CI](https://docs.expo.dev/build/building-on-ci/), [internal distribution](https://docs.expo.dev/build/internal-distribution/).
+Chọn `profile=preview` để xuất IPA ký Ad Hoc; chỉ cài được trên các thiết bị có UDID trong profile. Preview không upload TestFlight kể cả checkbox đang bật. Thêm thiết bị phải cập nhật profile trong GitHub Secret trước khi build lại.
+
+Workflow `.github/workflows/build-ios-sideloadly.yml` (**Build IPA & APK**) vẫn phục vụ thử nghiệm unsigned + Android, tự chạy khi push `develop`. IPA unsigned cần Sideloadly ký lại trên máy cài đặt; không dùng để gửi App Store. Production chọn workflow ký ở trên.
+
+## Kiểm tra và giới hạn local
+
+```bash
+cd mobile
+node --test scripts/prepare-ios-build.check.cjs scripts/configure-ios-signing.check.cjs
+python3 scripts/ios-signing.check.py
+bash -n scripts/build-signed-ios.sh
+```
+
+CI thường cũng chạy các kiểm tra helper này. Windows kiểm tra được cấu hình, profile validation và serialization Xcode project; archive/codesign/upload cần runner macOS cùng credentials thật. Build này dùng phút macOS GitHub; cần bảo đảm Actions được bật và billing/quota phù hợp. Nếu runner bỏ Xcode 26.4.1, cập nhật `DEVELOPER_DIR` sang bản đáp ứng Expo SDK 57 (Xcode 26.4 trở lên) sau khi kiểm tra.
+
+Nguồn: [Expo native production builds](https://docs.expo.dev/guides/local-app-production/), [Expo SDK 57](https://docs.expo.dev/versions/v57.0.0/), [GitHub Apple signing](https://docs.github.com/en/actions/how-tos/deploy/deploy-to-third-party-platforms/sign-xcode-applications), [macOS runner image](https://github.com/actions/runner-images/blob/main/images/macos/macos-26-Readme.md), [Apple upload builds](https://developer.apple.com/help/app-store-connect/manage-builds/upload-builds/).

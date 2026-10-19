@@ -8,6 +8,7 @@ describe("onboarding access boundaries", () => {
     expect(needsOnboarding({ role: "blog_author" })).toBe(false);
     expect(needsOnboarding({ role: "user" })).toBe(true);
     expect(needsOnboarding({ role: "admin" })).toBe(true);
+    expect(needsOnboarding({ role: "trial_user", companyCode: "OLD" })).toBe(true);
   });
   it("allows only personal auth/onboarding endpoints before joining a company", () => {
     expect(isOnboardingRoute("GET", "/api/v1/auth/me?x=1")).toBe(true);
@@ -21,6 +22,8 @@ describe("onboarding access boundaries", () => {
       "/api/v1/company-invitations",
       "/api/v1/auth/register-user",
       "/api/v1/chat/rooms",
+      "/api/v1/ai/personal",
+      "/api/v1/ai/consent/personal",
       "/api/v1/media/upload",
     ]) {
       expect(isOnboardingRoute("GET", path)).toBe(false);

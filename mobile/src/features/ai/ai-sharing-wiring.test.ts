@@ -2,9 +2,9 @@ import { readFileSync } from "node:fs";
 import { describe, expect, it } from "vitest";
 import { isOnboardingRoute } from "../../../../shared/onboarding";
 describe("native AI sharing wiring", () => {
-  it("allows only valid consent paths/methods for unaffiliated accounts", () => {
-    expect(isOnboardingRoute("GET", "/api/v1/ai/consent/personal")).toBe(true);
-    expect(isOnboardingRoute("POST", "/api/v1/ai/consent/personal")).toBe(true);
+  it("requires organization access before any AI consent endpoint", () => {
+    expect(isOnboardingRoute("GET", "/api/v1/ai/consent/personal")).toBe(false);
+    expect(isOnboardingRoute("POST", "/api/v1/ai/consent/personal")).toBe(false);
     expect(isOnboardingRoute("DELETE", "/api/v1/ai/consent/personal")).toBe(false);
     expect(isOnboardingRoute("GET", "/api/v1/ai/consent/other")).toBe(false);
   });

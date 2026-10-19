@@ -1,14 +1,5 @@
 import React, { useRef, useState } from "react";
-import {
-  ActivityIndicator,
-  Image,
-  Modal,
-  Pressable,
-  ScrollView,
-  StyleSheet,
-  Text,
-  View,
-} from "react-native";
+import { ActivityIndicator, Image, Modal, Pressable, ScrollView, StyleSheet, Text, View } from "react-native";
 import { SafeAreaView, useSafeAreaInsets } from "react-native-safe-area-context";
 import { Ionicons } from "@expo/vector-icons";
 import { router } from "expo-router";
@@ -73,19 +64,19 @@ export default function Profile() {
     user?.role === "superadmin"
       ? styles.roleSuperadmin
       : user?.role === "admin"
-      ? styles.roleAdmin
-      : user?.role === "manager"
-      ? styles.roleManager
-      : styles.roleUser;
+        ? styles.roleAdmin
+        : user?.role === "manager"
+          ? styles.roleManager
+          : styles.roleUser;
 
   const roleTextStyle =
     user?.role === "superadmin"
       ? styles.roleTextSuperadmin
       : user?.role === "admin"
-      ? styles.roleTextAdmin
-      : user?.role === "manager"
-      ? styles.roleTextManager
-      : styles.roleTextUser;
+        ? styles.roleTextAdmin
+        : user?.role === "manager"
+          ? styles.roleTextManager
+          : styles.roleTextUser;
 
   const initialLetter = (user?.displayName || user?.email || "U").charAt(0).toUpperCase();
 
@@ -98,11 +89,7 @@ export default function Profile() {
       >
         {/* Top Header Banner */}
         <View style={[styles.bannerContainer, { paddingTop: insets.top }]}>
-          <Image
-            source={bannerSource}
-            style={styles.bannerImage}
-            resizeMode="cover"
-          />
+          <Image source={bannerSource} style={styles.bannerImage} resizeMode="cover" />
         </View>
 
         {/* Hero Profile Card (Overlapping Banner) */}
@@ -133,7 +120,9 @@ export default function Profile() {
 
             {user?.companyCode && (
               <View style={styles.companyBadge}>
-                <Text style={styles.companyBadgeText}>{user.role === "trial_user" ? "Không gian trải nghiệm" : `Mã DN: ${user.companyCode}`}</Text>
+                <Text style={styles.companyBadgeText}>
+                  {user.role === "trial_user" ? "Không gian trải nghiệm" : `Mã DN: ${user.companyCode}`}
+                </Text>
               </View>
             )}
           </View>
@@ -150,11 +139,23 @@ export default function Profile() {
           <Pressable
             accessibilityRole="button"
             onPress={() => router.push("/onboarding")}
-            style={({ pressed }) => [styles.actionRow, { marginHorizontal: 16, marginBottom: 12, borderRadius: 14, backgroundColor: "#ecfdf5", borderWidth: 1, borderColor: "#a7f3d0", paddingHorizontal: 16 }, pressed && styles.actionRowPressed]}
+            style={({ pressed }) => [
+              styles.actionRow,
+              {
+                marginHorizontal: 16,
+                marginBottom: 12,
+                borderRadius: 14,
+                backgroundColor: "#ecfdf5",
+                borderWidth: 1,
+                borderColor: "#a7f3d0",
+                paddingHorizontal: 16,
+              },
+              pressed && styles.actionRowPressed,
+            ]}
           >
             <Ionicons name="business-outline" size={21} color="#047857" />
             <View style={{ flex: 1 }}>
-              <Text style={styles.actionTitle}>Đăng ký doanh nghiệp / lời mời</Text>
+              <Text style={styles.actionTitle}>Tổ chức & lời mời</Text>
               <Text style={styles.actionSub}>Tạo hồ sơ doanh nghiệp hoặc tham gia doanh nghiệp đã mời bạn</Text>
             </View>
             <Ionicons name="chevron-forward" size={18} color="#047857" />
@@ -178,9 +179,7 @@ export default function Profile() {
               </View>
               <View style={{ flex: 1 }}>
                 <Text style={styles.infoLabel}>Doanh nghiệp</Text>
-                <Text style={styles.infoValue}>
-                  {user?.companyName || user?.companyCode || "Chưa có thông tin"}
-                </Text>
+                <Text style={styles.infoValue}>{user?.companyName || user?.companyCode || "Chưa có thông tin"}</Text>
               </View>
             </View>
 
@@ -191,9 +190,7 @@ export default function Profile() {
               </View>
               <View style={{ flex: 1 }}>
                 <Text style={styles.infoLabel}>Phòng ban</Text>
-                <Text style={styles.infoValue}>
-                  {user?.department || "Chưa phân bổ phòng ban"}
-                </Text>
+                <Text style={styles.infoValue}>{user?.department || "Chưa phân bổ phòng ban"}</Text>
               </View>
             </View>
 
@@ -204,38 +201,32 @@ export default function Profile() {
               </View>
               <View style={{ flex: 1 }}>
                 <Text style={styles.infoLabel}>Chức danh / Vị trí</Text>
-                <Text style={styles.infoValue}>
-                  {user?.jobTitle || "Nhân viên"}
-                </Text>
+                <Text style={styles.infoValue}>{user?.jobTitle || "Nhân viên"}</Text>
               </View>
             </View>
 
             {/* Branch Switcher */}
-            {!needsOnboarding(user) && user?.role !== "trial_user" && <BranchSelector
-              renderCustomTrigger={(open, currentName) => (
-                <Pressable
-                  style={({ pressed }) => [
-                    styles.infoItem,
-                    pressed && { opacity: 0.8 },
-                  ]}
-                  onPress={open}
-                >
-                  <View style={styles.infoIconBox}>
-                    <Ionicons name="location-outline" size={18} color="#059669" />
-                  </View>
-                  <View style={{ flex: 1 }}>
-                    <Text style={styles.infoLabel}>Chi nhánh làm việc</Text>
-                    <Text style={styles.infoValue} numberOfLines={1}>
-                      {currentName}
-                    </Text>
-                  </View>
-                  <View style={styles.changeBadge}>
-                    <Text style={styles.changeBadgeText}>Đổi</Text>
-                    <Ionicons name="chevron-forward" size={12} color="#059669" />
-                  </View>
-                </Pressable>
-              )}
-            />}
+            {!needsOnboarding(user) && user?.role !== "trial_user" && (
+              <BranchSelector
+                renderCustomTrigger={(open, currentName) => (
+                  <Pressable style={({ pressed }) => [styles.infoItem, pressed && { opacity: 0.8 }]} onPress={open}>
+                    <View style={styles.infoIconBox}>
+                      <Ionicons name="location-outline" size={18} color="#059669" />
+                    </View>
+                    <View style={{ flex: 1 }}>
+                      <Text style={styles.infoLabel}>Chi nhánh làm việc</Text>
+                      <Text style={styles.infoValue} numberOfLines={1}>
+                        {currentName}
+                      </Text>
+                    </View>
+                    <View style={styles.changeBadge}>
+                      <Text style={styles.changeBadgeText}>Đổi</Text>
+                      <Ionicons name="chevron-forward" size={12} color="#059669" />
+                    </View>
+                  </Pressable>
+                )}
+              />
+            )}
           </View>
         </View>
 
@@ -265,11 +256,17 @@ export default function Profile() {
               <Ionicons name="chevron-forward" size={18} color="#94a3b8" />
             </Pressable>
 
-            {user?.role === "admin" && <Pressable style={styles.actionRow} onPress={() => router.push("/company-invitations")}>
-              <Text style={styles.actionTitle}>Mời nhân viên qua email</Text>
-            </Pressable>}
+            {user?.role === "admin" && (
+              <Pressable style={styles.actionRow} onPress={() => router.push("/company-invitations")}>
+                <Text style={styles.actionTitle}>Mời nhân viên qua email</Text>
+              </Pressable>
+            )}
             <Pressable style={styles.actionRow} onPress={() => router.push("/onboarding")}>
-              <Text style={styles.actionTitle}>{needsOnboarding(user) || user?.role === "trial_user" ? "Doanh nghiệp & lời mời" : "Trạng thái yêu cầu xóa tài khoản"}</Text>
+              <Text style={styles.actionTitle}>
+                {needsOnboarding(user) || user?.role === "trial_user"
+                  ? "Doanh nghiệp & lời mời"
+                  : "Trạng thái yêu cầu xóa tài khoản"}
+              </Text>
             </Pressable>
             {/* Change Password */}
             <Pressable
@@ -411,10 +408,7 @@ export default function Profile() {
       />
 
       {/* Blocked Users Modal */}
-      <BlockedUsersModal
-        visible={showBlockedModal}
-        onClose={() => setShowBlockedModal(false)}
-      />
+      <BlockedUsersModal visible={showBlockedModal} onClose={() => setShowBlockedModal(false)} />
 
       {/* Account Form Modal */}
       <Modal
@@ -427,15 +421,15 @@ export default function Profile() {
       >
         <SafeAreaView style={styles.modalOverlay}>
           <View style={styles.modalCard}>
-          {editing && (
-            <AccountForm
-              mode={editing}
-              onClose={() => setEditing(null)}
-              setLocked={(value) => {
-                formLock.current = value;
-              }}
-            />
-          )}
+            {editing && (
+              <AccountForm
+                mode={editing}
+                onClose={() => setEditing(null)}
+                setLocked={(value) => {
+                  formLock.current = value;
+                }}
+              />
+            )}
           </View>
         </SafeAreaView>
       </Modal>

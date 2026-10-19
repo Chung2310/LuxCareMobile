@@ -39,8 +39,12 @@ export async function runReviewPreflight({ base, fetchImpl = fetch, log = consol
         const data = await response.json();
         if (!data || typeof data !== "object" || Array.isArray(data)) throw new Error("Invalid API JSON response.");
         if (path.endsWith("/capabilities")) {
-          if (data.registrationEnabled !== true) throw new Error("Public registration is disabled.");
-          if (data.companyWalletEnabled !== false) throw new Error("Credit access is enabled or not explicitly disabled.");
+          if (data.registrationEnabled !== false) throw new Error("Standalone public registration must be disabled.");
+          if (data.invitationRegistrationEnabled !== true)
+            throw new Error("Organization invitation activation is unavailable.");
+          if (data.accessModel !== "organization_only") throw new Error("Organization-only access is not deployed.");
+          if (data.companyWalletEnabled !== false)
+            throw new Error("Credit access is enabled or not explicitly disabled.");
           if (data.aiQuotaEnabled !== true) throw new Error("Shared free AI quota is disabled or not deployed.");
         }
         if (status === 410 && data.code !== "FEATURE_DISABLED")
@@ -54,7 +58,7 @@ export async function runReviewPreflight({ base, fetchImpl = fetch, log = consol
   }
   if (passed)
     log(
-      "Public endpoints, free AI capability and disabled Credit routes passed. Verify rendered legal pages, email delivery, authenticated AI quota, permissions and account deletion on TestFlight before submission.",
+      "Public endpoints, organization-only capabilities and disabled Credit routes passed. Verify invitation activation, denial of standalone access, legal pages, organization permissions, AI consent/quota and account deletion on TestFlight before submission.",
     );
   return passed;
 }

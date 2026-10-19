@@ -1,47 +1,66 @@
 const { test } = require("node:test");
-// Run explicitly with node --test; keep separate from the app's Vitest suite.
 const assert = require("node:assert/strict");
 const { prepare } = require("./prepare-ios-build.cjs");
-const config = require("../eas.json");
 const env = {
-  BUILD_PROFILE: "preview", EXPO_TOKEN: "test-only-token",
-  EXPO_PUBLIC_API_URL: "https://api.example.com",
+  BUILD_PROFILE: "production",
+  UPLOAD_TESTFLIGHT: "true",
+  EXPO_PUBLIC_API_URL: "https://api.example.com/",
   EXPO_PUBLIC_EAS_PROJECT_ID: "11111111-2222-3333-4444-555555555555",
   LUXCARE_IOS_BUNDLE_IDENTIFIER: "com.example.luxcare",
+  APPLE_TEAM_ID: "VP77TD9A77",
+  IOS_BUILD_NUMBER_BASE: "1000",
+  GITHUB_RUN_NUMBER: "42",
 };
-test("forwards public configuration but not the token; does not mutate source", () => {
-  const result = prepare(config, env);
-  assert.equal(result.build.preview.env.EXPO_PUBLIC_API_URL, env.EXPO_PUBLIC_API_URL);
-  assert.equal(JSON.stringify(result).includes(env.EXPO_TOKEN), false);
-  assert.equal(config.build.preview.env, undefined);
-  assert.equal(result.build.preview.ios.simulator, false);
-  assert.equal(result.build.preview.ios.buildConfiguration, "Release");
-});
-test("production retains store distribution and automatic build numbers", () => {
-  const result = prepare(config, { ...env, BUILD_PROFILE: "production" });
-  assert.equal(result.build.production.distribution, "store");
-  assert.equal(result.build.production.autoIncrement, true);
-  assert.equal(result.build.preview.env, undefined);
-});
-for (const profile of ["preview", "production"]) {
-  test("normalizes trailing slashes and surrounding whitespace for " + profile, () => {
-    const buildEnv = { ...env, BUILD_PROFILE: profile, EXPO_PUBLIC_API_URL: " https://api.example.com/ " };
-    const result = prepare(config, buildEnv);
-    assert.equal(result.build[profile].env.EXPO_PUBLIC_API_URL, "https://api.example.com");
-    assert.equal(buildEnv.EXPO_PUBLIC_API_URL, " https://api.example.com/ ");
+test("builds native config without Expo token or modifying EAS configuration", () => {
+  assert.deepEqual(prepare(env), {
+    EXPO_PUBLIC_API_URL: "https://api.example.com",
+    IOS_BUILD_NUMBER: "1042",
+    APP_VERSION: "",
   });
-}
-for (const key of Object.keys(env)) {
-  test("rejects missing " + key, () => assert.throws(() => prepare(config, { ...env, [key]: "" })));
+});
+test("accepts explicit build number when migrating from remote version counter", () => {
+  assert.equal(prepare({ ...env, BUILD_NUMBER_INPUT: "5001", APP_VERSION: "1.0.1" }).IOS_BUILD_NUMBER, "5001");
+});
+test("allows Ad Hoc without TestFlight", () => {
+  assert.equal(prepare({ ...env, BUILD_PROFILE: "preview", UPLOAD_TESTFLIGHT: "false" }).IOS_BUILD_NUMBER, "1042");
+  assert.throws(() => prepare({ ...env, BUILD_PROFILE: "preview" }), /Only production/);
+});
+for (const field of [
+  "BUILD_PROFILE",
+  "EXPO_PUBLIC_API_URL",
+  "EXPO_PUBLIC_EAS_PROJECT_ID",
+  "LUXCARE_IOS_BUNDLE_IDENTIFIER",
+  "APPLE_TEAM_ID",
+  "GITHUB_RUN_NUMBER",
+  "IOS_BUILD_NUMBER_BASE",
+  "UPLOAD_TESTFLIGHT",
+]) {
+  test(`rejects missing ${field}`, () => assert.throws(() => prepare({ ...env, [field]: "" })));
 }
 for (const url of [
-  "http://api.example.com", "https://localhost", "https://user:password@example.com",
-  "https://api.example.com/api/v1", "https://api.example.com/?source=ci", "https://api.example.com/#fragment",
+  "http://api.example.com",
+  "https://localhost",
+  "https://127.0.0.1",
+  "https://10.1.2.3",
+  "https://192.168.1.1",
+  "https://[::1]",
+  "https://a:b@example.com",
+  "https://api.example.com/api",
+  "https://api.example.com/?q=x",
+  "https://api.example.com/#hash",
 ]) {
-  test("rejects invalid backend " + url, () => assert.throws(() => prepare(config, { ...env, EXPO_PUBLIC_API_URL: url })));
+  test(`rejects non-public API origin ${url}`, () =>
+    assert.throws(() => prepare({ ...env, EXPO_PUBLIC_API_URL: url })));
 }
-test("rejects invalid project, bundle ID and profile", () => {
-  for (const invalid of [{ EXPO_PUBLIC_EAS_PROJECT_ID: "missing" }, { LUXCARE_IOS_BUNDLE_IDENTIFIER: "bad id" }, { BUILD_PROFILE: "other" }]) {
-    assert.throws(() => prepare(config, { ...env, ...invalid }));
+test("rejects injected config, invalid versions and overflowing build numbers", () => {
+  for (const input of [
+    { BUILD_NUMBER_INPUT: "1\nBAD=value" },
+    { BUILD_NUMBER_INPUT: "0" },
+    { BUILD_NUMBER_INPUT: "2100000001" },
+    { IOS_BUILD_NUMBER_BASE: "2100000000" },
+    { LUXCARE_IOS_BUNDLE_IDENTIFIER: "a\nb" },
+    { APP_VERSION: "1.0-beta" },
+  ]) {
+    assert.throws(() => prepare({ ...env, ...input }));
   }
 });

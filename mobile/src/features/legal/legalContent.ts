@@ -8,7 +8,7 @@ export const PRIVACY_POLICY_URL = `${SERVICE_WEBSITE_URL}/privacy-policy`;
 export const TERMS_OF_SERVICE_URL = `${SERVICE_WEBSITE_URL}/terms-of-service`;
 export const USER_DATA_DELETION_URL = `${SERVICE_WEBSITE_URL}/user-data-deletion`;
 
-export const LAST_UPDATED = "October 03, 2026";
+export const LAST_UPDATED = "October 19, 2026";
 
 export interface LegalSection {
   title: string;
@@ -41,7 +41,7 @@ export const PRIVACY_POLICY_SECTIONS: LegalSection[] = [
     titleVi: "3. Mục đích sử dụng dữ liệu",
     content: [
       "Xác thực người dùng và duy trì phiên làm việc bảo mật trên các thiết bị.",
-      "Gửi mã xác minh và lời mời qua email; tiếp nhận, xét duyệt đơn đăng ký doanh nghiệp. Sau khi bạn xác nhận tham gia, quản trị viên doanh nghiệp quản lý dữ liệu công việc của bạn trong doanh nghiệp đó.",
+      "Gửi mã xác minh và lời mời tham gia tổ chức qua email. Khi kích hoạt tài khoản từ lời mời hoặc chấp nhận lời mời, quản trị viên tổ chức quản lý dữ liệu công việc của bạn trong tổ chức đó.",
       "Xác nhận vị trí thực tế tại thời điểm chấm công để đảm bảo tính minh bạch trong quản lý nhân sự.",
       "Truyền tải tin nhắn, thông báo công việc, bảng lương và tài liệu trao đổi nội bộ.",
       "Khởi tạo và duy trì các kết nối tích hợp được người dùng cho phép.",
@@ -112,7 +112,7 @@ export const TERMS_OF_SERVICE_SECTIONS: LegalSection[] = [
     content: [
       "Bạn chịu trách nhiệm bảo mật thông tin đăng nhập (email và mật khẩu) và cho mọi hoạt động diễn ra dưới tài khoản của mình.",
       "Bạn phải cung cấp thông tin đăng ký chính xác, trung thực và cập nhật khi có thay đổi.",
-      "Bạn có thể đăng ký tài khoản cơ bản khi chưa thuộc tổ chức nào. Đơn mở doanh nghiệp cần được nền tảng xét duyệt. Nhân viên xác nhận lời mời để tham gia công ty; đăng ký công khai không tự cấp quyền quản trị doanh nghiệp.",
+      "LuxCare cung cấp dịch vụ cho doanh nghiệp và nhóm theo thỏa thuận trực tiếp với tổ chức. Quản trị viên cấp tài khoản hoặc mời thành viên. Kích hoạt tài khoản mới yêu cầu lời mời tổ chức còn hiệu lực và xác minh email. LuxCare không cung cấp gói cá nhân, gia đình hoặc workspace trải nghiệm cá nhân.",
       "Thông báo ngay cho quản trị viên nếu bạn phát hiện bất kỳ hành vi xâm nhập hoặc sử dụng trái phép tài khoản.",
     ],
   },
@@ -139,7 +139,7 @@ export const TERMS_OF_SERVICE_SECTIONS: LegalSection[] = [
     content: [
       "Dịch vụ có thể cung cấp các công cụ hỗ trợ soạn thảo, tóm tắt và phân tích bằng trí tuệ nhân tạo.",
       "Kết quả từ AI mang tính tham khảo và người dùng cần xem xét, kiểm tra lại trước khi áp dụng vào công việc chính thức.",
-      "LuxCare chịu toàn bộ chi phí nhà cung cấp AI. Người dùng và doanh nghiệp không phải trả phí, nạp tiền hay mua thêm lượt sử dụng. AI miễn phí trong hạn mức được cấu hình; khi hết hạn mức, tính năng tạm ngừng đến khi hạn mức được đặt lại.",
+      "Quyền dùng AI thuộc quyền truy cập của tổ chức và hạn mức được cấu hình. LuxCare chi trả chi phí nhà cung cấp AI; không bán Credit hoặc lượt sử dụng bổ sung. Khi hết hạn mức, tính năng tạm ngừng đến khi hạn mức được đặt lại.",
       "AI doanh nghiệp không dùng để chẩn đoán, kê đơn hoặc hướng dẫn điều trị. Tính năng AI doanh nghiệp yêu cầu đồng ý chia sẻ trước khi gọi bên xử lý; bạn có thể từ chối hoặc thu hồi tại giao diện trợ lý.",
     ],
   },

@@ -125,17 +125,22 @@ describe("unverified account management", () => {
   });
   it("allows the security route through the onboarding redirect and keeps verification actions separate", () => {
     const tabsLayout = readSource("../../app/(tabs)/_layout.tsx");
-    expect(tabsLayout).toContain('if (needsEmailVerification(user)) return <Redirect href="/onboarding" />;');
+    expect(tabsLayout).toContain(
+      'if (needsOnboarding(user) || needsEmailVerification(user)) return <Redirect href="/onboarding" />;',
+    );
     const security = readSource("../../app/account-security.tsx");
     expect(security).toContain('if (!user) return <Redirect href="/login" />;');
     expect(security).not.toContain("needsEmailVerification");
     const onboarding = readSource("../../app/onboarding.tsx");
+    expect(onboarding).toContain('router.push("/account-security")');
     const verification = onboarding.slice(
-      onboarding.indexOf("// Keep verification separate"),
-      onboarding.indexOf("<SafeAreaView style={{ flex: 1"),
+      onboarding.indexOf("{!state.emailVerified && organizationRequired && ("),
+      onboarding.indexOf("{state.emailVerified && organizationRequired && ("),
     );
-    expect(verification).toContain('router.push("/account-security")');
-    expect(verification.match(/<AuthButton/g)).toHaveLength(2);
-    expect(verification).not.toContain('title="Xóa tài khoản"');
+    expect(verification).toContain("onboarding.verifyEmail(code)");
+    expect(verification).toContain("onboarding.resendCode()");
+    expect(verification.match(/<Button/g)).toHaveLength(2);
+    expect(verification).not.toContain("account-security");
+    expect(verification).not.toContain("deleteAccount");
   });
 });

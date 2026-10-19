@@ -1,7 +1,13 @@
 import { describe, expect, it, vi } from "vitest";
 import { runReviewPreflight } from "../../scripts/review-preflight.mjs";
 const base = "https://review.example.test";
-const capabilities = { registrationEnabled: true, companyWalletEnabled: false, aiQuotaEnabled: true };
+const capabilities = {
+  registrationEnabled: false,
+  invitationRegistrationEnabled: true,
+  accessModel: "organization_only",
+  companyWalletEnabled: false,
+  aiQuotaEnabled: true,
+};
 const setup = (change?: (path: string, response: Response) => Response) => {
   const send = vi.fn(async (input: RequestInfo | URL, _init?: RequestInit) => {
     const path = new URL(String(input)).pathname;
@@ -9,7 +15,9 @@ const setup = (change?: (path: string, response: Response) => Response) => {
     const creditRoute = path.includes("/wallet/") || path.includes("/company-wallet/");
     const body = path.endsWith("/capabilities")
       ? capabilities
-      : creditRoute ? { code: "FEATURE_DISABLED" } : { message: protectedRoute ? "Unauthorized" : "ok" };
+      : creditRoute
+        ? { code: "FEATURE_DISABLED" }
+        : { message: protectedRoute ? "Unauthorized" : "ok" };
     const response = new Response(JSON.stringify(body), {
       status: creditRoute ? 410 : protectedRoute ? 401 : 200,
       headers: { "content-type": "application/json" },
@@ -35,9 +43,7 @@ describe("App Review preflight", () => {
     }
   });
   it.each(["/api/v1/ai/consent/company", "/api/v1/ai/status"])("fails a missing protected route %s", async (route) => {
-    const options = setup((path, response) =>
-      path === route ? new Response("Missing", { status: 404 }) : response,
-    );
+    const options = setup((path, response) => (path === route ? new Response("Missing", { status: 404 }) : response));
     expect(await runReviewPreflight({ base, fetchImpl: options.send, ...options })).toBe(false);
     expect(options.errorLog).toHaveBeenCalledWith(expect.stringContaining("expected 401"));
   });
@@ -50,7 +56,9 @@ describe("App Review preflight", () => {
     expect(await runReviewPreflight({ base, fetchImpl: options.send, ...options })).toBe(false);
   });
   it.each([
-    ["registrationEnabled", false],
+    ["registrationEnabled", true],
+    ["invitationRegistrationEnabled", false],
+    ["accessModel", undefined],
     ["companyWalletEnabled", true],
     ["companyWalletEnabled", undefined],
     ["aiQuotaEnabled", false],
@@ -65,24 +73,37 @@ describe("App Review preflight", () => {
     );
     expect(await runReviewPreflight({ base, fetchImpl: options.send, ...options })).toBe(false);
   });
-  it.each(["/api/v1/wallet/balance", "/api/v1/company-wallet/status"])("rejects Credit route %s still accessible", async (route) => {
-    const options = setup((path, response) => path === route
-      ? new Response(JSON.stringify({ message: "Unauthorized" }), {
-          status: 401, headers: { "content-type": "application/json" },
-        }) : response);
-    expect(await runReviewPreflight({ base, fetchImpl: options.send, ...options })).toBe(false);
-    expect(options.errorLog).toHaveBeenCalledWith(expect.stringContaining("expected 410"));
-  });
+  it.each(["/api/v1/wallet/balance", "/api/v1/company-wallet/status"])(
+    "rejects Credit route %s still accessible",
+    async (route) => {
+      const options = setup((path, response) =>
+        path === route
+          ? new Response(JSON.stringify({ message: "Unauthorized" }), {
+              status: 401,
+              headers: { "content-type": "application/json" },
+            })
+          : response,
+      );
+      expect(await runReviewPreflight({ base, fetchImpl: options.send, ...options })).toBe(false);
+      expect(options.errorLog).toHaveBeenCalledWith(expect.stringContaining("expected 410"));
+    },
+  );
   it("requires FEATURE_DISABLED rather than an unrelated 410 response", async () => {
-    const options = setup((path, response) => path === "/api/v1/wallet/balance"
-      ? new Response(JSON.stringify({ code: "OTHER_ERROR" }), {
-          status: 410, headers: { "content-type": "application/json" },
-        }) : response);
+    const options = setup((path, response) =>
+      path === "/api/v1/wallet/balance"
+        ? new Response(JSON.stringify({ code: "OTHER_ERROR" }), {
+            status: 410,
+            headers: { "content-type": "application/json" },
+          })
+        : response,
+    );
     expect(await runReviewPreflight({ base, fetchImpl: options.send, ...options })).toBe(false);
   });
   it("refuses a HTTP API before making requests", async () => {
     const options = setup();
-    expect(await runReviewPreflight({ base: "http://review.example.test", fetchImpl: options.send, ...options })).toBe(false);
+    expect(await runReviewPreflight({ base: "http://review.example.test", fetchImpl: options.send, ...options })).toBe(
+      false,
+    );
     expect(options.send).not.toHaveBeenCalled();
   });
 });

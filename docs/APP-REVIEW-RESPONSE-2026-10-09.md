@@ -1,3 +1,5 @@
+> TÀI LIỆU LỊCH SỬ — mô hình cá nhân/miễn phí ngày 09/10 đã được thay bằng B2B. Không dùng nội dung đăng ký cá nhân hoặc phản hồi cũ để submit. Đọc [APP-REVIEW-B2B.md](APP-REVIEW-B2B.md) cho release hiện tại. Trạng thái server trong tài liệu này chỉ có giá trị tại ngày kiểm tra.
+
 # LuxCare: bản nháp phản hồi Apple ngày 09/10/2026
 
 Bản nháp để đọc và chỉnh trước khi gửi; chưa được gửi vào App Store Connect. Chỉ gửi các khẳng định về tính năng đang hoạt động sau khi backend/web và build review cùng phản ánh mô hình miễn phí. Không ghi đã xóa đăng ký: đăng ký cá nhân và đơn doanh nghiệp vẫn được giữ trong code.

@@ -93,11 +93,7 @@ function MomoTabIcon({ name, outlineName, focused }: MomoTabIconProps) {
           transform: [{ scale }, { translateY }],
         }}
       >
-        <Ionicons
-          name={focused ? name : outlineName}
-          size={23}
-          color={focused ? "#059669" : "#94a3b8"}
-        />
+        <Ionicons name={focused ? name : outlineName} size={23} color={focused ? "#059669" : "#94a3b8"} />
       </Animated.View>
 
       {/* Chấm chỉ báo nhỏ tinh tế bên dưới */}
@@ -170,11 +166,11 @@ export default function TabLayout() {
   const effectiveChatUnread = totalUnread > 0 ? totalUnread : chatUnread;
   const insets = useSafeAreaInsets();
   if (!user) return <Redirect href="/login" />;
-  if (needsEmailVerification(user)) return <Redirect href="/onboarding" />;
+  if (needsOnboarding(user) || needsEmailVerification(user)) return <Redirect href="/onboarding" />;
 
   const isEditor = isBlogEditorUser(user);
   const isTrialUser = user.role === "trial_user";
-  const bottomPadding = insets.bottom > 0 ? insets.bottom : (Platform.OS === "android" ? 12 : 10);
+  const bottomPadding = insets.bottom > 0 ? insets.bottom : Platform.OS === "android" ? 12 : 10;
   const tabHeight = 56 + bottomPadding;
 
   return (
@@ -190,20 +186,20 @@ export default function TabLayout() {
         tabBarStyle: isEditor
           ? { display: "none" }
           : {
-            backgroundColor: "#ffffff",
-            borderTopColor: "rgba(226, 232, 240, 0.8)",
-            borderTopWidth: 1,
-            borderTopLeftRadius: 22,
-            borderTopRightRadius: 22,
-            height: tabHeight,
-            paddingBottom: bottomPadding,
-            paddingTop: 6,
-            elevation: 12,
-            shadowColor: "#0f172a",
-            shadowOffset: { width: 0, height: -4 },
-            shadowOpacity: 0.07,
-            shadowRadius: 12,
-          },
+              backgroundColor: "#ffffff",
+              borderTopColor: "rgba(226, 232, 240, 0.8)",
+              borderTopWidth: 1,
+              borderTopLeftRadius: 22,
+              borderTopRightRadius: 22,
+              height: tabHeight,
+              paddingBottom: bottomPadding,
+              paddingTop: 6,
+              elevation: 12,
+              shadowColor: "#0f172a",
+              shadowOffset: { width: 0, height: -4 },
+              shadowOpacity: 0.07,
+              shadowRadius: 12,
+            },
         tabBarLabelStyle: {
           fontSize: 10.5,
           fontWeight: "700",
@@ -221,9 +217,7 @@ export default function TabLayout() {
           title: "Trang chủ",
           headerShown: false,
           href: isEditor ? null : undefined,
-          tabBarIcon: ({ focused }) => (
-            <MomoTabIcon name="home" outlineName="home-outline" focused={focused} />
-          ),
+          tabBarIcon: ({ focused }) => <MomoTabIcon name="home" outlineName="home-outline" focused={focused} />,
         }}
       />
       <Tabs.Screen
@@ -246,11 +240,7 @@ export default function TabLayout() {
           headerShown: false,
           href: isEditor || isTrialUser || needsOnboarding(user) ? null : undefined,
           tabBarIcon: ({ focused }) => (
-            <MomoTabIcon
-              name="chatbubble-ellipses"
-              outlineName="chatbubble-ellipses-outline"
-              focused={focused}
-            />
+            <MomoTabIcon name="chatbubble-ellipses" outlineName="chatbubble-ellipses-outline" focused={focused} />
           ),
         }}
       />
@@ -272,9 +262,7 @@ export default function TabLayout() {
           title: "Tài khoản",
           headerShown: false,
           href: isEditor ? null : undefined,
-          tabBarIcon: ({ focused }) => (
-            <MomoTabIcon name="person" outlineName="person-outline" focused={focused} />
-          ),
+          tabBarIcon: ({ focused }) => <MomoTabIcon name="person" outlineName="person-outline" focused={focused} />,
         }}
       />
 
@@ -308,10 +296,14 @@ export default function TabLayout() {
       <Tabs.Screen name="attendance-history" options={{ title: "Lịch sử chấm công", href: null }} />
       <Tabs.Screen name="kpi" options={{ title: "KPI tháng", href: null }} />
       <Tabs.Screen name="org-chart" options={{ title: "Sơ đồ tổ chức", href: null }} />
-      <Tabs.Screen name="blog" options={{
-        title: "Blog & Thảo luận", href: isEditor ? undefined : null,
-        tabBarBadge: blogUnread > 0 ? (blogUnread > 99 ? "99+" : blogUnread) : undefined
-      }} />
+      <Tabs.Screen
+        name="blog"
+        options={{
+          title: "Blog & Thảo luận",
+          href: isEditor ? undefined : null,
+          tabBarBadge: blogUnread > 0 ? (blogUnread > 99 ? "99+" : blogUnread) : undefined,
+        }}
+      />
       <Tabs.Screen name="training" options={{ title: "Đào tạo", href: null }} />
       <Tabs.Screen name="celebration-email" options={{ title: "Email chúc mừng", href: null }} />
       <Tabs.Screen name="knowledge" options={{ title: "Kho tri thức", href: null }} />

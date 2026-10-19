@@ -14,7 +14,7 @@ import {
 } from "react-native";
 import { StatusBar } from "expo-status-bar";
 import { SafeAreaView } from "react-native-safe-area-context";
-import { needsEmailVerification } from "../../shared/onboarding";
+import { needsOnboarding, needsEmailVerification } from "../../shared/onboarding";
 import { Redirect, router } from "expo-router";
 import { Ionicons } from "@expo/vector-icons";
 import { messageOf, useSession } from "../src/auth/SessionProvider";
@@ -33,19 +33,13 @@ export default function Login() {
   const [keyboardSpace, setKeyboardSpace] = useState(0);
 
   useEffect(() => {
-    const showSub = Keyboard.addListener(
-      Platform.OS === "ios" ? "keyboardWillShow" : "keyboardDidShow",
-      (e) => {
-        setKeyboardSpace(e.endCoordinates.height);
-      }
-    );
-    const hideSub = Keyboard.addListener(
-      Platform.OS === "ios" ? "keyboardWillHide" : "keyboardDidHide",
-      () => {
-        setKeyboardSpace(0);
-        scrollViewRef.current?.scrollTo({ y: 0, animated: true });
-      }
-    );
+    const showSub = Keyboard.addListener(Platform.OS === "ios" ? "keyboardWillShow" : "keyboardDidShow", (e) => {
+      setKeyboardSpace(e.endCoordinates.height);
+    });
+    const hideSub = Keyboard.addListener(Platform.OS === "ios" ? "keyboardWillHide" : "keyboardDidHide", () => {
+      setKeyboardSpace(0);
+      scrollViewRef.current?.scrollTo({ y: 0, animated: true });
+    });
     return () => {
       showSub.remove();
       hideSub.remove();
@@ -58,7 +52,12 @@ export default function Login() {
     }, 120);
   };
 
-  if (session.user) return <Redirect href={needsEmailVerification(session.user) ? "/onboarding" : "/(tabs)"} />;
+  if (session.user)
+    return (
+      <Redirect
+        href={needsOnboarding(session.user) || needsEmailVerification(session.user) ? "/onboarding" : "/(tabs)"}
+      />
+    );
 
   const submit = async () => {
     if (busy || !email.trim() || !password) return;
@@ -103,10 +102,7 @@ export default function Login() {
         {/* Top bar with quick Legal & Policy button */}
         <View style={localStyles.topBar}>
           <Pressable
-            style={({ pressed }) => [
-              localStyles.topLegalBtn,
-              pressed && { opacity: 0.75 },
-            ]}
+            style={({ pressed }) => [localStyles.topLegalBtn, pressed && { opacity: 0.75 }]}
             onPress={() => router.push("/privacy-policy")}
             hitSlop={8}
             accessibilityRole="button"
@@ -117,10 +113,7 @@ export default function Login() {
           </Pressable>
         </View>
 
-        <KeyboardAvoidingView
-          style={localStyles.keyboardView}
-          behavior={Platform.OS === "ios" ? "padding" : undefined}
-        >
+        <KeyboardAvoidingView style={localStyles.keyboardView} behavior={Platform.OS === "ios" ? "padding" : undefined}>
           <ScrollView
             ref={scrollViewRef}
             contentContainerStyle={[
@@ -132,8 +125,7 @@ export default function Login() {
           >
             <View style={localStyles.formContainer}>
               <Text style={localStyles.heading}>
-                Đăng nhập{" "}
-                <Text style={localStyles.brandLuxcare}>Luxcare</Text>
+                Đăng nhập <Text style={localStyles.brandLuxcare}>Luxcare</Text>
               </Text>
 
               {/* Email Field with rounded corners and light green background */}
@@ -181,9 +173,7 @@ export default function Login() {
                   >
                     <Image
                       source={
-                        showPassword
-                          ? require("../assets/lucide-eye.png")
-                          : require("../assets/lucide-eye-off.png")
+                        showPassword ? require("../assets/lucide-eye.png") : require("../assets/lucide-eye-off.png")
                       }
                       style={localStyles.lucideEye}
                       resizeMode="contain"
@@ -204,21 +194,23 @@ export default function Login() {
                   busy && { opacity: 0.7 },
                 ]}
               >
-                <Text style={localStyles.submitButtonText}>
-                  {busy ? "Đang đăng nhập…" : "Đăng nhập"}
-                </Text>
+                <Text style={localStyles.submitButtonText}>{busy ? "Đang đăng nhập…" : "Đăng nhập"}</Text>
               </Pressable>
 
-              <Pressable accessibilityRole="button" onPress={() => router.push("/register")} style={{ paddingVertical: 14, alignItems: "center" }}>
-                <Text style={{ color: "#047857", fontWeight: "600", fontSize: 16 }}>Đăng ký tài khoản</Text>
+              <Pressable
+                accessibilityRole="button"
+                onPress={() => router.push("/register")}
+                style={{ paddingVertical: 14, alignItems: "center" }}
+              >
+                <Text style={{ color: "#047857", fontWeight: "600", fontSize: 16 }}>Kích hoạt lời mời</Text>
               </Pressable>
+              <Text style={{ textAlign: "center", color: colors.muted, marginBottom: 12 }}>
+                Dành cho thành viên tổ chức. Liên hệ quản trị viên công ty để nhận lời mời.
+              </Text>
               {/* Legal Action Buttons */}
               <View style={localStyles.legalButtonsContainer}>
                 <Pressable
-                  style={({ pressed }) => [
-                    localStyles.legalActionBtn,
-                    pressed && localStyles.legalActionBtnPressed,
-                  ]}
+                  style={({ pressed }) => [localStyles.legalActionBtn, pressed && localStyles.legalActionBtnPressed]}
                   onPress={() => router.push("/privacy-policy")}
                   accessibilityRole="button"
                   accessibilityLabel="Xem Chính sách bảo mật"
@@ -231,10 +223,7 @@ export default function Login() {
                 </Pressable>
 
                 <Pressable
-                  style={({ pressed }) => [
-                    localStyles.legalActionBtn,
-                    pressed && localStyles.legalActionBtnPressed,
-                  ]}
+                  style={({ pressed }) => [localStyles.legalActionBtn, pressed && localStyles.legalActionBtnPressed]}
                   onPress={() => router.push("/terms-of-service")}
                   accessibilityRole="button"
                   accessibilityLabel="Xem Điều khoản sử dụng"
@@ -249,7 +238,8 @@ export default function Login() {
 
               {/* Legal Disclaimer Sub-text */}
               <Text style={localStyles.legalDisclaimerText}>
-                Bằng việc đăng nhập, bạn đồng ý tuân thủ các điều khoản dịch vụ và chính sách bảo vệ dữ liệu của LuxCare.
+                Bằng việc đăng nhập, bạn đồng ý tuân thủ các điều khoản dịch vụ và chính sách bảo vệ dữ liệu của
+                LuxCare.
               </Text>
             </View>
           </ScrollView>

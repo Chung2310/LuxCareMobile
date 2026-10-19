@@ -38,12 +38,15 @@ export function createOnboardingService(transport: ServiceTransport) {
     return envelope.data ?? envelope;
   }
   return {
-    capabilities: () => request<{
-      registrationEnabled: boolean;
-      personalAiEnabled: boolean;
-      companyWalletEnabled: boolean;
-      personalAiDisclosure?: AiSharingDisclosurePreview | null;
-    }>("/onboarding/capabilities"),
+    capabilities: () =>
+      request<{
+        registrationEnabled: boolean;
+        invitationRegistrationEnabled: boolean;
+        accessModel: "organization_only";
+        personalAiEnabled: boolean;
+        companyWalletEnabled: boolean;
+        personalAiDisclosure?: AiSharingDisclosurePreview | null;
+      }>("/onboarding/capabilities"),
     register: (
       email: string,
       password: string,
@@ -51,7 +54,7 @@ export function createOnboardingService(transport: ServiceTransport) {
       personalAiConsent = false,
       personalAiDisclosureFingerprint?: string,
     ) =>
-      request("/auth/register", "POST", {
+      request<{ registrationPending: true; email: string; companyName: string }>("/auth/register", "POST", {
         email,
         password,
         displayName,
@@ -60,8 +63,7 @@ export function createOnboardingService(transport: ServiceTransport) {
           ? { personalAiConsent: true, personalAiDisclosureFingerprint }
           : {}),
       }),
-    verifyRegistration: (email: string, code: string) =>
-      request("/auth/register/verify", "POST", { email, code }),
+    verifyRegistration: (email: string, code: string) => request("/auth/register/verify", "POST", { email, code }),
     state: () => request<OnboardingState>("/onboarding/state"),
     resendCode: () => request("/onboarding/email/resend", "POST"),
     verifyEmail: (code: string) => request("/onboarding/email/verify", "POST", { code }),

@@ -1,42 +1,48 @@
 const fs = require("node:fs");
-const path = require("node:path");
 
-function prepare(config, env) {
-  const token = env.EXPO_TOKEN || env.EAS_TOKEN || env.EXPO_ACCESS_TOKEN;
-  if (!token?.trim()) throw new Error("Missing GitHub secret: EXPO_TOKEN");
+function prepare(env) {
   if (!["preview", "production"].includes(env.BUILD_PROFILE)) throw new Error("Invalid BUILD_PROFILE");
-  const keys = ["EXPO_PUBLIC_API_URL", "EXPO_PUBLIC_EAS_PROJECT_ID", "LUXCARE_IOS_BUNDLE_IDENTIFIER"];
-  for (const key of keys) if (!env[key]?.trim()) throw new Error("Missing GitHub variable: " + key);
-  const api = new URL(env.EXPO_PUBLIC_API_URL.trim());
-  if (api.protocol !== "https:" || api.username || api.password ||
-      ["localhost", "127.0.0.1", "[::1]"].includes(api.hostname)) {
-    throw new Error("EXPO_PUBLIC_API_URL must be an HTTPS backend reachable from the iPhone, without credentials");
+  const api = new URL((env.EXPO_PUBLIC_API_URL || "").trim());
+  if (
+    api.protocol !== "https:" ||
+    api.username ||
+    api.password ||
+    api.pathname !== "/" ||
+    api.search ||
+    api.hash ||
+    /^(localhost|127\.|10\.|192\.168\.|172\.(1[6-9]|2\d|3[01])\.|\[::1\]$)/i.test(api.hostname)
+  ) {
+    throw new Error("EXPO_PUBLIC_API_URL must be a public HTTPS origin without credentials, path or query");
   }
-  if (api.pathname !== "/" || api.search || api.hash) {
-    throw new Error("EXPO_PUBLIC_API_URL must be the backend origin without a path, query or fragment");
-  }
-  if (!/^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i.test(env.EXPO_PUBLIC_EAS_PROJECT_ID)) {
-    throw new Error("EXPO_PUBLIC_EAS_PROJECT_ID must be the UUID of an existing EAS project");
-  }
-  if (!/^[A-Za-z0-9-]+(\.[A-Za-z0-9-]+)+$/.test(env.LUXCARE_IOS_BUNDLE_IDENTIFIER)) {
+  if (!/^[A-Za-z0-9-]+(\.[A-Za-z0-9-]+)+$/.test(env.LUXCARE_IOS_BUNDLE_IDENTIFIER || ""))
     throw new Error("Invalid LUXCARE_IOS_BUNDLE_IDENTIFIER");
+  if (!/^[A-Z0-9]{10}$/.test(env.APPLE_TEAM_ID || "")) throw new Error("Invalid APPLE_TEAM_ID");
+  if (!/^[0-9a-f]{8}(-[0-9a-f]{4}){3}-[0-9a-f]{12}$/i.test(env.EXPO_PUBLIC_EAS_PROJECT_ID || ""))
+    throw new Error("Invalid Expo project ID (used by push registration, not by a remote builder)");
+  const integer = (value) => /^\d+$/.test(String(value || "")) && Number.isSafeInteger(Number(value));
+  let build = (env.BUILD_NUMBER_INPUT || "").trim();
+  if (!build) {
+    if (!integer(env.IOS_BUILD_NUMBER_BASE) || !integer(env.GITHUB_RUN_NUMBER) || Number(env.GITHUB_RUN_NUMBER) < 1)
+      throw new Error("Set integer IOS_BUILD_NUMBER_BASE and GITHUB_RUN_NUMBER");
+    build = String(Number(env.IOS_BUILD_NUMBER_BASE) + Number(env.GITHUB_RUN_NUMBER));
   }
-  const next = JSON.parse(JSON.stringify(config));
-  const profile = next.build?.[env.BUILD_PROFILE];
-  if (!profile) throw new Error("Build profile missing from eas.json");
-  // GitHub environment variables are not automatically forwarded to the remote builder.
-  // Only public app settings go into the uploaded eas.json, never EXPO_TOKEN.
-  profile.env = {
-    ...profile.env,
-    ...Object.fromEntries(keys.map(key => [key, env[key]])),
-    EXPO_PUBLIC_API_URL: api.origin,
-  };
-  return next;
+  if (!/^[1-9]\d*$/.test(build) || Number(build) > 2100000000) throw new Error("Invalid iOS build number");
+  const version = (env.APP_VERSION || "").trim();
+  if (version && !/^\d+\.\d+\.\d+$/.test(version)) throw new Error("APP_VERSION must be major.minor.patch");
+  if (!["true", "false"].includes(env.UPLOAD_TESTFLIGHT)) throw new Error("Invalid UPLOAD_TESTFLIGHT");
+  if (env.BUILD_PROFILE !== "production" && env.UPLOAD_TESTFLIGHT === "true")
+    throw new Error("Only production builds can be uploaded to TestFlight");
+  return { EXPO_PUBLIC_API_URL: api.origin, IOS_BUILD_NUMBER: build, APP_VERSION: version };
 }
-
 if (require.main === module) {
-  const file = path.resolve(__dirname, "../eas.json");
-  const config = JSON.parse(fs.readFileSync(file, "utf8"));
-  fs.writeFileSync(file, JSON.stringify(prepare(config, process.env), null, 2) + "\n");
+  const output = prepare(process.env);
+  if (!process.env.GITHUB_ENV) throw new Error("Run this helper in GitHub Actions");
+  fs.appendFileSync(
+    process.env.GITHUB_ENV,
+    Object.entries(output)
+      .map(([k, v]) => `${k}=${v}\n`)
+      .join(""),
+  );
+  console.log(`Native iOS ${process.env.BUILD_PROFILE} build number: ${output.IOS_BUILD_NUMBER}`);
 }
 module.exports = { prepare };
