@@ -14,9 +14,37 @@ import subprocess
 import sys
 
 
+class SigningCommandError(RuntimeError):
+    pass
+
+
+def command_failure(args, error):
+    stage = " ".join(args[:2])
+    diagnostic = (error.stderr or b"").decode("utf-8", errors="replace").lower()
+    # Only fixed messages are logged, never raw output, passwords or key material.
+    hints = {
+        "security cms": "PROVISIONING_PROFILE_BASE64 must decode to the original Apple-signed .mobileprovision file.",
+        "security import": "Check the P12/password pair; the P12 must contain a private key and use encryption macOS can import.",
+        "security set-key-partition-list": "No imported private key was available or the temporary keychain could not be unlocked.",
+        "security find-identity": "The temporary keychain has no usable code signing identity.",
+    }
+    detail = hints.get(stage, "Check the runner keychain and Apple signing configuration.")
+    if "mac verification failed" in diagnostic or "invalid password" in diagnostic or "mac verify error" in diagnostic:
+        detail = "P12 password verification failed. Verify the certificate/password pair in GitHub Secrets."
+    elif "unknown format" in diagnostic or "unable to decode" in diagnostic:
+        detail = "The decoded signing file is not in the format expected by this command."
+    elif "unsupported" in diagnostic and stage == "openssl pkcs12":
+        detail = "The P12 uses unsupported encryption; export an Apple-compatible P12 from Keychain Access."
+    return f"{stage} failed (exit {error.returncode}). {detail}"
+
+
 def run(*args):
-    # Never use shell interpolation or echo secret inputs.
-    return subprocess.check_output(args, stderr=subprocess.PIPE)
+    # Log command/subcommand only, never argument values or command output.
+    print("[signing] " + " ".join(args[:2]), flush=True)
+    try:
+        return subprocess.check_output(args, stderr=subprocess.PIPE)
+    except subprocess.CalledProcessError as error:
+        raise SigningCommandError(command_failure(args, error)) from None
 
 
 def decode(value):
@@ -188,8 +216,5 @@ if __name__ == "__main__":
     folder = Path(os.environ["RUNNER_TEMP"]).resolve() / "luxcare-ios-signing"
     try:
         {"install": install, "cleanup": cleanup, "verify-app": verify_app}[sys.argv[1]](folder)
-    except subprocess.CalledProcessError as error:
-        # stderr may include sensitive input; show the command name and exit status only.
-        sys.exit(f"Apple signing command {error.cmd[0]} failed (exit {error.returncode}); check profile/certificate configuration.")
-    except (ValueError, KeyError) as error:
+    except (SigningCommandError, ValueError, KeyError) as error:
         sys.exit(str(error))

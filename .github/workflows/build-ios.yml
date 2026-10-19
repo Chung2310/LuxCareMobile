@@ -9,6 +9,10 @@ on:
         required: true
         default: production
         options: [production, preview]
+      signing_check_only:
+        description: "Only validate signing credentials on macOS (no native build/upload)"
+        type: boolean
+        default: false
       upload_testflight:
         description: "Upload production IPA to App Store Connect / TestFlight"
         type: boolean
@@ -42,7 +46,7 @@ jobs:
       EXPO_NO_DOTENV: "1"
       DEVELOPER_DIR: /Applications/Xcode_26.4.1.app/Contents/Developer
       BUILD_PROFILE: ${{ inputs.profile }}
-      UPLOAD_TESTFLIGHT: ${{ inputs.profile == 'production' && inputs.upload_testflight && 'true' || 'false' }}
+      UPLOAD_TESTFLIGHT: ${{ inputs.profile == 'production' && inputs.upload_testflight && !inputs.signing_check_only && 'true' || 'false' }}
       BUILD_NUMBER_INPUT: ${{ inputs.build_number }}
       IOS_BUILD_NUMBER_BASE: ${{ vars.IOS_BUILD_NUMBER_BASE || '1000' }}
       APP_VERSION: ${{ inputs.app_version }}
@@ -70,33 +74,6 @@ jobs:
           test -d "$DEVELOPER_DIR"
           xcodebuild -version
 
-      - name: Install root dependencies
-        working-directory: .
-        run: npm ci
-      - name: Install mobile dependencies
-        run: npm ci
-      - name: Typecheck
-        run: npm run typecheck
-      - name: Unit tests
-        working-directory: .
-        run: npm test
-      - name: Validate signing and archive helpers
-        run: |
-          node --test scripts/configure-ios-signing.check.cjs
-          python3 scripts/ios-signing.check.py
-          bash -n scripts/build-signed-ios.sh
-      - name: Check production B2B backend
-        if: inputs.profile == 'production'
-        env:
-          LUXCARE_REVIEW_API_URL: ${{ env.EXPO_PUBLIC_API_URL }}
-        run: npm run review:preflight
-
-      - name: Generate native iOS project
-        run: npx --no-install expo prebuild --platform ios --no-install
-      - name: Install CocoaPods
-        working-directory: mobile/ios
-        run: pod install
-
       - name: Install signing credentials in temporary keychain
         env:
           IOS_DISTRIBUTION_P12_BASE64: ${{ secrets.IOS_DISTRIBUTION_P12_BASE64 || secrets.APPLE_CERTIFICATE_BASE64 }}
@@ -107,12 +84,49 @@ jobs:
           APP_STORE_CONNECT_ISSUER_ID: ${{ secrets.APP_STORE_CONNECT_ISSUER_ID }}
         run: python3 scripts/ios-signing.py install
 
+      - name: Install root dependencies
+        if: ${{ !inputs.signing_check_only }}
+        working-directory: .
+        run: npm ci
+      - name: Install mobile dependencies
+        if: ${{ !inputs.signing_check_only }}
+        run: npm ci
+      - name: Typecheck
+        if: ${{ !inputs.signing_check_only }}
+        run: npm run typecheck
+      - name: Unit tests
+        if: ${{ !inputs.signing_check_only }}
+        working-directory: .
+        run: npm test
+      - name: Validate signing and archive helpers
+        if: ${{ !inputs.signing_check_only }}
+        run: |
+          node --test scripts/configure-ios-signing.check.cjs
+          python3 scripts/ios-signing.check.py
+          bash -n scripts/build-signed-ios.sh
+      - name: Check production B2B backend
+        if: inputs.profile == 'production' && !inputs.signing_check_only
+        env:
+          LUXCARE_REVIEW_API_URL: ${{ env.EXPO_PUBLIC_API_URL }}
+        run: npm run review:preflight
+
+      - name: Generate native iOS project
+        if: ${{ !inputs.signing_check_only }}
+        run: npx --no-install expo prebuild --platform ios --no-install
+      - name: Install CocoaPods
+        if: ${{ !inputs.signing_check_only }}
+        working-directory: mobile/ios
+        run: pod install
+
       - name: Configure app target signing
+        if: ${{ !inputs.signing_check_only }}
         run: node scripts/configure-ios-signing.cjs
       - name: Archive and export signed IPA on GitHub macOS
+        if: ${{ !inputs.signing_check_only }}
         run: bash scripts/build-signed-ios.sh
 
       - name: Save signed IPA and debug symbols
+        if: ${{ !inputs.signing_check_only }}
         uses: actions/upload-artifact@v4
         with:
           name: LuxCare-ios-${{ inputs.profile }}-${{ github.run_number }}-${{ github.run_attempt }}
@@ -123,7 +137,7 @@ jobs:
           retention-days: 7
 
       - name: Upload production IPA to TestFlight
-        if: inputs.profile == 'production' && inputs.upload_testflight
+        if: inputs.profile == 'production' && inputs.upload_testflight && !inputs.signing_check_only
         run: |
           set -euo pipefail
           # API_PRIVATE_KEYS_DIR is scoped to this process; no key enters the repository.
