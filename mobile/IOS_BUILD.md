@@ -59,7 +59,7 @@ Số build mặc định = `IOS_BUILD_NUMBER_BASE + github.run_number`. Trước
 ## Chạy production / TestFlight
 
 1. Kiểm tra signing trước: Run workflow với `signing_check_only=true`. Chế độ này đọc profile, kiểm tra mật khẩu/private key/P12 có khớp certificate trong profile, thử import/keychain và kiểm tra API key nếu đã cấu hình; không compile hoặc upload. Khi pass, chạy lượt mới với `signing_check_only=false`.
-2. Deploy backend B2B trước. Workflow production chạy `review:preflight`; sẽ dừng trước signing nếu public API chưa đáp ứng cấu hình B2B, legal URLs hoặc Credit chưa tắt.
+2. Deploy backend B2B trước. Workflow production chạy `review:preflight`; sẽ dừng trước native build nếu public API chưa đáp ứng cấu hình B2B, legal URLs hoặc Credit chưa tắt.
 3. Đưa workflow và toàn bộ source mới lên nhánh cần build trong repository LuxCareMobile. Workflow phải có trên nhánh mặc định để nút Run workflow hiện ra.
 4. Actions → **Build iOS IPA (GitHub macOS)** → Run workflow → chọn nhánh → profile `production`.
 5. Chọn `upload_testflight=true` để upload sau khi IPA kiểm tra thành công; chọn false nếu chỉ cần tải IPA để dùng Transporter.
