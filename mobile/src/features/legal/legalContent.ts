@@ -41,7 +41,7 @@ export const PRIVACY_POLICY_SECTIONS: LegalSection[] = [
     titleVi: "3. Mục đích sử dụng dữ liệu",
     content: [
       "Xác thực người dùng và duy trì phiên làm việc bảo mật trên các thiết bị.",
-      "Gửi mã xác minh và lời mời tham gia tổ chức qua email. Khi kích hoạt tài khoản từ lời mời hoặc chấp nhận lời mời, quản trị viên tổ chức quản lý dữ liệu công việc của bạn trong tổ chức đó.",
+      "Quản trị viên doanh nghiệp tạo và quản lý tài khoản nhân viên. Mã xác minh và thông báo tham gia tổ chức được gửi cho tài khoản đã tồn tại. Khi tham gia tổ chức, quản trị viên tổ chức quản lý dữ liệu công việc của bạn trong tổ chức đó.",
       "Xác nhận vị trí thực tế tại thời điểm chấm công để đảm bảo tính minh bạch trong quản lý nhân sự.",
       "Truyền tải tin nhắn, thông báo công việc, bảng lương và tài liệu trao đổi nội bộ.",
       "Khởi tạo và duy trì các kết nối tích hợp được người dùng cho phép.",
@@ -112,7 +112,7 @@ export const TERMS_OF_SERVICE_SECTIONS: LegalSection[] = [
     content: [
       "Bạn chịu trách nhiệm bảo mật thông tin đăng nhập (email và mật khẩu) và cho mọi hoạt động diễn ra dưới tài khoản của mình.",
       "Bạn phải cung cấp thông tin đăng ký chính xác, trung thực và cập nhật khi có thay đổi.",
-      "LuxCare cung cấp dịch vụ cho doanh nghiệp và nhóm theo thỏa thuận trực tiếp với tổ chức. Quản trị viên cấp tài khoản hoặc mời thành viên. Kích hoạt tài khoản mới yêu cầu lời mời tổ chức còn hiệu lực và xác minh email. LuxCare không cung cấp gói cá nhân, gia đình hoặc workspace trải nghiệm cá nhân.",
+      "LuxCare cung cấp dịch vụ cho doanh nghiệp và nhóm theo thỏa thuận trực tiếp với tổ chức. Quản trị viên doanh nghiệp tạo và cấp tài khoản cho nhân viên. Nhân viên đăng nhập bằng tài khoản được cấp; ứng dụng không hỗ trợ tự đăng ký hoặc tạo tài khoản từ lời mời. LuxCare không cung cấp gói cá nhân, gia đình hoặc workspace trải nghiệm cá nhân.",
       "Thông báo ngay cho quản trị viên nếu bạn phát hiện bất kỳ hành vi xâm nhập hoặc sử dụng trái phép tài khoản.",
     ],
   },

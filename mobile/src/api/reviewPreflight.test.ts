@@ -3,7 +3,7 @@ import { runReviewPreflight } from "../../scripts/review-preflight.mjs";
 const base = "https://review.example.test";
 const capabilities = {
   registrationEnabled: false,
-  invitationRegistrationEnabled: true,
+  invitationRegistrationEnabled: false,
   accessModel: "organization_only",
   companyWalletEnabled: false,
   aiQuotaEnabled: true,
@@ -57,7 +57,7 @@ describe("App Review preflight", () => {
   });
   it.each([
     ["registrationEnabled", true],
-    ["invitationRegistrationEnabled", false],
+    ["invitationRegistrationEnabled", true],
     ["accessModel", undefined],
     ["companyWalletEnabled", true],
     ["companyWalletEnabled", undefined],

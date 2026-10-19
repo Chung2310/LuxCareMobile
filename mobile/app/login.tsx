@@ -197,15 +197,9 @@ export default function Login() {
                 <Text style={localStyles.submitButtonText}>{busy ? "Đang đăng nhập…" : "Đăng nhập"}</Text>
               </Pressable>
 
-              <Pressable
-                accessibilityRole="button"
-                onPress={() => router.push("/register")}
-                style={{ paddingVertical: 14, alignItems: "center" }}
-              >
-                <Text style={{ color: "#047857", fontWeight: "600", fontSize: 16 }}>Kích hoạt lời mời</Text>
-              </Pressable>
-              <Text style={{ textAlign: "center", color: colors.muted, marginBottom: 12 }}>
-                Dành cho thành viên tổ chức. Liên hệ quản trị viên công ty để nhận lời mời.
+              <Text style={{ textAlign: "center", color: colors.muted, marginTop: 14, marginBottom: 12 }}>
+                Tài khoản do quản trị viên doanh nghiệp cung cấp. Vui lòng liên hệ quản trị viên nếu bạn chưa có tài
+                khoản.
               </Text>
               {/* Legal Action Buttons */}
               <View style={localStyles.legalButtonsContainer}>

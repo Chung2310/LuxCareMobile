@@ -40,8 +40,8 @@ export async function runReviewPreflight({ base, fetchImpl = fetch, log = consol
         if (!data || typeof data !== "object" || Array.isArray(data)) throw new Error("Invalid API JSON response.");
         if (path.endsWith("/capabilities")) {
           if (data.registrationEnabled !== false) throw new Error("Standalone public registration must be disabled.");
-          if (data.invitationRegistrationEnabled !== true)
-            throw new Error("Organization invitation activation is unavailable.");
+          if (data.invitationRegistrationEnabled !== false)
+            throw new Error("Invitation self-registration must be disabled; administrators provision accounts.");
           if (data.accessModel !== "organization_only") throw new Error("Organization-only access is not deployed.");
           if (data.companyWalletEnabled !== false)
             throw new Error("Credit access is enabled or not explicitly disabled.");
@@ -58,7 +58,7 @@ export async function runReviewPreflight({ base, fetchImpl = fetch, log = consol
   }
   if (passed)
     log(
-      "Public endpoints, organization-only capabilities and disabled Credit routes passed. Verify invitation activation, denial of standalone access, legal pages, organization permissions, AI consent/quota and account deletion on TestFlight before submission.",
+      "Public endpoints, organization-only capabilities and disabled Credit routes passed. Verify administrator-provisioned login, denial of self-registration, legal pages, organization permissions, AI consent/quota and account deletion on TestFlight before submission.",
     );
   return passed;
 }

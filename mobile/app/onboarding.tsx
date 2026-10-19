@@ -49,15 +49,15 @@ export default function Onboarding() {
     }
   }
   return (
-    <Page title="Tài khoản & lời mời">
+    <Page title="Tài khoản & tổ chức">
       <Text style={styles.text}>{user.email}</Text>
       <ErrorText message={error} />
       {organizationRequired && (
         <Card>
           <Text style={styles.title}>Tham gia tổ chức để sử dụng LuxCare</Text>
           <Text style={styles.text}>
-            LuxCare dành cho nhân viên và thành viên của các tổ chức. Liên hệ quản trị viên công ty để nhận lời mời vào
-            email của bạn.
+            Tài khoản nhân viên do quản trị viên doanh nghiệp cung cấp. Liên hệ quản trị viên để được cấp tài khoản hoặc
+            hỗ trợ tài khoản hiện có.
           </Text>
           {user.role === "trial_user" && (
             <Text style={styles.text}>

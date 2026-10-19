@@ -11,7 +11,7 @@ function setup(data: unknown = {}, status = 200) {
   return { fetch, service };
 }
 describe("onboarding contract on native transport", () => {
-  it("activates invited members without allowing the client to set company or role", async () => {
+  it("keeps the legacy registration request free of role and tenant assignment", async () => {
     const { fetch, service } = setup();
     await service.register("person@example.com", "password123", "Person");
     expect(fetch.mock.calls[0][0]).toBe("/api/v1/auth/register");

@@ -155,7 +155,7 @@ export default function Profile() {
           >
             <Ionicons name="business-outline" size={21} color="#047857" />
             <View style={{ flex: 1 }}>
-              <Text style={styles.actionTitle}>Tổ chức & lời mời</Text>
+              <Text style={styles.actionTitle}>Tổ chức & tài khoản</Text>
               <Text style={styles.actionSub}>Tạo hồ sơ doanh nghiệp hoặc tham gia doanh nghiệp đã mời bạn</Text>
             </View>
             <Ionicons name="chevron-forward" size={18} color="#047857" />
