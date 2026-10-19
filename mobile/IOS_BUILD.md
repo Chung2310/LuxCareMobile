@@ -24,7 +24,7 @@ API key App Store Connect dùng quyền phù hợp để upload build (ví dụ 
 
 Nếu signing credentials hiện nằm trên EAS, dùng `eas credentials -p ios` tại `mobile/` trên máy quản trị để tải **credentials hiện có** về, lấy `.p12`, password và provisioning profile; thao tác này chỉ chuyển credentials, không build trên EAS. Không revoke certificate đang dùng. Nếu không còn credentials, tạo/export Apple Distribution certificate gồm private key bằng Keychain Access trên Mac và tạo profile tương ứng trên Apple Developer. API key `.p8` lấy từ App Store Connect → Users and Access → Integrations → App Store Connect API, thường chỉ tải được lúc tạo.
 
-Profile phải khớp chính xác `com.luxcare.mobile`, team `VP77TD9A77`, còn hạn và chứa certificate trong `.p12`. Bật Push Notifications trên App ID và tạo lại profile nếu capability thiếu. Profile App Store/Ad Hoc phải có quyền push production khi ứng dụng sử dụng push nền. Luồng hiện hỗ trợ một app target; khi thêm extension phải bổ sung profile riêng trước khi build.
+Profile phải khớp chính xác `com.igen.luxcare`, team `VP77TD9A77`, còn hạn và chứa certificate trong `.p12`. Bật Push Notifications trên App ID và tạo lại profile nếu capability thiếu. Profile App Store/Ad Hoc phải có quyền push production khi ứng dụng sử dụng push nền. Luồng hiện hỗ trợ một app target; khi thêm extension phải bổ sung profile riêng trước khi build.
 
 Base64 file trên Mac (kết quả chỉ dán vào GitHub Secret tương ứng):
 
@@ -47,7 +47,7 @@ Giữ các file signing ngoài repository. Runner tạo keychain tạm, chỉ c�
 | Variable | Mặc định |
 | --- | --- |
 | `EXPO_PUBLIC_API_URL` | `https://luxcare.igentechnology.net` |
-| `LUXCARE_IOS_BUNDLE_IDENTIFIER` | `com.luxcare.mobile` |
+| `LUXCARE_IOS_BUNDLE_IDENTIFIER` | `com.igen.luxcare` |
 | `APPLE_TEAM_ID` | `VP77TD9A77` |
 | `EXPO_PUBLIC_EAS_PROJECT_ID` | `0ec1cf95-301c-44f9-8317-23b44d0f5234` (push registration) |
 | `IOS_BUILD_NUMBER_BASE` | `1000` |
@@ -90,7 +90,7 @@ Nguồn: [Expo native production builds](https://docs.expo.dev/guides/local-app-
 
 ## Xử lý lỗi certificate/profile không khớp
 
-Đã xác minh trên runner macOS ngày 19/10: P12 hiện tại mở được bằng password và có private key, nhưng certificate import từ P12 không nằm trong provisioning profile đang cấu hình. Đây là lỗi cặp credentials, không thể chữa bằng cách bỏ kiểm tra signing.
+Lỗi trước đây đã được xác minh trên runner macOS: P12 và profile không cùng certificate. Sau khi cập nhật credentials, workflow production đã archive/export ký và upload TestFlight thành công; build 1038 có processingState VALID. App Store Connect app 6815999878 dùng Bundle ID com.igen.luxcare; mặc định source và workflow được đồng bộ với app này. Các bước dưới đây áp dụng nếu lỗi cặp credentials tái diễn.
 
 Để lấy lại đúng cặp credentials từng được EAS quản lý, tại thư mục `mobile/` chạy:
 

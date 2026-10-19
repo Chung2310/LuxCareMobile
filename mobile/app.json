@@ -5,7 +5,9 @@
     "slug": "luxcare",
     "scheme": "luxcare",
     "extra": {
-      "eas": { "projectId": "0ec1cf95-301c-44f9-8317-23b44d0f5234" }
+      "eas": {
+        "projectId": "0ec1cf95-301c-44f9-8317-23b44d0f5234"
+      }
     },
     "version": "1.0.0",
     "orientation": "portrait",
@@ -19,7 +21,7 @@
     "ios": {
       "appleTeamId": "VP77TD9A77",
       "supportsTablet": false,
-      "bundleIdentifier": "com.luxcare.mobile",
+      "bundleIdentifier": "com.igen.luxcare",
       "infoPlist": {
         "ITSAppUsesNonExemptEncryption": false,
         "NSPhotoLibraryUsageDescription": "LuxCare cần quyền truy cập thư viện ảnh để đính kèm tệp và tải lên ảnh đại diện.",
@@ -51,7 +53,13 @@
       "favicon": "./assets/favicon.png"
     },
     "plugins": [
-      ["expo-notifications", { "defaultChannel": "default", "color": "#065f46" }],
+      [
+        "expo-notifications",
+        {
+          "defaultChannel": "default",
+          "color": "#065f46"
+        }
+      ],
       "expo-secure-store",
       "expo-router",
       "expo-sharing",

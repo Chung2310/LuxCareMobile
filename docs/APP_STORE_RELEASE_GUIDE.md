@@ -15,7 +15,7 @@ Tài liệu này tổng hợp toàn bộ quy trình, danh sách kiểm tra (chec
 | Cấu hình `ITSAppUsesNonExemptEncryption` | ✅ Đã bổ sung | Bỏ qua khảo sát mã hoá thủ công trên TestFlight |
 | Cấu hình `splash` screen | ✅ Đã bổ sung | Liên kết với `assets/splash-icon.png` |
 | `supportsTablet: false` | ✅ Đã cấu hình | Tối ưu điện thoại, không bị bắt buộc nộp bộ ảnh iPad 13" |
-| Default `bundleIdentifier` | ✅ Đã bổ sung | `com.luxcare.mobile` trong `app.json` |
+| Default `bundleIdentifier` | ✅ Đã bổ sung | `com.igen.luxcare` trong `app.json` |
 | GitHub macOS signing workflow | ✅ Đã bổ sung | Xcode archive/export và tùy chọn upload TestFlight |
 | Tính năng tự Xóa tài khoản (Account Deletion) | ✅ Đã triển khai | Bổ sung nút xóa, hộp thoại xác nhận mật khẩu và gọi API backend |
 | **Chính sách & Pháp lý (Apple Review Guidelines)** | | |
@@ -65,7 +65,7 @@ Vì LuxCare có tính năng gửi tin nhắn văn bản, ảnh, âm thanh giữa
 1. Đăng nhập [Apple Developer Certificates, Identifiers & Profiles](https://developer.apple.com/account/resources/identifiers/list).
 2. Tạo mới một **App Identifier** (Bundle ID):
    - Description: `LuxCare Mobile`
-   - Bundle ID: Khớp với ID trong cấu hình (ví dụ `com.luxcare.mobile` hoặc ID tổ chức của bạn).
+   - Bundle ID: Khớp với ID trong cấu hình (ví dụ `com.igen.luxcare` hoặc ID tổ chức của bạn).
 3. Trong mục **Capabilities**, tích chọn:
    - **Push Notifications** (để dùng thông báo nền).
 

@@ -62,7 +62,7 @@ export const PRIVACY_POLICY_SECTIONS: LegalSection[] = [
     title: "5. AI Processing And User Materials",
     titleVi: "5. Xử lý AI & Tài liệu người dùng",
     content: [
-      "Khi người dùng sử dụng tính năng hỗ trợ tạo nội dung bằng AI, hệ thống chỉ xử lý các tài liệu và văn bản do người dùng trực tiếp cung cấp.",
+      "Khi sử dụng AI doanh nghiệp, hệ thống có thể xử lý câu hỏi, nội dung người dùng cung cấp và tài liệu hoặc dữ liệu công việc mà người dùng được phân quyền truy cập.",
       "Người dùng giữ toàn quyền sở hữu và chịu trách nhiệm kiểm duyệt nội dung trước khi xuất bản hoặc sử dụng trong công việc.",
       "Trợ lý AI doanh nghiệp xử lý câu hỏi, tin nhắn gần đây với trợ lý và tài liệu hoặc dữ liệu công việc mà người dùng có quyền tra cứu. Không nhập thông tin y tế, dữ liệu cá nhân nhạy cảm hoặc dữ liệu kinh doanh bí mật nếu bạn không có quyền chia sẻ.",
       "AI doanh nghiệp sử dụng OpenRouter (https://openrouter.ai/privacy) để định tuyến tới bên phục vụ model đang cấu hình. Với model Gemini mặc định, bên xử lý bao gồm Google / Google AI Studio (https://cloud.google.com/terms/cloud-privacy-notice). Trước khi chia sẻ, app hiển thị danh sách bên xử lý thực tế cùng liên kết chính sách, loại dữ liệu và mục đích; bạn cần đồng ý rõ ràng. Khi model, bên xử lý hoặc công ty thay đổi, app yêu cầu xác nhận lại.",

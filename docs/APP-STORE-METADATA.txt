@@ -1,0 +1,67 @@
+LUXCARE — NỘI DUNG CHUẨN BỊ CHO APP STORE CONNECT
+Đối chiếu ngày 19/10/2026. File này không chứa tài khoản/mật khẩu reviewer.
+
+TRẠNG THÁI ĐÃ XÁC MINH
+App ID: 6815999878
+Bundle ID: com.igen.luxcare
+Phiên bản hồ sơ: 1.0
+Hồ sơ còn ở REJECTED và đang chọn build 24.
+Build mới 1038: VALID, chưa hết hạn; đã upload qua GitHub macOS.
+Tài khoản demo do bạn cung cấp đăng nhập được, là admin doanh nghiệp IGENTEST,
+có đủ 5 module, 17 đồng nghiệp và 2 chi nhánh.
+
+VIỆC CẦN CẬP NHẬT TRONG APP STORE CONNECT
+1. Chọn build 1038 thay cho 24, kiểm tra đúng bản mới trên TestFlight.
+2. Thay mô tả tiếng Việt cũ đang nói về cá nhân/tự đăng ký/workspace riêng.
+3. Thay Review Notes theo nội dung bên dưới; giữ tài khoản demo trong Sign-In Information.
+4. Kiểm tra Pricing and Availability vẫn là Public và khai báo App Privacy chính xác. Chụp lại ảnh từ bản mới: ảnh dashboard hiện có nội dung chồng thanh trạng thái, ảnh có chỉ báo TestFlight.
+5. Chỉ resubmit sau khi backend và build mới cùng hoạt động; chỉ mô tả đúng mô hình bán hàng thực tế.
+
+APP DESCRIPTION — TIẾNG VIỆT
+
+LuxCare là nền tảng quản lý nhân sự và vận hành dành cho các doanh nghiệp, giúp nhân viên phối hợp công việc và sử dụng thông tin nội bộ theo quyền được cấp.
+
+Ứng dụng dành cho nhân viên có tài khoản do quản trị viên doanh nghiệp cung cấp. Nhân viên đăng nhập bằng tài khoản được cấp; LuxCare không cung cấp tự đăng ký, workspace cá nhân hoặc gói dành cho cá nhân và gia đình.
+
+Tùy theo cấu hình và quyền của doanh nghiệp, người dùng có thể:
+• Xem lịch làm việc, ca làm, chấm công, nghỉ phép và thông tin bảng lương
+• Quản lý công việc, dự án và tiến độ phối hợp trong đội ngũ
+• Truy cập tài liệu và tài nguyên được phân quyền
+• Theo dõi thiết bị và vật tư của doanh nghiệp
+• Trao đổi qua trò chuyện và thông báo nội bộ
+• Sử dụng trợ lý AI phục vụ công việc trong hạn mức được cấu hình
+
+Dịch vụ LuxCare được cung cấp trực tiếp cho tổ chức theo thỏa thuận doanh nghiệp. Quản trị viên tổ chức tạo, phân quyền và quản lý tài khoản nhân viên. Các chức năng hiển thị phụ thuộc vào vai trò, quyền truy cập và các module doanh nghiệp sử dụng.
+
+Nếu bạn chưa có tài khoản, vui lòng liên hệ quản trị viên doanh nghiệp của mình.
+
+APP REVIEW NOTES — ENGLISH
+
+Business model and access:
+LuxCare provides business management services sold directly to organizations for use by their employees. We do not offer individual, consumer or family plans. Organization administrators create and manage employee accounts. Employees sign in using the accounts provided by their organization.
+
+Changes addressing Guidelines 3.1.1 and 3.1.3(c):
+Public self-registration and invitation-based account creation have been removed. Personal trial workspaces are unavailable. Downloading the app does not grant access to the enterprise services. Access requires an organization-provisioned account. The app contains no individual subscription purchase, Credit top-up or upgrade flow.
+
+Public distribution:
+LuxCare is intended to serve multiple independent customer organizations. Public App Store distribution enables their employees to find and download the app and sign in with their organization-provided accounts.
+
+Review access:
+Please use the credentials entered in Sign-In Information. This account is an administrator in a demo organization with representative data. It does not require registration or an invitation.
+
+Suggested review steps:
+1. Sign in using the provided demo credentials.
+2. Open the organization/profile area to view the company and available branches.
+3. Open the HR and user management modules to view employees, roles and work information.
+4. Review resources, equipment/supplies and internal chat according to the enabled modules.
+5. For AI features, review the processor/data-sharing notice and provide consent if you wish to test AI. Usage is subject to the configured allowance.
+6. Account deletion remains available in Profile. Please do not delete the demo account before completing the review.
+
+The backend and organization access controls have been updated for this submission. Please review the newly selected build rather than build 24.
+
+LƯU Ý
+Nội dung trên cần khớp build thực sự được chọn và hoạt động bán hàng thực tế.
+Đã xem 4 ảnh hiện có: không thấy đăng ký hoặc mua gói. Chưa thay ảnh trên App Store Connect.
+Tài khoản đang lưu trong Sign-In Information đã được kiểm tra đăng nhập thành công (HTTP 200).
+Bản ghi này không chứng minh cấu hình phân phối Public hoặc App Privacy.
+Các thay đổi mobile local sau build 1038 cần build mới nếu muốn đưa vào bản gửi duyệt.
