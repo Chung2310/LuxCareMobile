@@ -47,12 +47,17 @@ jobs:
                 if(review){
                   const r=review.data.attributes,notes=r.notes||'';
                   item.review={demoAccountRequired:r.demoAccountRequired,hasUsername:!!r.demoAccountName,hasPassword:!!r.demoAccountPassword,reviewAccountMatchesTested:r.demoAccountName?.trim().toLowerCase()==='igen1@gmail.com',hasContact:!!r.contactEmail&&!!r.contactPhone,notesLength:notes.length,notesMentionOrganization:/organization|enterprise|doanh nghi[eệ]p|t[oổ] ch[uứ]c/i.test(notes)};
+                  if(r.demoAccountName&&r.demoAccountPassword){
+                    const response=await fetch('https://luxcare.igentechnology.net/api/v1/auth/login',{method:'POST',headers:{'Content-Type':'application/json','x-luxcare-client':'mobile'},body:JSON.stringify({email:r.demoAccountName,password:r.demoAccountPassword}),signal:AbortSignal.timeout(25000)});
+                    item.review.savedCredentialsLoginStatus=response.status;
+                    await response.body?.cancel();
+                  }
                 }
                 const locales=await get('/appStoreVersions/'+version.id+'/appStoreVersionLocalizations');
                 for(const locale of locales?.data||[]){
                   const l=locale.attributes;
                   const sets=await get('/appStoreVersionLocalizations/'+locale.id+'/appScreenshotSets?include=appScreenshots');
-                  item.localizations.push({locale:l.locale,description:l.description,supportUrl:l.supportUrl,marketingUrl:l.marketingUrl,screenshotCount:sets?.included?.filter(s=>s.type==='appScreenshots').length||0});
+                  item.localizations.push({locale:l.locale,description:l.description,supportUrl:l.supportUrl,marketingUrl:l.marketingUrl,screenshotCount:sets?.included?.filter(s=>s.type==='appScreenshots').length||0,screenshots:(sets?.included||[]).filter(s=>s.type==='appScreenshots').map(s=>({name:s.attributes.fileName,asset:s.attributes.imageAsset}))});
                 }
               }
               report.versions.push(item);
