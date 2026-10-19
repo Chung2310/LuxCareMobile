@@ -109,6 +109,21 @@ def append_env(values):
             out.write(f"{key}={value}\n")
 
 
+def validate_p12(p12):
+    # Verify the password and private-key presence before touching the keychain.
+    # OpenSSL output is captured in memory and is never logged or saved.
+    args = ["openssl", "pkcs12", "-in", str(p12), "-passin", "env:IOS_DISTRIBUTION_P12_PASSWORD", "-nocerts", "-nodes"]
+    try:
+        material = run(*args)
+    except SigningCommandError as error:
+        if "unsupported encryption" not in str(error):
+            raise
+        material = run(*args, "-legacy")
+    if not re.search(rb"-----BEGIN (?:RSA |EC |ENCRYPTED )?PRIVATE KEY-----", material):
+        raise ValueError("The P12 contains no private key. Export the Apple Distribution identity (certificate AND private key) from EAS credentials or Keychain Access; a certificate-only export cannot sign iOS apps.")
+    print("P12 password and private-key presence verified.", flush=True)
+
+
 def install(folder):
     env = os.environ
     for key in ["IOS_DISTRIBUTION_P12_BASE64", "IOS_PROVISIONING_PROFILE_BASE64"]:
@@ -119,6 +134,7 @@ def install(folder):
     folder.mkdir(mode=0o700)
     p12 = folder / "distribution.p12"
     p12.write_bytes(decode(env["IOS_DISTRIBUTION_P12_BASE64"]))
+    validate_p12(p12)
     profile_path = folder / "profile.mobileprovision"
     profile_path.write_bytes(decode(env["IOS_PROVISIONING_PROFILE_BASE64"]))
     profile = plistlib.loads(run("security", "cms", "-D", "-i", str(profile_path)))
@@ -132,8 +148,7 @@ def install(folder):
     run("security", "set-keychain-settings", "-lut", "21600", str(keychain))
     run("security", "unlock-keychain", "-p", password, str(keychain))
     run("security", "import", str(p12), "-P", env["IOS_DISTRIBUTION_P12_PASSWORD"],
-        "-t", "cert", "-f", "pkcs12", "-k", str(keychain), "-T", "/usr/bin/codesign", "-T", "/usr/bin/security")
-    run("security", "set-key-partition-list", "-S", "apple-tool:,apple:,codesign:", "-s", "-k", password, str(keychain))
+        "-f", "pkcs12", "-k", str(keychain), "-T", "/usr/bin/codesign", "-T", "/usr/bin/security")
     run("security", "list-keychains", "-d", "user", "-s", str(keychain), *original)
     identities = run("security", "find-identity", "-v", "-p", "codesigning", str(keychain)).decode()
     available = set(re.findall(r"\b[0-9A-F]{40}\b", identities))
@@ -142,6 +157,7 @@ def install(folder):
     if not matching:
         raise ValueError("P12 private key/certificate does not match a valid signing identity in this profile")
     identity = matching[0]
+    run("security", "set-key-partition-list", "-S", "apple-tool:,apple:,codesign:", "-s", "-k", password, str(keychain))
     # Current Xcode location, plus the legacy location supported by older toolchains.
     installed = []
     for directory in [Path.home() / "Library/Developer/Xcode/UserData/Provisioning Profiles",

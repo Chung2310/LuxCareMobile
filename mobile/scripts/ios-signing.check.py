@@ -3,6 +3,10 @@ import datetime as dt
 import importlib.util
 from pathlib import Path
 import unittest
+from unittest.mock import patch
+import subprocess
+import io
+from contextlib import redirect_stdout
 
 spec = importlib.util.spec_from_file_location("ios_signing", Path(__file__).with_name("ios-signing.py"))
 signing = importlib.util.module_from_spec(spec)
@@ -41,5 +45,49 @@ class ProfileTests(unittest.TestCase):
         for value in ["", "not base64!", "@@@"]:
             with self.assertRaises(ValueError): signing.decode(value)
         self.assertEqual(signing.decode("aGVsbG8=\n"), b"hello")
+
+class CommandDiagnosticsTests(unittest.TestCase):
+    def test_reports_subcommand_without_secrets_or_raw_stderr(self):
+        password = "test-password-never-log"
+        failure = subprocess.CalledProcessError(1, ["security", "import"], stderr=("MAC verification failed " + password).encode())
+        output = io.StringIO()
+        with patch.object(signing.subprocess, "check_output", side_effect=failure), redirect_stdout(output):
+            with self.assertRaises(signing.SigningCommandError) as caught:
+                signing.run("security", "import", "cert.p12", "-P", password)
+        diagnostic = output.getvalue() + str(caught.exception)
+        self.assertIn("security import", diagnostic)
+        self.assertIn("P12 password verification failed", diagnostic)
+        self.assertNotIn(password, diagnostic)
+
+    def test_profile_decode_failure_identifies_profile_secret(self):
+        failure = subprocess.CalledProcessError(1, ["security", "cms"], stderr=b"invalid profile")
+        diagnostic = signing.command_failure(["security", "cms", "-D"], failure)
+        self.assertIn("PROVISIONING_PROFILE_BASE64", diagnostic)
+
+    def test_captures_private_key_output_without_logging_it(self):
+        output = io.StringIO()
+        with patch.object(signing.subprocess, "check_output", return_value=b"private-key-never-log"), redirect_stdout(output):
+            self.assertEqual(signing.run("openssl", "pkey", "-text"), b"private-key-never-log")
+        self.assertNotIn("private-key-never-log", output.getvalue())
+
+class P12Tests(unittest.TestCase):
+    def test_certificate_only_export_is_rejected_before_import(self):
+        with patch.object(signing, "run", return_value=b"Bag Attributes\n"):
+            with self.assertRaisesRegex(ValueError, "contains no private key"):
+                signing.validate_p12(Path("test.p12"))
+
+    def test_private_key_is_accepted_without_printing_key(self):
+        output = io.StringIO()
+        with patch.object(signing, "run", return_value=b"-----BEGIN PRIVATE KEY-----\nnever-log-this"), redirect_stdout(output):
+            signing.validate_p12(Path("test.p12"))
+        self.assertNotIn("never-log-this", output.getvalue())
+
+    def test_legacy_reader_fallback_only_for_unsupported_cipher(self):
+        with patch.object(signing, "run", side_effect=[signing.SigningCommandError("unsupported encryption"), b"-----BEGIN PRIVATE KEY-----"]) as run:
+            signing.validate_p12(Path("test.p12"))
+        self.assertIn("-legacy", run.call_args.args)
+        with patch.object(signing, "run", side_effect=signing.SigningCommandError("password verification failed")) as run:
+            with self.assertRaises(signing.SigningCommandError): signing.validate_p12(Path("test.p12"))
+        self.assertEqual(run.call_count, 1)
 
 if __name__ == "__main__": unittest.main()
