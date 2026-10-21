@@ -18,8 +18,8 @@ describe("native AI sharing wiring", () => {
     expect(knowledge).toContain("!sharing.accepted");
     const notice = readFileSync("mobile/src/features/ai/AiSharingNotice.tsx", "utf8");
     expect(chat).toContain("activeRoom.isChatbot && !sharing.accepted");
-    expect(notice).toContain("Không đồng ý");
-    expect(notice).toContain("Thu hồi đồng ý");
+    expect(notice).toContain("Decline / Từ chối");
+    expect(notice).toContain("Revoke / Thu hồi");
     expect(chat).toContain('socketService.on("internal_ai_error"');
     expect(chat).toContain('socketService.off("internal_typing_status"');
   });
