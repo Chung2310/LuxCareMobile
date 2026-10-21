@@ -8,11 +8,12 @@ export interface AiSharingDisclosure {
   recipients: AiSharingRecipient[];
   dataTypes: string[];
   purpose: string;
+  processingSafeguards: string;
   privacyUrl: string;
   accepted: boolean;
   acceptedAt: string | null;
 }
 export type AiSharingDisclosurePreview = Pick<
   AiSharingDisclosure,
-  "model" | "recipients" | "dataTypes" | "purpose" | "privacyUrl"
+  "model" | "recipients" | "dataTypes" | "purpose" | "processingSafeguards" | "privacyUrl"
 > & { fingerprint: string };

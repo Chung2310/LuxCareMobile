@@ -8,7 +8,7 @@ export const PRIVACY_POLICY_URL = `${SERVICE_WEBSITE_URL}/privacy-policy`;
 export const TERMS_OF_SERVICE_URL = `${SERVICE_WEBSITE_URL}/terms-of-service`;
 export const USER_DATA_DELETION_URL = `${SERVICE_WEBSITE_URL}/user-data-deletion`;
 
-export const LAST_UPDATED = "October 19, 2026";
+export const LAST_UPDATED = "October 21, 2026";
 
 export interface LegalSection {
   title: string;
@@ -65,8 +65,10 @@ export const PRIVACY_POLICY_SECTIONS: LegalSection[] = [
       "Khi sử dụng AI doanh nghiệp, hệ thống có thể xử lý câu hỏi, nội dung người dùng cung cấp và tài liệu hoặc dữ liệu công việc mà người dùng được phân quyền truy cập.",
       "Người dùng giữ toàn quyền sở hữu và chịu trách nhiệm kiểm duyệt nội dung trước khi xuất bản hoặc sử dụng trong công việc.",
       "Trợ lý AI doanh nghiệp xử lý câu hỏi, tin nhắn gần đây với trợ lý và tài liệu hoặc dữ liệu công việc mà người dùng có quyền tra cứu. Không nhập thông tin y tế, dữ liệu cá nhân nhạy cảm hoặc dữ liệu kinh doanh bí mật nếu bạn không có quyền chia sẻ.",
-      "AI doanh nghiệp sử dụng OpenRouter (https://openrouter.ai/privacy) để định tuyến tới bên phục vụ model đang cấu hình. Với model Gemini mặc định, bên xử lý bao gồm Google / Google AI Studio (https://cloud.google.com/terms/cloud-privacy-notice). Trước khi chia sẻ, app hiển thị danh sách bên xử lý thực tế cùng liên kết chính sách, loại dữ liệu và mục đích; bạn cần đồng ý rõ ràng. Khi model, bên xử lý hoặc công ty thay đổi, app yêu cầu xác nhận lại.",
-      "Khi tạo hoặc tải tài liệu vào Kho tri thức, nội dung tài liệu và ảnh/trang cần OCR có thể được gửi để đọc, lập chỉ mục và tìm kiếm; model và bên xử lý thực tế được hiển thị trước khi bạn xác nhận. Chỉ gửi dữ liệu bạn có quyền chia sẻ. Bạn có thể từ chối hoặc thu hồi đồng ý ngay trong trợ lý; các tính năng khác của tài khoản vẫn sử dụng được.",
+      "AI doanh nghiệp dùng OpenRouter (https://openrouter.ai/privacy), dịch vụ AI duy nhất LuxCare cấu hình. OpenRouter có thể định tuyến yêu cầu đến endpoint model theo Thỏa thuận xử lý dữ liệu và điều khoản bên xử lý phụ. Trước khi chia sẻ, ứng dụng nêu OpenRouter là bên nhận, loại dữ liệu và mục đích; bạn cần đồng ý rõ ràng. Khi thông tin chia sẻ thay đổi, ứng dụng yêu cầu xác nhận lại.",
+      "Company AI may send your question, recent assistant messages, relevant authorized company records, selected legal-document text for a requested amendment comparison, and Knowledge upload text or pages/images needing OCR to OpenRouter. The app states the purpose, data categories, and OpenRouter as the recipient before you agree. Requests stop if you decline or withdraw consent. / AI doanh nghiệp có thể gửi câu hỏi, tin nhắn gần đây, dữ liệu công ty được phép truy cập, văn bản pháp lý được chọn để đối chiếu sửa đổi và nội dung/trang/ảnh cần OCR của tài liệu Kho tri thức đến OpenRouter. Ứng dụng nêu mục đích, loại dữ liệu và OpenRouter là bên nhận trước khi bạn đồng ý. Yêu cầu sẽ dừng nếu bạn từ chối hoặc thu hồi đồng ý.",
+      "OpenRouter processes AI requests under LuxCare's Data Processing Agreement and its subprocessor terms. Requests are restricted to eligible model endpoints with zero data retention and data collection denied; fallback is disabled and requests fail if no eligible endpoint is available. OpenRouter's subprocessor protections are required to be at least equivalent to this Privacy Policy. / OpenRouter xử lý yêu cầu AI theo Thỏa thuận xử lý dữ liệu với LuxCare và các điều khoản bên xử lý phụ. Yêu cầu chỉ được định tuyến đến endpoint model phù hợp có chính sách không lưu giữ và không thu thập dữ liệu; không dùng endpoint dự phòng và yêu cầu sẽ lỗi nếu không có endpoint phù hợp. Các biện pháp bảo vệ dành cho bên xử lý phụ của OpenRouter phải tương đương ít nhất với Chính sách bảo mật này.",
+      "Khi tạo hoặc tải tài liệu vào Kho tri thức, nội dung tài liệu và trang/ảnh cần OCR có thể được gửi đến OpenRouter để đọc, lập chỉ mục và tìm kiếm. Chỉ gửi dữ liệu bạn có quyền chia sẻ. Bạn có thể từ chối hoặc thu hồi đồng ý trong trợ lý; các tính năng khác của tài khoản vẫn dùng được.",
     ],
   },
   {
@@ -75,7 +77,9 @@ export const PRIVACY_POLICY_SECTIONS: LegalSection[] = [
     content: [
       "Chúng tôi tuyệt đối không bán dữ liệu người dùng, thông tin cá nhân hoặc thông tin xác thực cho bất kỳ bên thứ ba nào.",
       "Chúng tôi không sử dụng dữ liệu người dùng cho mục đích quảng cáo thương mại ngoài phạm vi dịch vụ.",
-      "Dữ liệu được chia sẻ với các nhà cung cấp hạ tầng, lưu trữ và thông báo ở mức cần thiết để vận hành ứng dụng. Trợ lý doanh nghiệp chỉ gửi dữ liệu sang OpenRouter và các bên xử lý AI đã được hiển thị sau khi bạn đồng ý. Nội dung chat bị báo cáo và tệp liên quan có thể được quản trị viên doanh nghiệp có thẩm quyền xem để xử lý vi phạm.",
+      "Dữ liệu được chia sẻ với nhà cung cấp hạ tầng, lưu trữ và thông báo ở mức cần thiết để vận hành ứng dụng. Dữ liệu cho tính năng AI doanh nghiệp chỉ được gửi đến OpenRouter sau khi bạn đồng ý. Nội dung chat bị báo cáo và tệp liên quan có thể được quản trị viên doanh nghiệp có thẩm quyền xem để xử lý vi phạm.",
+      "Company AI data, including chat prompts, Knowledge materials, and selected legal-document text, is sent to OpenRouter only after explicit permission. OpenRouter's DPA and subprocessor terms apply to model endpoint routing. / Dữ liệu AI doanh nghiệp, gồm câu hỏi trong chat, tài liệu Kho tri thức và nội dung văn bản pháp lý được chọn, chỉ được gửi đến OpenRouter sau khi có đồng ý rõ ràng. DPA và điều khoản bên xử lý phụ của OpenRouter áp dụng cho việc định tuyến đến endpoint model.",
+      "OpenRouter and its subprocessors process data under agreements requiring protections at least equivalent to those described here. OpenRouter applies the zero-retention and no-data-collection routing controls described above. / OpenRouter và các bên xử lý phụ xử lý dữ liệu theo thỏa thuận yêu cầu biện pháp bảo vệ tương đương ít nhất với các nội dung tại đây. OpenRouter áp dụng các kiểm soát định tuyến không lưu giữ và không thu thập dữ liệu như mô tả ở trên.",
     ],
   },
   {
