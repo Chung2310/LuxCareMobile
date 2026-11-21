@@ -130,7 +130,7 @@ export function DepartmentForm({
     if (isNew || !onDelete) return;
     showAlert(
       "Xác nhận xóa phòng ban?",
-      `Bạn có chắc chắn muốn xóa phòng ban "${editing.name}"? Các nhân sự đang thuộc phòng ban này sẽ cần được phân bổ lại.`,
+      `Bạn có chắc chắn muốn xóa phòng ban "${editing.name}"? Cần chuyển hết nhân sự và thiết bị được gán sang phòng ban khác trước khi xóa.`,
       [
         { text: "Hủy", style: "cancel" },
         {

@@ -122,7 +122,7 @@ export const DepartmentDetailModal: React.FC<DepartmentDetailModalProps> = ({
   const handleDelete = () => {
     showAlert(
       "Xác nhận xóa phòng ban",
-      `Bạn có chắc chắn muốn xóa phòng ban "${department.name}" (${department.code})? Hành động này không thể hoàn tác.`,
+      `Bạn có chắc chắn muốn xóa phòng ban "${department.name}" (${department.code})? Cần chuyển hết nhân sự và thiết bị được gán sang phòng ban khác trước khi xóa.`,
       [
         { text: "Hủy", style: "cancel" },
         {
