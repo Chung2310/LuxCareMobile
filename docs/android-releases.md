@@ -16,7 +16,7 @@ Chạy workflow Build IPA & APK, chọn nhánh có thay đổi. Job Android dừ
 
 ## Mỗi lần cập nhật
 
-1. Sửa code; khi phát hành tính năng mới, đổi version trong mobile/app.json, ví dụ 1.0.0 → 1.0.1.
+1. Sửa code; khi phát hành tính năng mới, đổi Repository variable `APP_VERSION` tại **Settings → Secrets and variables → Actions → Variables**, ví dụ `1.0.0` → `1.0.1`. iOS và Android dùng chung biến này; không cần sửa `mobile/app.json`. Build sẽ dừng nếu thiếu hoặc sai định dạng `major.minor.patch`.
 2. Push rồi chạy Build IPA & APK. Android versionCode = 1000 + github.run_number, tự tăng theo mỗi lần chạy mới của workflow. Re-run cùng một run giữ nguyên versionCode; hãy tạo run mới khi phát hành bản cập nhật.
 3. Tải artifact LuxCare-android-apk-..., gửi LuxCare.apk cho khách bằng kênh phân phối của bạn.
 4. Khách mở APK và chọn Cập nhật. Giữ package com.igen.luxcare và khóa ký cố định để cài đè, giữ dữ liệu app.

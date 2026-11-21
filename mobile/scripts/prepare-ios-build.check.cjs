@@ -10,12 +10,13 @@ const env = {
   APPLE_TEAM_ID: "VP77TD9A77",
   IOS_BUILD_NUMBER_BASE: "1000",
   GITHUB_RUN_NUMBER: "42",
+  APP_VERSION: "1.0.0",
 };
 test("builds native config without Expo token or modifying EAS configuration", () => {
   assert.deepEqual(prepare(env), {
     EXPO_PUBLIC_API_URL: "https://api.example.com",
     IOS_BUILD_NUMBER: "1042",
-    APP_VERSION: "",
+    APP_VERSION: "1.0.0",
   });
 });
 test("accepts explicit build number when migrating from remote version counter", () => {
@@ -34,6 +35,7 @@ for (const field of [
   "GITHUB_RUN_NUMBER",
   "IOS_BUILD_NUMBER_BASE",
   "UPLOAD_TESTFLIGHT",
+  "APP_VERSION",
 ]) {
   test(`rejects missing ${field}`, () => assert.throws(() => prepare({ ...env, [field]: "" })));
 }

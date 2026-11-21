@@ -9,6 +9,9 @@ on:
 permissions:
   contents: read
 
+env:
+  APP_VERSION: ${{ vars.APP_VERSION }}
+
 concurrency:
   group: ios-sideloadly-${{ github.ref }}
   cancel-in-progress: false
@@ -44,6 +47,7 @@ jobs:
 
       - name: Validate public app settings
         run: |
+          node scripts/prepare-app-version.cjs
           node <<'NODE'
           const env = process.env;
           if (!env.EXPO_PUBLIC_API_URL) throw Error("Missing repository variable EXPO_PUBLIC_API_URL");
@@ -102,6 +106,7 @@ jobs:
 
       - name: Installation note
         run: |
+          echo "App version (APP_VERSION variable): $APP_VERSION" >> "$GITHUB_STEP_SUMMARY"
           echo '### IPA for Sideloadly' >> "$GITHUB_STEP_SUMMARY"
           echo 'Download LuxCare-unsigned.ipa from Artifacts and sign/install it with Sideloadly on your computer. Apple credentials are not used by this workflow.' >> "$GITHUB_STEP_SUMMARY"
           echo 'Release build for physical iPhone (not Simulator); Metro is not required. Remote push is not guaranteed with personal/free signing.' >> "$GITHUB_STEP_SUMMARY"
@@ -147,6 +152,7 @@ jobs:
 
       - name: Validate Android app settings
         run: |
+          node scripts/prepare-app-version.cjs
           node <<'NODE'
           const env = process.env;
           if (!env.EXPO_PUBLIC_API_URL) throw Error("Missing repository variable EXPO_PUBLIC_API_URL");
@@ -247,6 +253,7 @@ jobs:
 
       - name: Installation note
         run: |
+          echo "App version (APP_VERSION variable): $APP_VERSION" >> "$GITHUB_STEP_SUMMARY"
           echo "Android versionCode: $LUXCARE_ANDROID_VERSION_CODE" >> "$GITHUB_STEP_SUMMARY"
           echo '### Android APK' >> "$GITHUB_STEP_SUMMARY"
           echo 'Download LuxCare.apk from Artifacts and install it directly on Android. This Release build includes its JavaScript bundle and does not need Metro.' >> "$GITHUB_STEP_SUMMARY"
