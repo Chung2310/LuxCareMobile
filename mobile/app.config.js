@@ -1,3 +1,5 @@
+const { resolveAppVersion } = require("./scripts/prepare-app-version.cjs");
+
 if ((process.env.BUILD_PROFILE || process.env.EAS_BUILD_PROFILE) === "production") {
   const apiUrl = new URL(process.env.EXPO_PUBLIC_API_URL || "https://unconfigured.invalid");
   if (
@@ -17,7 +19,7 @@ if (iosBuildNumber && (!/^[1-9]\d*$/.test(iosBuildNumber) || Number(iosBuildNumb
 // Supply the actual registered application IDs and EAS project ID at build time.
 module.exports = ({ config }) => ({
   ...config,
-  ...(process.env.APP_VERSION ? { version: process.env.APP_VERSION } : {}),
+  ...(process.env.APP_VERSION ? { version: resolveAppVersion(process.env) } : {}),
   extra: {
     ...config.extra,
     ...(process.env.EXPO_PUBLIC_EAS_PROJECT_ID

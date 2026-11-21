@@ -20,12 +20,12 @@ on:
       build_number:
         description: "Optional integer above the latest App Store Connect build; default = IOS_BUILD_NUMBER_BASE + run number"
         type: string
-      app_version:
-        description: "Optional marketing version; blank uses app.json"
-        type: string
 
 permissions:
   contents: read
+
+env:
+  APP_VERSION: ${{ vars.APP_VERSION }}
 
 # Serialize all signed builds, including different branches/profiles.
 concurrency:
@@ -49,7 +49,6 @@ jobs:
       UPLOAD_TESTFLIGHT: ${{ inputs.profile == 'production' && inputs.upload_testflight && !inputs.signing_check_only && 'true' || 'false' }}
       BUILD_NUMBER_INPUT: ${{ inputs.build_number }}
       IOS_BUILD_NUMBER_BASE: ${{ vars.IOS_BUILD_NUMBER_BASE || '1000' }}
-      APP_VERSION: ${{ inputs.app_version }}
       EXPO_PUBLIC_API_URL: ${{ vars.EXPO_PUBLIC_API_URL || 'https://luxcare.igentechnology.net' }}
       EXPO_PUBLIC_EAS_PROJECT_ID: ${{ vars.EXPO_PUBLIC_EAS_PROJECT_ID || '0ec1cf95-301c-44f9-8317-23b44d0f5234' }}
       LUXCARE_IOS_BUNDLE_IDENTIFIER: ${{ vars.LUXCARE_IOS_BUNDLE_IDENTIFIER || 'com.igen.luxcare' }}
@@ -69,7 +68,7 @@ jobs:
 
       - name: Validate build settings and Xcode
         run: |
-          node --test scripts/prepare-ios-build.check.cjs
+          node --test scripts/prepare-app-version.check.cjs scripts/prepare-ios-build.check.cjs
           node scripts/prepare-ios-build.cjs
           test -d "$DEVELOPER_DIR"
           xcodebuild -version
@@ -171,6 +170,7 @@ jobs:
             echo "Build status: $BUILD_STATUS"
             echo "Builder: GitHub macOS / Xcode (no EAS Build)"
             echo "Profile: $BUILD_PROFILE; build number: ${IOS_BUILD_NUMBER:-not-configured}"
+            echo "App version (APP_VERSION variable): $APP_VERSION"
             if [[ "$BUILD_STATUS" == success && "$UPLOAD_TESTFLIGHT" == true ]]; then
               echo "IPA uploaded to App Store Connect. Check TestFlight processing before selecting the build."
             fi

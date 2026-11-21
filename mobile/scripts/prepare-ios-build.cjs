@@ -1,4 +1,5 @@
 const fs = require("node:fs");
+const { resolveAppVersion } = require("./prepare-app-version.cjs");
 
 function prepare(env) {
   if (!["preview", "production"].includes(env.BUILD_PROFILE)) throw new Error("Invalid BUILD_PROFILE");
@@ -27,8 +28,7 @@ function prepare(env) {
     build = String(Number(env.IOS_BUILD_NUMBER_BASE) + Number(env.GITHUB_RUN_NUMBER));
   }
   if (!/^[1-9]\d*$/.test(build) || Number(build) > 2100000000) throw new Error("Invalid iOS build number");
-  const version = (env.APP_VERSION || "").trim();
-  if (version && !/^\d+\.\d+\.\d+$/.test(version)) throw new Error("APP_VERSION must be major.minor.patch");
+  const version = resolveAppVersion(env);
   if (!["true", "false"].includes(env.UPLOAD_TESTFLIGHT)) throw new Error("Invalid UPLOAD_TESTFLIGHT");
   if (env.BUILD_PROFILE !== "production" && env.UPLOAD_TESTFLIGHT === "true")
     throw new Error("Only production builds can be uploaded to TestFlight");
@@ -44,5 +44,6 @@ if (require.main === module) {
       .join(""),
   );
   console.log(`Native iOS ${process.env.BUILD_PROFILE} build number: ${output.IOS_BUILD_NUMBER}`);
+  console.log(`App version (APP_VERSION variable): ${output.APP_VERSION}`);
 }
 module.exports = { prepare };

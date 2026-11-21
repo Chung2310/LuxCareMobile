@@ -46,6 +46,7 @@ Giữ các file signing ngoài repository. Runner tạo keychain tạm, chỉ c�
 
 | Variable | Mặc định |
 | --- | --- |
+| `APP_VERSION` | Bắt buộc, ví dụ `1.0.1`; dùng chung cho iOS và Android |
 | `EXPO_PUBLIC_API_URL` | `https://luxcare.igentechnology.net` |
 | `LUXCARE_IOS_BUNDLE_IDENTIFIER` | `com.igen.luxcare` |
 | `APPLE_TEAM_ID` | `VP77TD9A77` |
@@ -54,7 +55,7 @@ Giữ các file signing ngoài repository. Runner tạo keychain tạm, chỉ c�
 
 Số build mặc định = `IOS_BUILD_NUMBER_BASE + github.run_number`. Trước lần đầu, xem số build cao nhất trong App Store Connect và đặt base để kết quả lớn hơn số đó. Có thể nhập `build_number` thủ công. Bộ đếm version remote trong EAS không còn được dùng bởi workflow này. Nếu rerun một workflow đã upload thành công, số build không tự đổi: tạo Run workflow mới hoặc nhập số mới để tránh duplicate build. Khi dùng override lớn, tăng base cho các lần sau.
 
-`app_version` có thể đặt `1.0.1`; để trống dùng `app.json`. Giữ marketing version phù hợp với phiên bản đang chuẩn bị gửi Apple.
+Đổi marketing version tại **Settings → Secrets and variables → Actions → Variables → Repository variables → APP_VERSION**, ví dụ `1.0.0` → `1.0.1`, rồi tạo một Run workflow mới. Cả workflow App Store và Build IPA & APK dùng biến này; không cần sửa `app.json` hay nhập version khi chạy. Thiếu/sai định dạng biến sẽ dừng build. `app.json` chỉ giữ version mặc định cho phát triển local. Giữ marketing version phù hợp với phiên bản đang chuẩn bị gửi Apple.
 
 ## Chạy production / TestFlight
 

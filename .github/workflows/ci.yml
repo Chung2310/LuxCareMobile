@@ -50,6 +50,6 @@ jobs:
       - name: Validate native iOS build helpers
         working-directory: mobile
         run: |
-          node --test scripts/prepare-ios-build.check.cjs scripts/configure-ios-signing.check.cjs
+          node --test scripts/prepare-app-version.check.cjs scripts/prepare-ios-build.check.cjs scripts/configure-ios-signing.check.cjs
           python3 scripts/ios-signing.check.py
           bash -n scripts/build-signed-ios.sh

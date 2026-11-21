@@ -17,6 +17,7 @@ import {
   Text,
   TextInput,
   View,
+  useWindowDimensions,
 } from "react-native";
 import { router, useFocusEffect } from "expo-router";
 import { SafeAreaView } from "react-native-safe-area-context";
@@ -24,18 +25,27 @@ import { Ionicons, MaterialCommunityIcons } from "@expo/vector-icons";
 import Svg, { Circle, Path } from "react-native-svg";
 import * as ImagePicker from "expo-image-picker";
 import * as DocumentPicker from "expo-document-picker";
-import * as FileSystem from "expo-file-system";
+import { File, Paths } from "expo-file-system";
 import * as Sharing from "expo-sharing";
 import * as Linking from "expo-linking";
 import { DatePickerModal } from "../../src/features/credentials/DatePickerModal";
 import { EmptyState } from "../../src/ui";
 import { equipment, departments } from "../../src/api/services";
-import { useSession } from "../../src/auth/SessionProvider";
+import { messageOf, useSession } from "../../src/auth/SessionProvider";
+import type { DepartmentRecord } from "../../../src/services/departmentService";
+import { EquipmentDepartmentField } from "../../src/features/equipment/EquipmentDepartmentField";
+import { appendEquipmentPage, equipmentDepartmentName, equipmentStatusFilter } from "../../src/features/equipment/departmentModel";
+import { useEquipmentRequests } from "../../src/features/equipment/useEquipmentRequests";
+import { canReturnEquipment, equipmentIdentity } from "../../src/features/equipment/borrowModel";
+import { equipmentTechnicalPayload } from "../../src/features/equipment/formModel";
+import { inspectionResultValue, riskClassificationValue } from "../../../src/services/equipmentRecord";
 import { hasPermission } from "../../../src/utils/permissionUtils";
 import type {
   EquipmentRecord,
   EquipmentSummary,
   EquipmentComplianceSummary,
+  EquipmentRequestRecord,
+  EquipmentDocument,
 } from "../../../src/types/equipment";
 
 // ── Helpers ───────────────────────────────────────────────────────────────────
@@ -62,16 +72,17 @@ const STATUS_OPTIONS = [
 
 const RISK_OPTIONS = [
   { label: "Chưa phân nhóm", value: "Chưa phân nhóm" },
-  { label: "Loại A (Rủi ro thấp)", value: "Loại A" },
-  { label: "Loại B (Rủi ro trung bình thấp)", value: "Loại B" },
-  { label: "Loại C (Rủi ro trung bình cao)", value: "Loại C" },
-  { label: "Loại D (Rủi ro cao)", value: "Loại D" },
+  { label: "Loại A (Rủi ro thấp)", value: "A" },
+  { label: "Loại B (Rủi ro trung bình thấp)", value: "B" },
+  { label: "Loại C (Rủi ro trung bình cao)", value: "C" },
+  { label: "Loại D (Rủi ro cao)", value: "D" },
 ];
 
 const INSPECTION_RESULT_OPTIONS = [
-  { label: "✓ Đạt chuẩn (Pass)", value: "Pass" },
-  { label: "✗ Không đạt (Fail)", value: "Fail" },
-  { label: "Chờ đánh giá (Pending)", value: "Pending" },
+  { label: "Chưa đánh giá", value: "" },
+  { label: "✓ Đạt chuẩn", value: "pass" },
+  { label: "✗ Không đạt", value: "fail" },
+  { label: "Đạt có điều kiện", value: "conditional" },
 ];
 
 const DOC_TYPE_OPTIONS = [
@@ -182,14 +193,8 @@ function FilePreviewModal({
   const uri = file.uri || "";
   const name = file.name || "Tài liệu đính kèm";
 
-  const isImage =
-    uri.startsWith("data:image") ||
-    uri.startsWith("file://") ||
-    uri.startsWith("content://") ||
-    uri.startsWith("http://") ||
-    uri.startsWith("https://") ||
-    /\.(jpg|jpeg|png|webp|gif|heic)$/i.test(name) ||
-    /\.(jpg|jpeg|png|webp|gif|heic)$/i.test(uri);
+  const format = resolveFileFormat({ name, url: uri, mimeType: /^data:([^;,]+)/i.exec(uri)?.[1] || file.type });
+  const isImage = format.mimeType.startsWith("image/");
 
   const handleShareOrOpen = async () => {
     if (!uri) {
@@ -202,7 +207,16 @@ function FilePreviewModal({
         return;
       }
       if (await Sharing.isAvailableAsync()) {
-        await Sharing.shareAsync(uri, { mimeType: resolveFileFormat({ name, url: uri }).mimeType });
+        let shareUri = uri;
+        if (uri.startsWith("data:")) {
+          const encoded = /^data:[^;,]+;base64,([\s\S]+)$/i.exec(uri);
+          if (!encoded) throw new Error("Dữ liệu tệp không hợp lệ.");
+          const cached = new File(Paths.cache, `equipment-${Date.now()}-${format.name}`);
+          cached.create();
+          cached.write(encoded[1], { encoding: "base64" });
+          shareUri = cached.uri;
+        }
+        await Sharing.shareAsync(shareUri, { mimeType: format.mimeType });
       } else {
         await Linking.openURL(uri);
       }
@@ -299,22 +313,26 @@ function parseEquipmentNotes(rawNotes?: string) {
 // ── SwipeableItem ─────────────────────────────────────────────────────────────
 function SwipeableItem({
   item,
+  canManage,
   onEdit,
   onDelete,
   onViewDetail,
 }: {
   item: EquipmentRecord;
+  canManage: boolean;
   onEdit: (item: EquipmentRecord) => void;
   onDelete: (item: EquipmentRecord) => void;
   onViewDetail: (item: EquipmentRecord) => void;
 }) {
   const translateX = useRef(new Animated.Value(0)).current;
   const isOpen = useRef(false);
+  const canManageRef = useRef(canManage);
+  canManageRef.current = canManage;
 
   const panResponder = useRef(
     PanResponder.create({
       onMoveShouldSetPanResponder: (_, g) =>
-        Math.abs(g.dx) > 8 && Math.abs(g.dy) < Math.abs(g.dx),
+        canManageRef.current && Math.abs(g.dx) > 8 && Math.abs(g.dy) < Math.abs(g.dx),
       onPanResponderMove: (_, g) => {
         const val = Math.max(-120, Math.min(0, g.dx + (isOpen.current ? -120 : 0)));
         translateX.setValue(val);
@@ -344,7 +362,7 @@ function SwipeableItem({
 
   return (
     <View style={styles.swipeWrapper}>
-      <View style={styles.actionButtons}>
+      {canManage && <View style={styles.actionButtons}>
         <Pressable style={styles.editBtn} onPress={() => { close(); onEdit(item); }}>
           <Ionicons name="pencil" size={18} color="#ffffff" />
           <Text style={styles.actionBtnText}>Sửa</Text>
@@ -353,7 +371,7 @@ function SwipeableItem({
           <Ionicons name="trash" size={18} color="#ffffff" />
           <Text style={styles.actionBtnText}>Xóa</Text>
         </Pressable>
-      </View>
+      </View>}
       <Animated.View style={[styles.itemCard, { transform: [{ translateX }] }]} {...panResponder.panHandlers}>
         <Pressable
           onPress={() => {
@@ -370,8 +388,8 @@ function SwipeableItem({
               <Text style={styles.itemName}>{item.name}</Text>
               <Text style={styles.itemCode}>
                 {item.code || "N/A"}
-                {item.department || item.departmentName ? ` · ${item.department || item.departmentName}` : ""}
               </Text>
+              <Text style={styles.itemMeta}>Phòng ban: {equipmentDepartmentName(item) || "Chưa gán"}</Text>
             </View>
             <View style={[styles.itemBadge, { backgroundColor: badge.bg }]}>
               <Text style={[styles.itemBadgeText, { color: badge.color }]}>{badge.label}</Text>
@@ -530,16 +548,25 @@ function EquipmentModal({
   onClose,
   onSaved,
   editItem,
+  departmentList,
+  departmentsLoading,
+  departmentsError,
+  onRetryDepartments,
 }: {
   visible: boolean;
   onClose: () => void;
   onSaved: () => void;
   editItem: EquipmentRecord | null;
+  departmentList: DepartmentRecord[];
+  departmentsLoading: boolean;
+  departmentsError: string | null;
+  onRetryDepartments: () => void;
 }) {
   const isEdit = !!editItem;
   const [name, setName] = useState("");
   const [code, setCode] = useState("");
   const [category, setCategory] = useState("");
+  const [departmentId, setDepartmentId] = useState("");
   const [status, setStatus] = useState("available");
   const [formPreviewFile, setFormPreviewFile] = useState<{ name: string; uri?: string; type?: string } | null>(null);
   const [riskClassification, setRiskClassification] = useState("Chưa phân nhóm");
@@ -550,17 +577,18 @@ function EquipmentModal({
   const [serialNumber, setSerialNumber] = useState("");
   const [lastInspectionDate, setLastInspectionDate] = useState("");
   const [nextInspectionDate, setNextInspectionDate] = useState("");
-  const [inspectionResult, setInspectionResult] = useState("Pass");
+  const [inspectionResult, setInspectionResult] = useState("");
   const [inspectionAgency, setInspectionAgency] = useState("");
   const [inspectionCertFile, setInspectionCertFile] = useState("");
   const [inspectionCertFileName, setInspectionCertFileName] = useState("");
-  const [documents, setDocuments] = useState<{ name: string; uri: string; type?: string; code?: string; issueDate?: string; expiryDate?: string }[]>([]);
+  const [documents, setDocuments] = useState<EquipmentDocument[]>([]);
   const [location, setLocation] = useState("");
   const [purchaseDate, setPurchaseDate] = useState("");
   const [usageStartDate, setUsageStartDate] = useState("");
   const [notes, setNotes] = useState("");
   const [imageUri, setImageUri] = useState("");
   const [saving, setSaving] = useState(false);
+  const savingRef = useRef(false);
 
   // Subform thêm hồ sơ / tải ảnh
   const [showDocForm, setShowDocForm] = useState(false);
@@ -571,7 +599,7 @@ function EquipmentModal({
   const [newDocExpiryDate, setNewDocExpiryDate] = useState("");
   const [newDocFile, setNewDocFile] = useState<{ name: string; uri: string } | null>(null);
 
-  // Vị trí phòng ban
+  // Vị trí đặt thiết bị, độc lập với phòng ban quản lý.
   const [roomList, setRoomList] = useState<ClinicRoom[]>(DEFAULT_CLINIC_ROOMS);
   const [deptDropdownOpen, setDeptDropdownOpen] = useState(false);
   const [deptSearch, setDeptSearch] = useState("");
@@ -643,6 +671,7 @@ function EquipmentModal({
     setName(editItem?.name ?? "");
     setCode(editItem?.code ?? "");
     setCategory(editItem?.category ?? "");
+    setDepartmentId(editItem?.departmentId || "");
     const rawStatus = (editItem?.status ?? "available").toLowerCase();
     setStatus(
       rawStatus.includes("maint") ? "maintenance" : rawStatus.includes("retire") || rawStatus.includes("dispos") ? "retired" : "available"
@@ -664,7 +693,7 @@ function EquipmentModal({
       }
     }
 
-    setRiskClassification(editItem?.riskClassification || meta["Phân loại rủi ro"] || "Chưa phân nhóm");
+    setRiskClassification(riskClassificationValue(editItem?.riskClassification || meta["Phân loại rủi ro"] || "") || "Chưa phân nhóm");
     setInspectionIntervalMonths(
       editItem?.inspectionIntervalMonths
         ? String(editItem.inspectionIntervalMonths)
@@ -684,11 +713,11 @@ function EquipmentModal({
         ? editItem.nextInspectionDate.slice(0, 10)
         : meta["Hạn kiểm định tiếp theo"] || ""
     );
-    setInspectionResult(editItem?.inspectionResult || meta["Kết quả"] || "Pass");
+    setInspectionResult(inspectionResultValue(editItem?.inspectionResult || meta["Kết quả"] || ""));
     setInspectionAgency(editItem?.inspectionAgency || meta["Đơn vị kiểm định"] || "");
     const certFileVal = editItem?.inspectionCertFile || meta["Biên bản"] || "";
     setInspectionCertFile(certFileVal);
-    setInspectionCertFileName(certFileVal ? (certFileVal.startsWith("data:") ? "Biên bản đã tải lên" : certFileVal.split("/").pop() || "Biên bản") : "");
+    setInspectionCertFileName(editItem?.inspectionCertFileName || (certFileVal ? (certFileVal.startsWith("data:") ? "Biên bản đã tải lên" : certFileVal.split("/").pop() || "Biên bản") : ""));
 
     let docs = (editItem?.documents as any) ?? [];
     if (docs.length === 0 && meta["Tài liệu JSON"]) {
@@ -716,6 +745,10 @@ function EquipmentModal({
     setDeptDropdownOpen(false);
     setDeptSearch("");
   }, [editItem]);
+
+  useEffect(() => {
+    if (visible) resetToItem();
+  }, [visible, resetToItem]);
 
   const [mediaPickerTarget, setMediaPickerTarget] = useState<"equipmentImage" | "certFile" | "docFile" | null>(null);
 
@@ -810,14 +843,13 @@ function EquipmentModal({
         let fileUri = file.uri;
         try {
           if (file.uri && !file.uri.startsWith("data:")) {
-            const base64 = await FileSystem.readAsStringAsync(file.uri, {
-              encoding: FileSystem.EncodingType.Base64,
-            });
+            const base64 = await new File(file.uri).base64();
             const mime = file.mimeType || (file.name.toLowerCase().endsWith(".pdf") ? "application/pdf" : "image/jpeg");
             fileUri = `data:${mime};base64,${base64}`;
           }
         } catch {
-          fileUri = file.uri;
+          showFormAlert("Không thể đọc tệp", "Vui lòng chọn lại tài liệu đính kèm.", "error");
+          return;
         }
 
         if (target === "certFile") {
@@ -861,6 +893,7 @@ function EquipmentModal({
   };
 
   const handleSave = async () => {
+    if (savingRef.current) return;
     if (!name.trim()) {
       showFormAlert("Thiếu thông tin", "Vui lòng nhập tên thiết bị.", "warning");
       return;
@@ -874,6 +907,7 @@ function EquipmentModal({
       return;
     }
 
+    savingRef.current = true;
     setSaving(true);
     try {
       const serverStatus = ["available", "maintenance", "retired"].includes(status)
@@ -884,22 +918,18 @@ function EquipmentModal({
         name: name.trim(),
         code: code.trim(),
         category: category.trim(),
+        departmentId: departmentId || null,
         status: serverStatus,
+        ...equipmentTechnicalPayload({
+          riskClassification, manufacturer, origin, model, serialNumber, inspectionIntervalMonths,
+          lastInspectionDate, nextInspectionDate, inspectionResult, inspectionAgency, inspectionCertFile,
+          inspectionCertFileName, usageStartDate, documents,
+        }),
       };
 
-      if (location.trim()) payload.location = location.trim();
-      if (purchaseDate) payload.purchaseDate = purchaseDate;
-
-      if (imageUri.trim()) {
-        payload.imageUri = imageUri.trim();
-        payload.imageUrl = imageUri.trim();
-      }
-      if (inspectionCertFile.trim()) {
-        payload.inspectionCertFile = inspectionCertFile.trim();
-      }
-      if (documents.length > 0) {
-        payload.documents = documents;
-      }
+      payload.location = location.trim();
+      payload.purchaseDate = purchaseDate || null;
+      payload.imageUrl = imageUri.trim();
 
       // Đóng gói thông tin kỹ thuật & y tế vào notes để lưu trữ an toàn
       const metaLines: string[] = [];
@@ -926,9 +956,7 @@ function EquipmentModal({
         } catch {}
       }
 
-      if (metaLines.length > 0) {
-        payload.notes = metaLines.join("\n");
-      }
+      payload.notes = metaLines.join("\n");
 
       if (isEdit && editItem) {
         const equipId = editItem._id || editItem.id || "";
@@ -942,12 +970,13 @@ function EquipmentModal({
     } catch (e: any) {
       showFormAlert("Không thể lưu thiết bị", e.message || "Lỗi xử lý dữ liệu từ máy chủ.", "error");
     } finally {
+      savingRef.current = false;
       setSaving(false);
     }
   };
 
   return (
-    <Modal visible={visible} animationType="fade" transparent onShow={resetToItem} onRequestClose={onClose}>
+    <Modal visible={visible} animationType="fade" transparent onRequestClose={() => { if (!savingRef.current) onClose(); }}>
       <KeyboardAvoidingView
         behavior={Platform.OS === "ios" ? "padding" : undefined}
         style={modal.overlay}
@@ -961,7 +990,7 @@ function EquipmentModal({
                 {isEdit ? "Cập nhật hồ sơ & thông số thiết bị y tế" : "Thêm mới hồ sơ trang thiết bị y tế"}
               </Text>
             </View>
-            <Pressable onPress={onClose} hitSlop={10} style={modal.closeBtn}>
+            <Pressable disabled={saving} onPress={() => { if (!savingRef.current) onClose(); }} hitSlop={10} style={modal.closeBtn}>
               <Ionicons name="close" size={20} color="#64748b" />
             </Pressable>
           </View>
@@ -1142,7 +1171,7 @@ function EquipmentModal({
                   <Text style={modal.subLabel}>Kết quả thực hiện</Text>
                   <Pressable style={modal.selector} onPress={() => setActiveSelectPicker("inspectionResult")}>
                     <Text style={modal.selectorText} numberOfLines={1}>
-                      {INSPECTION_RESULT_OPTIONS.find((o) => o.value === inspectionResult)?.label || inspectionResult || "✓ Đạt chuẩn (Pass)"}
+                      {INSPECTION_RESULT_OPTIONS.find((o) => o.value === inspectionResult)?.label || "Chưa đánh giá"}
                     </Text>
                     <Ionicons name="chevron-down" size={15} color="#64748b" />
                   </Pressable>
@@ -1308,6 +1337,17 @@ function EquipmentModal({
                 </View>
               )}
             </View>
+
+            <EquipmentDepartmentField
+              value={departmentId}
+              selectedName={editItem && departmentId === editItem.departmentId ? equipmentDepartmentName(editItem) : ""}
+              departments={departmentList}
+              loading={departmentsLoading}
+              error={departmentsError}
+              onRetry={onRetryDepartments}
+              onChange={setDepartmentId}
+              disabled={saving}
+            />
 
             {/* Vị trí phòng (Chi nhánh) */}
             <Text style={modal.label}>Vị trí phòng </Text>
@@ -1589,11 +1629,13 @@ function EquipmentDetailModal({
   item,
   onClose,
   onEdit,
+  canManage,
 }: {
   visible: boolean;
   item: EquipmentRecord | null;
   onClose: () => void;
   onEdit: (item: EquipmentRecord) => void;
+  canManage: boolean;
 }) {
   if (!item) return null;
 
@@ -1611,7 +1653,8 @@ function EquipmentDetailModal({
   const serial = item.serialNumber || meta["Serial"] || "-";
   const lastInspection = item.lastInspectionDate ? formatDateDisplay(item.lastInspectionDate.slice(0, 10)) : meta["Kiểm định gần nhất"] ? formatDateDisplay(meta["Kiểm định gần nhất"]) : "-";
   const nextInspection = item.nextInspectionDate ? formatDateDisplay(item.nextInspectionDate.slice(0, 10)) : meta["Hạn kiểm định tiếp theo"] ? formatDateDisplay(meta["Hạn kiểm định tiếp theo"]) : "-";
-  const result = item.inspectionResult || meta["Kết quả"] || "Pass";
+  const resultValue = inspectionResultValue(item.inspectionResult || meta["Kết quả"] || "");
+  const result = INSPECTION_RESULT_OPTIONS.find(option => option.value === resultValue)?.label || "Chưa đánh giá";
   const agency = item.inspectionAgency || meta["Đơn vị kiểm định"] || "-";
   const certFile = item.inspectionCertFile || meta["Biên bản"] || "";
   const purchase = item.purchaseDate ? formatDateDisplay(item.purchaseDate.slice(0, 10)) : "-";
@@ -1668,6 +1711,10 @@ function EquipmentDetailModal({
                 </View>
               </View>
               <View style={detailStyles.tagsRow}>
+                <View style={detailStyles.tag}>
+                  <Ionicons name="people-outline" size={12} color="#475569" />
+                  <Text style={detailStyles.tagText}>Phòng ban: {equipmentDepartmentName(item) || "Chưa gán"}</Text>
+                </View>
                 {item.category ? (
                   <View style={detailStyles.tag}>
                     <Ionicons name="pricetag-outline" size={12} color="#475569" />
@@ -1813,7 +1860,7 @@ function EquipmentDetailModal({
               <Pressable style={detailStyles.closeBtnBottom} onPress={onClose}>
                 <Text style={detailStyles.closeBtnText}>Đóng</Text>
               </Pressable>
-              <Pressable
+              {canManage && <Pressable
                 style={detailStyles.editBtnBottom}
                 onPress={() => {
                   onClose();
@@ -1822,7 +1869,7 @@ function EquipmentDetailModal({
               >
                 <Ionicons name="pencil" size={16} color="#ffffff" />
                 <Text style={detailStyles.editBtnText}>Chỉnh sửa</Text>
-              </Pressable>
+              </Pressable>}
             </View>
           </ScrollView>
         </View>
@@ -1845,12 +1892,14 @@ function DeleteConfirmModal({
   onClose,
   onConfirm,
   loading,
+  error,
 }: {
   visible: boolean;
   itemName: string;
   onClose: () => void;
   onConfirm: () => void;
   loading?: boolean;
+  error: string | null;
 }) {
   return (
     <Modal visible={visible} transparent animationType="fade" onRequestClose={onClose}>
@@ -1860,6 +1909,7 @@ function DeleteConfirmModal({
           <Text style={confirmStyles.message}>
             Bạn có chắc muốn xóa "{itemName}"?
           </Text>
+          {!!error && <Text accessibilityRole="alert" style={{ color: "#b91c1c", marginBottom: 12 }}>{error}</Text>}
           <View style={confirmStyles.actions}>
             <Pressable
               style={({ pressed }) => [confirmStyles.cancelBtn, pressed && { opacity: 0.7 }]}
@@ -2030,17 +2080,13 @@ function DonutChart({
 function EquipmentBorrowReturnModal({
   visible,
   initialTab = "borrow",
-  equipmentList,
   onClose,
   onSaved,
-  showAlert,
 }: {
   visible: boolean;
   initialTab?: "borrow" | "return";
-  equipmentList: EquipmentRecord[];
   onClose: () => void;
-  onSaved: (updatedItem?: EquipmentRecord, newReq?: EquipmentRequestRecord) => void;
-  showAlert: (title: string, message: string, type?: "error" | "warning" | "success" | "info") => void;
+  onSaved: () => void;
 }) {
   const { user } = useSession();
   const [activeTab, setActiveTab] = useState<"borrow" | "return">(initialTab);
@@ -2052,6 +2098,46 @@ function EquipmentBorrowReturnModal({
   const [submitting, setSubmitting] = useState(false);
   const [showDevicePicker, setShowDevicePicker] = useState(false);
   const [showDatePicker, setShowDatePicker] = useState(false);
+  const [equipmentList, setEquipmentList] = useState<EquipmentRecord[]>([]);
+  const [devicesLoading, setDevicesLoading] = useState(false);
+  const [devicesError, setDevicesError] = useState<string | null>(null);
+  const [devicesTotal, setDevicesTotal] = useState(0);
+  const [devicesRevision, setDevicesRevision] = useState(0);
+  const devicesGeneration = useRef(0);
+  const devicesPage = useRef(0);
+  const devicesBusy = useRef(false);
+  const submittingRef = useRef(false);
+  const [submitError, setSubmitError] = useState<string | null>(null);
+  const closeModal = () => { if (!submittingRef.current) onClose(); };
+
+  const loadDevices = useCallback(async (page: number, generation: number) => {
+    devicesBusy.current = true;
+    setDevicesLoading(true);
+    setDevicesError(null);
+    try {
+      const result = await equipment.list({ status: activeTab === "borrow" ? "available" : "in-use", search: searchQuery.trim() || undefined, page });
+      if (generation !== devicesGeneration.current) return;
+      setEquipmentList(previous => page === 1 ? result.items : appendEquipmentPage(previous, result.items));
+      setDevicesTotal(result.total);
+      devicesPage.current = page;
+    } catch (err) {
+      if (generation === devicesGeneration.current) setDevicesError(messageOf(err));
+    } finally {
+      if (generation === devicesGeneration.current) { devicesBusy.current = false; setDevicesLoading(false); }
+    }
+  }, [activeTab, searchQuery, user?.uid, user?.companyCode, user?.branchId]);
+
+  useEffect(() => {
+    if (!visible) return;
+    const generation = ++devicesGeneration.current;
+    setEquipmentList([]);
+    setDevicesTotal(0);
+    setSelectedDevice(null);
+    devicesPage.current = 0;
+    setDevicesLoading(true);
+    const timer = setTimeout(() => void loadDevices(1, generation), 250);
+    return () => { clearTimeout(timer); devicesGeneration.current++; devicesBusy.current = false; };
+  }, [visible, loadDevices, devicesRevision]);
 
   useEffect(() => {
     setActiveTab(initialTab);
@@ -2062,113 +2148,65 @@ function EquipmentBorrowReturnModal({
     setReturnNotes("");
     setShowDevicePicker(false);
     setShowDatePicker(false);
+    setSubmitError(null);
   }, [visible, initialTab]);
 
   // Filter available devices for "borrow"
   const availableDevices = equipmentList.filter((item) => {
-    const s = (item.status || "").toLowerCase();
-    const isAvail = !s.includes("using") && !s.includes("dùng") && !s.includes("booked") && !s.includes("mượn") && !s.includes("đơn") && !s.includes("maint") && !s.includes("trì") && !s.includes("retire") && !s.includes("lý");
-    if (!isAvail) return false;
-    if (!searchQuery.trim()) return true;
-    const q = searchQuery.trim().toLowerCase();
-    return (
-      item.name.toLowerCase().includes(q) ||
-      (item.code || "").toLowerCase().includes(q) ||
-      (item.department || "").toLowerCase().includes(q)
-    );
+    return item.status === "available";
   });
 
   // Filter borrowed / in-use devices for "return"
   const borrowedDevices = equipmentList.filter((item) => {
-    const s = (item.status || "").toLowerCase();
-    const isBorrowed = s.includes("using") || s.includes("dùng") || s.includes("booked") || s.includes("mượn") || s.includes("đơn") || s.includes("maint") || s.includes("trì");
-    if (!isBorrowed) return false;
-    if (!searchQuery.trim()) return true;
-    const q = searchQuery.trim().toLowerCase();
-    return (
-      item.name.toLowerCase().includes(q) ||
-      (item.code || "").toLowerCase().includes(q) ||
-      (item.department || "").toLowerCase().includes(q)
-    );
+    return canReturnEquipment(item, user?.uid);
   });
 
   const activeDeviceList = activeTab === "borrow" ? availableDevices : borrowedDevices;
 
   const handleSubmit = async () => {
+    if (submittingRef.current) return;
     if (!selectedDevice) {
-      showAlert("Thiếu thông tin", `Vui lòng chọn thiết bị cần ${activeTab === "borrow" ? "mượn" : "trả"}.`, "warning");
+      setSubmitError(`Vui lòng chọn thiết bị cần ${activeTab === "borrow" ? "mượn" : "trả"}.`);
       return;
     }
 
     if (activeTab === "borrow" && !reason.trim()) {
-      showAlert("Thiếu thông tin", "Vui lòng nhập lý do mượn thiết bị.", "warning");
+      setSubmitError("Vui lòng nhập lý do mượn thiết bị.");
       return;
     }
 
     const deviceId = selectedDevice._id || selectedDevice.id;
     if (!deviceId) {
-      showAlert("Lỗi", "Không tìm thấy ID thiết bị.", "error");
+      setSubmitError("Không tìm thấy ID thiết bị.");
       return;
     }
 
+    submittingRef.current = true;
+    setSubmitError(null);
     setSubmitting(true);
     try {
       if (activeTab === "borrow") {
-        const updatedNotes = `${selectedDevice.notes || ""}\n[Mượn thiết bị: ${reason.trim()}${returnDate ? ` | Hạn trả: ${returnDate}` : ""}]`.trim();
-        const updatedRes = await equipment.update(deviceId, {
-          ...selectedDevice,
-          status: "booked",
-          assignedToName: user?.displayName || user?.email || "Nhân viên",
-          notes: updatedNotes,
-        });
-        const newReq: EquipmentRequestRecord = {
-          id: "req-" + Date.now(),
-          equipmentId: deviceId,
-          equipmentName: selectedDevice.name,
-          equipmentCode: selectedDevice.code || "100015",
-          type: "borrow",
-          requesterName: user?.displayName || user?.email || "Igen Test",
-          requesterDepartment: selectedDevice.department || "DDD",
-          status: "pending",
-          createdAt: "Vừa xong",
+        await equipment.createBorrowRequest(deviceId, {
           reason: reason.trim(),
-        };
-        showAlert("Thành công", `Đã gửi yêu cầu mượn thiết bị "${selectedDevice.name}" thành công! Phiếu đang chờ duyệt.`, "success");
-        onSaved({ ...selectedDevice, ...updatedRes, status: "booked", assignedToName: user?.displayName || "Nhân viên", notes: updatedNotes }, newReq);
-      } else {
-        const updatedNotes = `${selectedDevice.notes || ""}\n[Trả thiết bị: ${returnNotes.trim() || "Hoàn trả đầy đủ"}]`.trim();
-        const updatedRes = await equipment.update(deviceId, {
-          ...selectedDevice,
-          status: "ready",
-          assignedToName: "",
-          notes: updatedNotes,
+          ...(returnDate ? { expectedReturnAt: returnDate } : {}),
         });
-        const newReq: EquipmentRequestRecord = {
-          id: "req-" + Date.now(),
-          equipmentId: deviceId,
-          equipmentName: selectedDevice.name,
-          equipmentCode: selectedDevice.code || "100015",
-          type: "return",
-          requesterName: user?.displayName || user?.email || "Igen Test",
-          requesterDepartment: selectedDevice.department || "DDD",
-          status: "pending",
-          createdAt: "Vừa xong",
-          reason: returnNotes.trim(),
-        };
-        showAlert("Thành công", `Đã gửi yêu cầu trả thiết bị "${selectedDevice.name}" thành công! Phiếu đang chờ duyệt.`, "success");
-        onSaved({ ...selectedDevice, ...updatedRes, status: "ready", assignedToName: "", notes: updatedNotes }, newReq);
+      } else {
+        await equipment.createReturnRequest(deviceId, { note: returnNotes.trim() });
       }
+      onSaved();
       onClose();
     } catch (e: any) {
-      showAlert("Thất bại", e.message || "Không thể gửi yêu cầu.", "error");
+      setSubmitError(e.message || "Không thể gửi yêu cầu.");
     } finally {
+      submittingRef.current = false;
       setSubmitting(false);
     }
   };
 
   return (
-    <Modal visible={visible} transparent animationType="fade" onRequestClose={onClose}>
-      <Pressable style={borrowModalStyles.overlay} onPress={onClose}>
+    <Modal visible={visible} transparent animationType="fade" onRequestClose={closeModal}>
+      <KeyboardAvoidingView behavior={Platform.OS === "ios" ? "padding" : undefined} style={{ flex: 1 }}>
+      <Pressable style={borrowModalStyles.overlay} onPress={closeModal}>
         <Pressable style={borrowModalStyles.dialog} onPress={(e) => e.stopPropagation()}>
           {/* Header */}
           <View style={borrowModalStyles.header}>
@@ -2179,7 +2217,7 @@ function EquipmentBorrowReturnModal({
               <Text style={borrowModalStyles.title}>Tạo phiếu mượn / trả thiết bị</Text>
               <Text style={borrowModalStyles.subtitle}>Gửi yêu cầu mượn hoặc hoàn trả thiết bị trong hệ thống</Text>
             </View>
-            <Pressable onPress={onClose} style={borrowModalStyles.closeBtn} hitSlop={8}>
+            <Pressable disabled={submitting} onPress={closeModal} style={borrowModalStyles.closeBtn} hitSlop={8}>
               <Ionicons name="close" size={20} color="#64748b" />
             </Pressable>
           </View>
@@ -2188,6 +2226,7 @@ function EquipmentBorrowReturnModal({
           <View style={borrowModalStyles.tabSwitcher}>
             <Pressable
               style={[borrowModalStyles.tabBtn, activeTab === "borrow" && borrowModalStyles.tabBtnActive]}
+              disabled={submitting}
               onPress={() => {
                 setActiveTab("borrow");
                 setSelectedDevice(null);
@@ -2201,6 +2240,7 @@ function EquipmentBorrowReturnModal({
 
             <Pressable
               style={[borrowModalStyles.tabBtn, activeTab === "return" && borrowModalStyles.tabBtnActive]}
+              disabled={submitting}
               onPress={() => {
                 setActiveTab("return");
                 setSelectedDevice(null);
@@ -2221,12 +2261,13 @@ function EquipmentBorrowReturnModal({
               <TextInput
                 value={searchQuery}
                 onChangeText={setSearchQuery}
+                editable={!submitting}
                 placeholder={activeTab === "borrow" ? "Lọc theo tên, mã thiết bị sẵn sàng..." : "Lọc theo tên, mã thiết bị đang dùng..."}
                 placeholderTextColor="#94a3b8"
                 style={borrowModalStyles.searchInput}
               />
               {searchQuery ? (
-                <Pressable onPress={() => setSearchQuery("")} hitSlop={6}>
+              <Pressable disabled={submitting} onPress={() => setSearchQuery("")} hitSlop={6}>
                   <Ionicons name="close-circle" size={16} color="#94a3b8" />
                 </Pressable>
               ) : null}
@@ -2238,6 +2279,7 @@ function EquipmentBorrowReturnModal({
             </Text>
             <Pressable
               style={borrowModalStyles.selectBtn}
+              disabled={submitting || devicesLoading || !!devicesError}
               onPress={() => setShowDevicePicker(true)}
             >
               <Text style={[borrowModalStyles.selectBtnText, selectedDevice && { color: "#0f172a", fontWeight: "700" }]}>
@@ -2249,6 +2291,14 @@ function EquipmentBorrowReturnModal({
               </Text>
               <Ionicons name="chevron-down" size={18} color="#64748b" />
             </Pressable>
+            {devicesLoading && <Text style={{ color: "#64748b", paddingVertical: 8 }}>Đang tải thiết bị...</Text>}
+            {!!devicesError && <View style={{ gap: 6, paddingVertical: 8 }}>
+              <Text style={{ color: "#b91c1c" }}>{devicesError}</Text>
+              <Pressable disabled={submitting} onPress={() => setDevicesRevision(value => value + 1)}><Text style={{ color: "#047857" }}>Tải lại thiết bị</Text></Pressable>
+            </View>}
+            {devicesPage.current * 100 < devicesTotal && <Pressable disabled={submitting || devicesLoading} onPress={() => { if (!devicesBusy.current) void loadDevices(devicesPage.current + 1, devicesGeneration.current); }}>
+              <Text style={{ color: "#047857", paddingVertical: 8 }}>Tải thêm thiết bị</Text>
+            </Pressable>}
 
             {/* Form Fields for Borrow */}
             {activeTab === "borrow" ? (
@@ -2258,6 +2308,8 @@ function EquipmentBorrowReturnModal({
                 </Text>
                 <TextInput
                   value={reason}
+                  editable={!submitting}
+                  maxLength={1000}
                   onChangeText={setReason}
                   multiline
                   numberOfLines={3}
@@ -2267,9 +2319,9 @@ function EquipmentBorrowReturnModal({
                 />
 
                 <Text style={borrowModalStyles.fieldLabel}>Ngày dự kiến trả (không bắt buộc)</Text>
-                <Pressable style={borrowModalStyles.dateInputBtn} onPress={() => setShowDatePicker(true)}>
+                <Pressable disabled={submitting} style={borrowModalStyles.dateInputBtn} onPress={() => setShowDatePicker(true)}>
                   <TextInput
-                    value={returnDate}
+                    value={formatDateDisplay(returnDate)}
                     onChangeText={setReturnDate}
                     placeholder="dd/mm/yyyy"
                     placeholderTextColor="#94a3b8"
@@ -2285,6 +2337,8 @@ function EquipmentBorrowReturnModal({
                 <Text style={borrowModalStyles.fieldLabel}>Ghi chú khi trả / Tình trạng bàn giao</Text>
                 <TextInput
                   value={returnNotes}
+                  editable={!submitting}
+                  maxLength={1000}
                   onChangeText={setReturnNotes}
                   multiline
                   numberOfLines={3}
@@ -2296,8 +2350,9 @@ function EquipmentBorrowReturnModal({
             )}
 
             <Text style={borrowModalStyles.footerNote}>
-              Bạn có thể theo dõi hoặc Hủy yêu cầu tại tab Yêu cầu mượn/trả.
+              Bạn có thể theo dõi hoặc hủy phiếu trong Danh sách phiếu mượn / trả.
             </Text>
+            {!!submitError && <Text accessibilityRole="alert" style={{ color: "#b91c1c", marginTop: 8 }}>{submitError}</Text>}
           </ScrollView>
 
           {/* Footer Actions */}
@@ -2308,7 +2363,7 @@ function EquipmentBorrowReturnModal({
             <Pressable
               style={[borrowModalStyles.submitBtn, submitting && { opacity: 0.6 }]}
               onPress={handleSubmit}
-              disabled={submitting}
+              disabled={submitting || devicesLoading || !!devicesError}
             >
               {submitting ? (
                 <ActivityIndicator size="small" color="#ffffff" />
@@ -2340,7 +2395,7 @@ function EquipmentBorrowReturnModal({
                     </Text>
                   ) : (
                     activeDeviceList.map((dev) => {
-                      const isSelected = selectedDevice?._id === dev._id || selectedDevice?.id === dev.id;
+                      const isSelected = !!equipmentIdentity(selectedDevice) && equipmentIdentity(selectedDevice) === equipmentIdentity(dev);
                       return (
                         <Pressable
                           key={dev._id || dev.id || dev.code}
@@ -2355,7 +2410,7 @@ function EquipmentBorrowReturnModal({
                               {dev.name}
                             </Text>
                             <Text style={borrowModalStyles.pickerItemMeta}>
-                              Mã: {dev.code || "N/A"} {dev.department ? `· Khoa: ${dev.department}` : ""}
+                              Mã: {dev.code || "N/A"} {equipmentDepartmentName(dev) ? `· Khoa: ${equipmentDepartmentName(dev)}` : ""}
                             </Text>
                           </View>
                           {isSelected && <Ionicons name="checkmark-circle" size={20} color="#008852" />}
@@ -2381,6 +2436,7 @@ function EquipmentBorrowReturnModal({
           />
         </Pressable>
       </Pressable>
+      </KeyboardAvoidingView>
     </Modal>
   );
 }
@@ -2398,6 +2454,7 @@ const borrowModalStyles = StyleSheet.create({
     borderRadius: 20,
     width: "100%",
     maxWidth: 500,
+    maxHeight: "90%",
     padding: 18,
     gap: 12,
     shadowColor: "#000",
@@ -2524,75 +2581,33 @@ const borrowModalStyles = StyleSheet.create({
   pickerItemMeta: { fontSize: 11, color: "#64748b", fontFamily: "Inter-Regular", marginTop: 2 },
 });
 
-export interface EquipmentRequestRecord {
-  id: string;
-  equipmentId?: string;
-  equipmentName: string;
-  equipmentCode: string;
-  type: "borrow" | "return";
-  requesterName: string;
-  requesterDepartment: string;
-  status: "pending" | "approved" | "rejected" | "cancelled";
-  createdAt: string;
-  reason?: string;
-}
-
 // ── Main Screen ───────────────────────────────────────────────────────────────
 export default function EquipmentScreen() {
   const { user } = useSession();
+  const compactChart = useWindowDimensions().width < 370;
   const [items, setItems] = useState<EquipmentRecord[]>([]);
   const [serverTotal, setServerTotal] = useState<number | null>(null);
-  const [globalItems, setGlobalItems] = useState<EquipmentRecord[]>([]);
-  const [globalTotal, setGlobalTotal] = useState<number | null>(null);
   const [summary, setSummary] = useState<EquipmentSummary | null>(null);
   const [compliance, setCompliance] = useState<EquipmentComplianceSummary | null>(null);
+  const [overviewLoading, setOverviewLoading] = useState(true);
+  const [overviewError, setOverviewError] = useState<string | null>(null);
   const [loading, setLoading] = useState(true);
   const [refreshing, setRefreshing] = useState(false);
-
-  // Danh sách phiếu mượn / trả thiết bị (Duyệt & Hủy)
-  const [requests, setRequests] = useState<EquipmentRequestRecord[]>([
-    {
-      id: "req-100015",
-      equipmentName: "Máy nước nóng lạnh Kangaroo",
-      equipmentCode: "100015",
-      type: "borrow",
-      requesterName: "Igen Test",
-      requesterDepartment: "DDD",
-      status: "pending",
-      createdAt: "Vừa xong",
-      reason: "Mượn sử dụng ca làm việc",
-    },
-    {
-      id: "req-100016",
-      equipmentName: "Máy siêu âm 4D Chison",
-      equipmentCode: "SA-204",
-      type: "return",
-      requesterName: "Nguyễn Văn Nam",
-      requesterDepartment: "Khoa Chẩn đoán hình ảnh",
-      status: "pending",
-      createdAt: "15 phút trước",
-      reason: "Hoàn trả thiết bị sau ca làm việc",
-    },
-  ]);
+  const [loadingMore, setLoadingMore] = useState(false);
+  const [loadMoreError, setLoadMoreError] = useState<string | null>(null);
+  const loadingMoreRef = useRef(false);
+  const currentPageRef = useRef(1);
 
   // Phân quyền tài khoản thực tế dựa trên Role & Permissions hệ thống
-  const canApprove =
-    hasPermission(user, "equipment:approve") ||
-    hasPermission(user, "equipment:manage") ||
-    user?.role === "superadmin" ||
-    user?.role === "branch_owner" ||
-    (user as any)?.role === "admin" ||
-    (user as any)?.role === "manager";
-
-  const canManageEquipment =
-    hasPermission(user, "equipment:manage") ||
-    user?.role === "superadmin" ||
-    user?.role === "branch_owner" ||
-    (user as any)?.role === "admin" ||
-    (user as any)?.role === "manager";
+  const canManageEquipment = hasPermission(user, "equipment:manage");
+  const canApprove = canManageEquipment;
 
   const [error, setError] = useState<string | null>(null);
   const [search, setSearch] = useState("");
+  const [departmentId, setDepartmentId] = useState("");
+  const [departmentList, setDepartmentList] = useState<DepartmentRecord[]>([]);
+  const [departmentsLoading, setDepartmentsLoading] = useState(true);
+  const [departmentsError, setDepartmentsError] = useState<string | null>(null);
   const [selectedFilter, setSelectedFilter] = useState<string>("all");
   const [revision, setRevision] = useState(0);
   const [modalVisible, setModalVisible] = useState(false);
@@ -2600,6 +2615,8 @@ export default function EquipmentScreen() {
   const [viewDetailItem, setViewDetailItem] = useState<EquipmentRecord | null>(null);
   const [deleteItem, setDeleteItem] = useState<EquipmentRecord | null>(null);
   const [deleting, setDeleting] = useState(false);
+  const [deleteError, setDeleteError] = useState<string | null>(null);
+  const deletingRef = useRef(false);
 
   const [borrowReturnModalVisible, setBorrowReturnModalVisible] = useState(false);
   const [borrowReturnTab, setBorrowReturnTab] = useState<"borrow" | "return">("borrow");
@@ -2626,15 +2643,30 @@ export default function EquipmentScreen() {
     setAlertState({ visible: true, title, message, type });
   };
 
-  const openAdd = () => { setEditItem(null); setModalVisible(true); };
-  const openEdit = (item: EquipmentRecord) => { setEditItem(item); setModalVisible(true); };
+  const openAdd = () => { if (canManageEquipment) { setEditItem(null); setModalVisible(true); } };
+  const openEdit = (item: EquipmentRecord) => {
+    if (!canManageEquipment) return;
+    if (item.status === "in-use" || item.status === "requested") {
+      showAlert("Chưa thể sửa thiết bị", "Vui lòng hoàn tất quy trình mượn / trả trước khi chỉnh sửa thiết bị.", "warning");
+      return;
+    }
+    setEditItem(item); setModalVisible(true);
+  };
 
   const handleDelete = (item: EquipmentRecord) => {
+    if (!canManageEquipment) return;
+    if (item.status === "in-use" || item.status === "requested") {
+      showAlert("Chưa thể xóa thiết bị", "Vui lòng hoàn tất quy trình mượn / trả trước khi xóa thiết bị.", "warning");
+      return;
+    }
+    setDeleteError(null);
     setDeleteItem(item);
   };
 
   const confirmDelete = async () => {
-    if (!deleteItem) return;
+    if (!deleteItem || deletingRef.current) return;
+    deletingRef.current = true;
+    setDeleteError(null);
     setDeleting(true);
     try {
       const equipId = deleteItem._id || deleteItem.id || "";
@@ -2643,226 +2675,145 @@ export default function EquipmentScreen() {
       setDeleteItem(null);
       setRevision((v) => v + 1);
     } catch (e: any) {
-      showAlert("Lỗi xóa thiết bị", e.message || "Không thể xóa thiết bị.", "error");
+      setDeleteError(e.message || "Không thể xóa thiết bị.");
     } finally {
+      deletingRef.current = false;
       setDeleting(false);
     }
   };
 
-  // ── Xử lý Duyệt / Từ chối / Hủy phiếu ────────────────────────────────────
-  const handleApproveRequest = (req: EquipmentRequestRecord) => {
-    setRequests((prev) =>
-      prev.map((r) => (r.id === req.id ? { ...r, status: "approved" } : r))
-    );
+  const scope = `${user?.uid || ""}:${user?.companyCode || ""}:${user?.branchId || ""}`;
+  const { requests, total: requestsTotal, loading: requestsLoading, error: requestsError, loadMore: loadMoreRequests, hasMore: hasMoreRequests } = useEquipmentRequests(scope, revision);
+  const [requestActionId, setRequestActionId] = useState<string | null>(null);
+  const requestActionBusy = useRef(false);
+  const [rejectItem, setRejectItem] = useState<EquipmentRequestRecord | null>(null);
+  const [rejectionReason, setRejectionReason] = useState("");
+  const [rejectionError, setRejectionError] = useState<string | null>(null);
+  const loadRequestRef = useRef(0);
 
-    const isBorrow = req.type === "borrow";
-    const targetStatus = isBorrow ? "booked" : "ready";
-    const targetAssignee = isBorrow ? req.requesterName : "";
-
-    const updatedDevPayload: Partial<EquipmentRecord> = {
-      status: targetStatus,
-      assignedToName: targetAssignee,
-    };
-
-    setItems((prev) =>
-      prev.map((i) => {
-        if (i.code === req.equipmentCode || i.name === req.equipmentName || i._id === req.equipmentId || i.id === req.equipmentId) {
-          const updated = { ...i, ...updatedDevPayload };
-          const key = i._id || i.id || i.code;
-          if (key) localOverridesRef.current[key] = updated;
-          return updated;
-        }
-        return i;
-      })
-    );
-
-    setGlobalItems((prev) =>
-      prev.map((i) => {
-        if (i.code === req.equipmentCode || i.name === req.equipmentName || i._id === req.equipmentId || i.id === req.equipmentId) {
-          return { ...i, ...updatedDevPayload };
-        }
-        return i;
-      })
-    );
-
-    showAlert(
-      "Đã duyệt phiếu",
-      `Đã duyệt phiếu ${isBorrow ? "mượn" : "trả"} thiết bị "${req.equipmentName}" (${req.equipmentCode}) thành công!`,
-      "success"
-    );
-  };
-
-  const handleRejectRequest = (req: EquipmentRequestRecord) => {
-    setRequests((prev) =>
-      prev.map((r) => (r.id === req.id ? { ...r, status: "rejected" } : r))
-    );
-    showAlert(
-      "Đã từ chối phiếu",
-      `Đã từ chối phiếu ${req.type === "borrow" ? "mượn" : "trả"} thiết bị "${req.equipmentName}".`,
-      "warning"
-    );
-  };
-
-  const handleCancelRequest = (req: EquipmentRequestRecord) => {
-    setRequests((prev) =>
-      prev.map((r) => (r.id === req.id ? { ...r, status: "cancelled" } : r))
-    );
-    showAlert(
-      "Đã hủy phiếu",
-      `Đã tự hủy phiếu ${req.type === "borrow" ? "mượn" : "trả"} thiết bị "${req.equipmentName}".`,
-      "info"
-    );
-  };
-
-  // Local overrides store to preserve device borrow/return/edit updates across API re-fetches
-  const localOverridesRef = useRef<Record<string, Partial<EquipmentRecord>>>({});
-
-  const handleItemSaved = (updatedDev?: EquipmentRecord, newReq?: EquipmentRequestRecord) => {
-    if (newReq) {
-      setRequests((prev) => [newReq, ...prev]);
+  const handleRequestAction = async (req: EquipmentRequestRecord, action: "approved" | "rejected" | "cancelled") => {
+    if (requestActionBusy.current) return;
+    if (action === "rejected" && !rejectionReason.trim()) {
+      setRejectionError("Vui lòng nhập lý do từ chối.");
+      return;
     }
-    if (updatedDev) {
-      const key = updatedDev._id || updatedDev.id || updatedDev.code;
-      if (key) {
-        localOverridesRef.current[key] = updatedDev;
-      }
-      setItems((prev) =>
-        prev.map((i) =>
-          (i._id && i._id === updatedDev._id) || (i.id && i.id === updatedDev.id) || (i.code && i.code === updatedDev.code)
-            ? { ...i, ...updatedDev }
-            : i
-        )
-      );
-      setGlobalItems((prev) =>
-        prev.map((i) =>
-          (i._id && i._id === updatedDev._id) || (i.id && i.id === updatedDev.id) || (i.code && i.code === updatedDev.code)
-            ? { ...i, ...updatedDev }
-            : i
-        )
-      );
+    requestActionBusy.current = true;
+    setRejectionError(null);
+    setRequestActionId(req._id);
+    try {
+      if (action === "cancelled") await equipment.cancelRequest(req._id);
+      else await equipment.decideRequest(req._id, action, rejectionReason.trim());
+      setRejectItem(null);
+      setRejectionReason("");
+      setRevision(value => value + 1);
+      if (action !== "rejected") showAlert("Thành công", action === "approved" ? "Đã duyệt phiếu thiết bị." : "Đã hủy phiếu thiết bị.", "success");
+    } catch (err) {
+      if (action === "rejected") setRejectionError(messageOf(err));
+      else showAlert("Không thể xử lý phiếu", messageOf(err), "error");
+    } finally {
+      requestActionBusy.current = false;
+      setRequestActionId(null);
     }
-    setRevision((v) => v + 1);
   };
+  const handleItemSaved = () => setRevision(value => value + 1);
 
   const loadData = useCallback(async () => {
+    const requestId = ++loadRequestRef.current;
     setError(null);
+    setLoadMoreError(null);
+    setLoadingMore(false);
+    loadingMoreRef.current = false;
+    currentPageRef.current = 1;
     const isSearching = !!search.trim();
     try {
-      const promises: Promise<any>[] = [
-        equipment.getSummary(),
-        equipment.getCompliance(),
-        equipment.list({ search: isSearching ? search.trim() : undefined }),
-      ];
-
-      // Nếu đang tìm kiếm, luôn tải song song danh sách đầy đủ để 6 thẻ thống kê luôn chính xác
-      if (isSearching) {
-        promises.push(equipment.list());
-      }
-
-      const results = await Promise.allSettled(promises);
-      const [sumRes, compRes, listRes, fullRes] = results;
-
-      if (sumRes.status === "fulfilled" && sumRes.value) setSummary(sumRes.value);
-      if (compRes.status === "fulfilled" && compRes.value) setCompliance(compRes.value);
-
-      if (listRes.status === "fulfilled") {
-        let fetchedItems: EquipmentRecord[] = listRes.value.items || [];
-        // Apply local overrides (borrow/return/edit updates)
-        fetchedItems = fetchedItems.map((item) => {
-          const key = item._id || item.id || item.code;
-          return key && localOverridesRef.current[key] ? { ...item, ...localOverridesRef.current[key] } : item;
-        });
-
-        setItems(fetchedItems);
-        if (typeof listRes.value.total === "number") setServerTotal(listRes.value.total);
-
-        // Nếu không có tìm kiếm, danh sách này chính là danh sách toàn bộ thiết bị
-        if (!isSearching) {
-          setGlobalItems(fetchedItems);
-          setGlobalTotal(typeof listRes.value.total === "number" ? listRes.value.total : fetchedItems.length);
-        }
-      } else {
-        const err = listRes.reason;
-        setError(err instanceof Error ? err.message : "Không thể tải danh sách thiết bị.");
-      }
-
-      // Nhận kết quả danh sách toàn cục khi đang tìm kiếm
-      if (fullRes && fullRes.status === "fulfilled") {
-        let fullItems: EquipmentRecord[] = fullRes.value.items || [];
-        fullItems = fullItems.map((item) => {
-          const key = item._id || item.id || item.code;
-          return key && localOverridesRef.current[key] ? { ...item, ...localOverridesRef.current[key] } : item;
-        });
-        setGlobalItems(fullItems);
-        setGlobalTotal(typeof fullRes.value.total === "number" ? fullRes.value.total : fullItems.length);
-      }
+      const result = await equipment.list({ search: isSearching ? search.trim() : undefined, departmentId: departmentId || undefined, status: equipmentStatusFilter(selectedFilter) });
+      if (requestId !== loadRequestRef.current) return;
+      setItems(result.items);
+      setServerTotal(result.total);
     } catch (e) {
-      setError(e instanceof Error ? e.message : "Lỗi kết nối máy chủ.");
+      if (requestId === loadRequestRef.current) {
+        setItems([]);
+        setServerTotal(null);
+        setError(messageOf(e));
+      }
     } finally {
-      setLoading(false);
-      setRefreshing(false);
+      if (requestId === loadRequestRef.current) {
+        setLoading(false);
+        setRefreshing(false);
+      }
     }
-  }, [search]);
+  }, [search, departmentId, selectedFilter, scope]);
+
+  const loadMore = async () => {
+    if (loading || loadingMoreRef.current) return;
+    const requestId = loadRequestRef.current;
+    const page = currentPageRef.current + 1;
+    loadingMoreRef.current = true;
+    setLoadingMore(true);
+    setLoadMoreError(null);
+    try {
+      const result = await equipment.list({ search: search.trim() || undefined, departmentId: departmentId || undefined, status: equipmentStatusFilter(selectedFilter), page });
+      if (requestId !== loadRequestRef.current) return;
+      setItems(previous => appendEquipmentPage(previous, result.items));
+      setServerTotal(result.total);
+      currentPageRef.current = page;
+    } catch (err) {
+      if (requestId === loadRequestRef.current) setLoadMoreError(messageOf(err));
+    } finally {
+      if (requestId === loadRequestRef.current) { loadingMoreRef.current = false; setLoadingMore(false); }
+    }
+  };
+
+  // Overview counts refresh on focus/save, independently of list filters.
+  useFocusEffect(useCallback(() => {
+    let active = true;
+    setOverviewLoading(true);
+    setOverviewError(null);
+    setSummary(null);
+    setCompliance(null);
+    void Promise.allSettled([equipment.getSummary(), equipment.getCompliance()]).then(([summaryResult, complianceResult]) => {
+      if (!active) return;
+      setSummary(summaryResult.status === "fulfilled" ? summaryResult.value : null);
+      setCompliance(complianceResult.status === "fulfilled" ? complianceResult.value : null);
+      if (summaryResult.status === "rejected" || complianceResult.status === "rejected") setOverviewError("Không thể tải đầy đủ thống kê thiết bị. Vui lòng tải lại.");
+      setOverviewLoading(false);
+    });
+    return () => { active = false; };
+  }, [revision, scope]));
+
+  useFocusEffect(useCallback(() => {
+    let active = true;
+    setDepartmentsLoading(true);
+    setDepartmentsError(null);
+    setDepartmentList([]);
+    departments.list().then(records => {
+      if (active) setDepartmentList(records);
+    }).catch(err => {
+      if (active) setDepartmentsError(messageOf(err));
+    }).finally(() => {
+      if (active) setDepartmentsLoading(false);
+    });
+    return () => { active = false; };
+  }, [revision, scope]));
 
   useFocusEffect(
     useCallback(() => {
       let active = true;
       if (active) { setLoading(true); void loadData(); }
-      return () => { active = false; };
+      return () => { active = false; loadRequestRef.current++; };
     }, [loadData, revision]),
   );
 
-  // Dữ liệu cho 6 thẻ thống kê trên cùng và 3 thẻ tuân thủ:
-  // Luôn tính toán động trực tiếp từ baseItemsForStats để cập nhật ngay lập tức khi mượn/trả
-  const baseItemsForStats = globalItems.length > 0 ? globalItems : items;
-  const totalCount = baseItemsForStats.length > 0 ? baseItemsForStats.length : (summary?.total ?? globalTotal ?? (serverTotal ?? items.length));
-
-  const countByStatus = (...keywords: string[]) => {
-    return baseItemsForStats.filter((item) => {
-      const s = (item.status || "").toLowerCase();
-      return keywords.some((k) => s.includes(k.toLowerCase()));
-    }).length;
-  };
-
-  const bookedCount = countByStatus("đơn", "booked", "order", "request", "mượn");
-  const readyCount = countByStatus("sẵn", "ready", "avail", "available");
-  const usingCount = countByStatus("dùng", "using", "in_use", "in-use");
-  const maintenanceCount = countByStatus("trì", "maint", "repair");
-  const disposedCount = countByStatus("lý", "dispos", "scrap", "retire");
-
-  const displayedItems = items.filter((item) => {
-    if (selectedFilter === "all") return true;
-    const s = (item.status || "").toLowerCase();
-    if (selectedFilter === "booked") return s.includes("đơn") || s.includes("booked") || s.includes("order") || s.includes("request");
-    if (selectedFilter === "ready") return s.includes("sẵn") || s.includes("ready") || s.includes("avail");
-    if (selectedFilter === "using") return s.includes("dùng") || s.includes("using") || s.includes("in_use") || s.includes("in-use");
-    if (selectedFilter === "maintenance") return s.includes("trì") || s.includes("maint") || s.includes("repair");
-    if (selectedFilter === "disposed") return s.includes("lý") || s.includes("dispos") || s.includes("scrap") || s.includes("retire");
-    return true;
-  });
-
-  let computedOverdue = compliance?.overdue ?? 0;
-  let computedUpcoming = compliance?.upcoming ?? 0;
-  let computedValid = compliance?.valid ?? 0;
-
-  if (!compliance || (computedOverdue === 0 && computedUpcoming === 0 && computedValid === 0)) {
-    const now = Date.now();
-    const thirtyDaysMs = 30 * 24 * 60 * 60 * 1000;
-    baseItemsForStats.forEach((item) => {
-      const cs = (item.complianceStatus || "").toLowerCase();
-      if (cs.includes("valid") || cs.includes("đạt")) { computedValid++; return; }
-      if (cs.includes("overdue") || cs.includes("quá hạn")) { computedOverdue++; return; }
-      if (cs.includes("upcoming") || cs.includes("sắp")) { computedUpcoming++; return; }
-      if (item.nextInspectionDate) {
-        const time = new Date(item.nextInspectionDate).getTime();
-        if (!isNaN(time)) {
-          if (time < now) computedOverdue++;
-          else if (time <= now + thirtyDaysMs) computedUpcoming++;
-          else computedValid++;
-        }
-      }
-    });
-  }
+  const totalCount = summary?.total ?? 0;
+  const bookedCount = summary?.booked ?? 0;
+  const readyCount = summary?.ready ?? 0;
+  const usingCount = summary?.using ?? 0;
+  const maintenanceCount = summary?.maintenance ?? 0;
+  const disposedCount = summary?.disposed ?? 0;
+  const displayedItems = items;
+  const computedOverdue = compliance?.overdue ?? "—";
+  const computedUpcoming = compliance?.upcoming ?? "—";
+  const computedValid = compliance?.valid ?? "—";
 
   const [showAllCategories, setShowAllCategories] = useState(true);
 
@@ -2965,12 +2916,12 @@ export default function EquipmentScreen() {
 
         {/* Top 3 Quick Actions (Thêm / Mượn / Trả) */}
         <View style={styles.topActionsCard}>
-          <Pressable style={styles.actionCol} onPress={openAdd}>
+          {canManageEquipment && <Pressable style={styles.actionCol} onPress={openAdd}>
             <View style={[styles.actionIconBox, { backgroundColor: "#ecfeff", borderColor: "#a5f3fc" }]}>
               <Ionicons name="add-circle-outline" size={24} color="#0891b2" />
             </View>
             <Text style={styles.actionColLabel}>Thêm thiết bị</Text>
-          </Pressable>
+          </Pressable>}
 
           <Pressable style={styles.actionCol} onPress={openBorrowModal}>
             <View style={[styles.actionIconBox, { backgroundColor: "#f0fdf4", borderColor: "#bbf7d0" }]}>
@@ -3000,7 +2951,12 @@ export default function EquipmentScreen() {
         </View>
 
         {/* Overview Card with Donut Chart & 6 Stat Cards */}
-        <View style={styles.overviewCard}>
+        {!!overviewError && <View style={styles.errorBanner}>
+          <Text style={styles.errorBannerText}>{overviewError}</Text>
+          <Pressable onPress={() => setRevision(value => value + 1)}><Text style={styles.errorRetryText}>Tải lại thống kê</Text></Pressable>
+        </View>}
+        {overviewLoading && <ActivityIndicator color="#008852" />}
+        {!!summary && <View style={styles.overviewCard}>
           {/* Period/Scope selector */}
           <View style={styles.periodRow}>
             <Ionicons name="chevron-back" size={16} color="#94a3b8" />
@@ -3021,11 +2977,11 @@ export default function EquipmentScreen() {
           </View>
 
           {/* Donut Chart with White Center Circle for Total and Legend */}
-          <View style={styles.donutSection}>
+          <View style={[styles.donutSection, compactChart && { flexDirection: "column" }]}>
             <DonutChart items={chartItems} total={totalCount} size={175} strokeWidth={24} />
 
             {/* Legend / Callout items beside Donut */}
-            <View style={styles.donutLegend}>
+            <View style={[styles.donutLegend, compactChart && { width: "100%" }]}>
               {chartItems.map((item) => {
                 const pct = totalCount > 0 ? ((item.count / totalCount) * 100).toFixed(0) : 0;
                 const isSelected = selectedFilter === item.filter;
@@ -3037,7 +2993,7 @@ export default function EquipmentScreen() {
                   >
                     <View style={[styles.legendColorDot, { backgroundColor: item.color }]} />
                     <Text style={styles.legendPctText}>{pct}%</Text>
-                    <Text style={styles.legendLabelText} numberOfLines={1}>
+                    <Text style={styles.legendLabelText} numberOfLines={2}>
                       {item.label} ({item.count})
                     </Text>
                   </Pressable>
@@ -3072,7 +3028,7 @@ export default function EquipmentScreen() {
                       </View>
                       <Text style={[styles.statusValue, { color: c.color }]}>{c.value}</Text>
                     </View>
-                    <Text style={styles.statusLabel} numberOfLines={1}>
+                    <Text style={styles.statusLabel} numberOfLines={2}>
                       {c.label}
                     </Text>
                   </Pressable>
@@ -3080,7 +3036,7 @@ export default function EquipmentScreen() {
               })}
             </View>
           )}
-        </View>
+        </View>}
 
         {/* Section: Trạng thái kiểm định (Cards nền trắng bo góc, icon minh họa) */}
         <Text style={styles.statusSectionTitle}>Trạng thái kiểm định</Text>
@@ -3089,37 +3045,37 @@ export default function EquipmentScreen() {
           {/* Quá hạn */}
           <View style={styles.complianceCardWhite}>
             <View style={styles.complianceCardHeader}>
-              <Text style={[styles.complianceCardTitle, { color: "#be123c" }]} numberOfLines={1}>Quá hạn</Text>
+              <Text style={[styles.complianceCardTitle, { color: "#be123c" }]} numberOfLines={2}>Quá hạn</Text>
               <View style={[styles.complianceIconWrap, { backgroundColor: "#fee2e2" }]}>
                 <Ionicons name="time-outline" size={16} color="#dc2626" />
               </View>
             </View>
             <Text style={[styles.complianceValue, { color: "#be123c" }]}>{computedOverdue}</Text>
-            <Text style={[styles.complianceSubtitle, { color: "#e11d48" }]} numberOfLines={1}>Cần kiểm định gấp</Text>
+            <Text style={[styles.complianceSubtitle, { color: "#e11d48" }]} numberOfLines={2}>Cần kiểm định gấp</Text>
           </View>
 
           {/* Sắp tới hạn */}
           <View style={styles.complianceCardWhite}>
             <View style={styles.complianceCardHeader}>
-              <Text style={[styles.complianceCardTitle, { color: "#b45309" }]} numberOfLines={1}>Sắp tới hạn</Text>
+              <Text style={[styles.complianceCardTitle, { color: "#b45309" }]} numberOfLines={2}>Sắp tới hạn</Text>
               <View style={[styles.complianceIconWrap, { backgroundColor: "#fef3c7" }]}>
                 <Ionicons name="calendar-outline" size={16} color="#d97706" />
               </View>
             </View>
             <Text style={[styles.complianceValue, { color: "#b45309" }]}>{computedUpcoming}</Text>
-            <Text style={[styles.complianceSubtitle, { color: "#b45309" }]} numberOfLines={1}>Trong 30 ngày</Text>
+            <Text style={[styles.complianceSubtitle, { color: "#b45309" }]} numberOfLines={2}>Trong 30 ngày</Text>
           </View>
 
           {/* Đạt chuẩn */}
           <View style={styles.complianceCardWhite}>
             <View style={styles.complianceCardHeader}>
-              <Text style={[styles.complianceCardTitle, { color: "#047857" }]} numberOfLines={1}>Đạt chuẩn</Text>
+              <Text style={[styles.complianceCardTitle, { color: "#047857" }]} numberOfLines={2}>Đạt chuẩn</Text>
               <View style={[styles.complianceIconWrap, { backgroundColor: "#dcfce7" }]}>
                 <Ionicons name="shield-checkmark-outline" size={16} color="#059669" />
               </View>
             </View>
             <Text style={[styles.complianceValue, { color: "#047857" }]}>{computedValid}</Text>
-            <Text style={[styles.complianceSubtitle, { color: "#059669" }]} numberOfLines={1}>Hoạt động an toàn</Text>
+            <Text style={[styles.complianceSubtitle, { color: "#059669" }]} numberOfLines={2}>Hoạt động an toàn</Text>
           </View>
         </View>
 
@@ -3132,21 +3088,27 @@ export default function EquipmentScreen() {
             </View>
             <View style={requestStyles.pendingCountBadge}>
               <Text style={requestStyles.pendingCountText}>
-                {requests.filter((r) => r.status === "pending").length} chờ duyệt
+                {requests.length}/{requestsTotal} phiếu
               </Text>
             </View>
           </View>
 
           <View style={requestStyles.requestCardsList}>
+            {requestsLoading && <ActivityIndicator color="#008852" />}
+            {!!requestsError && <View style={{ gap: 8 }}>
+              <Text style={{ color: "#b91c1c" }}>{requestsError}</Text>
+              <Pressable disabled={requestsLoading} onPress={loadMoreRequests}><Text style={{ color: "#047857" }}>Thử tải lại phiếu</Text></Pressable>
+            </View>}
+            {!requestsLoading && !requestsError && requests.length === 0 && <Text style={{ color: "#64748b" }}>Chưa có phiếu mượn / trả.</Text>}
             {requests.map((req) => {
               const isPending = req.status === "pending";
               const isApproved = req.status === "approved";
               const isRejected = req.status === "rejected";
               const isCancelled = req.status === "cancelled";
-              const isMyRequest = user?.displayName ? req.requesterName.includes(user.displayName) : true;
+              const isMyRequest = !!user?.uid && req.employeeId === user.uid;
 
               return (
-                <View key={req.id} style={requestStyles.card}>
+                <View key={req._id} style={requestStyles.card}>
                   {/* Row 1: Header (Title, Type Badge, Status Badge) */}
                   <View style={requestStyles.cardHeaderRow}>
                     <View style={requestStyles.titleWrap}>
@@ -3160,7 +3122,7 @@ export default function EquipmentScreen() {
                       <View
                         style={[
                           requestStyles.typeBadge,
-                          req.type === "borrow"
+                          req.requestType === "borrow"
                             ? { backgroundColor: "#e0f2fe" }
                             : { backgroundColor: "#fef3c7" },
                         ]}
@@ -3168,10 +3130,10 @@ export default function EquipmentScreen() {
                         <Text
                           style={[
                             requestStyles.typeBadgeText,
-                            req.type === "borrow" ? { color: "#0284c7" } : { color: "#d97706" },
+                            req.requestType === "borrow" ? { color: "#0284c7" } : { color: "#d97706" },
                           ]}
                         >
-                          {req.type === "borrow" ? "Mượn" : "Trả"}
+                          {req.requestType === "borrow" ? "Mượn" : "Trả"}
                         </Text>
                       </View>
 
@@ -3203,10 +3165,12 @@ export default function EquipmentScreen() {
                   <View style={requestStyles.cardSubRow}>
                     <Ionicons name="person-outline" size={13} color="#64748b" />
                     <Text style={requestStyles.cardSubLine}>
-                      Người tạo: <Text style={requestStyles.cardRequesterName}>{req.requesterName}</Text> ({req.requesterDepartment})
+                      Người tạo: <Text style={requestStyles.cardRequesterName}>{req.employeeName}</Text>
                     </Text>
                   </View>
 
+                  {!!(req.reason || req.note) && <Text style={{ color: "#475569", fontSize: 13 }}>{req.reason || req.note}</Text>}
+                  {!!req.rejectionReason && <Text style={{ color: "#b91c1c", fontSize: 13 }}>Lý do từ chối: {req.rejectionReason}</Text>}
                   {/* Row 3: Action Buttons at the bottom */}
                   {isPending ? (
                     <View style={requestStyles.cardBottomActions}>
@@ -3214,7 +3178,8 @@ export default function EquipmentScreen() {
                         <>
                           <Pressable
                             style={requestStyles.approveBtn}
-                            onPress={() => handleApproveRequest(req)}
+                            disabled={!!requestActionId || requestsLoading || !!requestsError}
+                            onPress={() => void handleRequestAction(req, "approved")}
                           >
                             <Ionicons name="checkmark-sharp" size={14} color="#ffffff" />
                             <Text style={requestStyles.approveBtnText}>Duyệt</Text>
@@ -3222,7 +3187,8 @@ export default function EquipmentScreen() {
 
                           <Pressable
                             style={requestStyles.rejectBtn}
-                            onPress={() => handleRejectRequest(req)}
+                            disabled={!!requestActionId || requestsLoading || !!requestsError}
+                            onPress={() => { setRejectItem(req); setRejectionReason(""); setRejectionError(null); }}
                           >
                             <Ionicons name="close-circle-outline" size={14} color="#dc2626" />
                             <Text style={requestStyles.rejectBtnText}>Từ chối</Text>
@@ -3233,7 +3199,8 @@ export default function EquipmentScreen() {
                       {isMyRequest ? (
                         <Pressable
                           style={requestStyles.cancelBtn}
-                          onPress={() => handleCancelRequest(req)}
+                          disabled={!!requestActionId || requestsLoading || !!requestsError}
+                          onPress={() => void handleRequestAction(req, "cancelled")}
                         >
                           <Ionicons name="ban-outline" size={14} color="#64748b" />
                           <Text style={requestStyles.cancelBtnText}>Hủy</Text>
@@ -3257,6 +3224,9 @@ export default function EquipmentScreen() {
                 </View>
               );
             })}
+            {hasMoreRequests && !requestsError && <Pressable disabled={requestsLoading || !!requestActionId} onPress={loadMoreRequests}>
+              <Text style={{ color: "#047857", paddingVertical: 8 }}>Tải thêm phiếu</Text>
+            </Pressable>}
           </View>
         </View>
 
@@ -3267,35 +3237,46 @@ export default function EquipmentScreen() {
             value={search}
             onChangeText={setSearch}
             onSubmitEditing={() => loadData()}
-            placeholder="Tìm theo tên, mã thiết bị, khoa..."
+            placeholder="Tìm theo tên, mã thiết bị..."
             placeholderTextColor="#94a3b8"
             style={styles.searchInput}
             returnKeyType="search"
           />
           {search ? (
-            <Pressable onPress={() => { setSearch(""); void loadData(); }} hitSlop={8}>
+            <Pressable onPress={() => setSearch("")} hitSlop={8}>
               <Ionicons name="close-circle" size={18} color="#94a3b8" />
             </Pressable>
           ) : null}
         </View>
 
+        <EquipmentDepartmentField
+          label="Lọc theo phòng ban"
+          emptyLabel="Tất cả phòng ban"
+          value={departmentId}
+          departments={departmentList}
+          loading={departmentsLoading}
+          error={departmentsError}
+          onRetry={() => setRevision(v => v + 1)}
+          onChange={setDepartmentId}
+        />
+
         {/* List Section */}
         <View style={styles.listSection}>
           <View style={styles.listHeader}>
-            <Text style={styles.listTitle}>Danh sách thiết bị ({displayedItems.length})</Text>
+            <Text style={styles.listTitle}>Danh sách thiết bị ({serverTotal ?? displayedItems.length})</Text>
             <View style={styles.listHeaderRight}>
-              {selectedFilter !== "all" && (
-                <Pressable onPress={() => setSelectedFilter("all")} style={{ marginRight: 10 }}>
+              {(selectedFilter !== "all" || !!departmentId) && (
+                <Pressable onPress={() => { setSelectedFilter("all"); setDepartmentId(""); }} style={{ marginRight: 10 }}>
                   <Text style={styles.resetFilterText}>Xóa lọc</Text>
                 </Pressable>
               )}
-              <Pressable style={styles.addBtn} onPress={openAdd} accessibilityLabel="Thêm thiết bị">
+              {canManageEquipment && <Pressable style={styles.addBtn} onPress={openAdd} accessibilityLabel="Thêm thiết bị">
                 <Ionicons name="add" size={20} color="#ffffff" />
-              </Pressable>
+              </Pressable>}
             </View>
           </View>
 
-          {displayedItems.length > 0 && !loading && (
+          {canManageEquipment && displayedItems.length > 0 && !loading && (
             <Text style={styles.swipeHint}>← Vuốt trái để sửa / xóa</Text>
           )}
 
@@ -3306,9 +3287,13 @@ export default function EquipmentScreen() {
             </View>
           ) : displayedItems.length === 0 ? (
             <EmptyState
-              message="Chưa có thiết bị nào"
+              message={error ? "Không thể tải danh sách thiết bị" : "Chưa có thiết bị nào"}
               subtitle={
-                selectedFilter !== "all"
+                error
+                  ? "Bấm Thử lại để tải danh sách từ máy chủ."
+                  : departmentId
+                  ? "Không có thiết bị phù hợp với phòng ban và bộ lọc đã chọn."
+                  : selectedFilter !== "all"
                   ? "Không có thiết bị thuộc trạng thái này."
                   : search
                   ? "Không tìm thấy thiết bị phù hợp với từ khóa."
@@ -3318,6 +3303,7 @@ export default function EquipmentScreen() {
           ) : (
             displayedItems.map((item) => (
               <SwipeableItem
+                canManage={canManageEquipment}
                 key={item._id || item.id || item.code}
                 item={item}
                 onEdit={openEdit}
@@ -3326,11 +3312,30 @@ export default function EquipmentScreen() {
               />
             ))
           )}
+          {!loading && displayedItems.length > 0 && serverTotal !== null && currentPageRef.current * 100 < serverTotal && (
+            <View style={{ gap: 8, marginTop: 12, alignItems: "center" }}>
+              <Text style={styles.itemMeta}>Đang hiển thị {displayedItems.length}/{serverTotal} thiết bị</Text>
+              {!!loadMoreError && <Text style={{ color: "#b91c1c", fontSize: 12 }}>{loadMoreError}</Text>}
+              <Pressable accessibilityRole="button" disabled={loadingMore} onPress={loadMore} style={{ paddingHorizontal: 20, paddingVertical: 12, borderRadius: 12, backgroundColor: "#ecfdf5" }}>
+                <Text style={{ color: "#047857", fontWeight: "600" }}>{loadingMore ? "Đang tải thêm..." : loadMoreError ? "Thử tải lại" : "Tải thêm thiết bị"}</Text>
+              </Pressable>
+            </View>
+          )}
         </View>
       </ScrollView>
 
-      <EquipmentModal visible={modalVisible} onClose={() => setModalVisible(false)} onSaved={handleItemSaved} editItem={editItem} />
+      <EquipmentModal
+        visible={modalVisible}
+        onClose={() => setModalVisible(false)}
+        onSaved={handleItemSaved}
+        editItem={editItem}
+        departmentList={departmentList}
+        departmentsLoading={departmentsLoading}
+        departmentsError={departmentsError}
+        onRetryDepartments={() => setRevision(v => v + 1)}
+      />
       <EquipmentDetailModal
+        canManage={canManageEquipment}
         visible={!!viewDetailItem}
         item={viewDetailItem}
         onClose={() => setViewDetailItem(null)}
@@ -3339,9 +3344,10 @@ export default function EquipmentScreen() {
       <DeleteConfirmModal
         visible={!!deleteItem}
         itemName={deleteItem?.name || ""}
-        onClose={() => setDeleteItem(null)}
+        onClose={() => { if (!deletingRef.current) setDeleteItem(null); }}
         onConfirm={confirmDelete}
         loading={deleting}
+        error={deleteError}
       />
       <AppAlertModal
         visible={alertState.visible}
@@ -3353,11 +3359,22 @@ export default function EquipmentScreen() {
       <EquipmentBorrowReturnModal
         visible={borrowReturnModalVisible}
         initialTab={borrowReturnTab}
-        equipmentList={items}
         onClose={() => setBorrowReturnModalVisible(false)}
         onSaved={handleItemSaved}
-        showAlert={showAlert}
       />
+      <Modal visible={!!rejectItem} transparent animationType="fade" onRequestClose={() => { if (!requestActionBusy.current) setRejectItem(null); }}>
+        <KeyboardAvoidingView behavior={Platform.OS === "ios" ? "padding" : undefined} style={confirmStyles.overlay}>
+          <View style={confirmStyles.dialog}>
+            <Text style={confirmStyles.title}>Từ chối phiếu thiết bị</Text>
+            <TextInput accessibilityLabel="Lý do từ chối" placeholder="Nhập lý do từ chối" value={rejectionReason} onChangeText={setRejectionReason} editable={!requestActionId} maxLength={1000} multiline style={[borrowModalStyles.textAreaInput, { width: "100%" }]} />
+            {!!rejectionError && <Text accessibilityRole="alert" style={{ color: "#b91c1c", marginBottom: 12 }}>{rejectionError}</Text>}
+            <View style={confirmStyles.actions}>
+              <Pressable disabled={!!requestActionId} onPress={() => setRejectItem(null)} style={confirmStyles.cancelBtn}><Text style={confirmStyles.cancelText}>Đóng</Text></Pressable>
+              <Pressable disabled={!!requestActionId} onPress={() => { if (rejectItem) void handleRequestAction(rejectItem, "rejected"); }} style={confirmStyles.deleteBtn}><Text style={confirmStyles.deleteText}>{requestActionId ? "Đang xử lý..." : "Từ chối"}</Text></Pressable>
+            </View>
+          </View>
+        </KeyboardAvoidingView>
+      </Modal>
     </SafeAreaView>
   );
 }
@@ -4522,8 +4539,10 @@ const detailStyles = StyleSheet.create({
     paddingHorizontal: 8,
     paddingVertical: 4,
     borderRadius: 6,
+    maxWidth: "100%",
   },
   tagText: {
+    flexShrink: 1,
     fontSize: 11.5,
     color: "#475569",
     fontFamily: "Inter-Medium",
@@ -4811,6 +4830,8 @@ const requestStyles = StyleSheet.create({
   },
   sectionHeaderRow: {
     flexDirection: "row",
+    flexWrap: "wrap",
+    gap: 8,
     alignItems: "center",
     justifyContent: "space-between",
     paddingBottom: 8,
@@ -4819,10 +4840,12 @@ const requestStyles = StyleSheet.create({
   },
   sectionHeaderLeft: {
     flexDirection: "row",
+    flexShrink: 1,
     alignItems: "center",
     gap: 6,
   },
   sectionHeaderTitle: {
+    flexShrink: 1,
     fontSize: 15,
     fontWeight: "800",
     color: "#0f172a",
@@ -4858,7 +4881,7 @@ const requestStyles = StyleSheet.create({
     elevation: 1,
   },
   cardHeaderRow: {
-    flexDirection: "row",
+    flexDirection: "column",
     alignItems: "flex-start",
     justifyContent: "space-between",
     gap: 8,

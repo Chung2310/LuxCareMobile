@@ -9,12 +9,16 @@ export function ChoiceField<T extends string>({
   choices,
   onChange,
   disabled = false,
+  triggerLines = 1,
+  optionLines = 2,
 }: {
   label: string;
   value: T;
   choices: { value: T; label: string }[];
   onChange: (value: T) => void;
   disabled?: boolean;
+  triggerLines?: number;
+  optionLines?: number;
 }) {
   const [open, setOpen] = useState(false);
   const [search, setSearch] = useState("");
@@ -40,7 +44,7 @@ export function ChoiceField<T extends string>({
           setOpen(true);
         }}
       >
-        <Text style={[s.triggerText, !selectedItem && s.placeholder]} numberOfLines={1}>
+        <Text style={[s.triggerText, !selectedItem && s.placeholder]} numberOfLines={triggerLines}>
           {selectedItem?.label || "Chọn một tùy chọn"}
         </Text>
         <Ionicons name="chevron-down" size={18} color={disabled ? "#94a3b8" : "#64748b"} />
@@ -109,7 +113,7 @@ export function ChoiceField<T extends string>({
                     >
                       <Text
                         style={[s.itemText, isSelected && s.itemTextSelected]}
-                        numberOfLines={2}
+                        numberOfLines={optionLines}
                       >
                         {item.label}
                       </Text>
